@@ -7,7 +7,7 @@ export default function AuthModal({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
     const [mouseDownTarget, setMouseDownTarget] = useState(null);
-
+const {isAuthOpen} = useContext(MyUserContext)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -33,7 +33,7 @@ export default function AuthModal({ isOpen, onClose }) {
     <>
   {/* Overlay */}
 <div 
-  className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 flex items-center justify-center p-4 animate-fade-in"
+  className={`fixed inset-0 bg-black/70 backdrop-blur-md z-40 flex items-center justify-center p-4 animate-fade-in ` }
       onMouseDown={(e) => {
         // Jegyezzük meg, hol történt a mousedown
         setMouseDownTarget(e.target);
