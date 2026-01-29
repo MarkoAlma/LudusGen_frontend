@@ -11,6 +11,7 @@ import AuthPage from './pages/Login';
 import AuthModal from './pages/Login';
 import { useContext } from 'react';
 import { MyUserContext } from './context/MyUserProvider';
+import  "./App.css"
 
 
 function App() {
