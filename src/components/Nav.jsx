@@ -100,7 +100,7 @@ export default function Navbar({ scrollY }) {
             ))}
             
             {/* MEGA CTA Button */}
-            <button className="relative group overflow-hidden px-8 py-3 rounded-full font-bold text-base shadow-2xl">
+            <button className="relative group overflow-hidden cursor-pointer px-8 py-3 rounded-full font-bold text-base shadow-2xl">
               {/* Animated gradient background */}
               <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 animate-gradient-x" />
               
@@ -118,7 +118,7 @@ export default function Navbar({ scrollY }) {
               </div>
               
               {/* Button text */}
-              <span className="relative z-10 flex items-center font-black uppercase tracking-wide cursor-pointer">
+              <span className="relative z-10 flex items-center font-black uppercase tracking-wide ">
                 Kezdd el most
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />
                 <Zap className="ml-1 w-4 h-4 animate-pulse" />

@@ -10,7 +10,7 @@ export default function Footer() {
                     <div className="flex items-center space-x-3 mb-6">
                       <Sparkles className="w-8 h-8 text-purple-400" />
                       <span className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                        AI Nexus
+                        LudusGen
                       </span>
                     </div>
                     <p className="text-gray-500 leading-relaxed mb-6">
@@ -66,7 +66,7 @@ export default function Footer() {
       
                 <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center">
                   <p className="text-gray-600 text-sm mb-4 md:mb-0">
-                    © 2026 AI Nexus Technologies Inc. Minden jog fenntartva.
+                    © 2026  LudusGen. Minden jog fenntartva.
                   </p>
                   <div className="flex items-center space-x-6 text-sm text-gray-600">
                     <span>🇪🇺 GDPR Compliant</span>

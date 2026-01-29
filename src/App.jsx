@@ -4,6 +4,9 @@ import Background from './components/Background';
 import Navbar from './components/Nav';
 import Home from './pages/Home';
 import Footer from './components/Footer';
+import Admin from './pages/Admin';
+import LudusGenAdmin from './pages/Admin';
+import AIChat from './pages/Chat';
 
 
 function App() {
@@ -27,9 +30,10 @@ function App() {
         <main>
           <Routes>
             <Route path="/" element={<Home/>} />
+            <Route path="/chat" element={<AIChat/>} />
           </Routes>
         </main>
-
+<LudusGenAdmin/>
         <Footer />
       </div>
     </BrowserRouter>
