@@ -129,7 +129,7 @@ export default function Navbar({ scrollY }) {
               ))}
               
               {/* MEGA CTA Button */}
-              <button className="relative group overflow-hidden cursor-pointer px-8 py-3 rounded-full font-bold text-base shadow-2xl">
+              <button onClick={() => login()}  className="relative group overflow-hidden cursor-pointer px-8 py-3 rounded-full font-bold text-base shadow-2xl">
                 {/* Animated gradient background */}
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 animate-gradient-x" />
                 
@@ -147,7 +147,7 @@ export default function Navbar({ scrollY }) {
                 </div>
                 
                 {/* Button text */}
-                <span onClick={() => navigate('/chat')} className="relative z-10 flex items-center font-black uppercase tracking-wide">
+                <span className="relative z-10 flex items-center font-black uppercase tracking-wide">
                   Chatelj
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />
                   <Zap className="ml-1 w-4 h-4 animate-pulse" />
@@ -273,7 +273,7 @@ export default function Navbar({ scrollY }) {
           <button 
             onClick={() => {
               setMobileMenuOpen(false);
-              navigate('/chat');
+              login()
             }}
             className="relative group overflow-hidden px-8 py-6 rounded-2xl font-black text-lg shadow-2xl mt-8"
             style={{ animation: 'slideInRight 0.4s ease-out 0.4s backwards' }}
@@ -289,7 +289,7 @@ export default function Navbar({ scrollY }) {
             <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/40 to-transparent" />
             
             {/* Button content */}
-            <span className="relative z-10 flex items-center justify-center uppercase tracking-wider text-white">
+            <span  className="relative z-10 flex items-center justify-center uppercase tracking-wider text-white">
               <Zap className="mr-2 w-6 h-6 animate-pulse" />
               Chatelj Most
               <ArrowRight className="ml-2 w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
