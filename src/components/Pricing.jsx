@@ -164,7 +164,7 @@ export default function Pricing() {
           <div className="inline-flex items-center p-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl">
             <button
               onClick={() => setActiveTab('monthly')}
-              className={`relative px-8 py-3 rounded-full font-bold transition-all duration-300 ${
+              className={`relative px-8 py-3 rounded-full cursor-pointer font-bold transition-all duration-300 ${
                 activeTab === 'monthly' ? 'text-white' : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -175,7 +175,7 @@ export default function Pricing() {
             </button>
             <button
               onClick={() => setActiveTab('yearly')}
-              className={`relative px-8 py-3 rounded-full font-bold transition-all duration-300 ${
+              className={`relative px-8 py-3 rounded-full cursor-pointer font-bold transition-all duration-300 ${
                 activeTab === 'yearly' ? 'text-white' : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -323,7 +323,7 @@ export default function Pricing() {
             ))}
           </ul>
 
-          <button className={`relative w-full py-4 rounded-2xl font-black text-lg transition-all duration-500 overflow-hidden group/btn ${
+          <button className={`relative w-full cursor-pointer py-4 rounded-2xl font-black text-lg transition-all duration-500 overflow-hidden group/btn ${
             pkg.highlight ? '' : 'border border-white/30'
           }`}>
             {pkg.highlight ? (
