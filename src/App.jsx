@@ -7,6 +7,7 @@ import Footer from './components/Footer';
 import Admin from './pages/Admin';
 import LudusGenAdmin from './pages/Admin';
 import AIChat from './pages/Chat';
+import  "./App.css"
 
 
 function App() {
