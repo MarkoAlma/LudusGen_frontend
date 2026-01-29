@@ -1,12 +1,17 @@
 import { useState, useEffect } from "react";
 import { Sparkles, Menu, X, ArrowRight, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import AuthModal from "../pages/Login";
+import { useContext } from "react";
+import { MyUserContext } from "../context/MyUserProvider";
 
 export default function Navbar({ scrollY }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
 
+  const {isAuthOpen, setIsAuthOpen} = useContext(MyUserContext)
+  
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -16,6 +21,11 @@ export default function Navbar({ scrollY }) {
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
+
+
+  const login = ()=> {
+    setIsAuthOpen(true)
+  }
 
   return (
     <nav
@@ -102,9 +112,9 @@ export default function Navbar({ scrollY }) {
                 </span>
               </a>
             ))}
-            
+
             {/* MEGA CTA Button */}
-            <button className="relative group overflow-hidden cursor-pointer px-8 py-3 rounded-full font-bold text-base shadow-2xl">
+            <button onClick={()=>login()} className="relative group overflow-hidden cursor-pointer px-8 py-3 rounded-full font-bold text-base shadow-2xl">
               {/* Animated gradient background */}
               <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 animate-gradient-x" />
               
@@ -122,7 +132,7 @@ export default function Navbar({ scrollY }) {
               </div>
               
               {/* Button text */}
-              <span onClick={()=>navigate('/chat')} className="relative z-10 flex items-center font-black uppercase tracking-wide ">
+              <span className="relative z-10 flex items-center font-black uppercase tracking-wide ">
                 Chatelj
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />
                 <Zap className="ml-1 w-4 h-4 animate-pulse" />
@@ -173,7 +183,7 @@ export default function Navbar({ scrollY }) {
               </a>
             ))}
             
-            <button onClick={()=>navigate('/chat')} className="w-full relative group overflow-hidden px-8 py-5 rounded-2xl font-black text-lg shadow-2xl mt-4">
+            <button onClick={()=>login()} className="w-full relative group overflow-hidden px-8 py-5 rounded-2xl font-black text-lg shadow-2xl mt-4">
               <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 animate-gradient-x" />
               <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity animate-gradient-x" />
               <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
