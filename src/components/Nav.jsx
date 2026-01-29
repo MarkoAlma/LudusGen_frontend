@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { Sparkles, Menu, X, ArrowRight, Zap } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function Navbar({ scrollY }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
+
+  const navigate = useNavigate()
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -42,6 +45,7 @@ export default function Navbar({ scrollY }) {
         <div className="flex justify-between items-center h-20">
           {/* Logo with extreme effects */}
           <div 
+          onClick={()=>navigate("/")}
             className="flex items-center space-x-3 group cursor-pointer relative"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
@@ -118,8 +122,8 @@ export default function Navbar({ scrollY }) {
               </div>
               
               {/* Button text */}
-              <span className="relative z-10 flex items-center font-black uppercase tracking-wide ">
-                Kezdd el most
+              <span onClick={()=>navigate('/chat')} className="relative z-10 flex items-center font-black uppercase tracking-wide ">
+                Chatelj
                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />
                 <Zap className="ml-1 w-4 h-4 animate-pulse" />
               </span>
@@ -169,12 +173,12 @@ export default function Navbar({ scrollY }) {
               </a>
             ))}
             
-            <button className="w-full relative group overflow-hidden px-8 py-5 rounded-2xl font-black text-lg shadow-2xl mt-4">
+            <button onClick={()=>navigate('/chat')} className="w-full relative group overflow-hidden px-8 py-5 rounded-2xl font-black text-lg shadow-2xl mt-4">
               <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 animate-gradient-x" />
               <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity animate-gradient-x" />
               <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
               <span className="relative z-10 flex items-center justify-center uppercase tracking-wider">
-                Kezdd el most
+                Chatelj
                 <Sparkles className="ml-2 w-5 h-5 animate-pulse" />
               </span>
             </button>
