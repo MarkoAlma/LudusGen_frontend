@@ -12,7 +12,7 @@ export default function Navbar({ scrollY }) {
 
   const {isAuthOpen, setIsAuthOpen} = useContext(MyUserContext)
   
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -22,10 +22,6 @@ export default function Navbar({ scrollY }) {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
-
-  const login = ()=> {
-    setIsAuthOpen(true)
-  }
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
     if (mobileMenuOpen) {
@@ -44,6 +40,11 @@ export default function Navbar({ scrollY }) {
     { href: "#pricing", label: "Árak", icon: Gem },
     { href: "#contact", label: "Kapcsolat", icon: Phone }
   ];
+
+
+  const login = ()=> {
+    setIsAuthOpen(true)
+  }
 
   return (
     <>
@@ -128,7 +129,7 @@ export default function Navbar({ scrollY }) {
               ))}
               
               {/* MEGA CTA Button */}
-              <button className="relative group overflow-hidden cursor-pointer px-8 py-3 rounded-full font-bold text-base shadow-2xl">
+              <button onClick={() => login()}  className="relative group overflow-hidden cursor-pointer px-8 py-3 rounded-full font-bold text-base shadow-2xl">
                 {/* Animated gradient background */}
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 animate-gradient-x" />
                 
@@ -146,42 +147,11 @@ export default function Navbar({ scrollY }) {
                 </div>
                 
                 {/* Button text */}
-                <span onClick={() => navigate('/chat')} className="relative z-10 flex items-center font-black uppercase tracking-wide">
+                <span className="relative z-10 flex items-center font-black uppercase tracking-wide">
                   Chatelj
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />
                   <Zap className="ml-1 w-4 h-4 animate-pulse" />
                 </span>
-              </a>
-            ))}
-
-            {/* MEGA CTA Button */}
-            <button onClick={()=>login()} className="relative group overflow-hidden cursor-pointer px-8 py-3 rounded-full font-bold text-base shadow-2xl">
-              {/* Animated gradient background */}
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 animate-gradient-x" />
-              
-              {/* Hover gradient */}
-              <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-gradient-x" />
-              
-              {/* Glowing border effect */}
-              <div className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="absolute inset-[-2px] bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 rounded-full blur-sm animate-spin-slow" />
-              </div>
-              
-              {/* Shine effect */}
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12" />
-              </div>
-              
-              {/* Button text */}
-              <span className="relative z-10 flex items-center font-black uppercase tracking-wide ">
-                Chatelj
-                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />
-                <Zap className="ml-1 w-4 h-4 animate-pulse" />
-              </span>
-              
-              {/* Pulse effect */}
-              <div className="absolute inset-0 rounded-full bg-white/20 animate-ping opacity-0 group-hover:opacity-20" />
-            </button>
                 
                 {/* Pulse effect */}
                 <div className="absolute inset-0 rounded-full bg-white/20 animate-ping opacity-0 group-hover:opacity-20" />
@@ -244,39 +214,6 @@ export default function Navbar({ scrollY }) {
             <X className="w-6 h-6 text-purple-300 group-hover:text-pink-300 transition-colors" />
           </button>
 
-      {/* Mobile Menu with EXTREME styling */}
-      {mobileMenuOpen && (
-        <div className="md:hidden bg-black/95 backdrop-blur-3xl border-t border-purple-500/30 shadow-[0_0_60px_rgba(168,85,247,0.4)] animate-slideDown">
-          <div className="px-6 py-10 space-y-6">
-            {[
-              { href: "#home", label: "Kezdőlap", icon: "🏠" },
-              { href: "#features", label: "Funkciók", icon: "⚡" },
-              { href: "#pricing", label: "Árak", icon: "💎" },
-              { href: "#contact", label: "Kapcsolat", icon: "📞" }
-            ].map((item, index) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="block relative group"
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                <div className="flex items-center space-x-4 p-4 rounded-2xl bg-gradient-to-r from-purple-900/20 to-cyan-900/20 border border-purple-500/20 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)] transition-all duration-300">
-                  <span className="text-2xl">{item.icon}</span>
-                  <span className="text-xl font-bold bg-gradient-to-r from-purple-300 via-pink-300 to-cyan-300 bg-clip-text text-transparent group-hover:scale-105 transition-transform">
-                    {item.label}
-                  </span>
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-pink-600/0 to-cyan-600/0 group-hover:from-purple-600/10 group-hover:via-pink-600/10 group-hover:to-cyan-600/10 rounded-2xl blur-xl transition-all" />
-              </a>
-            ))}
-            
-            <button onClick={()=>login()} className="w-full relative group overflow-hidden px-8 py-5 rounded-2xl font-black text-lg shadow-2xl mt-4">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 animate-gradient-x" />
-              <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity animate-gradient-x" />
-              <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-              <span className="relative z-10 flex items-center justify-center uppercase tracking-wider">
-                Chatelj
-                <Sparkles className="ml-2 w-5 h-5 animate-pulse" />
           {/* Logo section */}
           <div className="mb-12 mt-4">
             <div className="flex items-center space-x-3 group">
@@ -336,7 +273,7 @@ export default function Navbar({ scrollY }) {
           <button 
             onClick={() => {
               setMobileMenuOpen(false);
-              navigate('/chat');
+              login()
             }}
             className="relative group overflow-hidden px-8 py-6 rounded-2xl font-black text-lg shadow-2xl mt-8"
             style={{ animation: 'slideInRight 0.4s ease-out 0.4s backwards' }}
@@ -352,7 +289,7 @@ export default function Navbar({ scrollY }) {
             <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/40 to-transparent" />
             
             {/* Button content */}
-            <span className="relative z-10 flex items-center justify-center uppercase tracking-wider text-white">
+            <span  className="relative z-10 flex items-center justify-center uppercase tracking-wider text-white">
               <Zap className="mr-2 w-6 h-6 animate-pulse" />
               Chatelj Most
               <ArrowRight className="ml-2 w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
