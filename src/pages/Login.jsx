@@ -17,14 +17,17 @@ const {isAuthOpen} = useContext(MyUserContext)
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (isLogin) {
-      console.log('Login:', { email: formData.email, password: formData.password });
-      alert('✅ Sikeres bejelentkezés!');
-    } else {
-      console.log('Register:', formData);
-      alert('✅ Sikeres regisztráció!');
-    }
-    onClose();
+
+
+    
+    // if (isLogin) {
+    //   console.log('Login:', { email: formData.email, password: formData.password });
+    //   alert('✅ Sikeres bejelentkezés!');
+    // } else {
+    //   console.log('Register:', formData);
+    //   alert('✅ Sikeres regisztráció!');
+    // }
+    // onClose();
   };
 
   if (!isOpen) return null;
@@ -130,6 +133,7 @@ const {isAuthOpen} = useContext(MyUserContext)
                       <User className="w-5 h-5" />
                     </div>
                     <input
+                    required
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -150,6 +154,7 @@ const {isAuthOpen} = useContext(MyUserContext)
                     <Mail className="w-5 h-5" />
                   </div>
                   <input
+                  required
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -169,6 +174,7 @@ const {isAuthOpen} = useContext(MyUserContext)
                     <Lock className="w-5 h-5" />
                   </div>
                   <input
+                  required
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -196,6 +202,7 @@ const {isAuthOpen} = useContext(MyUserContext)
                       <Lock className="w-5 h-5" />
                     </div>
                     <input
+                    required
                       type={showPassword ? 'text' : 'password'}
                       value={formData.confirmPassword}
                       onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
