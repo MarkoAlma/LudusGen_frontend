@@ -14,6 +14,12 @@ import './App.css';
 
 function App() {
   const { isAuthOpen, setIsAuthOpen } = useContext(MyUserContext);
+  const {showNavbar, setShowNavbar} = useContext(MyUserContext)
+
+  const bezar = ()=> {
+    setIsAuthOpen(false)
+    setShowNavbar(true)
+  }
 
   // Scroll lock on modal open
   useEffect(() => {
@@ -32,7 +38,7 @@ function App() {
   return (
     <div className="min-h-screen bg-black text-white relative">
       <Background />
-      <Navbar />
+      <Navbar/>
 
       <main>
         <Routes>
@@ -45,7 +51,7 @@ function App() {
       <LudusGenAdmin />
       <AuthModal
         isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
+        onClose={() => bezar()}
       />
       <Footer />
     </div>

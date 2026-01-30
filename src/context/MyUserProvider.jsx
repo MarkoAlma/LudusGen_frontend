@@ -9,6 +9,7 @@ const MyUserProvider = ({children}) => {
   
   const [user, setUser] = useState(null)
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [showNavbar, setShowNavbar] = useState(true);
 
   // useEffect(()=>{
   //   const unsub = onAuthStateChanged(auth,(currentUser)=>{
@@ -21,7 +22,7 @@ const MyUserProvider = ({children}) => {
 
   return (
     <MyUserContext.Provider 
-      value={{user, setUser, isAuthOpen, setIsAuthOpen}}>
+      value={{user, setUser, isAuthOpen, setIsAuthOpen, showNavbar, setShowNavbar}}>
       {children}
     </MyUserContext.Provider>
   )
