@@ -1,83 +1,118 @@
-import React, { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple, CheckCircle2, XCircle } from 'lucide-react';
 import { useContext } from 'react';
 import { MyUserContext } from '../context/MyUserProvider';
 
 export default function AuthModal({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-    const [mouseDownTarget, setMouseDownTarget] = useState(null);
-const {isAuthOpen} = useContext(MyUserContext)
+  const [mouseDownTarget, setMouseDownTarget] = useState(null);
+  const { isAuthOpen } = useContext(MyUserContext);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
-  const [loading, setLoading] = useState(null)
+  const [loading, setLoading] = useState(null);
+  const [touched, setTouched] = useState({
+    email: false,
+    password: false,
+    confirmPassword: false
+  });
 
-  const {signUpUser, signInUser, msg} = useContext(MyUserContext)
+  const { signUpUser, signInUser, msg } = useContext(MyUserContext);
 
-  const handleSubmit = async(e) => {
-    e.preventDefault();
-    if (!isLogin) {
-      setLoading(true)
-      await signUpUser(formData.email, formData.password, formData.name, setLoading)
-    }else {
-      await signInUser(formData.email, formData.password)
+  // Email validáció
+  const isEmailValid = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Jelszó validációs szabályok
+  const passwordValidation = {
+    minLength: formData.password.length >= 8,
+    hasUpperCase: /[A-Z]/.test(formData.password),
+    hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(formData.password)
+  };
+
+  const isPasswordValid = passwordValidation.minLength && 
+                          passwordValidation.hasUpperCase && 
+                          passwordValidation.hasSpecialChar;
+
+  const doPasswordsMatch = formData.password === formData.confirmPassword && formData.confirmPassword !== '';
+
+  // Form validáció
+  const isFormValid = () => {
+    if (isLogin) {
+      // Bejelentkezésnél csak email és jelszó kell
+      return formData.email !== '' && formData.password !== '' && isEmailValid(formData.email);
+    } else {
+      // Regisztrációnál minden mező kell + validációk
+      return (
+        formData.name !== '' &&
+        formData.email !== '' &&
+        isEmailValid(formData.email) &&
+        formData.password !== '' &&
+        isPasswordValid &&
+        formData.confirmPassword !== '' &&
+        doPasswordsMatch
+      );
     }
+  };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!isFormValid()) return; // Ne küldje el ha nem valid
     
-    // if (isLogin) {
-    //   console.log('Login:', { email: formData.email, password: formData.password });
-    //   alert('✅ Sikeres bejelentkezés!');
-    // } else {
-    //   console.log('Register:', formData);
-    //   alert('✅ Sikeres regisztráció!');
-    // }
-    // onClose();
+    if (!isLogin) {
+      setLoading(true);
+      await signUpUser(formData.email, formData.password, formData.name, setLoading);
+    } else {
+      await signInUser(formData.email, formData.password);
+    }
+  };
+
+  const handleBlur = (field) => {
+    setTouched({ ...touched, [field]: true });
   };
 
   if (!isOpen) return null;
 
   return (
     <>
-  {/* Overlay */}
-<div 
-  className={`fixed inset-0 bg-black/70 backdrop-blur-md z-40 flex items-center justify-center p-4 animate-fade-in ` }
-      onMouseDown={(e) => {
-        // Jegyezzük meg, hol történt a mousedown
-        setMouseDownTarget(e.target);
-      }}
-      onMouseUp={(e) => {
-        // Csak akkor zárjuk, ha a mousedown és mouseup is az overlay-en történt
-        if (
-          e.target === e.currentTarget && // mouseup az overlay-en
-          mouseDownTarget === e.currentTarget // mousedown is az overlay-en
-        ) {
-          onClose();
-        }
-        setMouseDownTarget(null);
-      }}
->
-  {/* Modal */}
-  <div 
-    className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-in"
-    onClick={(e) => e.stopPropagation()} // a modalon belüli click ne zárja
-    style={{
-      background: 'linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)',
-      border: '1px solid rgba(168, 85, 247, 0.3)'
-    }}
-  >
-    {/* Close Button */}
-    <button
-      className="absolute top-4 right-4 z-50 p-2 rounded-full cursor-pointer bg-white/5 hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
-      onClick={onClose} // bezárja a modalt
-    >
-      <X className="w-5 h-5" />
-    </button>
-
-
+      {/* Overlay */}
+      <div
+        className={`fixed inset-0 bg-black/70 backdrop-blur-md z-40 flex items-center justify-center p-4 animate-fade-in `}
+        onMouseDown={(e) => {
+          setMouseDownTarget(e.target);
+        }}
+        onMouseUp={(e) => {
+          if (
+            e.target === e.currentTarget &&
+            mouseDownTarget === e.currentTarget
+          ) {
+            onClose();
+          }
+          setMouseDownTarget(null);
+        }}
+      >
+        {/* Modal */}
+        <div
+          className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-in"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: 'linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)',
+            border: '1px solid rgba(168, 85, 247, 0.3)'
+          }}
+        >
+          {/* Close Button */}
+          <button
+            className="absolute top-4 right-4 z-50 p-2 rounded-full cursor-pointer bg-white/5 hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
+            onClick={onClose}
+          >
+            <X className="w-5 h-5" />
+          </button>
 
           {/* Decorative Background */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -105,24 +140,22 @@ const {isAuthOpen} = useContext(MyUserContext)
               border: '1px solid rgba(255, 255, 255, 0.1)'
             }}>
               <button
-              style={{cursor:'pointer'}}
+                style={{ cursor: 'pointer' }}
                 onClick={() => setIsLogin(true)}
-                className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all duration-300 ${
-                  isLogin 
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-gray-300'
-                }`}
+                className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all duration-300 ${isLogin
+                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-gray-300'
+                  }`}
               >
                 Bejelentkezés
               </button>
               <button
-              style={{cursor:'pointer'}}
+                style={{ cursor: 'pointer' }}
                 onClick={() => setIsLogin(false)}
-                className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all duration-300 ${
-                  !isLogin 
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg' 
-                    : 'text-gray-400 hover:text-gray-300'
-                }`}
+                className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all duration-300 ${!isLogin
+                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-gray-300'
+                  }`}
               >
                 Regisztráció
               </button>
@@ -141,7 +174,7 @@ const {isAuthOpen} = useContext(MyUserContext)
                       <User className="w-5 h-5" />
                     </div>
                     <input
-                    required
+                      required
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -162,14 +195,24 @@ const {isAuthOpen} = useContext(MyUserContext)
                     <Mail className="w-5 h-5" />
                   </div>
                   <input
-                  required
+                    required
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onBlur={() => handleBlur('email')}
                     placeholder="pelda@email.com"
-                    className="w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
+                    className={`w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border ${touched.email && !isEmailValid(formData.email) && formData.email !== ''
+                      ? 'border-red-500/50'
+                      : 'border-purple-500/30'
+                      } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all`}
                   />
                 </div>
+                {touched.email && !isEmailValid(formData.email) && formData.email !== '' && (
+                  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                    <XCircle className="w-3 h-3" />
+                    <span>Érvénytelen email formátum</span>
+                  </div>
+                )}
               </div>
 
               {/* Password Field */}
@@ -182,10 +225,11 @@ const {isAuthOpen} = useContext(MyUserContext)
                     <Lock className="w-5 h-5" />
                   </div>
                   <input
-                  required
+                    required
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    onBlur={() => handleBlur('password')}
                     placeholder="••••••••"
                     className="w-full pl-12 pr-12 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
                   />
@@ -197,6 +241,22 @@ const {isAuthOpen} = useContext(MyUserContext)
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+                {!isLogin && formData.password !== '' && (
+                  <div className="mt-2 space-y-1">
+                    <div className={`flex items-center gap-1 text-xs transition-all duration-300 validation-message ${passwordValidation.minLength ? 'text-green-400' : 'text-red-400'}`}>
+                      {passwordValidation.minLength ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      <span>Minimum 8 karakter</span>
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs transition-all duration-300 validation-message ${passwordValidation.hasUpperCase ? 'text-green-400' : 'text-red-400'}`}>
+                      {passwordValidation.hasUpperCase ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      <span>Legalább egy nagybetű</span>
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs transition-all duration-300 validation-message ${passwordValidation.hasSpecialChar ? 'text-green-400' : 'text-red-400'}`}>
+                      {passwordValidation.hasSpecialChar ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      <span>Legalább egy speciális karakter (!@#$%^&*...)</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Confirm Password (Register only) */}
@@ -210,14 +270,24 @@ const {isAuthOpen} = useContext(MyUserContext)
                       <Lock className="w-5 h-5" />
                     </div>
                     <input
-                    required
+                      required
                       type={showPassword ? 'text' : 'password'}
                       value={formData.confirmPassword}
                       onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                      onBlur={() => handleBlur('confirmPassword')}
                       placeholder="••••••••"
-                      className="w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
+                      className={`w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border ${touched.confirmPassword && !doPasswordsMatch && formData.confirmPassword !== ''
+                        ? 'border-red-500/50'
+                        : 'border-purple-500/30'
+                        } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all`}
                     />
                   </div>
+                  {formData.confirmPassword !== '' && (
+                    <div className={`flex items-center gap-1 mt-2 text-xs transition-all duration-300 validation-message ${doPasswordsMatch ? 'text-green-400' : 'text-red-400'}`}>
+                      {doPasswordsMatch ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      <span>{doPasswordsMatch ? 'A jelszavak egyeznek' : 'A jelszavak nem egyeznek'}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -225,8 +295,8 @@ const {isAuthOpen} = useContext(MyUserContext)
               {isLogin && (
                 <div className="flex items-center justify-between text-sm">
                   <label className="flex items-center gap-2 cursor-pointer group">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       className="w-4 h-4 rounded border-2 border-purple-500/50 bg-black/30 text-purple-600 focus:ring-2 focus:ring-purple-500/50 cursor-pointer"
                     />
                     <span className="text-gray-400 group-hover:text-gray-300 transition-colors">
@@ -241,9 +311,14 @@ const {isAuthOpen} = useContext(MyUserContext)
 
               {/* Submit Button */}
               <button
-              style={{cursor:'pointer'}}
+                style={{ cursor: isFormValid() ? 'pointer' : 'not-allowed' }}
                 type="submit"
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-base hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2"
+                disabled={!isFormValid()}
+                className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 ${
+                  isFormValid()
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105'
+                    : 'bg-gradient-to-r from-purple-600/40 to-pink-600/40 text-white/50 cursor-not-allowed'
+                }`}
               >
                 <Sparkles className="w-5 h-5" />
                 {isLogin ? 'Bejelentkezés' : 'Regisztráció'}
@@ -331,6 +406,22 @@ const {isAuthOpen} = useContext(MyUserContext)
           animation: scale-in 0.3s ease-out;
         }
 
+        .validation-message {
+          opacity: 0;
+          animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-5px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
         input::placeholder {
           color: #6b7280;
         }
@@ -343,21 +434,3 @@ const {isAuthOpen} = useContext(MyUserContext)
     </>
   );
 }
-
-// Példa használat:
-// 
-// import { useState } from 'react';
-// import AuthModal from './AuthModal';
-// 
-// function App() {
-//   const [isAuthOpen, setIsAuthOpen] = useState(false);
-// 
-//   return (
-//     <>
-//       <button onClick={() => setIsAuthOpen(true)}>
-//         Bejelentkezés
-//       </button>
-//       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
-//     </>
-//   );
-// }
