@@ -14,10 +14,18 @@ const {isAuthOpen} = useContext(MyUserContext)
     password: '',
     confirmPassword: ''
   });
+  const [loading, setLoading] = useState(null)
 
-  const handleSubmit = (e) => {
+  const {signUpUser, signInUser, msg} = useContext(MyUserContext)
+
+  const handleSubmit = async(e) => {
     e.preventDefault();
-
+    if (!isLogin) {
+      setLoading(true)
+      await signUpUser(formData.email, formData.password, formData.name, setLoading)
+    }else {
+      await signInUser(formData.email, formData.password)
+    }
 
     
     // if (isLogin) {
