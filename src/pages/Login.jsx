@@ -5,6 +5,8 @@ import { MyUserContext } from '../context/MyUserProvider';
 
 export default function AuthModal({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
+  const [isSwitching, setIsSwitching] = useState(false);
+
   const [showPassword, setShowPassword] = useState(false);
     const [mouseDownTarget, setMouseDownTarget] = useState(null);
 const {isAuthOpen} = useContext(MyUserContext)
@@ -31,6 +33,25 @@ const {isAuthOpen} = useContext(MyUserContext)
   };
 
   if (!isOpen) return null;
+const switchMode = (toLogin) => {
+  if (toLogin === isLogin) return;
+
+  setIsSwitching(true);
+  setIsLogin(toLogin);
+
+  setTimeout(() => {
+    setIsSwitching(false);
+  }, 400);
+};
+const handleLoginButton = ()=>{
+  setIsLogin(true);
+  switchMode(true);
+}
+
+const handleRegisterButton = ()=>{
+  setIsLogin(false);
+  switchMode(true);
+}
 
   return (
     <>
@@ -92,13 +113,27 @@ const {isAuthOpen} = useContext(MyUserContext)
             </div>
 
             {/* Toggle Tabs */}
+            {/* Bubis switch overlay */}
+<div className="absolute inset-0 pointer-events-none overflow-hidden">
+  <div
+    className={`absolute left-1/2 top-1/2 w-96 h-96 rounded-full
+      bg-purple-500/20 blur-3xl
+      transition-all duration-[400ms] ease-in-out
+      ${isSwitching
+        ? 'scale-100 opacity-100 -translate-x-1/2 -translate-y-1/2'
+        : 'scale-50 opacity-0 -translate-x-1/2 -translate-y-1/2'
+      }
+    `}
+  />
+</div>
+
             <div className="flex gap-2 mb-6 p-1 rounded-2xl" style={{
               background: 'rgba(255, 255, 255, 0.05)',
               border: '1px solid rgba(255, 255, 255, 0.1)'
             }}>
               <button
               style={{cursor:'pointer'}}
-                onClick={() => setIsLogin(true)}
+                onClick={handleLoginButton}
                 className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all duration-300 ${
                   isLogin 
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg' 
@@ -109,7 +144,7 @@ const {isAuthOpen} = useContext(MyUserContext)
               </button>
               <button
               style={{cursor:'pointer'}}
-                onClick={() => setIsLogin(false)}
+                onClick={handleRegisterButton}
                 className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all duration-300 ${
                   !isLogin 
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg' 
@@ -124,6 +159,16 @@ const {isAuthOpen} = useContext(MyUserContext)
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Name Field (Register only) */}
               {!isLogin && (
+                <div
+  className={`transition-all duration-[400ms] ease-in-out overflow-hidden
+    ${!isLogin
+      ? 'max-h-40 opacity-100 translate-y-0'
+      : 'max-h-0 opacity-0 translate-y-6'
+    }
+  `}
+>
+  {/* IDE JÖN A TE TELJES NÉV INPUTOD VÁLTOZTATÁS NÉLKÜL */}
+
                 <div>
                   <label className="block text-sm font-semibold text-purple-300 mb-2">
                     Teljes név
@@ -142,6 +187,8 @@ const {isAuthOpen} = useContext(MyUserContext)
                     />
                   </div>
                 </div>
+                </div>
+
               )}
 
               {/* Email Field */}
@@ -193,6 +240,17 @@ const {isAuthOpen} = useContext(MyUserContext)
 
               {/* Confirm Password (Register only) */}
               {!isLogin && (
+                <div
+  className={`transition-all duration-[400ms] ease-in-out overflow-hidden
+    ${!isLogin
+      ? 'max-h-40 opacity-100 translate-y-0'
+      : 'max-h-0 opacity-0 -translate-y-6'
+    }
+  `}
+>
+  {/* IDE JÖN A TE CONFIRM PASSWORD INPUTOD VÁLTOZTATÁS NÉLKÜL */}
+
+
                 <div>
                   <label className="block text-sm font-semibold text-purple-300 mb-2">
                     Jelszó megerősítése
@@ -210,6 +268,7 @@ const {isAuthOpen} = useContext(MyUserContext)
                       className="w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
                     />
                   </div>
+                </div>
                 </div>
               )}
 
@@ -350,6 +409,253 @@ const {isAuthOpen} = useContext(MyUserContext)
 //         Bejelentkezés
 //       </button>
 //       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+//     </>
+//   );
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// import React, { useState } from 'react';
+// import {
+//   Mail, Lock, User, Eye, EyeOff, X,
+//   Sparkles, Chrome, Github, Apple
+// } from 'lucide-react';
+
+// export default function AuthModal({ isOpen, onClose }) {
+//   const [isLogin, setIsLogin] = useState(true);
+//   const [isSwitching, setIsSwitching] = useState(false);
+//   const [showPassword, setShowPassword] = useState(false);
+
+//   const [formData, setFormData] = useState({
+//     name: '',
+//     email: '',
+//     password: '',
+//     confirmPassword: ''
+//   });
+
+//   const switchMode = (toLogin) => {
+//     if (toLogin === isLogin) return;
+
+//     setIsSwitching(true);
+//     setIsLogin(toLogin);
+
+//     setTimeout(() => {
+//       setIsSwitching(false);
+//     }, 400);
+//   };
+
+//   const handleSubmit = (e) => {
+//     e.preventDefault();
+//   };
+
+//   if (!isOpen) return null;
+
+//   return (
+//     <>
+//       {/* Overlay */}
+//       <div
+//         className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 flex items-center justify-center p-4 animate-fade-in"
+//         onClick={onClose}
+//       >
+//         {/* Modal */}
+//         <div
+//           onClick={(e) => e.stopPropagation()}
+//           className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-in"
+//           style={{
+//             background: 'linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)',
+//             border: '1px solid rgba(168, 85, 247, 0.3)'
+//           }}
+//         >
+//           {/* Close */}
+//           <button
+//             onClick={onClose}
+//             className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white"
+//           >
+//             <X className="w-5 h-5" />
+//           </button>
+
+//           {/* 🫧 Bubis switch overlay */}
+//           <div className="absolute inset-0 pointer-events-none overflow-hidden">
+//             <div
+//               className={`absolute left-1/2 top-1/2 w-96 h-96 rounded-full
+//                 bg-purple-500/20 blur-3xl
+//                 transition-all duration-[400ms] ease-in-out
+//                 ${isSwitching
+//                   ? 'scale-100 opacity-100 -translate-x-1/2 -translate-y-1/2'
+//                   : 'scale-50 opacity-0 -translate-x-1/2 -translate-y-1/2'
+//                 }
+//               `}
+//             />
+//           </div>
+
+//           <div className="relative z-10 p-8">
+//             {/* Header */}
+//             <div className="text-center mb-8">
+//               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 mb-4">
+//                 <Sparkles className="w-8 h-8 text-white" />
+//               </div>
+//               <h2 className="text-3xl font-black text-white mb-2">
+//                 {isLogin ? 'Üdvözlünk!' : 'Csatlakozz!'}
+//               </h2>
+//               <p className="text-gray-400">
+//                 {isLogin ? 'Lépj be a fiókodba' : 'Hozz létre egy új fiókot'}
+//               </p>
+//             </div>
+
+//             {/* Switch */}
+//             <div className="flex gap-2 mb-6 p-1 rounded-2xl bg-white/5 border border-white/10">
+//               <button
+//                 onClick={() => switchMode(true)}
+//                 className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
+//                   ${isLogin
+//                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+//                     : 'text-gray-400 hover:text-gray-300'
+//                   }
+//                 `}
+//               >
+//                 Bejelentkezés
+//               </button>
+//               <button
+//                 onClick={() => switchMode(false)}
+//                 className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
+//                   ${!isLogin
+//                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+//                     : 'text-gray-400 hover:text-gray-300'
+//                   }
+//                 `}
+//               >
+//                 Regisztráció
+//               </button>
+//             </div>
+
+//             {/* Form */}
+//             <form onSubmit={handleSubmit} className="space-y-4">
+
+//               {/* 🔼 Teljes név – lentről felfelé */}
+//               <div
+//                 className={`overflow-hidden transition-all duration-[400ms] ease-in-out
+//                   ${isLogin
+//                     ? 'max-h-0 opacity-0 translate-y-6'
+//                     : 'max-h-32 opacity-100 translate-y-0'
+//                   }
+//                 `}
+//               >
+//                 <label className="block text-sm font-semibold text-purple-300 mb-2">
+//                   Teljes név
+//                 </label>
+//                 <input
+//                   type="text"
+//                   value={formData.name}
+//                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+//                   className="w-full pl-4 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white"
+//                 />
+//               </div>
+
+//               {/* Email – FIX KÖZÉPPONT */}
+//               <div>
+//                 <label className="block text-sm font-semibold text-purple-300 mb-2">
+//                   Email cím
+//                 </label>
+//                 <input
+//                   type="email"
+//                   value={formData.email}
+//                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+//                   className="w-full pl-4 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white"
+//                 />
+//               </div>
+
+//               {/* Password – FIX KÖZÉPPONT */}
+//               <div>
+//                 <label className="block text-sm font-semibold text-purple-300 mb-2">
+//                   Jelszó
+//                 </label>
+//                 <div className="relative">
+//                   <input
+//                     type={showPassword ? 'text' : 'password'}
+//                     value={formData.password}
+//                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+//                     className="w-full pl-4 pr-12 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white"
+//                   />
+//                   <button
+//                     type="button"
+//                     onClick={() => setShowPassword(!showPassword)}
+//                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500"
+//                   >
+//                     {showPassword ? <EyeOff /> : <Eye />}
+//                   </button>
+//                 </div>
+//               </div>
+
+//               {/* 🔽 Confirm password – fentről lefelé */}
+//               <div
+//                 className={`overflow-hidden transition-all duration-[400ms] ease-in-out
+//                   ${isLogin
+//                     ? 'max-h-0 opacity-0 -translate-y-6'
+//                     : 'max-h-32 opacity-100 translate-y-0'
+//                   }
+//                 `}
+//               >
+//                 <label className="block text-sm font-semibold text-purple-300 mb-2">
+//                   Jelszó megerősítése
+//                 </label>
+//                 <input
+//                   type="password"
+//                   value={formData.confirmPassword}
+//                   onChange={(e) =>
+//                     setFormData({ ...formData, confirmPassword: e.target.value })
+//                   }
+//                   className="w-full pl-4 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white"
+//                 />
+//               </div>
+
+//               <button
+//                 type="submit"
+//                 className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:scale-105 transition"
+//               >
+//                 {isLogin ? 'Bejelentkezés' : 'Regisztráció'}
+//               </button>
+//             </form>
+//           </div>
+//         </div>
+//       </div>
+
+//       <style jsx>{`
+//         @keyframes fade-in {
+//           from { opacity: 0; }
+//           to { opacity: 1; }
+//         }
+//         @keyframes scale-in {
+//           from { opacity: 0; transform: scale(0.9); }
+//           to { opacity: 1; transform: scale(1); }
+//         }
+//         .animate-fade-in {
+//           animation: fade-in 0.2s ease-out;
+//         }
+//         .animate-scale-in {
+//           animation: scale-in 0.3s ease-out;
+//         }
+//       `}</style>
 //     </>
 //   );
 // }
