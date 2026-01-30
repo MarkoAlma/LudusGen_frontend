@@ -11,6 +11,7 @@ export default function Navbar({ scrollY }) {
   const [isHovering, setIsHovering] = useState(false);
 
   const {isAuthOpen, setIsAuthOpen} = useContext(MyUserContext)
+  const {showNavbar, setShowNavbar} = useContext(MyUserContext)
   
   const navigate = useNavigate();
 
@@ -44,6 +45,7 @@ export default function Navbar({ scrollY }) {
 
   const login = ()=> {
     setIsAuthOpen(true)
+    setShowNavbar(false)
   }
 
   return (
@@ -57,7 +59,8 @@ export default function Navbar({ scrollY }) {
         style={{
           boxShadow: scrollY > 50 
             ? "0 0 60px rgba(168,85,247,0.5), 0 0 100px rgba(236,72,153,0.3)" 
-            : "0 0 30px rgba(168,85,247,0.2)"
+            : "0 0 30px rgba(168,85,247,0.2)",
+            display: showNavbar ? "block" : "none"
         }}
       >
         {/* Animated gradient overlay */}
