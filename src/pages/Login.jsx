@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple, CheckCircle2, XCircle } from 'lucide-react';
 import { useContext } from 'react';
 import { MyUserContext } from '../context/MyUserProvider';
@@ -23,47 +23,48 @@ export default function AuthModal({ isOpen, onClose }) {
 
   const { signUpUser, signInUser, msg } = useContext(MyUserContext);
 
-  // Email validáció
-  const isEmailValid = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
+// Email validáció
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const isEmailValid = emailRegex.test(formData.email);
 
-  // Jelszó validációs szabályok
-  const passwordValidation = {
-    minLength: formData.password.length >= 8,
-    hasUpperCase: /[A-Z]/.test(formData.password),
-    hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(formData.password)
-  };
+// Jelszó validációs szabályok
+const passwordValidation = {
+  minLength: formData.password.length >= 8,
+  hasUpperCase: /[A-Z]/.test(formData.password),
+  hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(formData.password)
+};
 
-  const isPasswordValid = passwordValidation.minLength && 
-                          passwordValidation.hasUpperCase && 
-                          passwordValidation.hasSpecialChar;
+const isPasswordValid =
+  passwordValidation.minLength &&
+  passwordValidation.hasUpperCase &&
+  passwordValidation.hasSpecialChar;
 
-  const doPasswordsMatch = formData.password === formData.confirmPassword && formData.confirmPassword !== '';
+// Jelszavak egyeznek-e
+const doPasswordsMatch =
+  formData.password === formData.confirmPassword &&
+  formData.confirmPassword !== '';
 
-  // Form validáció
-  const isFormValid = () => {
-    if (isLogin) {
-      // Bejelentkezésnél csak email és jelszó kell
-      return formData.email !== '' && formData.password !== '' && isEmailValid(formData.email);
-    } else {
-      // Regisztrációnál minden mező kell + validációk
-      return (
-        formData.name !== '' &&
-        formData.email !== '' &&
-        isEmailValid(formData.email) &&
-        formData.password !== '' &&
-        isPasswordValid &&
-        formData.confirmPassword !== '' &&
-        doPasswordsMatch
-      );
-    }
-  };
+// Form validáció
+const isFormValid = isLogin
+  ? (
+      formData.email !== '' &&
+      formData.password !== '' &&
+      isEmailValid
+    )
+  : (
+      formData.name !== '' &&
+      formData.email !== '' &&
+      isEmailValid &&
+      formData.password !== '' &&
+      isPasswordValid &&
+      formData.confirmPassword !== '' &&
+      doPasswordsMatch
+    );
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isFormValid()) return; // Ne küldje el ha nem valid
+    if (!isFormValid) return;
     
     if (!isLogin) {
       setLoading(true);
@@ -97,13 +98,15 @@ export default function AuthModal({ isOpen, onClose }) {
           setMouseDownTarget(null);
         }}
       >
-        {/* Modal */}
+        {/* Modal - 0.8x scale */}
         <div
           className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-in"
           onClick={(e) => e.stopPropagation()}
           style={{
             background: 'linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)',
-            border: '1px solid rgba(168, 85, 247, 0.3)'
+            border: '1px solid rgba(168, 85, 247, 0.3)',
+            transform: 'scale(0.8)',
+            transformOrigin: 'center'
           }}
         >
           {/* Close Button */}
@@ -178,7 +181,7 @@ export default function AuthModal({ isOpen, onClose }) {
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Kovács János"
+                      placeholder="Kiss János"
                       className="w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
                     />
                   </div>
@@ -201,13 +204,13 @@ export default function AuthModal({ isOpen, onClose }) {
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     onBlur={() => handleBlur('email')}
                     placeholder="pelda@email.com"
-                    className={`w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border ${touched.email && !isEmailValid(formData.email) && formData.email !== ''
+                    className={`w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border ${!isEmailValid && formData.email !== ''
                       ? 'border-red-500/50'
                       : 'border-purple-500/30'
                       } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all`}
                   />
                 </div>
-                {touched.email && !isEmailValid(formData.email) && formData.email !== '' && (
+                {!isEmailValid && formData.email !== '' && (
                   <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
                     <XCircle className="w-3 h-3" />
                     <span>Érvénytelen email formátum</span>
@@ -234,6 +237,7 @@ export default function AuthModal({ isOpen, onClose }) {
                     className="w-full pl-12 pr-12 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
                   />
                   <button
+                  style={{cursor:'pointer'}}
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-purple-400 transition-colors"
@@ -241,7 +245,8 @@ export default function AuthModal({ isOpen, onClose }) {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
-                {!isLogin && formData.password !== '' && (
+                {/* Jelszó validáció - csak akkor jelenik meg, ha nem minden teljesül */}
+                {!isLogin && formData.password !== '' && !isPasswordValid && (
                   <div className="mt-2 space-y-1">
                     <div className={`flex items-center gap-1 text-xs transition-all duration-300 validation-message ${passwordValidation.minLength ? 'text-green-400' : 'text-red-400'}`}>
                       {passwordValidation.minLength ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
@@ -282,10 +287,11 @@ export default function AuthModal({ isOpen, onClose }) {
                         } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all`}
                     />
                   </div>
-                  {formData.confirmPassword !== '' && (
-                    <div className={`flex items-center gap-1 mt-2 text-xs transition-all duration-300 validation-message ${doPasswordsMatch ? 'text-green-400' : 'text-red-400'}`}>
-                      {doPasswordsMatch ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                      <span>{doPasswordsMatch ? 'A jelszavak egyeznek' : 'A jelszavak nem egyeznek'}</span>
+                  {/* Csak akkor jelenik meg, ha NEM egyeznek a jelszavak */}
+                  {formData.confirmPassword !== '' && !doPasswordsMatch && (
+                    <div className="flex items-center gap-1 mt-2 text-xs transition-all duration-300 validation-message text-red-400">
+                      <XCircle className="w-3 h-3" />
+                      <span>A jelszavak nem egyeznek</span>
                     </div>
                   )}
                 </div>
@@ -311,11 +317,11 @@ export default function AuthModal({ isOpen, onClose }) {
 
               {/* Submit Button */}
               <button
-                style={{ cursor: isFormValid() ? 'pointer' : 'not-allowed' }}
+                style={{ cursor: isFormValid ? 'pointer' : 'not-allowed' }}
                 type="submit"
-                disabled={!isFormValid()}
+                disabled={!isFormValid}
                 className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 ${
-                  isFormValid()
+                  isFormValid
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105'
                     : 'bg-gradient-to-r from-purple-600/40 to-pink-600/40 text-white/50 cursor-not-allowed'
                 }`}
@@ -390,11 +396,11 @@ export default function AuthModal({ isOpen, onClose }) {
         @keyframes scale-in {
           from {
             opacity: 0;
-            transform: scale(0.9);
+            transform: scale(0.72);
           }
           to {
             opacity: 1;
-            transform: scale(1);
+            transform: scale(0.8);
           }
         }
         
