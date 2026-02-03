@@ -53,7 +53,7 @@ const MyUserProvider = ({children}) => {
         setMsg({signIn:true, kijelentkezes:'Sikeres bejelentkezés!'})
       }else {
         setMsg({err:"Nincs megerősítve az email!"})
-            setUser(null)
+        setUser(null)
       }
       //
     } catch (error) {
