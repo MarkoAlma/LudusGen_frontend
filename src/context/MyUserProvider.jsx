@@ -36,7 +36,7 @@ useEffect(() => {
       setMsg({katt:"Kattints az emailben érkezett aktiváló linkre"})
     } catch (error) {
       console.log(error);
-      setMsg({err:error.message})
+      setMsg({incorrectSignUp:error.message})
     }finally {
       setLoading(false)
     }
@@ -61,7 +61,7 @@ useEffect(() => {
       //
     } catch (error) {
       console.log(error);
-      setMsg({err:error.message})
+      setMsg({incorrectSignIn:error.message})
     }
   }
 

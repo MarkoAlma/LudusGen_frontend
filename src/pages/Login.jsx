@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple, CheckCircle2, XCircle } from 'lucide-react';
 import { useContext } from 'react';
 import { MyUserContext } from '../context/MyUserProvider';
-import toast from 'react-hot-toast';
 import { IoCheckmarkDoneOutline } from 'react-icons/io5';
 import { FaCheck } from 'react-icons/fa';
 import { useEffect, useRef } from 'react';
@@ -25,7 +24,21 @@ export default function Login({ isOpen, onClose }) {
     confirmPassword: false
   });
 
-  const { signUpUser, signInUser, msg, user } = useContext(MyUserContext);
+  useEffect(() => {
+  // Töröljük a hibaüzenetet, ha a felhasználó gépelni kezd
+  if (msg?.incorrectSignIn) {
+    setMsg({ incorrectSignIn: null });
+  }
+}, [formData.email, formData.password]);
+
+  useEffect(() => {
+  // Töröljük a hibaüzenetet, ha a felhasználó gépelni kezd
+  if (msg?.incorrectSignUp) {
+    setMsg({incorrectSignUp: null})
+  }
+}, [formData.email]);
+
+  const { signUpUser, signInUser, msg, user, setMsg } = useContext(MyUserContext);
   
   // Ref-ek a sikeres művelet detektálásához
   const prevUserRef = useRef(null);
@@ -81,97 +94,9 @@ export default function Login({ isOpen, onClose }) {
       
       if (isRegistration) {
         // REGISZTRÁCIÓ TOAST
-        toast.custom((t) => (
-          <div
-            className={`${
-              t.visible ? 'animate-enter' : 'animate-leave'
-            } max-w-md w-full pointer-events-auto`}
-          >
-            <div className="relative overflow-hidden rounded-2xl backdrop-blur-xl bg-gradient-to-br from-purple-600/90 via-pink-600/90 to-purple-700/90 shadow-2xl border border-white/20">
-              <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute w-32 h-32 bg-white/10 rounded-full blur-3xl -top-10 -left-10 animate-pulse" />
-                <div className="absolute w-40 h-40 bg-pink-300/10 rounded-full blur-3xl -bottom-10 -right-10 animate-pulse delay-75" />
-              </div>
-              
-              <div className="relative p-4 flex items-start gap-3">
-                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center animate-bounce">
-                  <Sparkles className="w-6 h-6 text-white" />
-                </div>
-                
-                <div className="flex-1 pt-0.5">
-                  <p className="text-white font-bold text-base mb-0.5">
-                    Sikeres regisztráció!
-                  </p>
-                  <p className="text-white/80 text-sm">
-                    Üdvözlünk a közösségünkben, {savedNameRef.current}! 🎉
-                  </p>
-                </div>
-                
-                <button
-                  onClick={() => toast.dismiss(t.id)}
-                  className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
-                >
-                  <XCircle className="w-5 h-5 text-white/60 hover:text-white" />
-                </button>
-              </div>
-              
-              <div className="h-1 bg-white/20">
-                <div 
-                  className="h-full bg-white/60 animate-progress"
-                  style={{ animationDuration: '3000ms' }}
-                />
-              </div>
-            </div>
-          </div>
-        ), {
-          duration: 3000,
-        });
+        setMsg({err:"OKSA"})
       } else {
-        // BEJELENTKEZÉS TOAST
-        toast.custom((t) => (
-          <div
-            className={`${
-              t.visible ? 'animate-enter' : 'animate-leave'
-            } max-w-md w-full pointer-events-auto`}
-          >
-            <div className="relative overflow-hidden rounded-2xl backdrop-blur-xl bg-gradient-to-br from-emerald-500/90 via-teal-600/90 to-cyan-600/90 shadow-2xl border border-white/20">
-              <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute w-32 h-32 bg-white/20 rounded-full blur-3xl top-0 left-1/2 -translate-x-1/2 animate-pulse" />
-              </div>
-              
-              <div className="relative p-4 flex items-start gap-3">
-                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <CheckCircle2 className="w-6 h-6 text-white animate-scale-check" />
-                </div>
-                
-                <div className="flex-1 pt-0.5">
-                  <p className="text-white font-bold text-base mb-0.5">
-                    Sikeres bejelentkezés!
-                  </p>
-                  <p className="text-white/80 text-sm">
-                    Jó látni újra! ✨
-                  </p>
-                </div>
-                
-                <button
-                  onClick={() => toast.dismiss(t.id)}
-                  className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
-                >
-                  <XCircle className="w-5 h-5 text-white/60 hover:text-white" />
-                </button>
-              </div>
-              
-              <div className="h-1 bg-white/20">
-                <div 
-                  className="h-full bg-white/60 animate-progress"
-                  style={{ animationDuration: '2000ms' }}
-                />
-              </div>
-            </div>
-          </div>
-        ), {
-          duration: 2000,
-        });
+        setMsg({err:"Nem oksa"})
       }
       
       // Form reset és modal bezárása
@@ -222,50 +147,7 @@ export default function Login({ isOpen, onClose }) {
     } catch (error) {
       isSubmittingRef.current = false;
       // ❌ HIBA ESETÉN a toast megjelenik, DE a modal NYITVA MARAD
-      toast.custom((t) => (
-        <div
-          className={`${
-            t.visible ? 'animate-enter' : 'animate-leave'
-          } max-w-md w-full pointer-events-auto`}
-        >
-          <div className="relative overflow-hidden rounded-2xl backdrop-blur-xl bg-gradient-to-br from-red-500/90 via-rose-600/90 to-pink-600/90 shadow-2xl border border-white/20">
-            <div className="absolute inset-0 overflow-hidden">
-              <div className="absolute w-32 h-32 bg-white/10 rounded-full blur-3xl -top-10 -right-10 animate-pulse" />
-            </div>
-            
-            <div className="relative p-4 flex items-start gap-3">
-              <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center animate-shake">
-                <XCircle className="w-6 h-6 text-white" />
-              </div>
-              
-              <div className="flex-1 pt-0.5">
-                <p className="text-white font-bold text-base mb-0.5">
-                  Hiba történt!
-                </p>
-                <p className="text-white/80 text-sm">
-                  {error.message || 'Próbáld újra később.'}
-                </p>
-              </div>
-              
-              <button
-                onClick={() => toast.dismiss(t.id)}
-                className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
-              >
-                <XCircle className="w-5 h-5 text-white/60 hover:text-white" />
-              </button>
-            </div>
-            
-            <div className="h-1 bg-white/20">
-              <div 
-                className="h-full bg-white/60 animate-progress"
-                style={{ animationDuration: '4000ms' }}
-              />
-            </div>
-          </div>
-        </div>
-      ), {
-        duration: 4000,
-      });
+      setMsg({err:"HIBA"})
     } finally {
       setLoading(false);
     }
@@ -477,10 +359,10 @@ export default function Login({ isOpen, onClose }) {
                   </div>
                 )}
                 {/* ✅ ÚJ: Email már foglalt hibaüzenet REGISZTRÁCIÓ esetén */}
-                {!isLogin && msg?.err && msg.err.toLowerCase().includes('email') && (
+                {!isLogin && msg?.incorrectSignUp && msg.incorrectSignUp.toLowerCase().includes('email') && (
                   <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
                     <XCircle className="w-3 h-3" />
-                    <span>{msg.err}</span>
+                    <span>Az email cím már használatban van</span>
                   </div>
                 )}
               </div>
@@ -512,13 +394,13 @@ export default function Login({ isOpen, onClose }) {
                   </button>
                 </div>
                 
-                {/* ✅ Hibaüzenet bejelentkezésnél - CSAK akkor, ha nem email-ről szól */}
-                {isLogin && msg?.err && !msg.err.toLowerCase().includes('email') && (
-                  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
-                    <XCircle className="w-3 h-3" />
-                    <span>{msg.err}</span>
-                  </div>
-                )}
+{/* ✅ BEJELENTKEZÉS - Hibás email/jelszó üzenet */}
+{isLogin && msg?.incorrectSignIn && (
+  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+    <XCircle className="w-3 h-3" />
+    <span>Hibás email/jelszó páros</span>
+  </div>
+)}
 
                 {/* Jelszó validáció - csak akkor jelenik meg, ha nem minden teljesül */}
                 {!isLogin && formData.password !== '' && !isPasswordValid && (

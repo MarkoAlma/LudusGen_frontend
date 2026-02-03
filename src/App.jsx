@@ -14,9 +14,10 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 import { Toaster } from 'react-hot-toast';
+import MyToastify from './components/MyToastify';
 
 function App() {
-  const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen} = useContext(MyUserContext)
+  const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg} = useContext(MyUserContext)
 
   const bezar = ()=> {
     setIsAuthOpen(false)
@@ -61,18 +62,7 @@ function App() {
       />
       <Footer />
 
-      <Toaster 
-        position="top-right"
-        reverseOrder={false}
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: 'transparent',
-            boxShadow: 'none',
-            padding: 0,
-          },
-        }}
-      />
+      {msg && <MyToastify {...msg} />}
     </div>
   );
 }
