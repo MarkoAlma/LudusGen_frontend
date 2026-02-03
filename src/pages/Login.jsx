@@ -2,6 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple, CheckCircle2, XCircle } from 'lucide-react';
 import { useContext } from 'react';
 import { MyUserContext } from '../context/MyUserProvider';
+import { toast } from 'react-toastify';
+import { IoCheckmarkDoneOutline } from 'react-icons/io5';
+import { FaCheck } from 'react-icons/fa';
 import { useEffect } from 'react';
 
 export default function AuthModal({ isOpen, onClose }) {
@@ -15,7 +18,7 @@ export default function AuthModal({ isOpen, onClose }) {
     password: '',
     confirmPassword: ''
   });
-  const [loading, setLoading] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState({
     email: false,
     password: false,
@@ -75,13 +78,90 @@ export default function AuthModal({ isOpen, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isFormValid) return;
+    if (!isFormValid || loading) return;
     
-    if (!isLogin) {
-      setLoading(true);
-      await signUpUser(formData.email, formData.password, formData.name, setLoading);
-    } else {
-      await signInUser(formData.email, formData.password);
+    setLoading(true);
+    
+    try {
+      if (!isLogin) {
+        const result = await signUpUser(formData.email, formData.password, formData.name, setLoading);
+        
+        // Sikeres regisztráció
+        toast.success('🎉 Sikeres regisztráció! Üdvözlünk!', {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          style: {
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff',
+            borderRadius: '12px',
+            fontWeight: '600',
+          }
+        });
+        
+        // Bezárás 1 másodperc után
+        setTimeout(() => {
+          onClose();
+          // Form reset
+          setFormData({
+            name: '',
+            email: '',
+            password: '',
+            confirmPassword: ''
+          });
+        }, 1000);
+        
+      } else {
+        const result = await signInUser(formData.email, formData.password);
+        
+        // Sikeres bejelentkezés
+        toast.success('✨ Sikeres bejelentkezés!', {
+          position: "top-right",
+          autoClose: 2000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          style: {
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff',
+            borderRadius: '12px',
+            fontWeight: '600',
+          }
+        });
+        
+        // Bezárás 800ms után
+        setTimeout(() => {
+          onClose();
+          setFormData({
+            name: '',
+            email: '',
+            password: '',
+            confirmPassword: ''
+          });
+        }, 100);
+      }
+    } catch (error) {
+      // Hiba esetén
+      toast.error(error.message || 'Hiba történt. Próbáld újra!', {
+        position: "top-right",
+        autoClose: 4000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        style: {
+          background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+          color: '#fff',
+          borderRadius: '12px',
+          fontWeight: '600',
+        }
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -126,7 +206,7 @@ export default function AuthModal({ isOpen, onClose }) {
         >
           {/* Close Button */}
           <button
-          style={{cursor:'pointer'}}
+            style={{cursor:'pointer'}}
             onClick={onClose}
             className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white"
           >
@@ -153,36 +233,82 @@ export default function AuthModal({ isOpen, onClose }) {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 mb-4">
                 <Sparkles className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-3xl font-black text-white mb-2">
-                {isLogin ? 'Üdvözlünk!' : 'Csatlakozz!'}
-              </h2>
-              <p className="text-gray-400">
-                {isLogin ? 'Lépj be a fiókodba' : 'Hozz létre egy új fiókot'}
-              </p>
+              
+              {/* Animated title */}
+              <div className="relative h-10 mb-2">
+                <h2 
+                  className="absolute inset-0 text-3xl font-black text-white transition-all duration-400 ease-out flex items-center justify-center"
+                  style={{
+                    opacity: isLogin ? 1 : 0,
+                    transform: isLogin ? 'translate3d(0, 0, 0)' : 'translate3d(-20px, 0, 0)',
+                    willChange: 'opacity, transform',
+                  }}
+                >
+                  Üdvözlünk!
+                </h2>
+                <h2 
+                  className="absolute inset-0 text-3xl font-black text-white transition-all duration-400 ease-out flex items-center justify-center"
+                  style={{
+                    opacity: isLogin ? 0 : 1,
+                    transform: isLogin ? 'translate3d(20px, 0, 0)' : 'translate3d(0, 0, 0)',
+                    willChange: 'opacity, transform',
+                  }}
+                >
+                  Csatlakozz!
+                </h2>
+              </div>
+              
+              {/* Animated subtitle */}
+              <div className="relative h-6">
+                <p 
+                  className="absolute inset-0 text-gray-400 transition-all duration-400 ease-out flex items-center justify-center"
+                  style={{
+                    opacity: isLogin ? 1 : 0,
+                    transform: isLogin ? 'translate3d(0, 0, 0)' : 'translate3d(-20px, 0, 0)',
+                    willChange: 'opacity, transform',
+                  }}
+                >
+                  Lépj be a fiókodba
+                </p>
+                <p 
+                  className="absolute inset-0 text-gray-400 transition-all duration-400 ease-out flex items-center justify-center"
+                  style={{
+                    opacity: isLogin ? 0 : 1,
+                    transform: isLogin ? 'translate3d(20px, 0, 0)' : 'translate3d(0, 0, 0)',
+                    willChange: 'opacity, transform',
+                  }}
+                >
+                  Hozz létre egy új fiókot
+                </p>
+              </div>
             </div>
 
             {/* Toggle Tabs */}
-            <div className="flex gap-2 mb-6 p-1 rounded-2xl bg-white/5 border border-white/10">
+            <div className="relative flex gap-2 mb-6 p-1 rounded-2xl bg-white/5 border border-white/10">
+              {/* Animated background slider */}
+              <div 
+                className="absolute top-1 bottom-1 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 transition-all duration-400 ease-out"
+                style={{
+                  left: isLogin ? '4px' : 'calc(50% + 4px)',
+                  right: isLogin ? 'calc(50% + 4px)' : '4px',
+                  willChange: 'left, right',
+                }}
+              />
+              
               <button
-                              style={{cursor:'pointer'}}
+                style={{cursor:'pointer'}}
                 onClick={() => switchMode(true)}
-                className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
-                  ${isLogin
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-                    : 'text-gray-400 hover:text-gray-300'
-                  }
+                className={`relative z-10 flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
+                  ${isLogin ? 'text-white' : 'text-gray-400 hover:text-gray-300'}
                 `}
               >
                 Bejelentkezés
               </button>
               <button
-                              style={{cursor:'pointer'}}
+                style={{cursor:'pointer'}}
                 onClick={() => switchMode(false)}
-                className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
-                  ${!isLogin
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-                    : 'text-gray-400 hover:text-gray-300'
-                  }
+                className={`relative z-10 flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
+                  ${!isLogin ? 'text-white' : 'text-gray-400 hover:text-gray-300'}
                 `}
               >
                 Regisztráció
@@ -193,12 +319,13 @@ export default function AuthModal({ isOpen, onClose }) {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* 🔼 Teljes név – lentről felfelé */}
               <div
-                className={`overflow-hidden transition-all duration-[400ms] ease-in-out
-                  ${isLogin
-                    ? 'max-h-0 opacity-0 translate-y-6'
-                    : 'max-h-32 opacity-100 translate-y-0'
-                  }
-                `}
+                className="overflow-hidden transition-all duration-[400ms] ease-out"
+                style={{
+                  maxHeight: isLogin ? '0px' : '128px',
+                  opacity: isLogin ? 0 : 1,
+                  transform: isLogin ? 'translate3d(0, 24px, 0)' : 'translate3d(0, 0, 0)',
+                  willChange: 'max-height, opacity, transform',
+                }}
               >
                 <label className="block text-sm font-semibold text-purple-300 mb-2">
                   Teljes név
@@ -302,12 +429,13 @@ export default function AuthModal({ isOpen, onClose }) {
 
               {/* 🔽 Confirm password – fentről lefelé */}
               <div
-                className={`overflow-hidden transition-all duration-[400ms] ease-in-out
-                  ${isLogin
-                    ? 'max-h-0 opacity-0 -translate-y-6'
-                    : 'max-h-32 opacity-100 translate-y-0'
-                  }
-                `}
+                className="overflow-hidden transition-all duration-[400ms] ease-out"
+                style={{
+                  maxHeight: isLogin ? '0px' : '128px',
+                  opacity: isLogin ? 0 : 1,
+                  transform: isLogin ? 'translate3d(0, -24px, 0)' : 'translate3d(0, 0, 0)',
+                  willChange: 'max-height, opacity, transform',
+                }}
               >
                 <label className="block text-sm font-semibold text-purple-300 mb-2">
                   Jelszó megerősítése
@@ -330,7 +458,6 @@ export default function AuthModal({ isOpen, onClose }) {
                       } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all`}
                   />
                 </div>
-                {/* Csak akkor jelenik meg, ha NEM egyeznek a jelszavak */}
                 {formData.confirmPassword !== '' && !doPasswordsMatch && (
                   <div className="flex items-center gap-1 mt-2 text-xs transition-all duration-300 validation-message text-red-400">
                     <XCircle className="w-3 h-3" />
@@ -342,15 +469,44 @@ export default function AuthModal({ isOpen, onClose }) {
               {/* Remember Me / Forgot Password */}
               {isLogin && (
                 <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded border-2 border-purple-500/50 bg-black/30 text-purple-600 focus:ring-2 focus:ring-purple-500/50 cursor-pointer"
-                    />
-                    <span className="text-gray-400 group-hover:text-gray-300 transition-colors">
-                      Maradjak bejelentkezve
-                    </span>
-                  </label>
+<label className="flex items-center gap-3 cursor-pointer select-none group">
+  {/* EZ MARAD HIDDEN */}
+  <input type="checkbox" className="peer hidden" />
+
+  {/* CUSTOM CHECKBOX */}
+<div
+  className="
+    w-6 h-6 rounded-md
+    border border-purple-500/40
+    bg-black/40
+    flex items-center justify-center
+    transition-all duration-200 ease-out
+    group-hover:border-purple-400
+                p-1
+    peer-checked:bg-purple-600/80
+    peer-checked:border-purple-400
+    peer-checked:shadow-[0_0_6px_rgba(168,85,247,0.35)]
+
+    peer-checked:[&>svg]:opacity-100
+    peer-checked:[&>svg]:scale-100
+  "
+>
+  <FaCheck 
+    className="
+      w-4 h-4 text-white
+      opacity-0 scale-75
+      transition-all duration-200 ease-out
+    "
+  />
+</div>
+
+
+  <span className="text-gray-400 group-hover:text-gray-300 transition-colors text-sm">
+    Maradjak bejelentkezve
+  </span>
+</label>
+
+
                   <a href="#" className="text-purple-400 hover:text-purple-300 font-semibold transition-colors">
                     Elfelejtett jelszó?
                   </a>
@@ -359,17 +515,26 @@ export default function AuthModal({ isOpen, onClose }) {
 
               {/* Submit Button */}
               <button
-                style={{ cursor: isFormValid ? 'pointer' : 'not-allowed' }}
+                style={{ cursor: (isFormValid && !loading) ? 'pointer' : 'not-allowed' }}
                 type="submit"
-                disabled={!isFormValid}
+                disabled={!isFormValid || loading}
                 className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 ${
-                  isFormValid
+                  (isFormValid && !loading)
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105'
                     : 'bg-gradient-to-r from-purple-600/40 to-pink-600/40 text-white/50 cursor-not-allowed'
                 }`}
               >
-                <Sparkles className="w-5 h-5" />
-                {isLogin ? 'Bejelentkezés' : 'Regisztráció'}
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Feldolgozás...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5" />
+                    {isLogin ? 'Bejelentkezés' : 'Regisztráció'}
+                  </>
+                )}
               </button>
 
               {/* Divider */}
@@ -430,15 +595,8 @@ export default function AuthModal({ isOpen, onClose }) {
           from { opacity: 0; }
           to { opacity: 1; }
         }
-        @keyframes scale-in {
-          from { opacity: 0; transform: scale(0.9); }
-          to { opacity: 1; transform: scale(1); }
-        }
         .animate-fade-in {
           animation: fade-in 0.2s ease-out;
-        }
-        .animate-scale-in {
-          animation: scale-in 0.3s ease-out;
         }
 
         .validation-message {
@@ -465,6 +623,7 @@ export default function AuthModal({ isOpen, onClose }) {
           background-color: #a855f7;
           border-color: #a855f7;
         }
+
         
         @keyframes scale-inKetto {
           from { opacity: 0; transform: scale(0.72); }
