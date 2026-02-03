@@ -108,9 +108,9 @@ export default function Login({ isOpen, onClose }) {
       });
       savedNameRef.current = '';
       
-      setTimeout(() => {
-        onClose();
-      }, 500);
+      // setTimeout(() => {
+      //   onClose();
+      // }, 500);
     }
     
     prevUserRef.current = user;
@@ -154,7 +154,9 @@ export default function Login({ isOpen, onClose }) {
   };
 
   useEffect(()=>{
-    console.log(msg);
+    if (msg?.katt) {
+      switchMode(true)
+    }
   },[msg])
 
   const handleBlur = (field) => {
@@ -395,10 +397,18 @@ export default function Login({ isOpen, onClose }) {
                 </div>
                 
 {/* ✅ BEJELENTKEZÉS - Hibás email/jelszó üzenet */}
-{isLogin && msg?.incorrectSignIn && (
+{isLogin && msg?.incorrectSignIn && msg.incorrectSignIn.includes("email-already-in-use") && (
   <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
     <XCircle className="w-3 h-3" />
     <span>Hibás email/jelszó páros</span>
+  </div>
+)}
+
+{/* ✅ BEJELENTKEZÉS - Helytelen email cím */}
+{isLogin && msg?.incorrectSignIn && msg.incorrectSignIn.includes("invalid-email") && (
+  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+    <XCircle className="w-3 h-3" />
+    <span>Helytelen email cím</span>
   </div>
 )}
 
