@@ -13,6 +13,7 @@
     "@mui/material": "^7.3.7",
     "@tailwindcss/vite": "^4.1.18",
     "firebase": "^12.8.0",
+    "framer-motion": "^12.30.0",
     "lucide-react": "^0.562.0",
     "motion": "^12.30.0",
     "mui": "^0.0.1",

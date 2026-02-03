@@ -17,6 +17,9 @@ importers:
       firebase:
         specifier: ^12.8.0
         version: 12.8.0
+      framer-motion:
+        specifier: ^12.30.0
+        version: 12.30.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       lucide-react:
         specifier: ^0.562.0
         version: 0.562.0(react@19.2.3)
