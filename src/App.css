@@ -15,6 +15,3 @@
 .animate-itemFade {
   animation: itemFade 0.4s ease forwards;
 }
-html {
-  scroll-behavior: smooth;
-}

@@ -1,108 +1,151 @@
-import React, { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple, CheckCircle2, XCircle } from 'lucide-react';
 import { useContext } from 'react';
 import { MyUserContext } from '../context/MyUserProvider';
-import { AnimatePresence, motion } from "motion/react"
-import { AnimatedText } from '../components/AnimatedText';
+
 export default function AuthModal({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
   const [isSwitching, setIsSwitching] = useState(false);
-
   const [showPassword, setShowPassword] = useState(false);
-    const [mouseDownTarget, setMouseDownTarget] = useState(null);
-const {isAuthOpen} = useContext(MyUserContext)
+  const [mouseDownTarget, setMouseDownTarget] = useState(null);
+  const { isAuthOpen } = useContext(MyUserContext);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
+  const [loading, setLoading] = useState(null);
+  const [touched, setTouched] = useState({
+    email: false,
+    password: false,
+    confirmPassword: false
+  });
 
-  const handleSubmit = (e) => {
+  const { signUpUser, signInUser, msg } = useContext(MyUserContext);
+
+  // Email validáció
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const isEmailValid = emailRegex.test(formData.email);
+
+  // Jelszó validációs szabályok
+  const passwordValidation = {
+    minLength: formData.password.length >= 8,
+    hasUpperCase: /\p{Lu}/u.test(formData.password),
+    hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(formData.password)
+  };
+
+  const isPasswordValid =
+    passwordValidation.minLength &&
+    passwordValidation.hasUpperCase &&
+    passwordValidation.hasSpecialChar;
+
+  // Jelszavak egyeznek-e
+  const doPasswordsMatch =
+    formData.password === formData.confirmPassword &&
+    formData.confirmPassword !== '';
+
+  // Form validáció
+  const isFormValid = isLogin
+    ? (
+        formData.email !== '' &&
+        formData.password !== '' &&
+        isEmailValid
+      )
+    : (
+        formData.name !== '' &&
+        formData.email !== '' &&
+        isEmailValid &&
+        formData.password !== '' &&
+        isPasswordValid &&
+        formData.confirmPassword !== '' &&
+        doPasswordsMatch
+      );
+
+  const switchMode = (toLogin) => {
+    if (toLogin === isLogin) return;
+
+    setIsSwitching(true);
+    setIsLogin(toLogin);
+
+    setTimeout(() => {
+      setIsSwitching(false);
+    }, 400);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-
+    if (!isFormValid) return;
     
-    // if (isLogin) {
-    //   console.log('Login:', { email: formData.email, password: formData.password });
-    //   alert('✅ Sikeres bejelentkezés!');
-    // } else {
-    //   console.log('Register:', formData);
-    //   alert('✅ Sikeres regisztráció!');
-    // }
-    // onClose();
+    if (!isLogin) {
+      setLoading(true);
+      await signUpUser(formData.email, formData.password, formData.name, setLoading);
+    } else {
+      await signInUser(formData.email, formData.password);
+    }
+  };
+
+  const handleBlur = (field) => {
+    setTouched({ ...touched, [field]: true });
   };
 
   if (!isOpen) return null;
-const switchMode = (toLogin) => {
-  if (toLogin === isLogin) return;
-
-  setIsSwitching(true);
-  setIsLogin(toLogin);
-
-  setTimeout(() => {
-    setIsSwitching(false);
-  }, 400);
-};
-const handleLoginButton = ()=>{
-  setIsLogin(true);
-  switchMode(true);
-}
-
-const handleRegisterButton = ()=>{
-  setIsLogin(false);
-  switchMode(true);
-}
 
   return (
     <>
-  {/* Overlay */}
-<div 
-  className={`fixed inset-0 bg-black/70 backdrop-blur-md z-40 flex items-center justify-center p-4 animate-fade-in ` }
-      onMouseDown={(e) => {
-        // Jegyezzük meg, hol történt a mousedown
-        setMouseDownTarget(e.target);
-      }}
-      onMouseUp={(e) => {
-        // Csak akkor zárjuk, ha a mousedown és mouseup is az overlay-en történt
-        if (
-          e.target === e.currentTarget && // mouseup az overlay-en
-          mouseDownTarget === e.currentTarget // mousedown is az overlay-en
-        ) {
-          onClose();
-        }
-        setMouseDownTarget(null);
-      }}
->
-  {/* Modal */}
-  <div 
-    className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-in"
-    onClick={(e) => e.stopPropagation()} // a modalon belüli click ne zárja
-    style={{
-      background: 'linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)',
-      border: '1px solid rgba(168, 85, 247, 0.3)'
-    }}
-  >
-    {/* Close Button */}
-    <button
-      className="absolute top-4 right-4 z-50 p-2 rounded-full cursor-pointer bg-white/5 hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
-      onClick={onClose} // bezárja a modalt
-    >
-      <X className="w-5 h-5" />
-    </button>
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 flex items-center justify-center p-4 animate-fade-in"
+        onMouseDown={(e) => {
+          setMouseDownTarget(e.target);
+        }}
+        onMouseUp={(e) => {
+          if (
+            e.target === e.currentTarget &&
+            mouseDownTarget === e.currentTarget
+          ) {
+            onClose();
+          }
+          setMouseDownTarget(null);
+        }}
+      >
+        {/* Modal */}
+        <div
+          className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-inKetto"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            transform: 'scale(0.8)',
+            background: 'linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)',
+            border: '1px solid rgba(168, 85, 247, 0.3)',
+          }}
+        >
+          {/* Close Button */}
+          <button
+          style={{cursor:'pointer'}}
+            onClick={onClose}
+            className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white"
+          >
+            <X className="w-5 h-5" />
+          </button>
 
-
-
-          {/* Decorative Background */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-pink-500/20 rounded-full blur-3xl" />
+          {/* 🫧 Bubis switch overlay */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div
+              className={`absolute left-1/2 top-1/2 w-96 h-96 rounded-full
+                bg-purple-500/20 blur-3xl
+                transition-all duration-[400ms] ease-in-out
+                ${isSwitching
+                  ? 'scale-100 opacity-100 -translate-x-1/2 -translate-y-1/2'
+                  : 'scale-50 opacity-0 -translate-x-1/2 -translate-y-1/2'
+                }
+              `}
+            />
           </div>
 
           <div className="relative z-10 p-8">
             {/* Logo & Title */}
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 mb-4 shadow-lg">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 mb-4">
                 <Sparkles className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-3xl font-black text-white mb-2">
@@ -114,43 +157,28 @@ const handleRegisterButton = ()=>{
             </div>
 
             {/* Toggle Tabs */}
-            {/* Bubis switch overlay */}
-<div className="absolute inset-0 pointer-events-none overflow-hidden">
-  <div
-    className={`absolute left-1/2 top-1/2 w-96 h-96 rounded-full
-      bg-purple-500/20 blur-3xl
-      transition-all duration-[400ms] ease-in-out
-      ${isSwitching
-        ? 'scale-100 opacity-100 -translate-x-1/2 -translate-y-1/2'
-        : 'scale-50 opacity-0 -translate-x-1/2 -translate-y-1/2'
-      }
-    `}
-  />
-</div>
-
-            <div className="flex gap-2 mb-6 p-1 rounded-2xl" style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
+            <div className="flex gap-2 mb-6 p-1 rounded-2xl bg-white/5 border border-white/10">
               <button
-              style={{cursor:'pointer'}}
-                onClick={handleLoginButton}
-                className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all duration-300 ${
-                  isLogin 
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg' 
+                              style={{cursor:'pointer'}}
+                onClick={() => switchMode(true)}
+                className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
+                  ${isLogin
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
                     : 'text-gray-400 hover:text-gray-300'
-                }`}
+                  }
+                `}
               >
                 Bejelentkezés
               </button>
               <button
-              style={{cursor:'pointer'}}
-                onClick={handleRegisterButton}
-                className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all duration-300 ${
-                  !isLogin 
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg' 
+                              style={{cursor:'pointer'}}
+                onClick={() => switchMode(false)}
+                className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
+                  ${!isLogin
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
                     : 'text-gray-400 hover:text-gray-300'
-                }`}
+                  }
+                `}
               >
                 Regisztráció
               </button>
@@ -158,41 +186,33 @@ const handleRegisterButton = ()=>{
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Name Field (Register only) */}
-              {!isLogin && (
-                <div
-  className={`transition-all duration-[400ms] ease-in-out overflow-hidden
-    ${!isLogin
-      ? 'max-h-40 opacity-100 translate-y-0'
-      : 'max-h-0 opacity-0 translate-y-6'
-    }
-  `}
->
-  {/* IDE JÖN A TE TELJES NÉV INPUTOD VÁLTOZTATÁS NÉLKÜL */}
-
-                <div>
-                  <label className="block text-sm font-semibold text-purple-300 mb-2">
-                    Teljes név
-                  </label>
-                  <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
-                      <User className="w-5 h-5" />
-                    </div>
-                    <input
-                    required
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Kovács János"
-                      className="w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
-                    />
+              {/* 🔼 Teljes név – lentről felfelé */}
+              <div
+                className={`overflow-hidden transition-all duration-[400ms] ease-in-out
+                  ${isLogin
+                    ? 'max-h-0 opacity-0 translate-y-6'
+                    : 'max-h-32 opacity-100 translate-y-0'
+                  }
+                `}
+              >
+                <label className="block text-sm font-semibold text-purple-300 mb-2">
+                  Teljes név
+                </label>
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
+                    <User className="w-5 h-5" />
                   </div>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Kiss János"
+                    className="w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
+                  />
                 </div>
-                </div>
+              </div>
 
-              )}
-
-              {/* Email Field */}
+              {/* Email – FIX KÖZÉPPONT */}
               <div>
                 <label className="block text-sm font-semibold text-purple-300 mb-2">
                   Email cím
@@ -202,17 +222,26 @@ const handleRegisterButton = ()=>{
                     <Mail className="w-5 h-5" />
                   </div>
                   <input
-                  required
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onBlur={() => handleBlur('email')}
                     placeholder="pelda@email.com"
-                    className="w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
+                    className={`w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border ${!isEmailValid && formData.email !== ''
+                      ? 'border-red-500/50'
+                      : 'border-purple-500/30'
+                      } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all`}
                   />
                 </div>
+                {!isEmailValid && formData.email !== '' && (
+                  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                    <XCircle className="w-3 h-3" />
+                    <span>Érvénytelen email formátum</span>
+                  </div>
+                )}
               </div>
 
-              {/* Password Field */}
+              {/* Password – FIX KÖZÉPPONT */}
               <div>
                 <label className="block text-sm font-semibold text-purple-300 mb-2">
                   Jelszó
@@ -222,63 +251,86 @@ const handleRegisterButton = ()=>{
                     <Lock className="w-5 h-5" />
                   </div>
                   <input
-                  required
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    onBlur={() => handleBlur('password')}
                     placeholder="••••••••"
                     className="w-full pl-12 pr-12 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
                   />
                   <button
                     type="button"
+                    style={{cursor:'pointer'}}
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-purple-400 transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+                {/* Jelszó validáció - csak akkor jelenik meg, ha nem minden teljesül */}
+                {!isLogin && formData.password !== '' && !isPasswordValid && (
+                  <div className="mt-2 space-y-1">
+                    <div className={`flex items-center gap-1 text-xs transition-all duration-300 validation-message ${passwordValidation.minLength ? 'text-green-400' : 'text-red-400'}`}>
+                      {passwordValidation.minLength ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      <span>Minimum 8 karakter</span>
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs transition-all duration-300 validation-message ${passwordValidation.hasUpperCase ? 'text-green-400' : 'text-red-400'}`}>
+                      {passwordValidation.hasUpperCase ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      <span>Legalább egy nagybetű</span>
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs transition-all duration-300 validation-message ${passwordValidation.hasSpecialChar ? 'text-green-400' : 'text-red-400'}`}>
+                      {passwordValidation.hasSpecialChar ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      <span>Legalább egy speciális karakter (!@#$%^&*...)</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Confirm Password (Register only) */}
-              {!isLogin && (
-                <div
-  className={`transition-all duration-[400ms] ease-in-out overflow-hidden
-    ${!isLogin
-      ? 'max-h-40 opacity-100 translate-y-0'
-      : 'max-h-0 opacity-0 -translate-y-6'
-    }
-  `}
->
-  {/* IDE JÖN A TE CONFIRM PASSWORD INPUTOD VÁLTOZTATÁS NÉLKÜL */}
-
-
-                <div>
-                  <label className="block text-sm font-semibold text-purple-300 mb-2">
-                    Jelszó megerősítése
-                  </label>
-                  <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
-                      <Lock className="w-5 h-5" />
-                    </div>
-                    <input
-                    required
-                      type={showPassword ? 'text' : 'password'}
-                      value={formData.confirmPassword}
-                      onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                      placeholder="••••••••"
-                      className="w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all"
-                    />
+              {/* 🔽 Confirm password – fentről lefelé */}
+              <div
+                className={`overflow-hidden transition-all duration-[400ms] ease-in-out
+                  ${isLogin
+                    ? 'max-h-0 opacity-0 -translate-y-6'
+                    : 'max-h-32 opacity-100 translate-y-0'
+                  }
+                `}
+              >
+                <label className="block text-sm font-semibold text-purple-300 mb-2">
+                  Jelszó megerősítése
+                </label>
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
+                    <Lock className="w-5 h-5" />
                   </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.confirmPassword}
+                    onChange={(e) =>
+                      setFormData({ ...formData, confirmPassword: e.target.value })
+                    }
+                    onBlur={() => handleBlur('confirmPassword')}
+                    placeholder="••••••••"
+                    className={`w-full pl-12 pr-4 py-3 rounded-xl bg-black/30 border ${touched.confirmPassword && !doPasswordsMatch && formData.confirmPassword !== ''
+                      ? 'border-red-500/50'
+                      : 'border-purple-500/30'
+                      } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all`}
+                  />
                 </div>
-                </div>
-              )}
+                {/* Csak akkor jelenik meg, ha NEM egyeznek a jelszavak */}
+                {formData.confirmPassword !== '' && !doPasswordsMatch && (
+                  <div className="flex items-center gap-1 mt-2 text-xs transition-all duration-300 validation-message text-red-400">
+                    <XCircle className="w-3 h-3" />
+                    <span>A jelszavak nem egyeznek</span>
+                  </div>
+                )}
+              </div>
 
               {/* Remember Me / Forgot Password */}
               {isLogin && (
                 <div className="flex items-center justify-between text-sm">
                   <label className="flex items-center gap-2 cursor-pointer group">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       className="w-4 h-4 rounded border-2 border-purple-500/50 bg-black/30 text-purple-600 focus:ring-2 focus:ring-purple-500/50 cursor-pointer"
                     />
                     <span className="text-gray-400 group-hover:text-gray-300 transition-colors">
@@ -293,9 +345,14 @@ const handleRegisterButton = ()=>{
 
               {/* Submit Button */}
               <button
-              style={{cursor:'pointer'}}
+                style={{ cursor: isFormValid ? 'pointer' : 'not-allowed' }}
                 type="submit"
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-base hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2"
+                disabled={!isFormValid}
+                className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 ${
+                  isFormValid
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105'
+                    : 'bg-gradient-to-r from-purple-600/40 to-pink-600/40 text-white/50 cursor-not-allowed'
+                }`}
               >
                 <Sparkles className="w-5 h-5" />
                 {isLogin ? 'Bejelentkezés' : 'Regisztráció'}
@@ -336,7 +393,6 @@ const handleRegisterButton = ()=>{
               </div>
             </form>
 
-
             {/* Terms */}
             {!isLogin && (
               <p className="mt-5 text-center text-xs text-gray-500">
@@ -357,31 +413,34 @@ const handleRegisterButton = ()=>{
 
       <style jsx>{`
         @keyframes fade-in {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-        
         @keyframes scale-in {
-          from {
-            opacity: 0;
-            transform: scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
         }
-        
         .animate-fade-in {
           animation: fade-in 0.2s ease-out;
         }
-        
         .animate-scale-in {
           animation: scale-in 0.3s ease-out;
+        }
+
+        .validation-message {
+          opacity: 0;
+          animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-5px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         input::placeholder {
@@ -392,272 +451,15 @@ const handleRegisterButton = ()=>{
           background-color: #a855f7;
           border-color: #a855f7;
         }
+@keyframes scale-inKetto {
+          from { opacity: 0; transform: scale(0.72); }
+          to { opacity: 1; transform: scale(0.8); }
+        }
+        
+        .animate-scale-inKetto {
+          animation: scale-inKetto 0.3s ease-out;
+        }
       `}</style>
     </>
   );
 }
-
-// Példa használat:
-// 
-// import { useState } from 'react';
-// import AuthModal from './AuthModal';
-// 
-// function App() {
-//   const [isAuthOpen, setIsAuthOpen] = useState(false);
-// 
-//   return (
-//     <>
-//       <button onClick={() => setIsAuthOpen(true)}>
-//         Bejelentkezés
-//       </button>
-//       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
-//     </>
-//   );
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// import React, { useState } from 'react';
-// import {
-//   Mail, Lock, User, Eye, EyeOff, X,
-//   Sparkles, Chrome, Github, Apple
-// } from 'lucide-react';
-
-// export default function AuthModal({ isOpen, onClose }) {
-//   const [isLogin, setIsLogin] = useState(true);
-//   const [isSwitching, setIsSwitching] = useState(false);
-//   const [showPassword, setShowPassword] = useState(false);
-
-//   const [formData, setFormData] = useState({
-//     name: '',
-//     email: '',
-//     password: '',
-//     confirmPassword: ''
-//   });
-
-//   const switchMode = (toLogin) => {
-//     if (toLogin === isLogin) return;
-
-//     setIsSwitching(true);
-//     setIsLogin(toLogin);
-
-//     setTimeout(() => {
-//       setIsSwitching(false);
-//     }, 400);
-//   };
-
-//   const handleSubmit = (e) => {
-//     e.preventDefault();
-//   };
-
-//   if (!isOpen) return null;
-
-//   return (
-//     <>
-//       {/* Overlay */}
-//       <div
-//         className="fixed inset-0 bg-black/70 backdrop-blur-md z-40 flex items-center justify-center p-4 animate-fade-in"
-//         onClick={onClose}
-//       >
-//         {/* Modal */}
-//         <div
-//           onClick={(e) => e.stopPropagation()}
-//           className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-in"
-//           style={{
-//             background: 'linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)',
-//             border: '1px solid rgba(168, 85, 247, 0.3)'
-//           }}
-//         >
-//           {/* Close */}
-//           <button
-//             onClick={onClose}
-//             className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white"
-//           >
-//             <X className="w-5 h-5" />
-//           </button>
-
-//           {/* 🫧 Bubis switch overlay */}
-//           <div className="absolute inset-0 pointer-events-none overflow-hidden">
-//             <div
-//               className={`absolute left-1/2 top-1/2 w-96 h-96 rounded-full
-//                 bg-purple-500/20 blur-3xl
-//                 transition-all duration-[400ms] ease-in-out
-//                 ${isSwitching
-//                   ? 'scale-100 opacity-100 -translate-x-1/2 -translate-y-1/2'
-//                   : 'scale-50 opacity-0 -translate-x-1/2 -translate-y-1/2'
-//                 }
-//               `}
-//             />
-//           </div>
-
-//           <div className="relative z-10 p-8">
-//             {/* Header */}
-//             <div className="text-center mb-8">
-//               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 mb-4">
-//                 <Sparkles className="w-8 h-8 text-white" />
-//               </div>
-//               <h2 className="text-3xl font-black text-white mb-2">
-//                 {isLogin ? 'Üdvözlünk!' : 'Csatlakozz!'}
-//               </h2>
-//               <p className="text-gray-400">
-//                 {isLogin ? 'Lépj be a fiókodba' : 'Hozz létre egy új fiókot'}
-//               </p>
-//             </div>
-
-//             {/* Switch */}
-//             <div className="flex gap-2 mb-6 p-1 rounded-2xl bg-white/5 border border-white/10">
-//               <button
-//                 onClick={() => switchMode(true)}
-//                 className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
-//                   ${isLogin
-//                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-//                     : 'text-gray-400 hover:text-gray-300'
-//                   }
-//                 `}
-//               >
-//                 Bejelentkezés
-//               </button>
-//               <button
-//                 onClick={() => switchMode(false)}
-//                 className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
-//                   ${!isLogin
-//                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
-//                     : 'text-gray-400 hover:text-gray-300'
-//                   }
-//                 `}
-//               >
-//                 Regisztráció
-//               </button>
-//             </div>
-
-//             {/* Form */}
-//             <form onSubmit={handleSubmit} className="space-y-4">
-
-//               {/* 🔼 Teljes név – lentről felfelé */}
-//               <div
-//                 className={`overflow-hidden transition-all duration-[400ms] ease-in-out
-//                   ${isLogin
-//                     ? 'max-h-0 opacity-0 translate-y-6'
-//                     : 'max-h-32 opacity-100 translate-y-0'
-//                   }
-//                 `}
-//               >
-//                 <label className="block text-sm font-semibold text-purple-300 mb-2">
-//                   Teljes név
-//                 </label>
-//                 <input
-//                   type="text"
-//                   value={formData.name}
-//                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-//                   className="w-full pl-4 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white"
-//                 />
-//               </div>
-
-//               {/* Email – FIX KÖZÉPPONT */}
-//               <div>
-//                 <label className="block text-sm font-semibold text-purple-300 mb-2">
-//                   Email cím
-//                 </label>
-//                 <input
-//                   type="email"
-//                   value={formData.email}
-//                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-//                   className="w-full pl-4 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white"
-//                 />
-//               </div>
-
-//               {/* Password – FIX KÖZÉPPONT */}
-//               <div>
-//                 <label className="block text-sm font-semibold text-purple-300 mb-2">
-//                   Jelszó
-//                 </label>
-//                 <div className="relative">
-//                   <input
-//                     type={showPassword ? 'text' : 'password'}
-//                     value={formData.password}
-//                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-//                     className="w-full pl-4 pr-12 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white"
-//                   />
-//                   <button
-//                     type="button"
-//                     onClick={() => setShowPassword(!showPassword)}
-//                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500"
-//                   >
-//                     {showPassword ? <EyeOff /> : <Eye />}
-//                   </button>
-//                 </div>
-//               </div>
-
-//               {/* 🔽 Confirm password – fentről lefelé */}
-//               <div
-//                 className={`overflow-hidden transition-all duration-[400ms] ease-in-out
-//                   ${isLogin
-//                     ? 'max-h-0 opacity-0 -translate-y-6'
-//                     : 'max-h-32 opacity-100 translate-y-0'
-//                   }
-//                 `}
-//               >
-//                 <label className="block text-sm font-semibold text-purple-300 mb-2">
-//                   Jelszó megerősítése
-//                 </label>
-//                 <input
-//                   type="password"
-//                   value={formData.confirmPassword}
-//                   onChange={(e) =>
-//                     setFormData({ ...formData, confirmPassword: e.target.value })
-//                   }
-//                   className="w-full pl-4 pr-4 py-3 rounded-xl bg-black/30 border border-purple-500/30 text-white"
-//                 />
-//               </div>
-
-//               <button
-//                 type="submit"
-//                 className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:scale-105 transition"
-//               >
-//                 {isLogin ? 'Bejelentkezés' : 'Regisztráció'}
-//               </button>
-//             </form>
-//           </div>
-//         </div>
-//       </div>
-
-//       <style jsx>{`
-//         @keyframes fade-in {
-//           from { opacity: 0; }
-//           to { opacity: 1; }
-//         }
-//         @keyframes scale-in {
-//           from { opacity: 0; transform: scale(0.9); }
-//           to { opacity: 1; transform: scale(1); }
-//         }
-//         .animate-fade-in {
-//           animation: fade-in 0.2s ease-out;
-//         }
-//         .animate-scale-in {
-//           animation: scale-in 0.3s ease-out;
-//         }
-//       `}</style>
-//     </>
-//   );
-// }
