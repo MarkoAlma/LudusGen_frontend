@@ -2,13 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple, CheckCircle2, XCircle } from 'lucide-react';
 import { useContext } from 'react';
 import { MyUserContext } from '../context/MyUserProvider';
+import { useEffect } from 'react';
 
 export default function AuthModal({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
   const [isSwitching, setIsSwitching] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [mouseDownTarget, setMouseDownTarget] = useState(null);
-  const { isAuthOpen } = useContext(MyUserContext);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -84,6 +84,11 @@ export default function AuthModal({ isOpen, onClose }) {
       await signInUser(formData.email, formData.password);
     }
   };
+
+  useEffect(()=>{
+    console.log(msg);
+    
+  },[msg])
 
   const handleBlur = (field) => {
     setTouched({ ...touched, [field]: true });
@@ -267,6 +272,15 @@ export default function AuthModal({ isOpen, onClose }) {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+                
+                {/* Hibaüzenet bejelentkezésnél */}
+                {isLogin && msg?.err && (
+                  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                    <XCircle className="w-3 h-3" />
+                    <span>{msg.err}</span>
+                  </div>
+                )}
+
                 {/* Jelszó validáció - csak akkor jelenik meg, ha nem minden teljesül */}
                 {!isLogin && formData.password !== '' && !isPasswordValid && (
                   <div className="mt-2 space-y-1">
@@ -451,7 +465,8 @@ export default function AuthModal({ isOpen, onClose }) {
           background-color: #a855f7;
           border-color: #a855f7;
         }
-@keyframes scale-inKetto {
+        
+        @keyframes scale-inKetto {
           from { opacity: 0; transform: scale(0.72); }
           to { opacity: 1; transform: scale(0.8); }
         }
