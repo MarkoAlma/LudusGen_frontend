@@ -10,6 +10,8 @@ import AuthPage from './pages/Login';
 import AuthModal from './pages/Login';
 import { useContext } from 'react';
 import { MyUserContext } from './context/MyUserProvider';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 
 function App() {
@@ -54,6 +56,19 @@ function App() {
         onClose={() => bezar()}
       />
       <Footer />
+
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
     </div>
   );
 }

@@ -32,9 +32,15 @@ importers:
       react-dom:
         specifier: ^19.2.0
         version: 19.2.3(react@19.2.3)
+      react-icons:
+        specifier: ^5.5.0
+        version: 5.5.0(react@19.2.3)
       react-router-dom:
         specifier: ^7.13.0
         version: 7.13.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      react-toastify:
+        specifier: ^11.0.5
+        version: 11.0.5(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
     devDependencies:
       '@eslint/js':
         specifier: ^9.39.1
@@ -1554,6 +1560,11 @@ packages:
     peerDependencies:
       react: ^19.2.3
 
+  react-icons@5.5.0:
+    resolution: {integrity: sha512-MEFcXdkP3dLo8uumGI5xN3lDFNsRtrjbOEKDLD7yv76v4wpnEq2Lt2qeHaQOr34I/wPN3s3+N08WkQ+CW37Xiw==}
+    peerDependencies:
+      react: '*'
+
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
@@ -1580,6 +1591,12 @@ packages:
     peerDependenciesMeta:
       react-dom:
         optional: true
+
+  react-toastify@11.0.5:
+    resolution: {integrity: sha512-EpqHBGvnSTtHYhCPLxML05NLY2ZX0JURbAdNYa6BUkk+amz4wbKBQvoKQAB0ardvSarUBuY4Q4s1sluAzZwkmA==}
+    peerDependencies:
+      react: ^18 || ^19
+      react-dom: ^18 || ^19
 
   react-transition-group@4.4.5:
     resolution: {integrity: sha512-pZcd1MCJoiKiBR2NRxeCRg13uCXbydPnmB4EOeRrY7480qNWO8IIgQG6zlDkm6uRMsURXPuKq0GWtiM59a5Q6g==}
@@ -3238,6 +3255,10 @@ snapshots:
       react: 19.2.3
       scheduler: 0.27.0
 
+  react-icons@5.5.0(react@19.2.3):
+    dependencies:
+      react: 19.2.3
+
   react-is@16.13.1: {}
 
   react-is@19.2.4: {}
@@ -3256,6 +3277,12 @@ snapshots:
       react: 19.2.3
       set-cookie-parser: 2.7.2
     optionalDependencies:
+      react-dom: 19.2.3(react@19.2.3)
+
+  react-toastify@11.0.5(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
+    dependencies:
+      clsx: 2.1.1
+      react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
 
   react-transition-group@4.4.5(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
