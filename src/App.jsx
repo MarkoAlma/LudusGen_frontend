@@ -13,15 +13,20 @@ import { MyUserContext } from './context/MyUserProvider';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
+import { Toaster } from 'react-hot-toast';
 
 function App() {
-  const { isAuthOpen, setIsAuthOpen } = useContext(MyUserContext);
-  const {showNavbar, setShowNavbar} = useContext(MyUserContext)
+  const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen} = useContext(MyUserContext)
 
   const bezar = ()=> {
     setIsAuthOpen(false)
     setShowNavbar(true)
   }
+
+        useEffect(()=>{
+        setIsAuthOpen(false)
+        setShowNavbar(true)
+      },[user])
 
   // Scroll lock on modal open
   useEffect(() => {
@@ -46,7 +51,6 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/chat" element={<AIChat />} />
-          <Route path="/login" element={<AuthPage />} />
         </Routes>
       </main>
 
@@ -57,17 +61,17 @@ function App() {
       />
       <Footer />
 
-      <ToastContainer
+      <Toaster 
         position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="dark"
+        reverseOrder={false}
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: 'transparent',
+            boxShadow: 'none',
+            padding: 0,
+          },
+        }}
       />
     </div>
   );

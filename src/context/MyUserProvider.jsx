@@ -14,14 +14,17 @@ const MyUserProvider = ({children}) => {
   const [showNavbar, setShowNavbar] = useState(true);
 
 
-  useEffect(()=>{
-    const unsub = onAuthStateChanged(auth,(currentUser)=>{
-      console.log(currentUser);
-      currentUser && setUser(currentUser) //ezt kell majd modositani
-      user && console.log(user);
-    })
-    return ()=>unsub()
-  },[user])
+useEffect(() => {
+  const unsub = onAuthStateChanged(auth, (currentUser) => {
+    console.log("Auth state changed:", currentUser);
+    setUser(currentUser); // null if signed out, object if signed in
+    console.log(currentUser
+      
+    )
+  });
+
+  return () => unsub();
+}, []); // <-- run only once on mount
 
   const signUpUser = async (email, password, display_name, setLoading)=> {
     try {

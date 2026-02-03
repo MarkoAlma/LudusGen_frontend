@@ -2,12 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple, CheckCircle2, XCircle } from 'lucide-react';
 import { useContext } from 'react';
 import { MyUserContext } from '../context/MyUserProvider';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { IoCheckmarkDoneOutline } from 'react-icons/io5';
 import { FaCheck } from 'react-icons/fa';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
-export default function AuthModal({ isOpen, onClose }) {
+export default function Login({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
   const [isSwitching, setIsSwitching] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -25,7 +25,12 @@ export default function AuthModal({ isOpen, onClose }) {
     confirmPassword: false
   });
 
-  const { signUpUser, signInUser, msg } = useContext(MyUserContext);
+  const { signUpUser, signInUser, msg, user } = useContext(MyUserContext);
+  
+  // Ref-ek a sikeres művelet detektálásához
+  const prevUserRef = useRef(null);
+  const isSubmittingRef = useRef(false);
+  const savedNameRef = useRef('');
 
   // Email validáció
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -65,6 +70,127 @@ export default function AuthModal({ isOpen, onClose }) {
         doPasswordsMatch
       );
 
+  // ✅ SIKERES BEJELENTKEZÉS/REGISZTRÁCIÓ DETEKTÁLÁSA
+  useEffect(() => {
+    // Ha éppen van folyamatban lévő submit és a user megváltozott (bejelentkezett)
+    if (isSubmittingRef.current && user && prevUserRef.current !== user) {
+      isSubmittingRef.current = false;
+      
+      // Sikeres toast megjelenítése
+      const isRegistration = savedNameRef.current !== '';
+      
+      if (isRegistration) {
+        // REGISZTRÁCIÓ TOAST
+        toast.custom((t) => (
+          <div
+            className={`${
+              t.visible ? 'animate-enter' : 'animate-leave'
+            } max-w-md w-full pointer-events-auto`}
+          >
+            <div className="relative overflow-hidden rounded-2xl backdrop-blur-xl bg-gradient-to-br from-purple-600/90 via-pink-600/90 to-purple-700/90 shadow-2xl border border-white/20">
+              <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute w-32 h-32 bg-white/10 rounded-full blur-3xl -top-10 -left-10 animate-pulse" />
+                <div className="absolute w-40 h-40 bg-pink-300/10 rounded-full blur-3xl -bottom-10 -right-10 animate-pulse delay-75" />
+              </div>
+              
+              <div className="relative p-4 flex items-start gap-3">
+                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center animate-bounce">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                
+                <div className="flex-1 pt-0.5">
+                  <p className="text-white font-bold text-base mb-0.5">
+                    Sikeres regisztráció!
+                  </p>
+                  <p className="text-white/80 text-sm">
+                    Üdvözlünk a közösségünkben, {savedNameRef.current}! 🎉
+                  </p>
+                </div>
+                
+                <button
+                  onClick={() => toast.dismiss(t.id)}
+                  className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <XCircle className="w-5 h-5 text-white/60 hover:text-white" />
+                </button>
+              </div>
+              
+              <div className="h-1 bg-white/20">
+                <div 
+                  className="h-full bg-white/60 animate-progress"
+                  style={{ animationDuration: '3000ms' }}
+                />
+              </div>
+            </div>
+          </div>
+        ), {
+          duration: 3000,
+        });
+      } else {
+        // BEJELENTKEZÉS TOAST
+        toast.custom((t) => (
+          <div
+            className={`${
+              t.visible ? 'animate-enter' : 'animate-leave'
+            } max-w-md w-full pointer-events-auto`}
+          >
+            <div className="relative overflow-hidden rounded-2xl backdrop-blur-xl bg-gradient-to-br from-emerald-500/90 via-teal-600/90 to-cyan-600/90 shadow-2xl border border-white/20">
+              <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute w-32 h-32 bg-white/20 rounded-full blur-3xl top-0 left-1/2 -translate-x-1/2 animate-pulse" />
+              </div>
+              
+              <div className="relative p-4 flex items-start gap-3">
+                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-white animate-scale-check" />
+                </div>
+                
+                <div className="flex-1 pt-0.5">
+                  <p className="text-white font-bold text-base mb-0.5">
+                    Sikeres bejelentkezés!
+                  </p>
+                  <p className="text-white/80 text-sm">
+                    Jó látni újra! ✨
+                  </p>
+                </div>
+                
+                <button
+                  onClick={() => toast.dismiss(t.id)}
+                  className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <XCircle className="w-5 h-5 text-white/60 hover:text-white" />
+                </button>
+              </div>
+              
+              <div className="h-1 bg-white/20">
+                <div 
+                  className="h-full bg-white/60 animate-progress"
+                  style={{ animationDuration: '2000ms' }}
+                />
+              </div>
+            </div>
+          </div>
+        ), {
+          duration: 2000,
+        });
+      }
+      
+      // Form reset és modal bezárása
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
+      });
+      savedNameRef.current = '';
+      
+      setTimeout(() => {
+        onClose();
+      }, 500);
+    }
+    
+    prevUserRef.current = user;
+  }, [user, onClose]);
+
   const switchMode = (toLogin) => {
     if (toLogin === isLogin) return;
 
@@ -81,84 +207,64 @@ export default function AuthModal({ isOpen, onClose }) {
     if (!isFormValid || loading) return;
     
     setLoading(true);
+    isSubmittingRef.current = true;
     
     try {
       if (!isLogin) {
-        const result = await signUpUser(formData.email, formData.password, formData.name, setLoading);
-        
-        // Sikeres regisztráció
-        toast.success('🎉 Sikeres regisztráció! Üdvözlünk!', {
-          position: "top-right",
-          autoClose: 3000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          style: {
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: '#fff',
-            borderRadius: '12px',
-            fontWeight: '600',
-          }
-        });
-        
-        // Bezárás 1 másodperc után
-        setTimeout(() => {
-          onClose();
-          // Form reset
-          setFormData({
-            name: '',
-            email: '',
-            password: '',
-            confirmPassword: ''
-          });
-        }, 1000);
-        
+        // REGISZTRÁCIÓ
+        savedNameRef.current = formData.name; // Mentjük a nevet
+        await signUpUser(formData.email, formData.password, formData.name, setLoading);
       } else {
-        const result = await signInUser(formData.email, formData.password);
-        
-        // Sikeres bejelentkezés
-        toast.success('✨ Sikeres bejelentkezés!', {
-          position: "top-right",
-          autoClose: 2000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          style: {
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: '#fff',
-            borderRadius: '12px',
-            fontWeight: '600',
-          }
-        });
-        
-        // Bezárás 800ms után
-        setTimeout(() => {
-          onClose();
-          setFormData({
-            name: '',
-            email: '',
-            password: '',
-            confirmPassword: ''
-          });
-        }, 100);
+        // BEJELENTKEZÉS
+        savedNameRef.current = ''; // Töröljük, hogy megkülönböztessük a bejelentkezést
+        await signInUser(formData.email, formData.password);
       }
     } catch (error) {
-      // Hiba esetén
-      toast.error(error.message || 'Hiba történt. Próbáld újra!', {
-        position: "top-right",
-        autoClose: 4000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        style: {
-          background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-          color: '#fff',
-          borderRadius: '12px',
-          fontWeight: '600',
-        }
+      isSubmittingRef.current = false;
+      // ❌ HIBA ESETÉN a toast megjelenik, DE a modal NYITVA MARAD
+      toast.custom((t) => (
+        <div
+          className={`${
+            t.visible ? 'animate-enter' : 'animate-leave'
+          } max-w-md w-full pointer-events-auto`}
+        >
+          <div className="relative overflow-hidden rounded-2xl backdrop-blur-xl bg-gradient-to-br from-red-500/90 via-rose-600/90 to-pink-600/90 shadow-2xl border border-white/20">
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute w-32 h-32 bg-white/10 rounded-full blur-3xl -top-10 -right-10 animate-pulse" />
+            </div>
+            
+            <div className="relative p-4 flex items-start gap-3">
+              <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center animate-shake">
+                <XCircle className="w-6 h-6 text-white" />
+              </div>
+              
+              <div className="flex-1 pt-0.5">
+                <p className="text-white font-bold text-base mb-0.5">
+                  Hiba történt!
+                </p>
+                <p className="text-white/80 text-sm">
+                  {error.message || 'Próbáld újra később.'}
+                </p>
+              </div>
+              
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <XCircle className="w-5 h-5 text-white/60 hover:text-white" />
+              </button>
+            </div>
+            
+            <div className="h-1 bg-white/20">
+              <div 
+                className="h-full bg-white/60 animate-progress"
+                style={{ animationDuration: '4000ms' }}
+              />
+            </div>
+          </div>
+        </div>
+      ), {
+        duration: 4000,
       });
     } finally {
       setLoading(false);
@@ -167,7 +273,6 @@ export default function AuthModal({ isOpen, onClose }) {
 
   useEffect(()=>{
     console.log(msg);
-    
   },[msg])
 
   const handleBlur = (field) => {
@@ -371,6 +476,13 @@ export default function AuthModal({ isOpen, onClose }) {
                     <span>Érvénytelen email formátum</span>
                   </div>
                 )}
+                {/* ✅ ÚJ: Email már foglalt hibaüzenet REGISZTRÁCIÓ esetén */}
+                {!isLogin && msg?.err && msg.err.toLowerCase().includes('email') && (
+                  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                    <XCircle className="w-3 h-3" />
+                    <span>{msg.err}</span>
+                  </div>
+                )}
               </div>
 
               {/* Password – FIX KÖZÉPPONT */}
@@ -400,8 +512,8 @@ export default function AuthModal({ isOpen, onClose }) {
                   </button>
                 </div>
                 
-                {/* Hibaüzenet bejelentkezésnél */}
-                {isLogin && msg?.err && (
+                {/* ✅ Hibaüzenet bejelentkezésnél - CSAK akkor, ha nem email-ről szól */}
+                {isLogin && msg?.err && !msg.err.toLowerCase().includes('email') && (
                   <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
                     <XCircle className="w-3 h-3" />
                     <span>{msg.err}</span>
@@ -590,50 +702,107 @@ export default function AuthModal({ isOpen, onClose }) {
         </div>
       </div>
 
-      <style jsx>{`
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.2s ease-out;
-        }
+<style jsx>{`
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out;
+  }
 
-        .validation-message {
-          opacity: 0;
-          animation: fadeIn 0.4s ease-out forwards;
-        }
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateX(400px) scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+  }
 
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-5px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+  @keyframes leave {
+    from {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(400px) scale(0.9);
+    }
+  }
 
-        input::placeholder {
-          color: #6b7280;
-        }
+  .animate-enter {
+    animation: enter 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+  }
 
-        input[type="checkbox"]:checked {
-          background-color: #a855f7;
-          border-color: #a855f7;
-        }
+  .animate-leave {
+    animation: leave 0.3s cubic-bezier(0.06, 0.71, 0.55, 1) forwards;
+  }
 
-        
-        @keyframes scale-inKetto {
-          from { opacity: 0; transform: scale(0.72); }
-          to { opacity: 1; transform: scale(0.8); }
-        }
-        
-        .animate-scale-inKetto {
-          animation: scale-inKetto 0.3s ease-out;
-        }
-      `}</style>
+  @keyframes progress {
+    from { width: 100%; }
+    to { width: 0%; }
+  }
+
+  .animate-progress {
+    animation: progress linear forwards;
+  }
+
+  @keyframes scale-check {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+  }
+
+  .animate-scale-check {
+    animation: scale-check 0.6s ease-in-out;
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+  }
+
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
+
+  .validation-message {
+    opacity: 0;
+    animation: fadeIn 0.4s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  input::placeholder {
+    color: #6b7280;
+  }
+
+  input[type="checkbox"]:checked {
+    background-color: #a855f7;
+    border-color: #a855f7;
+  }
+
+  @keyframes scale-inKetto {
+    from { opacity: 0; transform: scale(0.72); }
+    to { opacity: 1; transform: scale(0.8); }
+  }
+  
+  .animate-scale-inKetto {
+    animation: scale-inKetto 0.3s ease-out;
+  }
+`}</style>
     </>
   );
 }
