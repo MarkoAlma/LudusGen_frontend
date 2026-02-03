@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple } from 'lucide-react';
 import { useContext } from 'react';
 import { MyUserContext } from '../context/MyUserProvider';
-
+import { AnimatePresence, motion } from "motion/react"
+import { AnimatedText } from '../components/AnimatedText';
 export default function AuthModal({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
   const [isSwitching, setIsSwitching] = useState(false);
@@ -334,6 +335,7 @@ const handleRegisterButton = ()=>{
                 ))}
               </div>
             </form>
+
 
             {/* Terms */}
             {!isLogin && (
