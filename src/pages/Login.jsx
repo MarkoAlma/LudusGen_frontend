@@ -18,12 +18,18 @@ import { MyUserContext } from "../context/MyUserProvider";
 import { IoCheckmarkDoneOutline } from "react-icons/io5";
 import { FaCheck } from "react-icons/fa";
 import { useEffect, useRef } from "react";
+import TwoFactorLogin from "../components/TwoFactorLogin";
 
 export default function Login({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
   const [isSwitching, setIsSwitching] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [mouseDownTarget, setMouseDownTarget] = useState(null);
+  
+  // ✅ 2FA State
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [pending2FAEmail, setPending2FAEmail] = useState("");
+  
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -98,16 +104,6 @@ export default function Login({ isOpen, onClose }) {
     if (isSubmittingRef.current && user && prevUserRef.current !== user) {
       isSubmittingRef.current = false;
 
-      // // Sikeres toast megjelenítése
-      // const isRegistration = savedNameRef.current !== '';
-
-      // // if (isRegistration) {
-      // //   // REGISZTRÁCIÓ TOAST
-      // //   setMsg({err:"OKSA"})
-      // // } else {
-      // //   setMsg({err:"Nem oksa"})
-      // // }
-
       // Form reset és modal bezárása
       setFormData({
         name: "",
@@ -116,10 +112,9 @@ export default function Login({ isOpen, onClose }) {
         confirmPassword: "",
       });
       savedNameRef.current = "";
-
-      // setTimeout(() => {
-      //   onClose();
-      // }, 500);
+      
+      // Zárjuk be a login modalt
+      onClose();
     }
 
     prevUserRef.current = user;
@@ -146,7 +141,7 @@ export default function Login({ isOpen, onClose }) {
     try {
       if (!isLogin) {
         // REGISZTRÁCIÓ
-        savedNameRef.current = formData.name; // Mentjük a nevet
+        savedNameRef.current = formData.name;
         await signUpUser(
           formData.email,
           formData.password,
@@ -154,17 +149,71 @@ export default function Login({ isOpen, onClose }) {
           setLoading
         );
       } else {
-        // BEJELENTKEZÉS
-        savedNameRef.current = ""; // Töröljük, hogy megkülönböztessük a bejelentkezést
-        await signInUser(formData.email, formData.password);
+        // ✅ BEJELENTKEZÉS - 2FA ELLENŐRZÉSSEL
+        savedNameRef.current = "";
+        
+        // Először megpróbáljuk bejelentkeztetni
+        const result = await signInUser(formData.email, formData.password);
+        
+        // Ha 2FA szükséges, megnyitjuk a 2FA modalt
+        if (result?.requires2FA) {
+          setPending2FAEmail(formData.email);
+          setShow2FAModal(true);
+          setLoading(false);
+          isSubmittingRef.current = false;
+          return;
+        }
       }
     } catch (error) {
       isSubmittingRef.current = false;
-      // ❌ HIBA ESETÉN a toast megjelenik, DE a modal NYITVA MARAD
       setMsg({ err: "HIBA" });
     } finally {
-      setLoading(false);
+      if (!show2FAModal) {
+        setLoading(false);
+      }
     }
+  };
+
+  // ✅ 2FA Sikeres validáció
+  const handle2FASuccess = async () => {
+    setShow2FAModal(false);
+    
+    try {
+      // Firebase bejelentkezés a tárolt adatokkal
+      const { signInWithEmailAndPassword } = await import("firebase/auth");
+      const { auth } = await import("../firebase/firebaseApp");
+      
+      await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      
+      setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés 2FA-val!" });
+      
+      // Form reset
+      setFormData({
+        name: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+      });
+      
+      setPending2FAEmail("");
+      
+      // Modal bezárása kis késleltetéssel
+      setTimeout(() => {
+        onClose();
+      }, 300);
+      
+    } catch (error) {
+      console.error("Firebase login after 2FA error:", error);
+      setMsg({ err: "Hiba történt a bejelentkezés során" });
+      setPending2FAEmail("");
+    }
+  };
+
+  // ✅ 2FA Modal bezárása
+  const handle2FAClose = () => {
+    setShow2FAModal(false);
+    setPending2FAEmail("");
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -396,9 +445,6 @@ export default function Login({ isOpen, onClose }) {
                     <span>Érvénytelen email formátum</span>
                   </div>
                 )}
-                {/* ✅ ÚJ: Email már foglalt hibaüzenet REGISZTRÁCIÓ esetén */}
-                {/* ✅ BEJELENTKEZÉS - Helytelen email cím */}
-                {console.log(msg)}
 
                 {!isLogin &&
                   msg?.incorrectSignUp &&
@@ -411,7 +457,6 @@ export default function Login({ isOpen, onClose }) {
                     </div>
                   )}
 
-                {/* ✅ BEJELENTKEZÉS - Helytelen email cím */}
                 {!isLogin &&
                   msg?.incorrectSignUp &&
                   msg.incorrectSignUp
@@ -562,7 +607,6 @@ export default function Login({ isOpen, onClose }) {
               </div>
 
               {/* Remember Me / Forgot Password */}
-              {/* Remember Me / Forgot Password - animált verzió */}
               <div
                 className="overflow-hidden transition-all duration-[400ms] ease-out"
                 style={{
@@ -576,10 +620,8 @@ export default function Login({ isOpen, onClose }) {
               >
                 <div className="flex items-center justify-between text-sm">
                   <label className="flex items-center gap-3 cursor-pointer select-none group">
-                    {/* EZ MARAD HIDDEN */}
                     <input type="checkbox" className="peer hidden" />
 
-                    {/* CUSTOM CHECKBOX */}
                     <div
                       className="
 w-6 h-6 rounded-md
@@ -619,6 +661,7 @@ transition-all duration-200 ease-out
                   </a>
                 </div>
               </div>
+
               {/* Submit Button */}
               <button
                 style={{
@@ -715,7 +758,6 @@ transition-all duration-200 ease-out
             </form>
 
             {/* Terms */}
-            {/* Terms - animált verzió */}
             <div
               className="overflow-hidden transition-all duration-[400ms] ease-out"
               style={{
@@ -748,6 +790,14 @@ transition-all duration-200 ease-out
           </div>
         </div>
       </div>
+
+      {/* ✅ 2FA Login Modal */}
+      <TwoFactorLogin
+        isOpen={show2FAModal}
+        onClose={handle2FAClose}
+        onSuccess={handle2FASuccess}
+        email={pending2FAEmail}
+      />
 
       <style jsx>{`
         @keyframes fade-in {
