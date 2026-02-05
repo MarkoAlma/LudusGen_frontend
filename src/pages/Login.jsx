@@ -1,24 +1,10 @@
-import React, { useState, useMemo } from "react";
-import {
-  Mail,
-  Lock,
-  User,
-  Eye,
-  EyeOff,
-  X,
-  Sparkles,
-  Chrome,
-  Github,
-  Apple,
-  CheckCircle2,
-  XCircle,
-} from "lucide-react";
-import { useContext } from "react";
-import { MyUserContext } from "../context/MyUserProvider";
-import toast from "react-hot-toast";
-import { IoCheckmarkDoneOutline } from "react-icons/io5";
-import { FaCheck } from "react-icons/fa";
-import { useEffect, useRef } from "react";
+import React, { useState, useMemo } from 'react';
+import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple, CheckCircle2, XCircle } from 'lucide-react';
+import { useContext } from 'react';
+import { MyUserContext } from '../context/MyUserProvider';
+import { IoCheckmarkDoneOutline } from 'react-icons/io5';
+import { FaCheck } from 'react-icons/fa';
+import { useEffect, useRef } from 'react';
 
 export default function Login({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -38,8 +24,22 @@ export default function Login({ isOpen, onClose }) {
     confirmPassword: false,
   });
 
-  const { signUpUser, signInUser, msg, user } = useContext(MyUserContext);
+  useEffect(() => {
+  // Töröljük a hibaüzenetet, ha a felhasználó gépelni kezd
+  if (msg?.incorrectSignIn) {
+    setMsg({ incorrectSignIn: null });
+  }
+}, [formData.email, formData.password]);
 
+  useEffect(() => {
+  // Töröljük a hibaüzenetet, ha a felhasználó gépelni kezd
+  if (msg?.incorrectSignUp) {
+    setMsg({incorrectSignUp: null})
+  }
+}, [formData.email]);
+
+  const { signUpUser, signInUser, msg, user, setMsg } = useContext(MyUserContext);
+  
   // Ref-ek a sikeres művelet detektálásához
   const prevUserRef = useRef(null);
   const isSubmittingRef = useRef(false);
@@ -88,101 +88,9 @@ export default function Login({ isOpen, onClose }) {
 
       if (isRegistration) {
         // REGISZTRÁCIÓ TOAST
-        toast.custom(
-          (t) => (
-            <div
-              className={`${
-                t.visible ? "animate-enter" : "animate-leave"
-              } max-w-md w-full pointer-events-auto`}
-            >
-              <div className="relative overflow-hidden rounded-2xl backdrop-blur-xl bg-gradient-to-br from-purple-600/90 via-pink-600/90 to-purple-700/90 shadow-2xl border border-white/20">
-                <div className="absolute inset-0 overflow-hidden">
-                  <div className="absolute w-32 h-32 bg-white/10 rounded-full blur-3xl -top-10 -left-10 animate-pulse" />
-                  <div className="absolute w-40 h-40 bg-pink-300/10 rounded-full blur-3xl -bottom-10 -right-10 animate-pulse delay-75" />
-                </div>
-
-                <div className="relative p-4 flex items-start gap-3">
-                  <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center animate-bounce">
-                    <Sparkles className="w-6 h-6 text-white" />
-                  </div>
-
-                  <div className="flex-1 pt-0.5">
-                    <p className="text-white font-bold text-base mb-0.5">
-                      Sikeres regisztráció!
-                    </p>
-                    <p className="text-white/80 text-sm">
-                      Üdvözlünk a közösségünkben, {savedNameRef.current}! 🎉
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() => toast.dismiss(t.id)}
-                    className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
-                  >
-                    <XCircle className="w-5 h-5 text-white/60 hover:text-white" />
-                  </button>
-                </div>
-
-                <div className="h-1 bg-white/20">
-                  <div
-                    className="h-full bg-white/60 animate-progress"
-                    style={{ animationDuration: "3000ms" }}
-                  />
-                </div>
-              </div>
-            </div>
-          ),
-          {
-            duration: 3000,
-          }
-        );
+        setMsg({err:"OKSA"})
       } else {
-        // BEJELENTKEZÉS TOAST
-        toast.custom(
-          (t) => (
-            <div
-              className={`${
-                t.visible ? "animate-enter" : "animate-leave"
-              } max-w-md w-full pointer-events-auto`}
-            >
-              <div className="relative overflow-hidden rounded-2xl backdrop-blur-xl bg-gradient-to-br from-emerald-500/90 via-teal-600/90 to-cyan-600/90 shadow-2xl border border-white/20">
-                <div className="absolute inset-0 overflow-hidden">
-                  <div className="absolute w-32 h-32 bg-white/20 rounded-full blur-3xl top-0 left-1/2 -translate-x-1/2 animate-pulse" />
-                </div>
-
-                <div className="relative p-4 flex items-start gap-3">
-                  <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6 text-white animate-scale-check" />
-                  </div>
-
-                  <div className="flex-1 pt-0.5">
-                    <p className="text-white font-bold text-base mb-0.5">
-                      Sikeres bejelentkezés!
-                    </p>
-                    <p className="text-white/80 text-sm">Jó látni újra! ✨</p>
-                  </div>
-
-                  <button
-                    onClick={() => toast.dismiss(t.id)}
-                    className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
-                  >
-                    <XCircle className="w-5 h-5 text-white/60 hover:text-white" />
-                  </button>
-                </div>
-
-                <div className="h-1 bg-white/20">
-                  <div
-                    className="h-full bg-white/60 animate-progress"
-                    style={{ animationDuration: "2000ms" }}
-                  />
-                </div>
-              </div>
-            </div>
-          ),
-          {
-            duration: 2000,
-          }
-        );
+        setMsg({err:"Nem oksa"})
       }
 
       // Form reset és modal bezárása
@@ -238,53 +146,7 @@ export default function Login({ isOpen, onClose }) {
     } catch (error) {
       isSubmittingRef.current = false;
       // ❌ HIBA ESETÉN a toast megjelenik, DE a modal NYITVA MARAD
-      toast.custom(
-        (t) => (
-          <div
-            className={`${
-              t.visible ? "animate-enter" : "animate-leave"
-            } max-w-md w-full pointer-events-auto`}
-          >
-            <div className="relative overflow-hidden rounded-2xl backdrop-blur-xl bg-gradient-to-br from-red-500/90 via-rose-600/90 to-pink-600/90 shadow-2xl border border-white/20">
-              <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute w-32 h-32 bg-white/10 rounded-full blur-3xl -top-10 -right-10 animate-pulse" />
-              </div>
-
-              <div className="relative p-4 flex items-start gap-3">
-                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center animate-shake">
-                  <XCircle className="w-6 h-6 text-white" />
-                </div>
-
-                <div className="flex-1 pt-0.5">
-                  <p className="text-white font-bold text-base mb-0.5">
-                    Hiba történt!
-                  </p>
-                  <p className="text-white/80 text-sm">
-                    {error.message || "Próbáld újra később."}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => toast.dismiss(t.id)}
-                  className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors"
-                >
-                  <XCircle className="w-5 h-5 text-white/60 hover:text-white" />
-                </button>
-              </div>
-
-              <div className="h-1 bg-white/20">
-                <div
-                  className="h-full bg-white/60 animate-progress"
-                  style={{ animationDuration: "4000ms" }}
-                />
-              </div>
-            </div>
-          </div>
-        ),
-        {
-          duration: 4000,
-        }
-      );
+      setMsg({err:"HIBA"})
     } finally {
       setLoading(false);
     }
@@ -518,14 +380,12 @@ export default function Login({ isOpen, onClose }) {
                   </div>
                 )}
                 {/* ✅ ÚJ: Email már foglalt hibaüzenet REGISZTRÁCIÓ esetén */}
-                {!isLogin &&
-                  msg?.err &&
-                  msg.err.toLowerCase().includes("email") && (
-                    <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
-                      <XCircle className="w-3 h-3" />
-                      <span>{msg.err}</span>
-                    </div>
-                  )}
+                {!isLogin && msg?.incorrectSignUp && msg.incorrectSignUp.toLowerCase().includes('email') && (
+                  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                    <XCircle className="w-3 h-3" />
+                    <span>Az email cím már használatban van</span>
+                  </div>
+                )}
               </div>
 
               {/* Password – FIX KÖZÉPPONT */}
@@ -560,16 +420,14 @@ export default function Login({ isOpen, onClose }) {
                     )}
                   </button>
                 </div>
-
-                {/* ✅ Hibaüzenet bejelentkezésnél - CSAK akkor, ha nem email-ről szól */}
-                {isLogin &&
-                  msg?.err &&
-                  !msg.err.toLowerCase().includes("email") && (
-                    <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
-                      <XCircle className="w-3 h-3" />
-                      <span>{msg.err}</span>
-                    </div>
-                  )}
+                
+{/* ✅ BEJELENTKEZÉS - Hibás email/jelszó üzenet */}
+{isLogin && msg?.incorrectSignIn && (
+  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+    <XCircle className="w-3 h-3" />
+    <span>Hibás email/jelszó páros</span>
+  </div>
+)}
 
                 {/* Jelszó validáció - csak akkor jelenik meg, ha nem minden teljesül */}
                 {!isLogin && formData.password !== "" && !isPasswordValid && (
@@ -668,78 +526,124 @@ export default function Login({ isOpen, onClose }) {
               </div>
 
               {/* Remember Me / Forgot Password */}
-              {isLogin && (
-                <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center gap-3 cursor-pointer select-none group">
-                    {/* EZ MARAD HIDDEN */}
-                    <input type="checkbox" className="peer hidden" />
+{/* Remember Me / Forgot Password - animált verzió */}
+<div
+  className="overflow-hidden transition-all duration-[400ms] ease-out"
+  style={{
+    maxHeight: isLogin ? "60px" : "0px",
+    opacity: isLogin ? 1 : 0,
+    transform: isLogin
+      ? "translate3d(0, 0, 0)"
+      : "translate3d(0, 24px, 0)",
+    willChange: "max-height, opacity, transform",
+  }}
+>
+  <div className="flex items-center justify-between text-sm">
+    <label className="flex items-center gap-3 cursor-pointer select-none group">
+      {/* EZ MARAD HIDDEN */}
+      <input type="checkbox" className="peer hidden" />
 
-                    {/* CUSTOM CHECKBOX */}
-                    <div
-                      className="
-    w-6 h-6 rounded-md
-    border border-purple-500/40
-    bg-black/40
-    flex items-center justify-center
-    transition-all duration-200 ease-out
-    group-hover:border-purple-400
-                p-1
-    peer-checked:bg-purple-600/80
-    peer-checked:border-purple-400
-    peer-checked:shadow-[0_0_6px_rgba(168,85,247,0.35)]
+      {/* CUSTOM CHECKBOX */}
+      <div
+        className="
+w-6 h-6 rounded-md
+border border-purple-500/40
+bg-black/40
+flex items-center justify-center
+transition-all duration-200 ease-out
+group-hover:border-purple-400
+p-1
+peer-checked:bg-purple-600/80
+peer-checked:border-purple-400
+peer-checked:shadow-[0_0_6px_rgba(168,85,247,0.35)]
 
-    peer-checked:[&>svg]:opacity-100
-    peer-checked:[&>svg]:scale-100
-  "
-                    >
-                      <FaCheck
-                        className="
-      w-4 h-4 text-white
-      opacity-0 scale-75
-      transition-all duration-200 ease-out
-    "
-                      />
-                    </div>
+peer-checked:[&>svg]:opacity-100
+peer-checked:[&>svg]:scale-100
+"
+      >
+        <FaCheck
+          className="
+w-4 h-4 text-white
+opacity-0 scale-75
+transition-all duration-200 ease-out
+"
+        />
+      </div>
 
-                    <span className="text-gray-400 group-hover:text-gray-300 transition-colors text-sm">
-                      Maradjak bejelentkezve
-                    </span>
-                  </label>
+      <span className="text-gray-400 group-hover:text-gray-300 transition-colors text-sm">
+        Maradjak bejelentkezve
+      </span>
+    </label>
 
-                  <a
-                    href="#"
-                    className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
-                  >
-                    Elfelejtett jelszó?
-                  </a>
-                </div>
-              )}
-
+    <a
+      href="#"
+      className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+    >
+      Elfelejtett jelszó?
+    </a>
+  </div>
+</div>
               {/* Submit Button */}
-              <button
-                style={{
-                  cursor: isFormValid && !loading ? "pointer" : "not-allowed",
-                }}
-                type="submit"
-                disabled={!isFormValid || loading}
-                className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 ${
-                  isFormValid && !loading
-                    ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105"
-                    : "bg-gradient-to-r from-purple-600/40 to-pink-600/40 text-white/50 cursor-not-allowed"
-                }`}
-              >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Feldolgozás...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5" />
-                    {isLogin ? "Bejelentkezés" : "Regisztráció"}
-                  </>
-                )}
-              </button>
+<button
+  style={{
+    cursor: isFormValid && !loading ? "pointer" : "not-allowed",
+  }}
+  type="submit"
+  disabled={!isFormValid || loading}
+  className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 relative overflow-hidden ${
+    isFormValid && !loading
+      ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105"
+      : "bg-gradient-to-r from-purple-600/40 to-pink-600/40 text-white/50 cursor-not-allowed"
+  }`}
+>
+  {loading ? (
+    <>
+      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+      <span>Feldolgozás...</span>
+    </>
+  ) : (
+    <>
+      {/* Animated text container */}
+      <div className="relative h-6 w-32">
+        
+        {/* "Bejelentkezés" text */}
+        <span
+          className="absolute inset-0 flex  gap-2 items-center justify-center transition-all duration-400 ease-out"
+          style={{
+            opacity: isLogin ? 1 : 0,
+            transform: isLogin
+              ? "translate3d(0, 0, 0)"
+              : "translate3d(-20px, 0, 0)",
+            willChange: "opacity, transform",
+          }}
+        >
+          
+      <Sparkles className="w-5 h-5" />
+      
+          Bejelentkezés
+        </span>
+        
+        {/* "Regisztráció" text */}
+        <span
+          className="absolute inset-0 flex gap-2 items-center justify-center transition-all duration-400 ease-out"
+          style={{
+            opacity: isLogin ? 0 : 1,
+            transform: isLogin
+              ? "translate3d(20px, 0, 0)"
+              : "translate3d(0, 0, 0)",
+            willChange: "opacity, transform",
+            
+          }}
+        >
+          
+      <Sparkles className="w-5 h-5" />
+      
+          Regisztráció
+        </span>
+      </div>
+    </>
+  )}
+</button>
 
               {/* Divider */}
               <div className="relative my-5">
@@ -781,25 +685,36 @@ export default function Login({ isOpen, onClose }) {
             </form>
 
             {/* Terms */}
-            {!isLogin && (
-              <p className="mt-5 text-center text-xs text-gray-500">
-                A regisztrációval elfogadod az{" "}
-                <a
-                  href="#"
-                  className="text-purple-400 hover:text-purple-300 font-semibold"
-                >
-                  ÁSZF-et
-                </a>{" "}
-                és az{" "}
-                <a
-                  href="#"
-                  className="text-purple-400 hover:text-purple-300 font-semibold"
-                >
-                  Adatvédelmi Nyilatkozatot
-                </a>
-                .
-              </p>
-            )}
+             {/* Terms - animált verzió */}
+<div
+  className="overflow-hidden transition-all duration-[400ms] ease-out"
+  style={{
+    maxHeight: isLogin ? "0px" : "100px",
+    opacity: isLogin ? 0 : 1,
+    transform: isLogin
+      ? "translate3d(0, -24px, 0)"
+      : "translate3d(0, 0, 0)",
+    willChange: "max-height, opacity, transform",
+  }}
+>
+  <p className="mt-5 text-center text-xs text-gray-500">
+    A regisztrációval elfogadod az{" "}
+    <a
+      href="#"
+      className="text-purple-400 hover:text-purple-300 font-semibold"
+    >
+      ÁSZF-et
+    </a>{" "}
+    és az{" "}
+    <a
+      href="#"
+      className="text-purple-400 hover:text-purple-300 font-semibold"
+    >
+      Adatvédelmi Nyilatkozatot
+    </a>
+    .
+  </p>
+</div>
           </div>
         </div>
       </div>
