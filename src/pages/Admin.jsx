@@ -1,24 +1,34 @@
-import React, { useState } from 'react';
-import { Settings, X, Save, Eye, Plus, Trash2, Upload, Download, RotateCcw } from 'lucide-react';
+import React, { useState } from "react";
+import {
+  Settings,
+  X,
+  Save,
+  Eye,
+  Plus,
+  Trash2,
+  Upload,
+  Download,
+  RotateCcw,
+} from "lucide-react";
 
 export default function LudusGenAdmin() {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('content');
+  const [activeTab, setActiveTab] = useState("content");
 
   // Example state - replace with your actual state management
   const [content, setContent] = useState({
-    heroTitle: 'A jövő AI platformja',
-    heroSubtitle: 'már itt van',
-    description: 'Tapasztald meg a következő generációs AI technológiát...',
-    ctaPrimary: 'Próbáld ki ingyen',
-    ctaSecondary: 'Nézd meg működés közben',
+    heroTitle: "A jövő AI platformja",
+    heroSubtitle: "már itt van",
+    description: "Tapasztald meg a következő generációs AI technológiát...",
+    ctaPrimary: "Próbáld ki ingyen",
+    ctaSecondary: "Nézd meg működés közben",
   });
 
   return (
     <>
       {/* Floating Admin Button */}
       <button
-      style={{cursor:'pointer'}}
+        style={{ cursor: "pointer" }}
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-8 right-8 z-[9999] bg-gradient-to-br from-purple-600 to-pink-600 text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform duration-300"
       >
@@ -36,7 +46,7 @@ export default function LudusGenAdmin() {
       {/* Admin Panel */}
       <div
         className={`fixed top-0 right-0 h-full w-full sm:w-[500px] bg-gradient-to-b from-[#1a1a2e] to-[#0f0f1e] shadow-2xl z-[9999] transform transition-transform duration-500 ease-out border-l border-purple-500/20 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
+          isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
         {/* Header */}
@@ -69,14 +79,16 @@ export default function LudusGenAdmin() {
 
         {/* Tabs */}
         <div className="flex border-b border-purple-500/20 bg-[#0f0f1e]">
-          {['Tartalom', 'Média', 'Beállítások'].map((tab, idx) => (
+          {["Tartalom", "Média", "Beállítások"].map((tab, idx) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(['content', 'media', 'settings'][idx])}
+              onClick={() =>
+                setActiveTab(["content", "media", "settings"][idx])
+              }
               className={`flex-1 py-3 text-sm font-semibold transition-all ${
-                activeTab === ['content', 'media', 'settings'][idx]
-                  ? 'text-purple-400 border-b-2 border-purple-500 bg-purple-500/10'
-                  : 'text-gray-400 hover:text-gray-300'
+                activeTab === ["content", "media", "settings"][idx]
+                  ? "text-purple-400 border-b-2 border-purple-500 bg-purple-500/10"
+                  : "text-gray-400 hover:text-gray-300"
               }`}
             >
               {tab}
@@ -86,8 +98,7 @@ export default function LudusGenAdmin() {
 
         {/* Content Area */}
         <div className="h-[calc(100vh-200px)] overflow-y-auto p-6">
-          
-          {activeTab === 'content' && (
+          {activeTab === "content" && (
             <div className="space-y-5">
               {/* Input Fields */}
               <div>
@@ -97,7 +108,9 @@ export default function LudusGenAdmin() {
                 <input
                   type="text"
                   value={content.heroTitle}
-                  onChange={(e) => setContent({...content, heroTitle: e.target.value})}
+                  onChange={(e) =>
+                    setContent({ ...content, heroTitle: e.target.value })
+                  }
                   className="w-full bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
                   placeholder="Írd be a főcímet..."
                 />
@@ -110,7 +123,9 @@ export default function LudusGenAdmin() {
                 <input
                   type="text"
                   value={content.heroSubtitle}
-                  onChange={(e) => setContent({...content, heroSubtitle: e.target.value})}
+                  onChange={(e) =>
+                    setContent({ ...content, heroSubtitle: e.target.value })
+                  }
                   className="w-full bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
                   placeholder="Kiemelendő rész..."
                 />
@@ -122,7 +137,9 @@ export default function LudusGenAdmin() {
                 </label>
                 <textarea
                   value={content.description}
-                  onChange={(e) => setContent({...content, description: e.target.value})}
+                  onChange={(e) =>
+                    setContent({ ...content, description: e.target.value })
+                  }
                   rows={4}
                   className="w-full bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all resize-none"
                   placeholder="Leírás szövege..."
@@ -137,7 +154,9 @@ export default function LudusGenAdmin() {
                   <input
                     type="text"
                     value={content.ctaPrimary}
-                    onChange={(e) => setContent({...content, ctaPrimary: e.target.value})}
+                    onChange={(e) =>
+                      setContent({ ...content, ctaPrimary: e.target.value })
+                    }
                     className="w-full bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
                   />
                 </div>
@@ -148,7 +167,9 @@ export default function LudusGenAdmin() {
                   <input
                     type="text"
                     value={content.ctaSecondary}
-                    onChange={(e) => setContent({...content, ctaSecondary: e.target.value})}
+                    onChange={(e) =>
+                      setContent({ ...content, ctaSecondary: e.target.value })
+                    }
                     className="w-full bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
                   />
                 </div>
@@ -166,8 +187,15 @@ export default function LudusGenAdmin() {
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {['Globális AI Hálózat', 'Enterprise Biztonság', 'AI Orchestration'].map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2 bg-gray-900/30 border border-purple-500/20 rounded-lg p-3">
+                  {[
+                    "Globális AI Hálózat",
+                    "Enterprise Biztonság",
+                    "AI Orchestration",
+                  ].map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 bg-gray-900/30 border border-purple-500/20 rounded-lg p-3"
+                    >
                       <input
                         type="text"
                         value={item}
@@ -183,12 +211,14 @@ export default function LudusGenAdmin() {
             </div>
           )}
 
-          {activeTab === 'media' && (
+          {activeTab === "media" && (
             <div className="space-y-5">
               <div className="border-2 border-dashed border-purple-500/30 rounded-lg p-8 text-center hover:border-purple-500/50 transition-colors cursor-pointer">
                 <Upload size={32} className="mx-auto text-purple-400 mb-3" />
                 <p className="text-white font-semibold mb-1">Kép feltöltése</p>
-                <p className="text-gray-400 text-sm">Kattints vagy húzd ide a fájlt</p>
+                <p className="text-gray-400 text-sm">
+                  Kattints vagy húzd ide a fájlt
+                </p>
               </div>
 
               <div>
@@ -204,7 +234,7 @@ export default function LudusGenAdmin() {
             </div>
           )}
 
-          {activeTab === 'settings' && (
+          {activeTab === "settings" && (
             <div className="space-y-5">
               {/* Color Pickers */}
               <div>
