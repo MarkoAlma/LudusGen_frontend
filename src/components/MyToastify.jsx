@@ -28,13 +28,15 @@ const MyToastify = ({err, katt, resetPw, kijelentkezes, torles}) => {
             // }, 2000)
         }else if (kijelentkezes) {
           toast.success(kijelentkezes, {position:'top-center', autoClose:1250})
+          console.log("kijelent");
           setMsg({})
         }else if (torles) {
           toast.success(torles, {position:'top-center', autoClose:2500})
+          console.log("tor");
           setMsg({})
         }
         else if (resetPw) {
-            navigate('/signin')
+            // navigate('/signin')
             toast.success(resetPw, {position:'top-center', autoClose:2500})
         }
     },[err, katt, resetPw, kijelentkezes, torles])
