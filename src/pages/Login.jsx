@@ -1,10 +1,23 @@
-import React, { useState, useMemo } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, X, Sparkles, Chrome, Github, Apple, CheckCircle2, XCircle } from 'lucide-react';
-import { useContext } from 'react';
-import { MyUserContext } from '../context/MyUserProvider';
-import { IoCheckmarkDoneOutline } from 'react-icons/io5';
-import { FaCheck } from 'react-icons/fa';
-import { useEffect, useRef } from 'react';
+import React, { useState, useMemo } from "react";
+import {
+  Mail,
+  Lock,
+  User,
+  Eye,
+  EyeOff,
+  X,
+  Sparkles,
+  Chrome,
+  Github,
+  Apple,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
+import { useContext } from "react";
+import { MyUserContext } from "../context/MyUserProvider";
+import { IoCheckmarkDoneOutline } from "react-icons/io5";
+import { FaCheck } from "react-icons/fa";
+import { useEffect, useRef } from "react";
 
 export default function Login({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -25,23 +38,23 @@ export default function Login({ isOpen, onClose }) {
   });
 
   useEffect(() => {
-  // Töröljük a hibaüzenetet, ha a felhasználó gépelni kezd
-  if (msg?.incorrectSignIn) {
-    setMsg({ incorrectSignIn: null });
-  }
-}, [formData.email, formData.password]);
+    // Töröljük a hibaüzenetet, ha a felhasználó gépelni kezd
+    if (msg?.incorrectSignIn) {
+      setMsg({ incorrectSignIn: null });
+    }
+  }, [formData.email, formData.password]);
 
   useEffect(() => {
-  // Töröljük a hibaüzenetet, ha a felhasználó gépelni kezd
-  if (msg?.incorrectSignUp) {
-    setMsg({incorrectSignUp: null})
-    console.log("ALMALMALAMLAMLMAL");
-    
-  }
-}, [formData.email]);
+    // Töröljük a hibaüzenetet, ha a felhasználó gépelni kezd
+    if (msg?.incorrectSignUp) {
+      setMsg({ incorrectSignUp: null });
+      console.log("ALMALMALAMLAMLMAL");
+    }
+  }, [formData.email]);
 
-  const { signUpUser, signInUser, msg, user, setMsg } = useContext(MyUserContext);
-  
+  const { signUpUser, signInUser, msg, user, setMsg } =
+    useContext(MyUserContext);
+
   // Ref-ek a sikeres művelet detektálásához
   const prevUserRef = useRef(null);
   const isSubmittingRef = useRef(false);
@@ -84,17 +97,17 @@ export default function Login({ isOpen, onClose }) {
     // Ha éppen van folyamatban lévő submit és a user megváltozott (bejelentkezett)
     if (isSubmittingRef.current && user && prevUserRef.current !== user) {
       isSubmittingRef.current = false;
-      
+
       // // Sikeres toast megjelenítése
       // const isRegistration = savedNameRef.current !== '';
-      
+
       // // if (isRegistration) {
       // //   // REGISZTRÁCIÓ TOAST
       // //   setMsg({err:"OKSA"})
       // // } else {
       // //   setMsg({err:"Nem oksa"})
       // // }
-      
+
       // Form reset és modal bezárása
       setFormData({
         name: "",
@@ -102,8 +115,8 @@ export default function Login({ isOpen, onClose }) {
         password: "",
         confirmPassword: "",
       });
-      savedNameRef.current = '';
-      
+      savedNameRef.current = "";
+
       // setTimeout(() => {
       //   onClose();
       // }, 500);
@@ -148,17 +161,17 @@ export default function Login({ isOpen, onClose }) {
     } catch (error) {
       isSubmittingRef.current = false;
       // ❌ HIBA ESETÉN a toast megjelenik, DE a modal NYITVA MARAD
-      setMsg({err:"HIBA"})
+      setMsg({ err: "HIBA" });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(()=>{
+  useEffect(() => {
     if (msg?.katt) {
-      switchMode(true)
+      switchMode(true);
     }
-  },[msg])
+  }, [msg]);
 
   const handleBlur = (field) => {
     setTouched({ ...touched, [field]: true });
@@ -386,21 +399,29 @@ export default function Login({ isOpen, onClose }) {
                 {/* ✅ ÚJ: Email már foglalt hibaüzenet REGISZTRÁCIÓ esetén */}
                 {/* ✅ BEJELENTKEZÉS - Helytelen email cím */}
                 {console.log(msg)}
-                
-                {!isLogin && msg?.incorrectSignUp && msg.incorrectSignUp.toLowerCase().includes("invalid-email") && (
-                  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
-                    <XCircle className="w-3 h-3" />
-                    <span>Helytelen email cím</span>
-                  </div>
-                )}
+
+                {!isLogin &&
+                  msg?.incorrectSignUp &&
+                  msg.incorrectSignUp
+                    .toLowerCase()
+                    .includes("invalid-email") && (
+                    <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                      <XCircle className="w-3 h-3" />
+                      <span>Helytelen email cím</span>
+                    </div>
+                  )}
 
                 {/* ✅ BEJELENTKEZÉS - Helytelen email cím */}
-                {!isLogin && msg?.incorrectSignUp && msg.incorrectSignUp.toLowerCase().includes("email-already-in-use") && (
-                  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
-                    <XCircle className="w-3 h-3" />
-                    <span>Az email cím már használatban van</span>
-                  </div>
-                )}
+                {!isLogin &&
+                  msg?.incorrectSignUp &&
+                  msg.incorrectSignUp
+                    .toLowerCase()
+                    .includes("email-already-in-use") && (
+                    <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                      <XCircle className="w-3 h-3" />
+                      <span>Az email cím már használatban van</span>
+                    </div>
+                  )}
               </div>
 
               {/* Password – FIX KÖZÉPPONT */}
@@ -435,16 +456,14 @@ export default function Login({ isOpen, onClose }) {
                     )}
                   </button>
                 </div>
-                
-{/* ✅ BEJELENTKEZÉS - Hibás email/jelszó üzenet */}
-{isLogin && msg?.incorrectSignIn && (
-  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
-    <XCircle className="w-3 h-3" />
-    <span>Hibás email/jelszó páros</span>
-  </div>
-)}
 
-
+                {/* ✅ BEJELENTKEZÉS - Hibás email/jelszó üzenet */}
+                {isLogin && msg?.incorrectSignIn && (
+                  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                    <XCircle className="w-3 h-3" />
+                    <span>Hibás email/jelszó páros</span>
+                  </div>
+                )}
 
                 {/* Jelszó validáció - csak akkor jelenik meg, ha nem minden teljesül */}
                 {!isLogin && formData.password !== "" && !isPasswordValid && (
@@ -543,26 +562,26 @@ export default function Login({ isOpen, onClose }) {
               </div>
 
               {/* Remember Me / Forgot Password */}
-{/* Remember Me / Forgot Password - animált verzió */}
-<div
-  className="overflow-hidden transition-all duration-[400ms] ease-out"
-  style={{
-    maxHeight: isLogin ? "60px" : "0px",
-    opacity: isLogin ? 1 : 0,
-    transform: isLogin
-      ? "translate3d(0, 0, 0)"
-      : "translate3d(0, 24px, 0)",
-    willChange: "max-height, opacity, transform",
-  }}
->
-  <div className="flex items-center justify-between text-sm">
-    <label className="flex items-center gap-3 cursor-pointer select-none group">
-      {/* EZ MARAD HIDDEN */}
-      <input type="checkbox" className="peer hidden" />
+              {/* Remember Me / Forgot Password - animált verzió */}
+              <div
+                className="overflow-hidden transition-all duration-[400ms] ease-out"
+                style={{
+                  maxHeight: isLogin ? "60px" : "0px",
+                  opacity: isLogin ? 1 : 0,
+                  transform: isLogin
+                    ? "translate3d(0, 0, 0)"
+                    : "translate3d(0, 24px, 0)",
+                  willChange: "max-height, opacity, transform",
+                }}
+              >
+                <div className="flex items-center justify-between text-sm">
+                  <label className="flex items-center gap-3 cursor-pointer select-none group">
+                    {/* EZ MARAD HIDDEN */}
+                    <input type="checkbox" className="peer hidden" />
 
-      {/* CUSTOM CHECKBOX */}
-      <div
-        className="
+                    {/* CUSTOM CHECKBOX */}
+                    <div
+                      className="
 w-6 h-6 rounded-md
 border border-purple-500/40
 bg-black/40
@@ -577,90 +596,84 @@ peer-checked:shadow-[0_0_6px_rgba(168,85,247,0.35)]
 peer-checked:[&>svg]:opacity-100
 peer-checked:[&>svg]:scale-100
 "
-      >
-        <FaCheck
-          className="
+                    >
+                      <FaCheck
+                        className="
 w-4 h-4 text-white
 opacity-0 scale-75
 transition-all duration-200 ease-out
 "
-        />
-      </div>
+                      />
+                    </div>
 
-      <span className="text-gray-400 group-hover:text-gray-300 transition-colors text-sm">
-        Maradjak bejelentkezve
-      </span>
-    </label>
+                    <span className="text-gray-400 group-hover:text-gray-300 transition-colors text-sm">
+                      Maradjak bejelentkezve
+                    </span>
+                  </label>
 
-    <a
-      href="#"
-      className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
-    >
-      Elfelejtett jelszó?
-    </a>
-  </div>
-</div>
+                  <a
+                    href="#"
+                    className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+                  >
+                    Elfelejtett jelszó?
+                  </a>
+                </div>
+              </div>
               {/* Submit Button */}
-<button
-  style={{
-    cursor: isFormValid && !loading ? "pointer" : "not-allowed",
-  }}
-  type="submit"
-  disabled={!isFormValid || loading}
-  className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 relative overflow-hidden ${
-    isFormValid && !loading
-      ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105"
-      : "bg-gradient-to-r from-purple-600/40 to-pink-600/40 text-white/50 cursor-not-allowed"
-  }`}
->
-  {loading ? (
-    <>
-      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-      <span>Feldolgozás...</span>
-    </>
-  ) : (
-    <>
-      {/* Animated text container */}
-      <div className="relative h-6 w-32">
-        
-        {/* "Bejelentkezés" text */}
-        <span
-          className="absolute inset-0 flex  gap-2 items-center justify-center transition-all duration-400 ease-out"
-          style={{
-            opacity: isLogin ? 1 : 0,
-            transform: isLogin
-              ? "translate3d(0, 0, 0)"
-              : "translate3d(-20px, 0, 0)",
-            willChange: "opacity, transform",
-          }}
-        >
-          
-      <Sparkles className="w-5 h-5" />
-      
-          Bejelentkezés
-        </span>
-        
-        {/* "Regisztráció" text */}
-        <span
-          className="absolute inset-0 flex gap-2 items-center justify-center transition-all duration-400 ease-out"
-          style={{
-            opacity: isLogin ? 0 : 1,
-            transform: isLogin
-              ? "translate3d(20px, 0, 0)"
-              : "translate3d(0, 0, 0)",
-            willChange: "opacity, transform",
-            
-          }}
-        >
-          
-      <Sparkles className="w-5 h-5" />
-      
-          Regisztráció
-        </span>
-      </div>
-    </>
-  )}
-</button>
+              <button
+                style={{
+                  cursor: isFormValid && !loading ? "pointer" : "not-allowed",
+                }}
+                type="submit"
+                disabled={!isFormValid || loading}
+                className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 relative overflow-hidden ${
+                  isFormValid && !loading
+                    ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105"
+                    : "bg-gradient-to-r from-purple-600/40 to-pink-600/40 text-white/50 cursor-not-allowed"
+                }`}
+              >
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Feldolgozás...</span>
+                  </>
+                ) : (
+                  <>
+                    {/* Animated text container */}
+                    <div className="relative h-6 w-32">
+                      {/* "Bejelentkezés" text */}
+                      <span
+                        className="absolute inset-0 flex  gap-2 items-center justify-center transition-all duration-400 ease-out"
+                        style={{
+                          opacity: isLogin ? 1 : 0,
+                          transform: isLogin
+                            ? "translate3d(0, 0, 0)"
+                            : "translate3d(-20px, 0, 0)",
+                          willChange: "opacity, transform",
+                        }}
+                      >
+                        <Sparkles className="w-5 h-5" />
+                        Bejelentkezés
+                      </span>
+
+                      {/* "Regisztráció" text */}
+                      <span
+                        className="absolute inset-0 flex gap-2 items-center justify-center transition-all duration-400 ease-out"
+                        style={{
+                          opacity: isLogin ? 0 : 1,
+                          transform: isLogin
+                            ? "translate3d(20px, 0, 0)"
+                            : "translate3d(0, 0, 0)",
+                          willChange: "opacity, transform",
+                        }}
+                      >
+                        <Sparkles className="w-5 h-5" />
+                        Regisztráció
+                      </span>
+                    </div>
+                  </>
+                )}
+              </button>
 
               {/* Divider */}
               <div className="relative my-5">
@@ -702,36 +715,36 @@ transition-all duration-200 ease-out
             </form>
 
             {/* Terms */}
-             {/* Terms - animált verzió */}
-<div
-  className="overflow-hidden transition-all duration-[400ms] ease-out"
-  style={{
-    maxHeight: isLogin ? "0px" : "100px",
-    opacity: isLogin ? 0 : 1,
-    transform: isLogin
-      ? "translate3d(0, -24px, 0)"
-      : "translate3d(0, 0, 0)",
-    willChange: "max-height, opacity, transform",
-  }}
->
-  <p className="mt-5 text-center text-xs text-gray-500">
-    A regisztrációval elfogadod az{" "}
-    <a
-      href="#"
-      className="text-purple-400 hover:text-purple-300 font-semibold"
-    >
-      ÁSZF-et
-    </a>{" "}
-    és az{" "}
-    <a
-      href="#"
-      className="text-purple-400 hover:text-purple-300 font-semibold"
-    >
-      Adatvédelmi Nyilatkozatot
-    </a>
-    .
-  </p>
-</div>
+            {/* Terms - animált verzió */}
+            <div
+              className="overflow-hidden transition-all duration-[400ms] ease-out"
+              style={{
+                maxHeight: isLogin ? "0px" : "100px",
+                opacity: isLogin ? 0 : 1,
+                transform: isLogin
+                  ? "translate3d(0, -24px, 0)"
+                  : "translate3d(0, 0, 0)",
+                willChange: "max-height, opacity, transform",
+              }}
+            >
+              <p className="mt-5 text-center text-xs text-gray-500">
+                A regisztrációval elfogadod az{" "}
+                <a
+                  href="#"
+                  className="text-purple-400 hover:text-purple-300 font-semibold"
+                >
+                  ÁSZF-et
+                </a>{" "}
+                és az{" "}
+                <a
+                  href="#"
+                  className="text-purple-400 hover:text-purple-300 font-semibold"
+                >
+                  Adatvédelmi Nyilatkozatot
+                </a>
+                .
+              </p>
+            </div>
           </div>
         </div>
       </div>
