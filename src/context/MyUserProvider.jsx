@@ -31,10 +31,22 @@ const MyUserProvider = ({ children }) => {
       console.log(currentUser);
     });
 
-    return () => unsub();
-  }, []); // <-- run only once on mount
+useEffect(() => {
+  const unsub = onAuthStateChanged(auth, (currentUser) => {
+    console.log("Auth state changed:", currentUser);
+    setUser(currentUser); // null if signed out, object if signed in
+    console.log(currentUser)
+  });
 
-  const signUpUser = async (email, password, display_name, setLoading) => {
+  return () => unsub();
+}, []); // <-- run only once on mount
+
+useEffect(() => {
+  console.log("msg változott:", msg);
+}, [msg]);
+
+
+  const signUpUser = async (email, password, display_name, setLoading)=> {
     try {
       // 1. Firebase Auth user létrehozása
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -113,12 +125,18 @@ const MyUserProvider = ({ children }) => {
   const resetPassword = async (email) => {
     let success = false;
     try {
-      await sendPasswordResetEmail(auth, email);
-      setMsg({ resetPw: "A jelszó visszaállításhoz szükséges email elküldve" });
-      success = true;
+      await sendPasswordResetEmail(auth, email, {
+        url: "http://localhost:5173/reset-password",
+      })
+      // setMsg({resetPw:"A jelszó visszaállításhoz szükséges email elküldve"})
+      success = true
     } catch (error) {
-      setMsg({ err: error.message });
-    } finally {
+      console.log(error);
+      
+      setMsg({incorrectResetPwEmail:error.message})
+      // console.log(msg);
+      
+    }finally {
       if (success) {
         //navigate("/signin")
       }
@@ -135,21 +153,8 @@ const MyUserProvider = ({ children }) => {
   // },[user])
 
   return (
-    <MyUserContext.Provider
-      value={{
-        user,
-        signUpUser,
-        logoutUser,
-        signInUser,
-        msg,
-        setMsg,
-        setUser,
-        isAuthOpen,
-        setIsAuthOpen,
-        showNavbar,
-        setShowNavbar,
-      }}
-    >
+    <MyUserContext.Provider 
+      value={{user, signUpUser,logoutUser,signInUser, msg, setMsg, setUser, isAuthOpen, setIsAuthOpen, showNavbar, setShowNavbar, resetPassword}}>
       {children}
     </MyUserContext.Provider>
   );

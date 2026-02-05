@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Background from './components/Background';
 import Navbar from './components/Nav';
 import Home from './pages/Home';
@@ -15,11 +15,13 @@ import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 import { Toaster } from 'react-hot-toast';
 import MyToastify from './components/MyToastify';
+import ResetPassword from './components/ResetPassword';
 import Enable2FA from './components/Enable2Fa';
 import Settings from './pages/Settings';
 
 function App() {
   const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg} = useContext(MyUserContext)
+  const navigate = useNavigate()
 
 
   const bezar = ()=> {
@@ -48,6 +50,19 @@ function App() {
     };
   }, [isAuthOpen]);
 
+useEffect(() => {
+  // Ha a gyökérúton van Firebase action
+  if (location.pathname === '/') {
+    const params = new URLSearchParams(location.search);
+    const mode = params.get('mode');
+    
+    if (mode === 'resetPassword') {
+      // ✅ Átirányítás a reset oldalra PARAMÉTEREKKEL (a ResetPassword komponens majd kitörli őket)
+      navigate(`/reset-password${location.search}`, { replace: true });
+    }
+  }
+}, [location, navigate]);
+
   return (
     <div className="min-h-screen bg-black text-white relative">
       <Background />
@@ -57,6 +72,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/chat" element={<AIChat />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           
           <Route path="/settings" element={<Settings />} />
         </Routes>
