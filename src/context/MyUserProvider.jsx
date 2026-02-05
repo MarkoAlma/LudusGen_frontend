@@ -129,11 +129,43 @@ const MyUserProvider = ({ children }) => {
   const signInUser = async (email, password) => {
     setUser(null);
     try {
-      // ✅ ELŐSZÖR ELLENŐRIZZÜK A JELSZÓT - próbáljunk bejelentkezni Firebase-ben
-      // Ez dobni fog hibát, ha rossz a jelszó vagy email
+      // ✅ ELŐSZÖR ELLENŐRIZZÜK, HOGY SZÜKSÉGES-E A 2FA (backend API-val)
+      const check2FAResponse = await axios.post(
+        "http://localhost:3001/api/check-2fa-required",
+        { email }
+      );
+
+      // ✅ Ha 2FA szükséges, NE jelentkeztessük be Firebase-ben!
+      // Csak ellenőrizzük a jelszót a backend-en
+      if (check2FAResponse.data.requires2FA) {
+        console.log("2FA required for user:", email);
+        
+        // Ellenőrizzük a jelszót anélkül, hogy bejelentkeznénk
+        // A backend-en validáljuk a jelszót
+        try {
+          const validateResponse = await axios.post(
+            "http://localhost:3001/api/validate-password",
+            { email, password }
+          );
+          
+          if (validateResponse.data.success) {
+            // Jelszó helyes, de 2FA kell
+            return { requires2FA: true };
+          } else {
+            // Rossz jelszó
+            setMsg({ incorrectSignIn: "Hibás email/jelszó páros" });
+            return { requires2FA: false };
+          }
+        } catch (error) {
+          console.error("Password validation error:", error);
+          setMsg({ incorrectSignIn: error.response?.data?.message || "Hibás email/jelszó páros" });
+          return { requires2FA: false };
+        }
+      }
+
+      // ✅ HA NINCS 2FA, AKKOR NORMÁL FIREBASE BEJELENTKEZÉS
       const adat = await signInWithEmailAndPassword(auth, email, password);
       
-      // Ha sikerült a bejelentkezés, ellenőrizzük az email verifikációt
       if (!adat.user.emailVerified) {
         setMsg({ err: "Nincs megerősítve az email!" });
         setUser(null);
@@ -141,22 +173,7 @@ const MyUserProvider = ({ children }) => {
         return { requires2FA: false };
       }
 
-      // ✅ Most ellenőrizzük, hogy szükséges-e a 2FA
-      const check2FAResponse = await axios.post(
-        "http://localhost:3001/api/check-2fa-required",
-        { email }
-      );
-
-      // Ha 2FA szükséges, kijelentkeztetjük (majd a 2FA után újra bejelentkezik)
-      if (check2FAResponse.data.requires2FA) {
-        console.log("2FA required for user:", email);
-        await signOut(auth); // Kijelentkeztetjük ideiglenesen
-        return { requires2FA: true };
-      }
-
-      // ✅ HA NINCS 2FA, AKKOR MARADJON BEJELENTKEZVE
       setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés!" });
-      // A 2FA státuszt automatikusan betölti az onAuthStateChanged
       return { requires2FA: false };
       
     } catch (error) {
