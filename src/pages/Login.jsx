@@ -35,6 +35,8 @@ export default function Login({ isOpen, onClose }) {
   // Töröljük a hibaüzenetet, ha a felhasználó gépelni kezd
   if (msg?.incorrectSignUp) {
     setMsg({incorrectSignUp: null})
+    console.log("ALMALMALAMLAMLMAL");
+    
   }
 }, [formData.email]);
 
@@ -82,17 +84,17 @@ export default function Login({ isOpen, onClose }) {
     // Ha éppen van folyamatban lévő submit és a user megváltozott (bejelentkezett)
     if (isSubmittingRef.current && user && prevUserRef.current !== user) {
       isSubmittingRef.current = false;
-
-      // Sikeres toast megjelenítése
-      const isRegistration = savedNameRef.current !== "";
-
-      if (isRegistration) {
-        // REGISZTRÁCIÓ TOAST
-        setMsg({err:"OKSA"})
-      } else {
-        setMsg({err:"Nem oksa"})
-      }
-
+      
+      // // Sikeres toast megjelenítése
+      // const isRegistration = savedNameRef.current !== '';
+      
+      // // if (isRegistration) {
+      // //   // REGISZTRÁCIÓ TOAST
+      // //   setMsg({err:"OKSA"})
+      // // } else {
+      // //   setMsg({err:"Nem oksa"})
+      // // }
+      
       // Form reset és modal bezárása
       setFormData({
         name: "",
@@ -100,11 +102,11 @@ export default function Login({ isOpen, onClose }) {
         password: "",
         confirmPassword: "",
       });
-      savedNameRef.current = "";
-
-      setTimeout(() => {
-        onClose();
-      }, 500);
+      savedNameRef.current = '';
+      
+      // setTimeout(() => {
+      //   onClose();
+      // }, 500);
     }
 
     prevUserRef.current = user;
@@ -152,9 +154,11 @@ export default function Login({ isOpen, onClose }) {
     }
   };
 
-  useEffect(() => {
-    console.log(msg);
-  }, [msg]);
+  useEffect(()=>{
+    if (msg?.katt) {
+      switchMode(true)
+    }
+  },[msg])
 
   const handleBlur = (field) => {
     setTouched({ ...touched, [field]: true });
@@ -380,7 +384,18 @@ export default function Login({ isOpen, onClose }) {
                   </div>
                 )}
                 {/* ✅ ÚJ: Email már foglalt hibaüzenet REGISZTRÁCIÓ esetén */}
-                {!isLogin && msg?.incorrectSignUp && msg.incorrectSignUp.toLowerCase().includes('email') && (
+                {/* ✅ BEJELENTKEZÉS - Helytelen email cím */}
+                {console.log(msg)}
+                
+                {!isLogin && msg?.incorrectSignUp && msg.incorrectSignUp.toLowerCase().includes("invalid-email") && (
+                  <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                    <XCircle className="w-3 h-3" />
+                    <span>Helytelen email cím</span>
+                  </div>
+                )}
+
+                {/* ✅ BEJELENTKEZÉS - Helytelen email cím */}
+                {!isLogin && msg?.incorrectSignUp && msg.incorrectSignUp.toLowerCase().includes("email-already-in-use") && (
                   <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
                     <XCircle className="w-3 h-3" />
                     <span>Az email cím már használatban van</span>
@@ -428,6 +443,8 @@ export default function Login({ isOpen, onClose }) {
     <span>Hibás email/jelszó páros</span>
   </div>
 )}
+
+
 
                 {/* Jelszó validáció - csak akkor jelenik meg, ha nem minden teljesül */}
                 {!isLogin && formData.password !== "" && !isPasswordValid && (

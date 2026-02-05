@@ -24,10 +24,12 @@ function App() {
     setShowNavbar(true)
   }
 
-        useEffect(()=>{
-        setIsAuthOpen(false)
-        setShowNavbar(true)
-      },[user])
+  useEffect(()=>{
+    if (user?.emailVerified) {
+      setIsAuthOpen(false)
+      setShowNavbar(true)
+    }
+  },[user])
 
   // Scroll lock on modal open
   useEffect(() => {
