@@ -81,10 +81,9 @@ const MyUserProvider = ({ children }) => {
     }));
   };
 
-useEffect(() => {
-  console.log("msg változott:", msg);
-}, [msg]);
-
+  useEffect(() => {
+    console.log("msg változott:", msg);
+  }, [msg]);
 
   const signUpUser = async (email, password, display_name, setLoading)=> {
     try {
@@ -130,31 +129,36 @@ useEffect(() => {
   const signInUser = async (email, password) => {
     setUser(null);
     try {
-      // ✅ ELŐSZÖR ELLENŐRIZZÜK, HOGY SZÜKSÉGES-E A 2FA
-      const check2FAResponse = await axios.post(
-        "http://localhost:3001/api/check-2fa-required",
-        { email }
-      );
-
-      // Ha 2FA szükséges, NEM jelentkeztetjük be a Firebase-ben
-      if (check2FAResponse.data.requires2FA) {
-        console.log("2FA required for user:", email);
-        return { requires2FA: true };
-      }
-
-      // ✅ HA NINCS 2FA, AKKOR NORMÁL BEJELENTKEZÉS
+      // ✅ ELŐSZÖR ELLENŐRIZZÜK A JELSZÓT - próbáljunk bejelentkezni Firebase-ben
+      // Ez dobni fog hibát, ha rossz a jelszó vagy email
       const adat = await signInWithEmailAndPassword(auth, email, password);
       
-      if (adat.user.emailVerified) {
-        setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés!" });
-        // A 2FA státuszt automatikusan betölti az onAuthStateChanged
-        return { requires2FA: false };
-      } else {
+      // Ha sikerült a bejelentkezés, ellenőrizzük az email verifikációt
+      if (!adat.user.emailVerified) {
         setMsg({ err: "Nincs megerősítve az email!" });
         setUser(null);
         await signOut(auth);
         return { requires2FA: false };
       }
+
+      // ✅ Most ellenőrizzük, hogy szükséges-e a 2FA
+      const check2FAResponse = await axios.post(
+        "http://localhost:3001/api/check-2fa-required",
+        { email }
+      );
+
+      // Ha 2FA szükséges, kijelentkeztetjük (majd a 2FA után újra bejelentkezik)
+      if (check2FAResponse.data.requires2FA) {
+        console.log("2FA required for user:", email);
+        await signOut(auth); // Kijelentkeztetjük ideiglenesen
+        return { requires2FA: true };
+      }
+
+      // ✅ HA NINCS 2FA, AKKOR MARADJON BEJELENTKEZVE
+      setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés!" });
+      // A 2FA státuszt automatikusan betölti az onAuthStateChanged
+      return { requires2FA: false };
+      
     } catch (error) {
       console.log(error);
       setMsg({ incorrectSignIn: error.message });
