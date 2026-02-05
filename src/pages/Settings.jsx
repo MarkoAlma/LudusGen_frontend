@@ -21,7 +21,8 @@ import Enable2FA from "../components/Enable2Fa";
 import axios from "axios";
 
 export default function Settings() {
-  const { user, updateUser } = useContext(MyUserContext);
+  // ✅ FONTOS: is2FAEnabled, loading2FA és refresh2FAStatus a Context-ből jön
+  const { user, updateUser, is2FAEnabled, loading2FA, refresh2FAStatus } = useContext(MyUserContext);
   const navigate = useNavigate();
   
   // Form states
@@ -30,10 +31,8 @@ export default function Settings() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
   
-  // 2FA states
+  // 2FA modal state
   const [show2FA, setShow2FA] = useState(false);
-  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
-  const [checking2FA, setChecking2FA] = useState(true);
   
   // Form data
   const [formData, setFormData] = useState({
@@ -56,22 +55,8 @@ export default function Settings() {
         location: user.location || "",
         bio: user.bio || "",
       });
-      check2FAStatus();
     }
   }, [user]);
-
-  // Check 2FA status
-  const check2FAStatus = async () => {
-    try {
-      setChecking2FA(true);
-      const res = await axios.get("http://localhost:3001/api/check-2fa-status");
-      setIs2FAEnabled(res.data.is2FAEnabled);
-    } catch (err) {
-      console.error("2FA check error:", err);
-    } finally {
-      setChecking2FA(false);
-    }
-  };
 
   // Handle input change
   const handleChange = (e) => {
@@ -126,9 +111,21 @@ export default function Settings() {
     if (!code) return;
 
     try {
-      const res = await axios.post("http://localhost:3001/api/disable-2fa", { code });
+      const token = await user.getIdToken();
+      
+      const res = await axios.post(
+        "http://localhost:3001/api/disable-2fa", 
+        { code },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      
       if (res.data.success) {
-        setIs2FAEnabled(false);
+        // ✅ Frissítsd a Context-ben a 2FA státuszt
+        await refresh2FAStatus();
         alert("2FA sikeresen kikapcsolva");
       }
     } catch (err) {
@@ -381,7 +378,8 @@ export default function Settings() {
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-semibold text-gray-300">Kéttényezős azonosítás</span>
-                      {checking2FA ? (
+                      {/* ✅ loading2FA és is2FAEnabled a Context-ből */}
+                      {loading2FA ? (
                         <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
                       ) : (
                         <div className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -469,7 +467,8 @@ export default function Settings() {
         isOpen={show2FA} 
         onClose={() => {
           setShow2FA(false);
-          check2FAStatus(); // Refresh 2FA status after closing
+          // ✅ A modal bezárásakor frissítjük a 2FA státuszt
+          refresh2FAStatus();
         }} 
       />
 

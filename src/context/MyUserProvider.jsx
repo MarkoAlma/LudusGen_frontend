@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { createContext } from "react";
+import { useState, createContext, useEffect } from "react";
 import { auth } from "../firebase/firebaseApp";
 import {
   createUserWithEmailAndPassword,
@@ -13,7 +12,6 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-import { useEffect } from "react";
 import axios from "axios";
 
 export const MyUserContext = createContext();
@@ -23,16 +21,65 @@ const MyUserProvider = ({ children }) => {
   const [msg, setMsg] = useState({});
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [showNavbar, setShowNavbar] = useState(true);
+  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [loading2FA, setLoading2FA] = useState(true);
 
+  // Firebase Auth State Listener
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (currentUser) => {
+    const unsub = onAuthStateChanged(auth, async (currentUser) => {
       console.log("Auth state changed:", currentUser);
-      setUser(currentUser); // null if signed out, object if signed in
-      console.log(currentUser);
+      setUser(currentUser);
+      
+      // Ha van bejelentkezett user, töltsd be a 2FA státuszt
+      if (currentUser) {
+        await fetch2FAStatus(currentUser);
+      } else {
+        setIs2FAEnabled(false);
+        setLoading2FA(false);
+      }
     });
 
     return () => unsub();
-  }, []); // <-- run only once on mount
+  }, []);
+
+  // 2FA státusz betöltése a backend-ből
+  const fetch2FAStatus = async (currentUser) => {
+    try {
+      setLoading2FA(true);
+      const token = await currentUser.getIdToken();
+      
+      const response = await axios.get("http://localhost:3001/api/check-2fa-status", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      if (response.data.success) {
+        setIs2FAEnabled(response.data.is2FAEnabled);
+        console.log("2FA Status loaded:", response.data.is2FAEnabled);
+      }
+    } catch (error) {
+      console.error("Error fetching 2FA status:", error);
+      setIs2FAEnabled(false);
+    } finally {
+      setLoading2FA(false);
+    }
+  };
+
+  // Refresh 2FA status (call this after enabling/disabling 2FA)
+  const refresh2FAStatus = async () => {
+    if (user) {
+      await fetch2FAStatus(user);
+    }
+  };
+
+  // ✅ ÚJ: updateUser függvény - lokális user state frissítése
+  const updateUser = (updatedData) => {
+    setUser(prevUser => ({
+      ...prevUser,
+      ...updatedData,
+    }));
+  };
 
   const signUpUser = async (email, password, display_name, setLoading) => {
     try {
@@ -46,7 +93,7 @@ const MyUserProvider = ({ children }) => {
       // 3. Email verifikáció küldése
       await sendEmailVerification(auth.currentUser);
       
-      // 4. Firestore dokumentum létrehozása - axios-szal hívjuk a backend-et
+      // 4. Firestore dokumentum létrehozása
       try {
         await axios.post("http://localhost:3001/api/create-user", {
           uid,
@@ -56,7 +103,6 @@ const MyUserProvider = ({ children }) => {
         });
       } catch (firestoreError) {
         console.error("Firestore user creation error:", firestoreError);
-        // Folytatjuk, mert a Firebase Auth user már létrejött
       }
       
       setMsg((prev) => delete prev.err);
@@ -73,6 +119,7 @@ const MyUserProvider = ({ children }) => {
     await signOut(auth);
     setMsg({ kijelentkezes: "Sikeres kijelentkezés!" });
     setUser(null);
+    setIs2FAEnabled(false);
   };
 
   const signInUser = async (email, password) => {
@@ -95,11 +142,11 @@ const MyUserProvider = ({ children }) => {
       
       if (adat.user.emailVerified) {
         setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés!" });
+        // A 2FA státuszt automatikusan betölti az onAuthStateChanged
         return { requires2FA: false };
       } else {
         setMsg({ err: "Nincs megerősítve az email!" });
         setUser(null);
-        // Kijelentkeztetjük, mert nincs megerősítve az email
         await signOut(auth);
         return { requires2FA: false };
       }
@@ -125,15 +172,6 @@ const MyUserProvider = ({ children }) => {
     }
   };
 
-  // useEffect(()=>{
-  //   const unsub = onAuthStateChanged(auth,(currentUser)=>{
-  //     console.log(currentUser);
-  //     currentUser && setUser(currentUser) //ezt kell majd modositani
-  //     user && console.log(user);
-  //   })
-  //   return ()=>unsub()
-  // },[user])
-
   return (
     <MyUserContext.Provider
       value={{
@@ -144,10 +182,14 @@ const MyUserProvider = ({ children }) => {
         msg,
         setMsg,
         setUser,
+        updateUser, // ✅ ÚJ export
         isAuthOpen,
         setIsAuthOpen,
         showNavbar,
         setShowNavbar,
+        is2FAEnabled,
+        loading2FA,
+        refresh2FAStatus, // Ezt hívd meg, amikor be/ki kapcsolod a 2FA-t
       }}
     >
       {children}
