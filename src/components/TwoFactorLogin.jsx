@@ -17,19 +17,20 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (code.length !== 6) return;
+    if (code.length !== 6 && code.length !== 8) return; // 6 for normal, 8 for backup
 
     try {
       setLoading(true);
       setError(null);
 
+      // Email-t is elküldjük, hogy a backend tudja melyik user
       const res = await axios.post("http://localhost:3001/api/login-with-2fa", {
+        email,
         code,
       });
 
       if (res.data.success) {
-        // Sikeres 2FA validáció - meghívjuk az onSuccess callback-et
-        // A Firebase bejelentkezést a Login komponens fogja kezelni
+        // Sikeres 2FA validáció
         onSuccess();
       }
     } catch (err) {
@@ -42,12 +43,9 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email }) {
   };
 
   const handleUseBackupCode = () => {
-    // Egyszerű prompt backup kódhoz (később lehet finomítani)
     const backupCode = prompt("Add meg a visszaállítási kódot:");
     if (!backupCode) return;
 
-    setCode(backupCode);
-    // Auto submit
     handleSubmitWithCode(backupCode);
   };
 
@@ -57,6 +55,7 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email }) {
       setError(null);
 
       const res = await axios.post("http://localhost:3001/api/login-with-2fa", {
+        email,
         code: codeValue,
       });
 
@@ -65,6 +64,7 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email }) {
       }
     } catch (err) {
       setError("Érvénytelen visszaállítási kód");
+      setCode("");
     } finally {
       setLoading(false);
     }
@@ -136,15 +136,17 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email }) {
                   <input
                     type="text"
                     inputMode="numeric"
-                    pattern="[0-9]*"
                     value={code}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, "").slice(0, 6);
-                      setCode(val);
-                      setError(null);
+                      // Accept both 6-digit codes and 8-char backup codes
+                      const val = e.target.value.toUpperCase();
+                      if (val.match(/^[A-Z0-9]*$/)) {
+                        setCode(val.slice(0, 8));
+                        setError(null);
+                      }
                     }}
                     placeholder="123456"
-                    maxLength={6}
+                    maxLength={8}
                     autoComplete="off"
                     autoFocus
                     className={`w-full pl-12 pr-4 py-4 rounded-xl bg-black/30 border ${
@@ -164,12 +166,12 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email }) {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={code.length !== 6 || loading}
+                disabled={(code.length !== 6 && code.length !== 8) || loading}
                 style={{
-                  cursor: code.length === 6 && !loading ? "pointer" : "not-allowed",
+                  cursor: (code.length === 6 || code.length === 8) && !loading ? "pointer" : "not-allowed",
                 }}
                 className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 ${
-                  code.length === 6 && !loading
+                  (code.length === 6 || code.length === 8) && !loading
                     ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105"
                     : "bg-gradient-to-r from-purple-600/40 to-pink-600/40 text-white/50 cursor-not-allowed"
                 }`}
