@@ -1,6 +1,6 @@
-import Hero from '../components/Hero';
-import Pricing from '../components/Pricing';
-import AuthModal from './Login';
+import Hero from "../components/Hero";
+import Pricing from "../components/Pricing";
+import AuthModal from "./Login";
 
 export default function Home() {
   return (
@@ -11,7 +11,7 @@ export default function Home() {
       </div>
 
       <Hero />
-      
+
       <Pricing />
     </div>
   );
