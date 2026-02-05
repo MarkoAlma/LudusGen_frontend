@@ -16,10 +16,13 @@ import './App.css';
 import { Toaster } from 'react-hot-toast';
 import MyToastify from './components/MyToastify';
 import ResetPassword from './components/ResetPassword';
+import Enable2FA from './components/Enable2Fa';
+import Settings from './pages/Settings';
 
 function App() {
   const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg} = useContext(MyUserContext)
   const navigate = useNavigate()
+
 
   const bezar = ()=> {
     setIsAuthOpen(false)
@@ -70,9 +73,11 @@ useEffect(() => {
           <Route path="/" element={<Home />} />
           <Route path="/chat" element={<AIChat />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
-
+  
       <LudusGenAdmin />
       <AuthModal
         isOpen={isAuthOpen}

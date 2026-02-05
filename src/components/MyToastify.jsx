@@ -1,12 +1,14 @@
-import React from 'react'
-import { useContext } from 'react'
-import { useEffect } from 'react'
-import { toast } from 'react-toastify'
-import { ToastContainer } from 'react-toastify'
-import { MyUserContext } from '../context/MyUserProvider'
-import { useNavigate } from 'react-router-dom'
+import React from "react";
+import { useContext } from "react";
+import { useEffect } from "react";
+import { toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
+import { MyUserContext } from "../context/MyUserProvider";
+import { useNavigate } from "react-router-dom";
 
-const MyToastify = ({err, katt, resetPw, kijelentkezes, torles}) => {
+const MyToastify = ({ err, katt, resetPw, kijelentkezes, torles }) => {
+  const { setMsg } = useContext(MyUserContext);
+  const navigate = useNavigate();
 
     const {setMsg} = useContext(MyUserContext)
     const navigate = useNavigate()
@@ -43,9 +45,9 @@ const MyToastify = ({err, katt, resetPw, kijelentkezes, torles}) => {
 
   return (
     <div>
-      <ToastContainer/>
+      <ToastContainer />
     </div>
-  )
-}
+  );
+};
 
-export default MyToastify
+export default MyToastify;
