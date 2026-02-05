@@ -24,6 +24,7 @@ export default function Navbar({ scrollY }) {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+
   const {
     isAuthOpen,
     setIsAuthOpen,
@@ -240,7 +241,7 @@ export default function Navbar({ scrollY }) {
                         <button
                           onClick={() => {
                             setUserDropdownOpen(false);
-                            // navigate to profile
+                            navigate("/settings");
                           }}
                           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-600/20 transition-all duration-300 group"
                         >
@@ -390,7 +391,7 @@ export default function Navbar({ scrollY }) {
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
-                  // navigate to settings
+                  navigate("/settings");
                 }}
                 className="w-full block relative group"
                 style={{
