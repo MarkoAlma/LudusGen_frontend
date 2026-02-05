@@ -24,13 +24,6 @@ const MyUserProvider = ({ children }) => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [showNavbar, setShowNavbar] = useState(true);
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (currentUser) => {
-      console.log("Auth state changed:", currentUser);
-      setUser(currentUser); // null if signed out, object if signed in
-      console.log(currentUser);
-    });
-
 useEffect(() => {
   const unsub = onAuthStateChanged(auth, (currentUser) => {
     console.log("Auth state changed:", currentUser);

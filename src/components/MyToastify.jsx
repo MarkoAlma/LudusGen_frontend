@@ -7,8 +7,6 @@ import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
 
 const MyToastify = ({ err, katt, resetPw, kijelentkezes, torles }) => {
-  const { setMsg } = useContext(MyUserContext);
-  const navigate = useNavigate();
 
     const {setMsg} = useContext(MyUserContext)
     const navigate = useNavigate()
