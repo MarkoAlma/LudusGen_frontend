@@ -42,7 +42,6 @@ export default function UpdatePassword({ isOpen, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isFormValid || verifying) return;
-
     setVerifying(true);
     setError('');
 

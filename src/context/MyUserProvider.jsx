@@ -1,16 +1,11 @@
 import { useState, createContext, useEffect } from "react";
 import { auth } from "../firebase/firebaseApp";
 import {
-  createUserWithEmailAndPassword,
-  deleteUser,
-  EmailAuthProvider,
   onAuthStateChanged,
-  reauthenticateWithCredential,
-  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   signOut,
-  updateProfile,
 } from "firebase/auth";
 import axios from "axios";
 
@@ -30,6 +25,17 @@ const MyUserProvider = ({ children }) => {
       console.log("Auth state changed:", currentUser);
       
       if (currentUser) {
+        // Email verifikáció ellenőrzése
+        if (!currentUser.emailVerified) {
+          console.log("❌ Email not verified, signing out");
+          await signOut(auth);
+          setUser(null);
+          setIs2FAEnabled(false);
+          setLoading2FA(false);
+          setMsg({ err: "Nincs megerősítve az email!" });
+          return;
+        }
+        
         // Betöltjük a Firestore-ból a teljes user adatokat
         await loadUserFromFirestore(currentUser);
         await fetch2FAStatus(currentUser);
@@ -48,8 +54,6 @@ const MyUserProvider = ({ children }) => {
     try {
       const token = await currentUser.getIdToken();
       
-      // Itt kérhetsz le egy /api/get-user endpoint-ot vagy használhatsz egy meglévőt
-      // Egyszerűbb megoldás: közvetlenül a Firestore-ból olvassuk
       const response = await axios.get(`http://localhost:3001/api/get-user/${currentUser.uid}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -63,12 +67,10 @@ const MyUserProvider = ({ children }) => {
           uid: currentUser.uid,
         });
       } else {
-        // Ha nincs Firestore dokumentum, csak a Firebase Auth adatokat használjuk
         setUser(currentUser);
       }
     } catch (error) {
       console.error("Error loading user from Firestore:", error);
-      // Fallback: csak a Firebase Auth user
       setUser(currentUser);
     }
   };
@@ -97,16 +99,14 @@ const MyUserProvider = ({ children }) => {
     }
   };
 
-  // Refresh 2FA status (call this after enabling/disabling 2FA)
+  // Refresh 2FA status
   const refresh2FAStatus = async () => {
     if (user) {
       await fetch2FAStatus(user);
     }
   };
 
-  // ✅ JAVÍTOTT updateUser függvény - lokális state frissítés
-  // Ez NEM menti el az adatokat a backend-re, csak a local state-et frissíti
-  // A backend mentést a Settings komponens handleSave függvénye végzi
+  // ✅ updateUser függvény - lokális state frissítés
   const updateUser = (updatedData) => {
     setUser(prevUser => ({
       ...prevUser,
@@ -118,35 +118,26 @@ const MyUserProvider = ({ children }) => {
     console.log("msg változott:", msg);
   }, [msg]);
 
-  const signUpUser = async (email, password, display_name, setLoading)=> {
+  // ✅ BIZTONSÁGOS REGISZTRÁCIÓ - Backend csinálja, soha nem jelentkezik be!
+  const signUpUser = async (email, password, display_name, setLoading) => {
     try {
-      // 1. Firebase Auth user létrehozása
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
-      
-      // 2. Display name beállítása
-      await updateProfile(auth.currentUser, { displayName: display_name });
-      
-      // 3. Email verifikáció küldése
-      await sendEmailVerification(auth.currentUser);
-      
-      // 4. Firestore dokumentum létrehozása
-      try {
-        await axios.post("http://localhost:3001/api/create-user", {
-          uid,
-          email,
-          name: display_name,
-          displayName: display_name,
-        });
-      } catch (firestoreError) {
-        console.error("Firestore user creation error:", firestoreError);
+      const response = await axios.post("http://localhost:3001/api/register-user", {
+        email,
+        password,
+        displayName: display_name,
+      });
+
+      if (response.data.success) {
+        setMsg((prev) => delete prev.err);
+        setMsg({ katt: "Kattints az emailben érkezett aktiváló linkre" });
+      } else {
+        setMsg({ incorrectSignUp: response.data.message });
       }
-      
-      setMsg((prev) => delete prev.err);
-      setMsg({ katt: "Kattints az emailben érkezett aktiváló linkre" });
     } catch (error) {
-      console.log(error);
-      setMsg({ incorrectSignUp: error.message });
+      console.error("Registration error:", error);
+      setMsg({ 
+        incorrectSignUp: error.response?.data?.message || error.message 
+      });
     } finally {
       setLoading(false);
     }
@@ -162,19 +153,17 @@ const MyUserProvider = ({ children }) => {
   const signInUser = async (email, password) => {
     setUser(null);
     try {
-      // ✅ ELŐSZÖR ELLENŐRIZZÜK, HOGY SZÜKSÉGES-E A 2FA (backend API-val)
+      // ✅ ELŐSZÖR ELLENŐRIZZÜK, HOGY SZÜKSÉGES-E A 2FA
       const check2FAResponse = await axios.post(
         "http://localhost:3001/api/check-2fa-required",
         { email }
       );
 
       // ✅ Ha 2FA szükséges, NE jelentkeztessük be Firebase-ben!
-      // Csak ellenőrizzük a jelszót a backend-en
       if (check2FAResponse.data.requires2FA) {
         console.log("2FA required for user:", email);
         
-        // Ellenőrizzük a jelszót anélkül, hogy bejelentkeznénk
-        // A backend-en validáljuk a jelszót
+        // Jelszó validáció backend-en
         try {
           const validateResponse = await axios.post(
             "http://localhost:3001/api/validate-password",
@@ -185,13 +174,14 @@ const MyUserProvider = ({ children }) => {
             // Jelszó helyes, de 2FA kell
             return { requires2FA: true };
           } else {
-            // Rossz jelszó
             setMsg({ incorrectSignIn: "Hibás email/jelszó páros" });
             return { requires2FA: false };
           }
         } catch (error) {
           console.error("Password validation error:", error);
-          setMsg({ incorrectSignIn: error.response?.data?.message || "Hibás email/jelszó páros" });
+          setMsg({ 
+            incorrectSignIn: error.response?.data?.message || "Hibás email/jelszó páros" 
+          });
           return { requires2FA: false };
         }
       }
@@ -199,6 +189,7 @@ const MyUserProvider = ({ children }) => {
       // ✅ HA NINCS 2FA, AKKOR NORMÁL FIREBASE BEJELENTKEZÉS
       const adat = await signInWithEmailAndPassword(auth, email, password);
       
+      // Email verifikáció ellenőrzése (ez a onAuthStateChanged-ben is fut)
       if (!adat.user.emailVerified) {
         setMsg({ err: "Nincs megerősítve az email!" });
         setUser(null);
@@ -216,19 +207,32 @@ const MyUserProvider = ({ children }) => {
     }
   };
 
+  // ✅ 2FA login with custom token
+  const signInWith2FA = async (customToken) => {
+    try {
+      await signInWithCustomToken(auth, customToken);
+      setMsg({ signIn: true, kijelentkezes: "Sikeres 2FA bejelentkezés!" });
+      return { success: true };
+    } catch (error) {
+      console.error("2FA sign in error:", error);
+      setMsg({ incorrectSignIn: "Bejelentkezési hiba" });
+      return { success: false };
+    }
+  };
+
   const resetPassword = async (email) => {
     let success = false;
     try {
       await sendPasswordResetEmail(auth, email, {
         url: "http://localhost:5173/reset-password",
-      })
-      success = true
+      });
+      success = true;
     } catch (error) {
       console.log(error);
-      setMsg({incorrectResetPwEmail:error.message})
-    }finally {
+      setMsg({ incorrectResetPwEmail: error.message });
+    } finally {
       if (success) {
-        //navigate("/signin")
+        // navigate("/signin")
       }
     }
   };
@@ -240,6 +244,7 @@ const MyUserProvider = ({ children }) => {
         signUpUser,
         logoutUser,
         signInUser,
+        signInWith2FA,
         msg,
         setMsg,
         setUser,
@@ -252,7 +257,7 @@ const MyUserProvider = ({ children }) => {
         loading2FA,
         resetPassword,
         refresh2FAStatus,
-        loadUserFromFirestore, // Ha később szükséges lenne manuális refresh
+        loadUserFromFirestore,
       }}
     >
       {children}
