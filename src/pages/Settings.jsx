@@ -407,7 +407,7 @@ export default function Settings() {
           {/* Back button */}
           <button
             onClick={() => navigate("/")}
-            className="flex items-center gap-2 text-purple-300 hover:text-purple-200 mb-6 transition-colors group"
+            className="flex cursor-pointer items-center gap-2 text-purple-300 hover:text-purple-200 mb-6 transition-colors group"
           >
             <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             <span className="font-semibold">Vissza</span>
@@ -451,7 +451,7 @@ export default function Settings() {
                     {/* Profile Picture - Clickable */}
                     <button
                       onClick={openProfileModal}
-                      className="relative w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center overflow-hidden group hover:ring-4 hover:ring-purple-500/50 transition-all"
+                      className="relative w-12 cursor-pointer h-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center overflow-hidden group hover:ring-4 hover:ring-purple-500/50 transition-all"
                     >
                       {user.profilePicture ? (
                         <img
@@ -479,7 +479,7 @@ export default function Settings() {
                   {!editMode ? (
                     <button
                       onClick={() => setEditMode(true)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 font-semibold transition-all hover:scale-105"
+                      className="flex items-center cursor-pointer gap-2 px-4 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 font-semibold transition-all hover:scale-105"
                     >
                       <Edit2 className="w-4 h-4" />
                       Szerkesztés
@@ -489,14 +489,14 @@ export default function Settings() {
                       <button
                         onClick={handleCancel}
                         disabled={loading}
-                        className="p-2 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 transition-all hover:scale-105 disabled:opacity-50"
+                        className="p-2 rounded-xl cursor-pointer bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 transition-all hover:scale-105 disabled:opacity-50"
                       >
                         <X className="w-5 h-5" />
                       </button>
                       <button
                         onClick={handleSave}
                         disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
+                        className="flex items-center cursor-pointer gap-2 px-4 py-2 rounded-xl bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
                       >
                         {loading ? (
                           <>
@@ -665,7 +665,7 @@ export default function Settings() {
                     {!is2FAEnabled ? (
                       <button
                         onClick={() => setShow2FA(true)}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300"
+                        className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300"
                       >
                         <Lock className="w-4 h-4" />
                         2FA Bekapcsolása
@@ -673,7 +673,7 @@ export default function Settings() {
                     ) : (
                       <button
                         onClick={openDisable2FA}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 font-semibold transition-all hover:scale-105"
+                        className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 font-semibold transition-all hover:scale-105"
                       >
                         <X className="w-4 h-4" />
                         2FA Kikapcsolása
@@ -685,7 +685,7 @@ export default function Settings() {
                   <div className="pt-4 border-t border-purple-500/20">
                     <button
                       onClick={() => handleUpdatePW()}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 font-semibold transition-all hover:scale-105"
+                      className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 font-semibold transition-all hover:scale-105"
                     >
                       <Lock className="w-4 h-4" />
                       Jelszó Módosítása
@@ -739,8 +739,14 @@ export default function Settings() {
 
       {/* Profile Picture Modal */}
       {showProfileModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-purple-900/90 to-cyan-900/90 border border-purple-500/30 rounded-2xl max-w-lg w-full p-8 shadow-2xl animate-fadeIn">
+        <div 
+          onClick={closeProfileModal}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-gradient-to-br from-purple-900/90 to-cyan-900/90 border border-purple-500/30 rounded-2xl max-w-lg w-full p-8 shadow-2xl animate-fadeIn"
+          >
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -757,7 +763,7 @@ export default function Settings() {
               <button
                 onClick={closeProfileModal}
                 disabled={uploadingImage}
-                className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-all disabled:opacity-50"
+                className="p-2 cursor-pointer rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-all disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -800,7 +806,7 @@ export default function Settings() {
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingImage}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all disabled:opacity-50"
+                    className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all disabled:opacity-50"
                   >
                     <Upload className="w-5 h-5" />
                     Új kép feltöltése
@@ -810,7 +816,7 @@ export default function Settings() {
                     <button
                       onClick={handleDeleteProfilePicture}
                       disabled={uploadingImage}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
+                      className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
                     >
                       {uploadingImage ? (
                         <>
@@ -834,14 +840,14 @@ export default function Settings() {
                       setSelectedFile(null);
                     }}
                     disabled={uploadingImage}
-                    className="flex-1 px-4 py-3 rounded-xl bg-gray-600/20 hover:bg-gray-600/30 border border-gray-500/30 text-gray-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
+                    className="flex-1 cursor-pointer px-4 py-3 rounded-xl bg-gray-600/20 hover:bg-gray-600/30 border border-gray-500/30 text-gray-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
                   >
                     Mégse
                   </button>
                   <button
                     onClick={handleUploadProfilePicture}
                     disabled={uploadingImage}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all disabled:opacity-50"
+                    className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all disabled:opacity-50"
                   >
                     {uploadingImage ? (
                       <>
@@ -878,8 +884,14 @@ export default function Settings() {
 
       {/* 2FA Disable Modal */}
       {showDisable2FA && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-purple-900/90 to-cyan-900/90 border border-purple-500/30 rounded-2xl max-w-md w-full p-8 shadow-2xl animate-fadeIn">
+        <div 
+          onClick={closeDisable2FA}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-gradient-to-br from-purple-900/90 to-cyan-900/90 border border-purple-500/30 rounded-2xl max-w-md w-full p-8 shadow-2xl animate-fadeIn"
+          >
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -896,7 +908,7 @@ export default function Settings() {
               <button
                 onClick={closeDisable2FA}
                 disabled={disable2FALoading}
-                className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-all disabled:opacity-50"
+                className="p-2 cursor-pointer rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-all disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -944,14 +956,14 @@ export default function Settings() {
               <button
                 onClick={closeDisable2FA}
                 disabled={disable2FALoading}
-                className="flex-1 px-4 py-3 rounded-xl bg-gray-600/20 hover:bg-gray-600/30 border border-gray-500/30 text-gray-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
+                className="flex-1 cursor-pointer px-4 py-3 rounded-xl bg-gray-600/20 hover:bg-gray-600/30 border border-gray-500/30 text-gray-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
               >
                 Mégse
               </button>
               <button
                 onClick={handleDisable2FA}
                 disabled={disable2FALoading || disable2FACode.length !== 6}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-red-500/50 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-red-500/50 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {disable2FALoading ? (
                   <>
