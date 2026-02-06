@@ -80,7 +80,7 @@ export default function Navbar({ scrollY }) {
   const logout = () => {
     logoutUser();
     setUserDropdownOpen(false);
-    navigate("/")
+    navigate("/");
   };
 
   return (
@@ -203,9 +203,20 @@ export default function Navbar({ scrollY }) {
                     <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-gradient-x" />
 
                     <div className="relative z-10 flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                        <UserIcon className="w-4 h-4" />
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-white/20">
+                        {user.profilePicture ? (
+                          <img
+                            src={user.profilePicture}
+                            alt="profile"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <UserIcon className="w-4 h-4" />
+                          </div>
+                        )}
                       </div>
+
                       <span className="max-w-[120px] truncate">
                         {user.displayName}
                       </span>
@@ -225,9 +236,20 @@ export default function Navbar({ scrollY }) {
                       {/* User Info */}
                       <div className="relative p-4 border-b border-purple-500/30">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
-                            <UserIcon className="w-6 h-6 text-white" />
+                          <div className="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-purple-600 to-pink-600">
+                            {user.profilePicture ? (
+                              <img
+                                src={user.profilePicture}
+                                alt="profile"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <UserIcon className="w-6 h-6 text-white" />
+                              </div>
+                            )}
                           </div>
+
                           <div>
                             <p className="font-bold text-white">{user.name}</p>
                             <p className="text-xs text-purple-300">
