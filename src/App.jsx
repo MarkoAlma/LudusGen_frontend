@@ -18,6 +18,7 @@ import MyToastify from './components/MyToastify';
 import ResetPassword from './components/ResetPassword';
 import Enable2FA from './components/Enable2Fa';
 import Settings from './pages/Settings';
+import { ProtectedRoute } from './ProtectedRoute';
 
 function App() {
   const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg} = useContext(MyUserContext)
@@ -71,10 +72,9 @@ useEffect(() => {
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/chat" element={<AIChat />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />
+          <Route path="/reset-password" element={<ProtectedRoute><ResetPassword /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         </Routes>
       </main>
   
