@@ -19,11 +19,13 @@ import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
 import Enable2FA from "../components/Enable2Fa";
 import axios from "axios";
+import UpdatePassword from "../components/UpdatePassword";
 import { auth } from "../firebase/firebaseApp";
 
 export default function Settings() {
   const { user, updateUser, is2FAEnabled, loading2FA, refresh2FAStatus } = useContext(MyUserContext);
   const navigate = useNavigate();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   
   // Form states
   const [editMode, setEditMode] = useState(false);
@@ -61,6 +63,10 @@ export default function Settings() {
       });
     }
   }, [user]);
+
+  const handleUpdatePW = ()=> {
+    setShowPasswordModal(true)
+  }
 
   // Handle input change
   const handleChange = (e) => {
@@ -482,7 +488,7 @@ export default function Settings() {
                   {/* Password Change */}
                   <div className="pt-4 border-t border-purple-500/20">
                     <button
-                      onClick={() => alert("Jelszó változtatás funkció hamarosan...")}
+                      onClick={() => handleUpdatePW()}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 font-semibold transition-all hover:scale-105"
                     >
                       <Lock className="w-4 h-4" />
@@ -491,6 +497,10 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
+              <UpdatePassword 
+  isOpen={showPasswordModal} 
+  onClose={() => setShowPasswordModal(false)} 
+/>
 
               {/* Account Info Card */}
               <div className="rounded-2xl bg-gradient-to-br from-purple-900/30 to-cyan-900/30 border border-purple-500/30 backdrop-blur-xl overflow-hidden">
