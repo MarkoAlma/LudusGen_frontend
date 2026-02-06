@@ -197,7 +197,7 @@ export default function Navbar({ scrollY }) {
                       e.stopPropagation();
                       setUserDropdownOpen(!userDropdownOpen);
                     }}
-                    className="relative group overflow-hidden px-6 py-3 rounded-full font-bold text-sm shadow-2xl flex items-center gap-2"
+                    className="relative cursor-pointer group overflow-hidden px-6 py-3 rounded-full font-bold text-sm shadow-2xl flex items-center gap-2"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 animate-gradient-x" />
                     <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-gradient-x" />
@@ -266,7 +266,7 @@ export default function Navbar({ scrollY }) {
                             setUserDropdownOpen(false);
                             navigate("/settings");
                           }}
-                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-600/20 transition-all duration-300 group"
+                          className="w-full cursor-pointer flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-purple-600/20 transition-all duration-300 group"
                         >
                           <Settings className="w-5 h-5 text-purple-400 group-hover:text-cyan-400 transition-colors" />
                           <span className="text-white font-semibold">
@@ -276,7 +276,7 @@ export default function Navbar({ scrollY }) {
 
                         <button
                           onClick={logout}
-                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-600/20 transition-all duration-300 group"
+                          className="w-full cursor-pointer flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-600/20 transition-all duration-300 group"
                         >
                           <LogOut className="w-5 h-5 text-red-400 group-hover:text-red-300 transition-colors" />
                           <span className="text-white font-semibold">
