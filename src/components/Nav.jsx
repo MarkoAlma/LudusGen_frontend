@@ -80,6 +80,7 @@ export default function Navbar({ scrollY }) {
   const logout = () => {
     logoutUser();
     setUserDropdownOpen(false);
+    navigate("/")
   };
 
   return (
