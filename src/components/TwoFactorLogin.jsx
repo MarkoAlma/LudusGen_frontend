@@ -24,6 +24,7 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email }) {
     try {
       setLoading(true);
       setError(null);
+console.log("2FA payload:", { email, code });
 
       // 1️⃣ Backend validálja a 2FA kódot
       const res = await axios.post("http://localhost:3001/api/login-with-2fa", {
