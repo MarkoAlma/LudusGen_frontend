@@ -46,6 +46,8 @@ export default function Enable2FA({ isOpen, onClose }) {
       const headers = await getAuthHeaders();
       const res = await axios.get("http://localhost:3001/api/setup-mfa", { headers });
       
+      console.log('📥 QR Setup Response:', res.data);
+      
       setQr(res.data.qr);
       setSecret(res.data.secret);
       setBackupCodes(res.data.backupCodes || []);
@@ -59,28 +61,50 @@ export default function Enable2FA({ isOpen, onClose }) {
 
   const handleVerify = async (e) => {
     e.preventDefault();
-    if (code.length !== 6) return;
+    
+    // Debug információk
+    console.log('🔐 Verifying 2FA Code:');
+    console.log('Code:', code);
+    console.log('Code type:', typeof code);
+    console.log('Code length:', code.length);
+    console.log('Secret:', secret);
+    
+    if (code.length !== 6) {
+      console.warn('❌ Invalid code length:', code.length);
+      return;
+    }
 
     try {
       setVerifying(true);
       setError(null);
       
       const headers = await getAuthHeaders();
+      
+      // Küldd el a kódot string-ként
+      const payload = { 
+        code: code.toString().trim() 
+      };
+      
+      console.log('📤 Sending payload:', payload);
+      
       const res = await axios.post(
         "http://localhost:3001/api/verify-mfa", 
-        { code },
+        payload,
         { headers }
       );
+      
+      console.log('✅ Verification response:', res.data);
       
       if (res.data.success) {
         setSuccess(true);
         setShowBackupCodes(true);
         
-        // ✅ FONTOS: Frissítsd a 2FA státuszt a Context-ben
+        // Frissítsd a 2FA státuszt a Context-ben
         await refresh2FAStatus();
       }
     } catch (err) {
-      console.error("Verify error:", err);
+      console.error("❌ Verify error:", err);
+      console.error("Error response:", err.response?.data);
       setError(err.response?.data?.message || "Érvénytelen kód. Próbáld újra!");
       setCode("");
     } finally {
@@ -115,17 +139,6 @@ export default function Enable2FA({ isOpen, onClose }) {
     setError(null);
     onClose();
   };
-const handleEnable2FA = async () => {
-  try {
-    const res = await axios.post("/api/enable-2fa");
-    if (res.data.success) {
-      onEnabled?.(); // értesíti a szülőt
-      onClose();     // bezárja a modal-t
-    }
-  } catch (err) {
-    console.error(err);
-  }
-};
 
   if (!isOpen) return null;
 

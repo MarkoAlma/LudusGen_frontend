@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Shield, Key, X, Sparkles, AlertCircle } from "lucide-react";
 import axios from "axios";
+import { signInWithCustomToken } from "firebase/auth";
+import { auth } from "../firebase/firebaseApp"; // ✅ Importáljuk az auth-ot
 
 export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email }) {
   const [code, setCode] = useState("");
@@ -24,14 +26,19 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email }) {
       setError(null);
 console.log("2FA payload:", { email, code });
 
-      // Email-t is elküldjük, hogy a backend tudja melyik user
+      // 1️⃣ Backend validálja a 2FA kódot
       const res = await axios.post("http://localhost:3001/api/login-with-2fa", {
         email,
         code,
       });
 
-      if (res.data.success) {
-        // Sikeres 2FA validáció
+      if (res.data.success && res.data.customToken) {
+        // 2️⃣ Firebase bejelentkezés a Custom Token-nel
+        await signInWithCustomToken(auth, res.data.customToken);
+        
+        console.log("✅ Sikeres 2FA bejelentkezés");
+        
+        // 3️⃣ Success callback (bezárja a modalt, stb.)
         onSuccess();
       }
     } catch (err) {
@@ -55,12 +62,19 @@ console.log("2FA payload:", { email, code });
       setLoading(true);
       setError(null);
 
+      // 1️⃣ Backend validálja a backup kódot
       const res = await axios.post("http://localhost:3001/api/login-with-2fa", {
         email,
         code: codeValue,
       });
 
-      if (res.data.success) {
+      if (res.data.success && res.data.customToken) {
+        // 2️⃣ Firebase bejelentkezés a Custom Token-nel
+        await signInWithCustomToken(auth, res.data.customToken);
+        
+        console.log("✅ Sikeres backup kód bejelentkezés");
+        
+        // 3️⃣ Success callback
         onSuccess();
       }
     } catch (err) {

@@ -81,10 +81,9 @@ const MyUserProvider = ({ children }) => {
     }));
   };
 
-useEffect(() => {
-  console.log("msg változott:", msg);
-}, [msg]);
-
+  useEffect(() => {
+    console.log("msg változott:", msg);
+  }, [msg]);
 
   const signUpUser = async (email, password, display_name, setLoading)=> {
     try {
@@ -130,31 +129,53 @@ useEffect(() => {
   const signInUser = async (email, password) => {
     setUser(null);
     try {
-      // ✅ ELŐSZÖR ELLENŐRIZZÜK, HOGY SZÜKSÉGES-E A 2FA
+      // ✅ ELŐSZÖR ELLENŐRIZZÜK, HOGY SZÜKSÉGES-E A 2FA (backend API-val)
       const check2FAResponse = await axios.post(
         "http://localhost:3001/api/check-2fa-required",
         { email }
       );
 
-      // Ha 2FA szükséges, NEM jelentkeztetjük be a Firebase-ben
+      // ✅ Ha 2FA szükséges, NE jelentkeztessük be Firebase-ben!
+      // Csak ellenőrizzük a jelszót a backend-en
       if (check2FAResponse.data.requires2FA) {
         console.log("2FA required for user:", email);
-        return { requires2FA: true };
+        
+        // Ellenőrizzük a jelszót anélkül, hogy bejelentkeznénk
+        // A backend-en validáljuk a jelszót
+        try {
+          const validateResponse = await axios.post(
+            "http://localhost:3001/api/validate-password",
+            { email, password }
+          );
+          
+          if (validateResponse.data.success) {
+            // Jelszó helyes, de 2FA kell
+            return { requires2FA: true };
+          } else {
+            // Rossz jelszó
+            setMsg({ incorrectSignIn: "Hibás email/jelszó páros" });
+            return { requires2FA: false };
+          }
+        } catch (error) {
+          console.error("Password validation error:", error);
+          setMsg({ incorrectSignIn: error.response?.data?.message || "Hibás email/jelszó páros" });
+          return { requires2FA: false };
+        }
       }
 
-      // ✅ HA NINCS 2FA, AKKOR NORMÁL BEJELENTKEZÉS
+      // ✅ HA NINCS 2FA, AKKOR NORMÁL FIREBASE BEJELENTKEZÉS
       const adat = await signInWithEmailAndPassword(auth, email, password);
       
-      if (adat.user.emailVerified) {
-        setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés!" });
-        // A 2FA státuszt automatikusan betölti az onAuthStateChanged
-        return { requires2FA: false };
-      } else {
+      if (!adat.user.emailVerified) {
         setMsg({ err: "Nincs megerősítve az email!" });
         setUser(null);
         await signOut(auth);
         return { requires2FA: false };
       }
+
+      setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés!" });
+      return { requires2FA: false };
+      
     } catch (error) {
       console.log(error);
       setMsg({ incorrectSignIn: error.message });
