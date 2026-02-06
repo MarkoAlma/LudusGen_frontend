@@ -28,12 +28,13 @@ const MyUserProvider = ({ children }) => {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (currentUser) => {
       console.log("Auth state changed:", currentUser);
-      setUser(currentUser);
       
-      // Ha van bejelentkezett user, töltsd be a 2FA státuszt
       if (currentUser) {
+        // Betöltjük a Firestore-ból a teljes user adatokat
+        await loadUserFromFirestore(currentUser);
         await fetch2FAStatus(currentUser);
       } else {
+        setUser(null);
         setIs2FAEnabled(false);
         setLoading2FA(false);
       }
@@ -41,6 +42,36 @@ const MyUserProvider = ({ children }) => {
 
     return () => unsub();
   }, []);
+
+  // Firestore-ból betölti a user adatokat
+  const loadUserFromFirestore = async (currentUser) => {
+    try {
+      const token = await currentUser.getIdToken();
+      
+      // Itt kérhetsz le egy /api/get-user endpoint-ot vagy használhatsz egy meglévőt
+      // Egyszerűbb megoldás: közvetlenül a Firestore-ból olvassuk
+      const response = await axios.get(`http://localhost:3001/api/get-user/${currentUser.uid}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.data.success) {
+        setUser({
+          ...currentUser,
+          ...response.data.user,
+          uid: currentUser.uid,
+        });
+      } else {
+        // Ha nincs Firestore dokumentum, csak a Firebase Auth adatokat használjuk
+        setUser(currentUser);
+      }
+    } catch (error) {
+      console.error("Error loading user from Firestore:", error);
+      // Fallback: csak a Firebase Auth user
+      setUser(currentUser);
+    }
+  };
 
   // 2FA státusz betöltése a backend-ből
   const fetch2FAStatus = async (currentUser) => {
@@ -73,7 +104,9 @@ const MyUserProvider = ({ children }) => {
     }
   };
 
-  // ✅ ÚJ: updateUser függvény - lokális user state frissítése
+  // ✅ JAVÍTOTT updateUser függvény - lokális state frissítés
+  // Ez NEM menti el az adatokat a backend-re, csak a local state-et frissíti
+  // A backend mentést a Settings komponens handleSave függvénye végzi
   const updateUser = (updatedData) => {
     setUser(prevUser => ({
       ...prevUser,
@@ -189,14 +222,10 @@ const MyUserProvider = ({ children }) => {
       await sendPasswordResetEmail(auth, email, {
         url: "http://localhost:5173/reset-password",
       })
-      // setMsg({resetPw:"A jelszó visszaállításhoz szükséges email elküldve"})
       success = true
     } catch (error) {
       console.log(error);
-      
       setMsg({incorrectResetPwEmail:error.message})
-      // console.log(msg);
-      
     }finally {
       if (success) {
         //navigate("/signin")
@@ -214,7 +243,7 @@ const MyUserProvider = ({ children }) => {
         msg,
         setMsg,
         setUser,
-        updateUser, // ✅ ÚJ export
+        updateUser,
         isAuthOpen,
         setIsAuthOpen,
         showNavbar,
@@ -222,7 +251,8 @@ const MyUserProvider = ({ children }) => {
         is2FAEnabled,
         loading2FA,
         resetPassword,
-        refresh2FAStatus, // Ezt hívd meg, amikor be/ki kapcsolod a 2FA-t
+        refresh2FAStatus,
+        loadUserFromFirestore, // Ha később szükséges lenne manuális refresh
       }}
     >
       {children}

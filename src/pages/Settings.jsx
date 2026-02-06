@@ -20,9 +20,9 @@ import { useNavigate } from "react-router-dom";
 import Enable2FA from "../components/Enable2Fa";
 import axios from "axios";
 import UpdatePassword from "../components/UpdatePassword";
+import { auth } from "../firebase/firebaseApp";
 
 export default function Settings() {
-  // ✅ FONTOS: is2FAEnabled, loading2FA és refresh2FAStatus a Context-ből jön
   const { user, updateUser, is2FAEnabled, loading2FA, refresh2FAStatus } = useContext(MyUserContext);
   const navigate = useNavigate();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -33,8 +33,12 @@ export default function Settings() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
   
-  // 2FA modal state
+  // 2FA modal states
   const [show2FA, setShow2FA] = useState(false);
+  const [showDisable2FA, setShowDisable2FA] = useState(false);
+  const [disable2FACode, setDisable2FACode] = useState("");
+  const [disable2FALoading, setDisable2FALoading] = useState(false);
+  const [disable2FAError, setDisable2FAError] = useState("");
   
   // Form data
   const [formData, setFormData] = useState({
@@ -79,11 +83,44 @@ export default function Settings() {
       setLoading(true);
       setError(null);
       
-      const res = await axios.post("http://localhost:3001/api/update-profile", formData);
+      const token = await auth.currentUser.getIdToken();
+      
+      // Csak azokat a mezőket küldjük el, amik ki vannak töltve
+      const dataToSend = {};
+      
+      if (formData.name && formData.name.trim()) {
+        dataToSend.name = formData.name.trim();
+      }
+      
+      if (formData.displayName && formData.displayName.trim()) {
+        dataToSend.displayName = formData.displayName.trim();
+      }
+      
+      if (formData.phone && formData.phone.trim()) {
+        dataToSend.phone = formData.phone.trim();
+      }
+      
+      if (formData.location && formData.location.trim()) {
+        dataToSend.location = formData.location.trim();
+      }
+      
+      if (formData.bio && formData.bio.trim()) {
+        dataToSend.bio = formData.bio.trim();
+      }
+      
+      const res = await axios.post(
+        "http://localhost:3001/api/update-profile", 
+        dataToSend,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       
       if (res.data.success) {
-        // Update context
-        updateUser(res.data.user);
+        // Update context with the new data
+        updateUser(dataToSend);
         setSuccess(true);
         setEditMode(false);
         
@@ -111,17 +148,36 @@ export default function Settings() {
     setError(null);
   };
 
+  // Open disable 2FA modal
+  const openDisable2FA = () => {
+    setShowDisable2FA(true);
+    setDisable2FACode("");
+    setDisable2FAError("");
+  };
+
+  // Close disable 2FA modal
+  const closeDisable2FA = () => {
+    setShowDisable2FA(false);
+    setDisable2FACode("");
+    setDisable2FAError("");
+  };
+
   // Disable 2FA
   const handleDisable2FA = async () => {
-    const code = prompt("Add meg a 6 jegyű kódot a 2FA kikapcsolásához:");
-    if (!code) return;
+    if (disable2FACode.length !== 6) {
+      setDisable2FAError("6 jegyű kódot adj meg!");
+      return;
+    }
 
     try {
-      const token = await user.getIdToken();
+      setDisable2FALoading(true);
+      setDisable2FAError("");
+      
+      const token = await auth.currentUser.getIdToken();
       
       const res = await axios.post(
         "http://localhost:3001/api/disable-2fa", 
-        { code },
+        { code: disable2FACode },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -130,13 +186,23 @@ export default function Settings() {
       );
       
       if (res.data.success) {
-        // ✅ Frissítsd a Context-ben a 2FA státuszt
         await refresh2FAStatus();
-        alert("2FA sikeresen kikapcsolva");
+        closeDisable2FA();
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
       }
     } catch (err) {
-      alert(err.response?.data?.message || "Érvénytelen kód");
+      setDisable2FAError(err.response?.data?.message || "Érvénytelen kód");
+    } finally {
+      setDisable2FALoading(false);
     }
+  };
+
+  // Handle code input (only numbers, max 6 digits)
+  const handleCodeChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setDisable2FACode(value);
+    setDisable2FAError("");
   };
 
   if (!user) {
@@ -286,19 +352,19 @@ export default function Settings() {
 
                   {/* Email */}
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
-                      <Mail className="w-4 h-4 text-purple-400" />
-                      Email cím
+                    <label className="flex items-center justify-between text-sm font-semibold text-gray-300 mb-2">
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-purple-400" />
+                        Email cím
+                      </div>
+                      <span className="text-xs text-gray-500 font-normal">Nem módosítható</span>
                     </label>
                     <input
                       type="email"
                       name="email"
                       value={formData.email}
-                      onChange={handleChange}
-                      disabled={!editMode}
-                      className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${
-                        editMode ? "border-purple-500/30" : "border-purple-500/10"
-                      } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
+                      disabled={true}
+                      className="w-full px-4 py-3 rounded-xl bg-black/30 border border-purple-500/10 text-gray-500 placeholder-gray-500 focus:outline-none transition-all opacity-60 cursor-not-allowed"
                       placeholder="pl. janos@example.com"
                     />
                   </div>
@@ -384,7 +450,6 @@ export default function Settings() {
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-semibold text-gray-300">Kéttényezős azonosítás</span>
-                      {/* ✅ loading2FA és is2FAEnabled a Context-ből */}
                       {loading2FA ? (
                         <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
                       ) : (
@@ -411,7 +476,7 @@ export default function Settings() {
                       </button>
                     ) : (
                       <button
-                        onClick={handleDisable2FA}
+                        onClick={openDisable2FA}
                         className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 font-semibold transition-all hover:scale-105"
                       >
                         <X className="w-4 h-4" />
@@ -461,7 +526,7 @@ export default function Settings() {
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-400">User ID</span>
                       <span className="text-xs text-gray-500 font-mono">
-                        {user.id?.substring(0, 8) || "N/A"}...
+                        {user.uid?.substring(0, 8) || "N/A"}...
                       </span>
                     </div>
                   </div>
@@ -472,15 +537,103 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* 2FA Modal */}
+      {/* 2FA Enable Modal */}
       <Enable2FA 
         isOpen={show2FA} 
         onClose={() => {
           setShow2FA(false);
-          // ✅ A modal bezárásakor frissítjük a 2FA státuszt
           refresh2FAStatus();
         }} 
       />
+
+      {/* 2FA Disable Modal */}
+      {showDisable2FA && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-purple-900/90 to-cyan-900/90 border border-purple-500/30 rounded-2xl max-w-md w-full p-8 shadow-2xl animate-fadeIn">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-600 to-pink-600 flex items-center justify-center">
+                  <Shield className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">2FA Kikapcsolása</h2>
+                  <p className="text-sm text-gray-400">Biztonsági ellenőrzés</p>
+                </div>
+              </div>
+              <button
+                onClick={closeDisable2FA}
+                disabled={disable2FALoading}
+                className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-all disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Warning */}
+            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-red-400 mb-1">Figyelem!</p>
+                <p className="text-xs text-gray-300">
+                  A 2FA kikapcsolásával csökken a fiókod biztonsága. Add meg az autentikátor kódodat a folytatáshoz.
+                </p>
+              </div>
+            </div>
+
+            {/* Code Input */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-300 mb-3">
+                6 jegyű autentikátor kód
+              </label>
+              <input
+                type="text"
+                value={disable2FACode}
+                onChange={handleCodeChange}
+                maxLength={6}
+                placeholder="000000"
+                disabled={disable2FALoading}
+                className="w-full px-4 py-4 text-center text-2xl font-mono tracking-widest rounded-xl bg-black/40 border border-purple-500/30 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-50"
+                autoFocus
+              />
+              {disable2FAError && (
+                <p className="mt-2 text-sm text-red-400 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {disable2FAError}
+                </p>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={closeDisable2FA}
+                disabled={disable2FALoading}
+                className="flex-1 px-4 py-3 rounded-xl bg-gray-600/20 hover:bg-gray-600/30 border border-gray-500/30 text-gray-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
+              >
+                Mégse
+              </button>
+              <button
+                onClick={handleDisable2FA}
+                disabled={disable2FALoading || disable2FACode.length !== 6}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-red-500/50 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {disable2FALoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Ellenőrzés...</span>
+                  </>
+                ) : (
+                  <>
+                    <X className="w-5 h-5" />
+                    <span>Kikapcsolás</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes slideDown {
@@ -495,6 +648,19 @@ export default function Settings() {
         }
         .animate-slideDown {
           animation: slideDown 0.3s ease-out forwards;
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out forwards;
         }
       `}</style>
     </>
