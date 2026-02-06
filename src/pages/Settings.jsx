@@ -1,8 +1,7 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import {
   User,
   Mail,
-  Phone,
   MapPin,
   Calendar,
   Shield,
@@ -14,6 +13,9 @@ import {
   Lock,
   Sparkles,
   ChevronLeft,
+  Camera,
+  Upload,
+  Trash2,
 } from "lucide-react";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
@@ -23,37 +25,42 @@ import UpdatePassword from "../components/UpdatePassword";
 import { auth } from "../firebase/firebaseApp";
 
 export default function Settings() {
-  const { user, updateUser, is2FAEnabled, loading2FA, refresh2FAStatus } = useContext(MyUserContext);
+  const { user, updateUser, is2FAEnabled, loading2FA, refresh2FAStatus } =
+    useContext(MyUserContext);
   const navigate = useNavigate();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const fileInputRef = useRef(null);
   
   // Form states
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
-  
+
+  // Profile picture modal states
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+
   // Validation errors
   const [validationErrors, setValidationErrors] = useState({
     name: "",
     displayName: "",
-    phone: "",
   });
-  
+
   // 2FA modal states
   const [show2FA, setShow2FA] = useState(false);
   const [showDisable2FA, setShowDisable2FA] = useState(false);
   const [disable2FACode, setDisable2FACode] = useState("");
   const [disable2FALoading, setDisable2FALoading] = useState(false);
   const [disable2FAError, setDisable2FAError] = useState("");
-  
+
   // Form data
   const [formData, setFormData] = useState({
     name: "",
     displayName: "",
     email: "",
-    phone: "",
-    location: "",
     bio: "",
   });
 
@@ -64,8 +71,6 @@ export default function Settings() {
         name: user.name || "",
         displayName: user.displayName || "",
         email: user.email || "",
-        phone: user.phone || "",
-        location: user.location || "",
         bio: user.bio || "",
       });
     }
@@ -74,56 +79,12 @@ export default function Settings() {
   // Capitalize first letter of each word
   const capitalizeWords = (str) => {
     return str
-      .split(' ')
-      .map(word => {
+      .split(" ")
+      .map((word) => {
         if (word.length === 0) return word;
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
       })
-      .join(' ');
-  };
-
-  // Validate phone number (magyar formátum)
-  const validatePhone = (phone) => {
-    if (!phone || phone.trim() === "") return true; // Optional field
-    
-    // Remove all spaces and special chars for validation
-    const cleaned = phone.replace(/[\s\-\(\)]/g, '');
-    
-    // Check if it's a valid Hungarian phone number
-    // +36 followed by 9 digits OR 06 followed by 9 digits
-    const hungarianRegex = /^(\+36|06)[0-9]{9}$/;
-    
-    return hungarianRegex.test(cleaned);
-  };
-
-  // Format phone number as user types
-  const formatPhone = (value) => {
-    // Remove all non-digits except +
-    let cleaned = value.replace(/[^\d+]/g, '');
-    
-    // If starts with 06, convert to +36
-    if (cleaned.startsWith('06')) {
-      cleaned = '+36' + cleaned.substring(2);
-    }
-    
-    // If starts with 36 (without +), add +
-    if (cleaned.startsWith('36') && !cleaned.startsWith('+')) {
-      cleaned = '+' + cleaned;
-    }
-    
-    // Format: +36 XX XXX XXXX
-    if (cleaned.startsWith('+36')) {
-      const numbers = cleaned.substring(3);
-      if (numbers.length <= 2) {
-        return `+36 ${numbers}`;
-      } else if (numbers.length <= 5) {
-        return `+36 ${numbers.substring(0, 2)} ${numbers.substring(2)}`;
-      } else {
-        return `+36 ${numbers.substring(0, 2)} ${numbers.substring(2, 5)} ${numbers.substring(5, 9)}`;
-      }
-    }
-    
-    return cleaned;
+      .join(" ");
   };
 
   // Validate all fields
@@ -131,67 +92,50 @@ export default function Settings() {
     const errors = {
       name: "",
       displayName: "",
-      phone: "",
     };
-    
+
     let isValid = true;
-
-    // Name validation (min 2 chars)
-
-    // Display name validation (min 2 chars)
-
-
-    // Phone validation
-    if (formData.phone && !validatePhone(formData.phone)) {
-      errors.phone = "Érvénytelen telefonszám formátum (pl. +36 30 123 4567)";
-      isValid = false;
-    }
 
     setValidationErrors(errors);
     return isValid;
   };
-  const handleUpdatePW = ()=> {
-    setShowPasswordModal(true)
-  }
+
+  const handleUpdatePW = () => {
+    setShowPasswordModal(true);
+  };
 
   // Handle input change
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Email mezőt NE lehessen változtatni
-    if (name === 'email') return;
-    
+    if (name === "email") return;
+
     let processedValue = value;
-    
+
     // Auto-capitalize name fields
-    if (name === 'name' || name === 'displayName') {
+    if (name === "name" || name === "displayName") {
       processedValue = capitalizeWords(value);
     }
-    
-    // Format phone number
-    if (name === 'phone') {
-      processedValue = formatPhone(value);
-    }
-    
+
     setFormData({
       ...formData,
       [name]: processedValue,
     });
-    
+
     // Clear validation error for this field
     setValidationErrors({
       ...validationErrors,
       [name]: "",
     });
-    
+
     setError(null);
   };
 
   const normalize = (value) => (value ?? "").trim();
 
-  // Save changes - JAVÍTOTT VERZIÓ
+  // Save changes
   const handleSave = async () => {
-    // First validate the form
     if (!validateForm()) {
       setError("Kérlek javítsd a hibás mezőket!");
       return;
@@ -204,7 +148,6 @@ export default function Settings() {
       const token = await auth.currentUser.getIdToken();
       const dataToSend = {};
 
-      // Csak azokat küldjük, amik megváltoztak
       if (normalize(formData.name) !== normalize(user.name)) {
         dataToSend.name = normalize(formData.name);
       }
@@ -213,26 +156,17 @@ export default function Settings() {
         dataToSend.displayName = normalize(formData.displayName);
       }
 
-      if (normalize(formData.phone) !== normalize(user.phone)) {
-        dataToSend.phone = normalize(formData.phone);
-      }
-
-      if (normalize(formData.location) !== normalize(user.location)) {
-        dataToSend.location = normalize(formData.location);
-      }
-
       if (normalize(formData.bio) !== normalize(user.bio)) {
         dataToSend.bio = normalize(formData.bio);
       }
 
-      // Ha tényleg semmi nem változott
       if (Object.keys(dataToSend).length === 0) {
         setError("Nincs változás a profilban");
         setLoading(false);
         return;
       }
 
-      console.log('📤 Sending update:', dataToSend);
+      console.log("📤 Sending update:", dataToSend);
 
       const res = await axios.post(
         "http://localhost:3001/api/update-profile",
@@ -244,18 +178,16 @@ export default function Settings() {
         }
       );
 
-      console.log('📥 Server response:', res.data);
+      console.log("📥 Server response:", res.data);
 
       if (res.data.success) {
-        // JAVÍTÁS: A backend teljes user objektumot küld vissza
         if (res.data.user) {
           updateUser(res.data.user);
-          console.log('✅ User context updated with:', res.data.user);
+          console.log("✅ User context updated with:", res.data.user);
         } else {
-          // Fallback: csak a változásokat updateeljük
           updateUser(dataToSend);
         }
-        
+
         setSuccess(true);
         setEditMode(false);
         setTimeout(() => setSuccess(false), 3000);
@@ -274,8 +206,6 @@ export default function Settings() {
       name: user.name || "",
       displayName: user.displayName || "",
       email: user.email || "",
-      phone: user.phone || "",
-      location: user.location || "",
       bio: user.bio || "",
     });
     setEditMode(false);
@@ -283,8 +213,120 @@ export default function Settings() {
     setValidationErrors({
       name: "",
       displayName: "",
-      phone: "",
     });
+  };
+
+  // Profile picture functions
+  const openProfileModal = () => {
+    setShowProfileModal(true);
+    setImagePreview(null);
+    setSelectedFile(null);
+  };
+
+  const closeProfileModal = () => {
+    setShowProfileModal(false);
+    setImagePreview(null);
+    setSelectedFile(null);
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      setError("Csak képfájlokat tölthetsz fel!");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError("A kép mérete maximum 5MB lehet!");
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadProfilePicture = async () => {
+    if (!selectedFile) return;
+
+    try {
+      setUploadingImage(true);
+      setError(null);
+
+      const token = await auth.currentUser.getIdToken();
+      const formData = new FormData();
+      formData.append("profilePicture", selectedFile);
+
+      const res = await axios.post(
+        "http://localhost:3001/api/upload-profile-picture",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (res.data.success) {
+        updateUser({ profilePicture: res.data.profilePictureUrl });
+        setSuccess(true);
+        closeProfileModal();
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error("Profile picture upload error:", err);
+      setError(
+        err.response?.data?.message || "Hiba történt a kép feltöltése során"
+      );
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleDeleteProfilePicture = async () => {
+    if (!user.profilePicture) return;
+
+    if (!window.confirm("Biztosan törlöd a profilképedet?")) return;
+
+    try {
+      setUploadingImage(true);
+      setError(null);
+
+      const token = await auth.currentUser.getIdToken();
+
+      const res = await axios.delete(
+        "http://localhost:3001/api/delete-profile-picture",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (res.data.success) {
+        updateUser({ profilePicture: null });
+        setSuccess(true);
+        closeProfileModal();
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error("Profile picture delete error:", err);
+      setError(
+        err.response?.data?.message || "Hiba történt a kép törlése során"
+      );
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   // Open disable 2FA modal
@@ -311,11 +353,11 @@ export default function Settings() {
     try {
       setDisable2FALoading(true);
       setDisable2FAError("");
-      
+
       const token = await auth.currentUser.getIdToken();
-      
+
       const res = await axios.post(
-        "http://localhost:3001/api/disable-2fa", 
+        "http://localhost:3001/api/disable-2fa",
         { code: disable2FACode },
         {
           headers: {
@@ -323,7 +365,7 @@ export default function Settings() {
           },
         }
       );
-      
+
       if (res.data.success) {
         await refresh2FAStatus();
         closeDisable2FA();
@@ -339,7 +381,7 @@ export default function Settings() {
 
   // Handle code input (only numbers, max 6 digits)
   const handleCodeChange = (e) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    const value = e.target.value.replace(/\D/g, "").slice(0, 6);
     setDisable2FACode(value);
     setDisable2FAError("");
   };
@@ -376,14 +418,18 @@ export default function Settings() {
             <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent mb-2">
               Beállítások
             </h1>
-            <p className="text-gray-400">Kezeld a fiókod és a biztonsági beállításaidat</p>
+            <p className="text-gray-400">
+              Kezeld a fiókod és a biztonsági beállításaidat
+            </p>
           </div>
 
           {/* Success message */}
           {success && (
             <div className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/30 flex items-center gap-3 animate-slideDown">
               <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-              <p className="text-green-400 font-semibold">Változtatások sikeresen mentve!</p>
+              <p className="text-green-400 font-semibold">
+                Változtatások sikeresen mentve!
+              </p>
             </div>
           )}
 
@@ -402,15 +448,34 @@ export default function Settings() {
                 {/* Card header */}
                 <div className="p-6 border-b border-purple-500/30 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
-                      <User className="w-6 h-6 text-white" />
-                    </div>
+                    {/* Profile Picture - Clickable */}
+                    <button
+                      onClick={openProfileModal}
+                      className="relative w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center overflow-hidden group hover:ring-4 hover:ring-purple-500/50 transition-all"
+                    >
+                      {user.profilePicture ? (
+                        <img
+                          src={user.profilePicture}
+                          alt="Profile"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-6 h-6 text-white" />
+                      )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Camera className="w-5 h-5 text-white" />
+                      </div>
+                    </button>
                     <div>
-                      <h2 className="text-xl font-bold text-white">Profil Adatok</h2>
-                      <p className="text-sm text-gray-400">Személyes információid kezelése</p>
+                      <h2 className="text-xl font-bold text-white">
+                        Profil Adatok
+                      </h2>
+                      <p className="text-sm text-gray-400">
+                        Személyes információid kezelése
+                      </p>
                     </div>
                   </div>
-                  
+
                   {!editMode ? (
                     <button
                       onClick={() => setEditMode(true)}
@@ -464,11 +529,11 @@ export default function Settings() {
                       onChange={handleChange}
                       disabled={!editMode}
                       className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${
-                        validationErrors.name 
-                          ? "border-red-500/50" 
-                          : editMode 
-                            ? "border-purple-500/30" 
-                            : "border-purple-500/10"
+                        validationErrors.name
+                          ? "border-red-500/50"
+                          : editMode
+                          ? "border-purple-500/30"
+                          : "border-purple-500/10"
                       } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
                       placeholder="pl. Kovács János"
                     />
@@ -493,11 +558,11 @@ export default function Settings() {
                       onChange={handleChange}
                       disabled={!editMode}
                       className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${
-                        validationErrors.displayName 
-                          ? "border-red-500/50" 
-                          : editMode 
-                            ? "border-purple-500/30" 
-                            : "border-purple-500/10"
+                        validationErrors.displayName
+                          ? "border-red-500/50"
+                          : editMode
+                          ? "border-purple-500/30"
+                          : "border-purple-500/10"
                       } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
                       placeholder="pl. János"
                     />
@@ -516,7 +581,9 @@ export default function Settings() {
                         <Mail className="w-4 h-4 text-purple-400" />
                         Email cím
                       </div>
-                      <span className="text-xs text-gray-500 font-normal">Nem módosítható</span>
+                      <span className="text-xs text-gray-500 font-normal">
+                        Nem módosítható
+                      </span>
                     </label>
                     <input
                       type="email"
@@ -525,60 +592,6 @@ export default function Settings() {
                       disabled={true}
                       className="w-full px-4 py-3 rounded-xl bg-black/30 border border-purple-500/10 text-gray-500 placeholder-gray-500 focus:outline-none transition-all opacity-60 cursor-not-allowed"
                       placeholder="pl. janos@example.com"
-                    />
-                  </div>
-
-                  {/* Phone */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
-                      <Phone className="w-4 h-4 text-purple-400" />
-                      Telefonszám
-                      <span className="text-xs text-gray-500 font-normal">(opcionális)</span>
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      disabled={!editMode}
-                      className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${
-                        validationErrors.phone 
-                          ? "border-red-500/50" 
-                          : editMode 
-                            ? "border-purple-500/30" 
-                            : "border-purple-500/10"
-                      } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
-                      placeholder="pl. +36 30 123 4567"
-                    />
-                    {validationErrors.phone && (
-                      <p className="mt-1 text-xs text-red-400 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {validationErrors.phone}
-                      </p>
-                    )}
-                    {!validationErrors.phone && editMode && (
-                      <p className="mt-1 text-xs text-gray-500">
-                        Formátum: +36 XX XXX XXXX
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Location */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
-                      <MapPin className="w-4 h-4 text-purple-400" />
-                      Tartózkodási hely
-                    </label>
-                    <input
-                      type="text"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleChange}
-                      disabled={!editMode}
-                      className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${
-                        editMode ? "border-purple-500/30" : "border-purple-500/10"
-                      } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
-                      placeholder="pl. Budapest, Magyarország"
                     />
                   </div>
 
@@ -595,7 +608,9 @@ export default function Settings() {
                       disabled={!editMode}
                       rows={4}
                       className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${
-                        editMode ? "border-purple-500/30" : "border-purple-500/10"
+                        editMode
+                          ? "border-purple-500/30"
+                          : "border-purple-500/10"
                       } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed resize-none`}
                       placeholder="Írj pár szót magadról..."
                     />
@@ -614,7 +629,9 @@ export default function Settings() {
                       <Shield className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-white">Biztonság</h3>
+                      <h3 className="text-lg font-bold text-white">
+                        Biztonság
+                      </h3>
                       <p className="text-xs text-gray-400">Fiók védelme</p>
                     </div>
                   </div>
@@ -624,15 +641,19 @@ export default function Settings() {
                   {/* 2FA Status */}
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-semibold text-gray-300">Kéttényezős azonosítás</span>
+                      <span className="text-sm font-semibold text-gray-300">
+                        Kéttényezős azonosítás
+                      </span>
                       {loading2FA ? (
                         <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
                       ) : (
-                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          is2FAEnabled 
-                            ? "bg-green-500/20 text-green-400 border border-green-500/30" 
-                            : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
-                        }`}>
+                        <div
+                          className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            is2FAEnabled
+                              ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                              : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
+                          }`}
+                        >
                           {is2FAEnabled ? "Aktív" : "Inaktív"}
                         </div>
                       )}
@@ -672,25 +693,29 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
-              <UpdatePassword 
-  isOpen={showPasswordModal} 
-  onClose={() => setShowPasswordModal(false)} 
-/>
+              <UpdatePassword
+                isOpen={showPasswordModal}
+                onClose={() => setShowPasswordModal(false)}
+              />
 
               {/* Account Info Card */}
               <div className="rounded-2xl bg-gradient-to-br from-purple-900/30 to-cyan-900/30 border border-purple-500/30 backdrop-blur-xl overflow-hidden">
                 <div className="p-6">
-                  <h3 className="text-sm font-bold text-gray-300 mb-4">Fiók információk</h3>
-                  
+                  <h3 className="text-sm font-bold text-gray-300 mb-4">
+                    Fiók információk
+                  </h3>
+
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-400">Létrehozva</span>
                       <div className="flex items-center gap-2 text-sm text-white font-semibold">
                         <Calendar className="w-3 h-3 text-purple-400" />
-                        {new Date(user.createdAt || Date.now()).toLocaleDateString('hu-HU')}
+                        {new Date(
+                          user.createdAt || Date.now()
+                        ).toLocaleDateString("hu-HU")}
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-400">Fiók típus</span>
                       <div className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-bold border border-purple-500/30">
@@ -712,13 +737,143 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Profile Picture Modal */}
+      {showProfileModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-purple-900/90 to-cyan-900/90 border border-purple-500/30 rounded-2xl max-w-lg w-full p-8 shadow-2xl animate-fadeIn">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                  <Camera className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Profilkép</h2>
+                  <p className="text-sm text-gray-400">
+                    Nézd meg vagy módosítsd
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closeProfileModal}
+                disabled={uploadingImage}
+                className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-all disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Current/Preview Image */}
+            <div className="mb-6">
+              <div className="w-48 h-48 mx-auto rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center overflow-hidden border-4 border-purple-500/30">
+                {imagePreview ? (
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : user.profilePicture ? (
+                  <img
+                    src={user.profilePicture}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="w-24 h-24 text-white" />
+                )}
+              </div>
+            </div>
+
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+
+            {/* Actions */}
+            <div className="space-y-3">
+              {!imagePreview ? (
+                <>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all disabled:opacity-50"
+                  >
+                    <Upload className="w-5 h-5" />
+                    Új kép feltöltése
+                  </button>
+
+                  {user.profilePicture && (
+                    <button
+                      onClick={handleDeleteProfilePicture}
+                      disabled={uploadingImage}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
+                    >
+                      {uploadingImage ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin" />
+                          <span>Törlés...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-5 h-5" />
+                          <span>Profilkép törlése</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setImagePreview(null);
+                      setSelectedFile(null);
+                    }}
+                    disabled={uploadingImage}
+                    className="flex-1 px-4 py-3 rounded-xl bg-gray-600/20 hover:bg-gray-600/30 border border-gray-500/30 text-gray-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
+                  >
+                    Mégse
+                  </button>
+                  <button
+                    onClick={handleUploadProfilePicture}
+                    disabled={uploadingImage}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all disabled:opacity-50"
+                  >
+                    {uploadingImage ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Feltöltés...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-5 h-5" />
+                        <span>Mentés</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Info */}
+            <p className="mt-4 text-xs text-center text-gray-400">
+              Támogatott formátumok: JPG, PNG, GIF (max. 5MB)
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* 2FA Enable Modal */}
-      <Enable2FA 
-        isOpen={show2FA} 
+      <Enable2FA
+        isOpen={show2FA}
         onClose={() => {
           setShow2FA(false);
           refresh2FAStatus();
-        }} 
+        }}
       />
 
       {/* 2FA Disable Modal */}
@@ -732,7 +887,9 @@ export default function Settings() {
                   <Shield className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-white">2FA Kikapcsolása</h2>
+                  <h2 className="text-2xl font-bold text-white">
+                    2FA Kikapcsolása
+                  </h2>
                   <p className="text-sm text-gray-400">Biztonsági ellenőrzés</p>
                 </div>
               </div>
@@ -749,9 +906,12 @@ export default function Settings() {
             <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-semibold text-red-400 mb-1">Figyelem!</p>
+                <p className="text-sm font-semibold text-red-400 mb-1">
+                  Figyelem!
+                </p>
                 <p className="text-xs text-gray-300">
-                  A 2FA kikapcsolásával csökken a fiókod biztonsága. Add meg az autentikátor kódodat a folytatáshoz.
+                  A 2FA kikapcsolásával csökken a fiókod biztonsága. Add meg az
+                  autentikátor kódodat a folytatáshoz.
                 </p>
               </div>
             </div>
