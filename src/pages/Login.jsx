@@ -33,6 +33,12 @@ export default function Login({ isOpen, onClose }) {
   const [pending2FAEmail, setPending2FAEmail] = useState("");
   const [pending2FAPassword, setPending2FAPassword] = useState(""); // ✅ Tároljuk a jelszót is
   
+
+  // ✅ Másolás/Beillesztés megakadályozása a jelszó mezőbe
+  const handlePasswordCopyPaste = (e) => {
+    e.preventDefault();
+    return false;
+  };
   // Debug: követjük a 2FA modal állapotát
   useEffect(() => {
     console.log("🔍 2FA Modal state changed:", show2FAModal);
@@ -641,6 +647,8 @@ export default function Login({ isOpen, onClose }) {
                         <Lock className="w-5 h-5" />
                       </div>
                       <input
+                        onCopy={handlePasswordCopyPaste}
+                        onCut={handlePasswordCopyPaste}
                         type={showPassword ? 'text' : 'password'}
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -703,6 +711,9 @@ export default function Login({ isOpen, onClose }) {
                         <Lock className="w-5 h-5" />
                       </div>
                       <input
+                        onCopy={handlePasswordCopyPaste}
+                        onCut={handlePasswordCopyPaste}
+                        onPaste={handlePasswordCopyPaste}
                         type={showPassword ? 'text' : 'password'}
                         value={formData.confirmPassword}
                         onChange={(e) =>
@@ -772,6 +783,7 @@ transition-all duration-200 ease-out
                   </label>
 
                   <a
+                  style={{cursor:'pointer'}}
                     onClick={() => switchMode('forgot')}
                     className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
                   >

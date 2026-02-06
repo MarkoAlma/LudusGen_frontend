@@ -14,6 +14,12 @@ export default function UpdatePassword({ isOpen, onClose }) {
   const [success, setSuccess] = useState(false);
   const [mouseDownTarget, setMouseDownTarget] = useState(null);
 
+  // ✅ Másolás/Beillesztés megakadályozása a jelszó mezőbe
+  const handlePasswordCopyPaste = (e) => {
+    e.preventDefault();
+    return false;
+  };
+
   // Jelszó validáció
   const passwordValidation = {
     minLength: newPassword.length >= 8,
@@ -183,6 +189,8 @@ export default function UpdatePassword({ isOpen, onClose }) {
                         <Lock className="w-5 h-5" />
                       </div>
                       <input
+                        onCopy={handlePasswordCopyPaste}
+                        onCut={handlePasswordCopyPaste}
                         type={showNewPassword ? 'text' : 'password'}
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
@@ -227,6 +235,9 @@ export default function UpdatePassword({ isOpen, onClose }) {
                         <Lock className="w-5 h-5" />
                       </div>
                       <input
+                        onCopy={handlePasswordCopyPaste}
+                        onCut={handlePasswordCopyPaste}
+                        onPaste={handlePasswordCopyPaste}
                         type={showNewPassword ? 'text' : 'password'}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
