@@ -33,6 +33,13 @@ export default function Settings() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
   
+  // Validation errors
+  const [validationErrors, setValidationErrors] = useState({
+    name: "",
+    displayName: "",
+    phone: "",
+  });
+  
   // 2FA modal states
   const [show2FA, setShow2FA] = useState(false);
   const [showDisable2FA, setShowDisable2FA] = useState(false);
@@ -64,52 +71,171 @@ export default function Settings() {
     }
   }, [user]);
 
+  // Capitalize first letter of each word
+  const capitalizeWords = (str) => {
+    return str
+      .split(' ')
+      .map(word => {
+        if (word.length === 0) return word;
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join(' ');
+  };
+
+  // Validate phone number (magyar formátum)
+  const validatePhone = (phone) => {
+    if (!phone || phone.trim() === "") return true; // Optional field
+    
+    // Remove all spaces and special chars for validation
+    const cleaned = phone.replace(/[\s\-\(\)]/g, '');
+    
+    // Check if it's a valid Hungarian phone number
+    // +36 followed by 9 digits OR 06 followed by 9 digits
+    const hungarianRegex = /^(\+36|06)[0-9]{9}$/;
+    
+    return hungarianRegex.test(cleaned);
+  };
+
+  // Format phone number as user types
+  const formatPhone = (value) => {
+    // Remove all non-digits except +
+    let cleaned = value.replace(/[^\d+]/g, '');
+    
+    // If starts with 06, convert to +36
+    if (cleaned.startsWith('06')) {
+      cleaned = '+36' + cleaned.substring(2);
+    }
+    
+    // If starts with 36 (without +), add +
+    if (cleaned.startsWith('36') && !cleaned.startsWith('+')) {
+      cleaned = '+' + cleaned;
+    }
+    
+    // Format: +36 XX XXX XXXX
+    if (cleaned.startsWith('+36')) {
+      const numbers = cleaned.substring(3);
+      if (numbers.length <= 2) {
+        return `+36 ${numbers}`;
+      } else if (numbers.length <= 5) {
+        return `+36 ${numbers.substring(0, 2)} ${numbers.substring(2)}`;
+      } else {
+        return `+36 ${numbers.substring(0, 2)} ${numbers.substring(2, 5)} ${numbers.substring(5, 9)}`;
+      }
+    }
+    
+    return cleaned;
+  };
+
+  // Validate all fields
+  const validateForm = () => {
+    const errors = {
+      name: "",
+      displayName: "",
+      phone: "",
+    };
+    
+    let isValid = true;
+
+    // Name validation (min 2 chars)
+
+    // Display name validation (min 2 chars)
+
+
+    // Phone validation
+    if (formData.phone && !validatePhone(formData.phone)) {
+      errors.phone = "Érvénytelen telefonszám formátum (pl. +36 30 123 4567)";
+      isValid = false;
+    }
+
+    setValidationErrors(errors);
+    return isValid;
+  };
   const handleUpdatePW = ()=> {
     setShowPasswordModal(true)
   }
 
   // Handle input change
   const handleChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Email mezőt NE lehessen változtatni
+    if (name === 'email') return;
+    
+    let processedValue = value;
+    
+    // Auto-capitalize name fields
+    if (name === 'name' || name === 'displayName') {
+      processedValue = capitalizeWords(value);
+    }
+    
+    // Format phone number
+    if (name === 'phone') {
+      processedValue = formatPhone(value);
+    }
+    
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: processedValue,
     });
+    
+    // Clear validation error for this field
+    setValidationErrors({
+      ...validationErrors,
+      [name]: "",
+    });
+    
     setError(null);
   };
 
-  // Save changes
+  const normalize = (value) => (value ?? "").trim();
+
+  // Save changes - JAVÍTOTT VERZIÓ
   const handleSave = async () => {
+    // First validate the form
+    if (!validateForm()) {
+      setError("Kérlek javítsd a hibás mezőket!");
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      
+
       const token = await auth.currentUser.getIdToken();
-      
-      // Csak azokat a mezőket küldjük el, amik ki vannak töltve
       const dataToSend = {};
-      
-      if (formData.name && formData.name.trim()) {
-        dataToSend.name = formData.name.trim();
+
+      // Csak azokat küldjük, amik megváltoztak
+      if (normalize(formData.name) !== normalize(user.name)) {
+        dataToSend.name = normalize(formData.name);
       }
-      
-      if (formData.displayName && formData.displayName.trim()) {
-        dataToSend.displayName = formData.displayName.trim();
+
+      if (normalize(formData.displayName) !== normalize(user.displayName)) {
+        dataToSend.displayName = normalize(formData.displayName);
       }
-      
-      if (formData.phone && formData.phone.trim()) {
-        dataToSend.phone = formData.phone.trim();
+
+      if (normalize(formData.phone) !== normalize(user.phone)) {
+        dataToSend.phone = normalize(formData.phone);
       }
-      
-      if (formData.location && formData.location.trim()) {
-        dataToSend.location = formData.location.trim();
+
+      if (normalize(formData.location) !== normalize(user.location)) {
+        dataToSend.location = normalize(formData.location);
       }
-      
-      if (formData.bio && formData.bio.trim()) {
-        dataToSend.bio = formData.bio.trim();
+
+      if (normalize(formData.bio) !== normalize(user.bio)) {
+        dataToSend.bio = normalize(formData.bio);
       }
-      
+
+      // Ha tényleg semmi nem változott
+      if (Object.keys(dataToSend).length === 0) {
+        setError("Nincs változás a profilban");
+        setLoading(false);
+        return;
+      }
+
+      console.log('📤 Sending update:', dataToSend);
+
       const res = await axios.post(
-        "http://localhost:3001/api/update-profile", 
+        "http://localhost:3001/api/update-profile",
         dataToSend,
         {
           headers: {
@@ -117,13 +243,21 @@ export default function Settings() {
           },
         }
       );
-      
+
+      console.log('📥 Server response:', res.data);
+
       if (res.data.success) {
-        // Update context with the new data
-        updateUser(dataToSend);
+        // JAVÍTÁS: A backend teljes user objektumot küld vissza
+        if (res.data.user) {
+          updateUser(res.data.user);
+          console.log('✅ User context updated with:', res.data.user);
+        } else {
+          // Fallback: csak a változásokat updateeljük
+          updateUser(dataToSend);
+        }
+        
         setSuccess(true);
         setEditMode(false);
-        
         setTimeout(() => setSuccess(false), 3000);
       }
     } catch (err) {
@@ -146,6 +280,11 @@ export default function Settings() {
     });
     setEditMode(false);
     setError(null);
+    setValidationErrors({
+      name: "",
+      displayName: "",
+      phone: "",
+    });
   };
 
   // Open disable 2FA modal
@@ -325,10 +464,20 @@ export default function Settings() {
                       onChange={handleChange}
                       disabled={!editMode}
                       className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${
-                        editMode ? "border-purple-500/30" : "border-purple-500/10"
+                        validationErrors.name 
+                          ? "border-red-500/50" 
+                          : editMode 
+                            ? "border-purple-500/30" 
+                            : "border-purple-500/10"
                       } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
                       placeholder="pl. Kovács János"
                     />
+                    {validationErrors.name && (
+                      <p className="mt-1 text-xs text-red-400 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {validationErrors.name}
+                      </p>
+                    )}
                   </div>
 
                   {/* Display Name */}
@@ -344,10 +493,20 @@ export default function Settings() {
                       onChange={handleChange}
                       disabled={!editMode}
                       className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${
-                        editMode ? "border-purple-500/30" : "border-purple-500/10"
+                        validationErrors.displayName 
+                          ? "border-red-500/50" 
+                          : editMode 
+                            ? "border-purple-500/30" 
+                            : "border-purple-500/10"
                       } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
                       placeholder="pl. János"
                     />
+                    {validationErrors.displayName && (
+                      <p className="mt-1 text-xs text-red-400 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {validationErrors.displayName}
+                      </p>
+                    )}
                   </div>
 
                   {/* Email */}
@@ -374,6 +533,7 @@ export default function Settings() {
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
                       <Phone className="w-4 h-4 text-purple-400" />
                       Telefonszám
+                      <span className="text-xs text-gray-500 font-normal">(opcionális)</span>
                     </label>
                     <input
                       type="tel"
@@ -382,10 +542,25 @@ export default function Settings() {
                       onChange={handleChange}
                       disabled={!editMode}
                       className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${
-                        editMode ? "border-purple-500/30" : "border-purple-500/10"
+                        validationErrors.phone 
+                          ? "border-red-500/50" 
+                          : editMode 
+                            ? "border-purple-500/30" 
+                            : "border-purple-500/10"
                       } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
                       placeholder="pl. +36 30 123 4567"
                     />
+                    {validationErrors.phone && (
+                      <p className="mt-1 text-xs text-red-400 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {validationErrors.phone}
+                      </p>
+                    )}
+                    {!validationErrors.phone && editMode && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Formátum: +36 XX XXX XXXX
+                      </p>
+                    )}
                   </div>
 
                   {/* Location */}
