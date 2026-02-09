@@ -120,7 +120,7 @@ export default function UpdatePassword({ isOpen, onClose }) {
           className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-inKetto"
           onClick={(e) => e.stopPropagation()}
           style={{
-            transform: "scale(0.8)",
+            transform: "scale(0.88)",
             background: "linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)",
             border: "1px solid rgba(168, 85, 247, 0.3)",
           }}
@@ -318,7 +318,7 @@ export default function UpdatePassword({ isOpen, onClose }) {
 
         @keyframes scale-inKetto {
           from { opacity: 0; transform: scale(0.72); }
-          to { opacity: 1; transform: scale(0.8); }
+          to { opacity: 1; transform: scale(0.88); }
         }
         
         .animate-scale-inKetto {
