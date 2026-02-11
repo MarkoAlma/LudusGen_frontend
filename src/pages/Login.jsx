@@ -629,7 +629,7 @@ export default function Login({ isOpen, onClose }) {
                       </div>
                     )}
 
-                    {!isLogin && msg?.incorrectSignUp && msg.incorrectSignUp.toLowerCase().includes("email-already-in-use") && (
+                    {msg?.incorrectSignUp && msg.incorrectSignUp.toLowerCase().includes("ez az email cím már regisztrálva van") && (
                       <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
                         <XCircle className="w-3 h-3" />
                         <span>Az email cím már használatban van</span>
