@@ -15,11 +15,14 @@ const MyToastify = ({ err, katt, resetPw, kijelentkezes, torles }) => {
 
         if (err) {
             toast.error(err, {position:'top-center', autoClose:1250})
-
+            setTimeout(() => {
+              setMsg({})
+            }, 50);
         }else if (katt) {
             // navigate('/signin')
             let alma = katt
             toast.success(alma, {position:'top-center', autoClose:2500})
+            setMsg({})
             //setMsg(prev => delete prev.katt)
             //setMsg({})
             // setTimeout(()=> {
@@ -38,6 +41,7 @@ const MyToastify = ({ err, katt, resetPw, kijelentkezes, torles }) => {
         else if (resetPw) {
             // navigate('/signin')
             toast.success(resetPw, {position:'top-center', autoClose:2500})
+            setMsg({})
         }
     },[err, katt, resetPw, kijelentkezes, torles])
 
