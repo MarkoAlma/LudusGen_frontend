@@ -1,141 +1,261 @@
-import { Sparkles } from "lucide-react";
+import { Sparkles, ChevronRight } from "lucide-react";
 
 export default function Footer() {
+  const footerLinks = {
+    product: [
+      { name: "Funkciók", href: "#features" },
+      { name: "Árazás", href: "#pricing" },
+      { name: "API", href: "#api" },
+      { name: "Integráció", href: "#integration" },
+      { name: "Changelog", href: "#changelog" },
+    ],
+    company: [
+      { name: "Rólunk", href: "#about" },
+      { name: "Blog", href: "#blog" },
+      { name: "Karrier", href: "#careers" },
+      { name: "Press Kit", href: "#press" },
+      { name: "Kapcsolat", href: "#contact" },
+    ],
+    legal: [
+      { name: "Adatvédelem", href: "#privacy" },
+      { name: "Feltételek", href: "#terms" },
+      { name: "Cookie", href: "#cookie" },
+      { name: "Compliance", href: "#compliance" },
+      { name: "GDPR", href: "#gdpr" },
+    ],
+    resources: [
+      { name: "Dokumentáció", href: "#docs" },
+      { name: "Súgó központ", href: "#help" },
+      { name: "Közösség", href: "#community" },
+      { name: "API státusz", href: "#status" },
+      { name: "Partnerprogramm", href: "#partner" },
+    ],
+  };
+
+  const complianceBadges = [
+    { icon: "🇪🇺", title: "GDPR", subtitle: "Compliant", gradient: "from-purple-500/20 to-pink-500/20" },
+    { icon: "🔒", title: "ISO 27001", subtitle: "Certified", gradient: "from-cyan-500/20 to-blue-500/20" },
+    { icon: "✓", title: "SOC 2", subtitle: "Type II", gradient: "from-emerald-500/20 to-teal-500/20" },
+  ];
+
+  const socialLinks = [
+    { symbol: "𝕏", gradient: "from-purple-500/10", border: "border-purple-500/20", hover: "hover:border-purple-500/50", color: "text-purple-400 group-hover:text-purple-300", glow: "bg-purple-500/20" },
+    { symbol: "in", gradient: "from-pink-500/10", border: "border-pink-500/20", hover: "hover:border-pink-500/50", color: "text-pink-400 group-hover:text-pink-300", glow: "bg-pink-500/20" },
+    { symbol: "▶", gradient: "from-cyan-500/10", border: "border-cyan-500/20", hover: "hover:border-cyan-500/50", color: "text-cyan-400 group-hover:text-cyan-300", glow: "bg-cyan-500/20" },
+  ];
+
   return (
-    <footer className="relative border-t border-white/5 bg-black/40 backdrop-blur-2xl">
-      <footer className="relative border-t border-white/5 bg-black/40 backdrop-blur-2xl">
-        <div className="max-w-7xl mx-auto px-4 py-16">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-12">
-            <div className="md:col-span-2">
-              <div className="flex items-center space-x-3 mb-6">
-                <Sparkles className="w-8 h-8 text-purple-400" />
-                <span className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                  LudusGen
-                </span>
+    <footer className="relative border-t border-purple-500/10 bg-black/60 backdrop-blur-3xl overflow-hidden">
+      {/* Background Gradients */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
+      </div>
+
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
+        
+        {/* Brand & Newsletter Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 mb-12 lg:mb-16">
+          
+          {/* Brand Info */}
+          <div className="space-y-6">
+            {/* Logo */}
+            <div className="flex items-center space-x-3 group">
+              <div className="relative">
+                <Sparkles className="w-8 h-8 lg:w-9 lg:h-9 text-purple-400 group-hover:text-cyan-400 transition-all duration-500 group-hover:rotate-180" />
+                <div className="absolute inset-0 bg-purple-500/30 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <p className="text-gray-500 leading-relaxed mb-6">
-                A világ legfejlettebb AI platformja. Egyesítjük a legjobb
-                technológiákat, hogy te mindig egy lépéssel előrébb járj.
-              </p>
-              <div className="flex space-x-4">
-                <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition cursor-pointer">
-                  <span className="text-xs">𝕏</span>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition cursor-pointer">
-                  <span className="text-xs">in</span>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition cursor-pointer">
-                  <span className="text-xs">▶</span>
-                </div>
-              </div>
+              <span className="text-2xl lg:text-3xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
+                LudusGen
+              </span>
             </div>
+            
+            {/* Description */}
+            <p className="text-gray-400 text-sm lg:text-base leading-relaxed max-w-md">
+              A világ legfejlettebb AI platformja. Egyesítjük a legjobb
+              technológiákat, hogy te mindig egy lépéssel előrébb járj.
+            </p>
 
-            <div>
-              <h4 className="font-bold mb-6 text-white">Termék</h4>
-              <ul className="space-y-3 text-gray-500">
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Funkciók
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Árazás
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    API
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Integráció
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Changelog
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-bold mb-6 text-white">Vállalat</h4>
-              <ul className="space-y-3 text-gray-500">
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Rólunk
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Blog
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Karrier
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Press Kit
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Kapcsolat
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-bold mb-6 text-white">Jogi</h4>
-              <ul className="space-y-3 text-gray-500">
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Adatvédelem
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Feltételek
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Cookie
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    Compliance
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-white transition">
-                    GDPR
-                  </a>
-                </li>
-              </ul>
+            {/* Social Links */}
+            <div className="flex gap-2.5 lg:gap-3">
+              {socialLinks.map((social, index) => (
+                <a key={index} href="#" className="group relative">
+                  <div className={`relative z-10 w-11 h-11 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-gradient-to-br ${social.gradient} to-transparent border ${social.border} flex items-center justify-center backdrop-blur-sm transition-all duration-300 ${social.hover} hover:scale-110`}>
+                    <span className={`${social.color} transition-colors text-base lg:text-lg font-bold`}>
+                      {social.symbol}
+                    </span>
+                  </div>
+                  <div className={`absolute inset-0 rounded-xl lg:rounded-2xl ${social.glow} blur-xl opacity-0 group-hover:opacity-100 transition-opacity`} />
+                </a>
+              ))}
             </div>
           </div>
 
-          <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-600 text-sm mb-4 md:mb-0">
-              © 2026 LudusGen. Minden jog fenntartva.
-            </p>
-            <div className="flex items-center space-x-6 text-sm text-gray-600">
-              <span>🇪🇺 GDPR Compliant</span>
-              <span>🔒 ISO 27001</span>
-              <span>✓ SOC 2 Type II</span>
+          {/* Newsletter - Desktop Only */}
+          <div className="hidden lg:block">
+            <div className="relative group">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-cyan-500/20 rounded-3xl blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-3xl p-8 backdrop-blur-sm">
+                <h3 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
+                  <span className="text-2xl">✨</span>
+                  Iratkozz fel hírlevelünkre
+                </h3>
+                <p className="text-gray-400 text-sm mb-6">
+                  Legfrissebb fejlesztések és exkluzív tartalmak.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    placeholder="email@example.com"
+                    className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
+                  />
+                  <button className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold text-white hover:from-purple-500 hover:to-pink-500 transition-all duration-300 hover:scale-105 whitespace-nowrap">
+                    Feliratkozás
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </footer>
+
+        {/* Links Grid */}
+{/* Links Grid */}
+<div className="grid grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-12 mb-10 lg:mb-12">
+  {/* Product Links */}
+  <FooterLinkColumn
+    title="Termék"
+    links={footerLinks.product}
+    barColor="from-purple-500 to-pink-500"
+    iconColor="text-purple-400"
+  />
+
+  {/* Company Links */}
+  <FooterLinkColumn
+    title="Vállalat"
+    links={footerLinks.company}
+    barColor="from-pink-500 to-rose-500"
+    iconColor="text-pink-400"
+  />
+
+  {/* Legal Links */}
+  <FooterLinkColumn
+    title="Jogi"
+    links={footerLinks.legal}
+    barColor="from-cyan-500 to-blue-500"
+    iconColor="text-cyan-400"
+  />
+
+  {/* Resources Links - Desktop Only */}
+  <div className="hidden lg:block">
+    <FooterLinkColumn
+      title="Erőforrások"
+      links={footerLinks.resources}
+      barColor="from-amber-500 to-orange-500"
+      iconColor="text-amber-400"
+    />
+  </div>
+
+          {/* Resources Links - Desktop Only */}
+
+        </div>
+
+        {/* Compliance Badges */}
+        <div className="mb-8 lg:mb-12">
+          <div className="grid grid-cols-3 gap-2 lg:gap-3 max-w-2xl mx-auto">
+            {complianceBadges.map((badge, index) => (
+              <ComplianceBadge key={index} {...badge} />
+            ))}
+          </div>
+        </div>
+
+        {/* Newsletter - Mobile Only */}
+        <div className="lg:hidden mb-8">
+          <div className="relative group">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-cyan-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-2xl p-5 backdrop-blur-sm">
+              <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2">
+                <span className="text-lg">✨</span>
+                Hírlevél
+              </h3>
+              <p className="text-gray-400 text-xs mb-4">
+                Friss hírek és exkluzív tartalmak.
+              </p>
+              <div className="flex flex-col gap-2">
+                <input
+                  type="email"
+                  placeholder="email@example.com"
+                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
+                />
+                <button className="w-full px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold text-sm text-white hover:from-purple-500 hover:to-pink-500 transition-all duration-300">
+                  Feliratkozás
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="pt-6 lg:pt-8 border-t border-white/5">
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-3 lg:gap-4">
+            <p className="text-gray-600 text-[11px] lg:text-sm text-center lg:text-left">
+              © 2026 <span className="text-gray-500 font-semibold">LudusGen</span>. Minden jog fenntartva.
+            </p>
+            
+            <div className="flex items-center gap-4 lg:gap-6 text-[11px] lg:text-xs text-gray-600">
+              <a href="#" className="hover:text-gray-400 transition-colors">Adatvédelem</a>
+              <span className="text-gray-700">•</span>
+              <a href="#" className="hover:text-gray-400 transition-colors">Feltételek</a>
+              <span className="text-gray-700">•</span>
+              <a href="#" className="hover:text-gray-400 transition-colors">Sitemap</a>
+            </div>
+          </div>
+        </div>
+      </div>
     </footer>
+  );
+}
+
+// Footer Link Column Component
+function FooterLinkColumn({ title, links, barColor, iconColor }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-1">
+        <div className={`w-1 lg:w-1.5 h-5 lg:h-6 bg-gradient-to-b ${barColor} rounded-full`} />
+        <h4 className="font-bold text-white text-xs lg:text-base">{title}</h4>
+      </div>
+      <ul className="space-y-2.5 lg:space-y-3">
+        {links.map((link) => (
+          <li key={link.name}>
+            <a
+              href={link.href}
+              className="group flex items-center gap-2 text-gray-400 hover:text-white transition-all duration-200 text-xs lg:text-sm"
+            >
+              <ChevronRight className={`w-3 h-3 opacity-0 group-hover:opacity-100 -ml-5 group-hover:ml-0 transition-all duration-200 ${iconColor}`} />
+              <span className="break-words">{link.name}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Compliance Badge Component
+function ComplianceBadge({ icon, title, subtitle, gradient }) {
+  return (
+    <div className="group relative">
+      <div className={`absolute inset-0 bg-gradient-to-r ${gradient} rounded-xl lg:rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity`} />
+      <div className="relative flex flex-col lg:flex-row items-center gap-2 lg:gap-3 px-3 lg:px-5 py-2.5 lg:py-3 rounded-xl lg:rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+        <span className="text-lg lg:text-xl">{icon}</span>
+        <div className="text-center lg:text-left">
+          <div className="text-[10px] lg:text-xs font-semibold text-white whitespace-nowrap">
+            {title}
+          </div>
+          <div className="text-[9px] lg:text-[10px] text-gray-500">
+            {subtitle}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
