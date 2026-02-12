@@ -7,9 +7,6 @@ import {
   EyeOff,
   X,
   Sparkles,
-  Chrome,
-  Github,
-  Apple,
   CheckCircle2,
   XCircle,
   ArrowLeft,
@@ -32,6 +29,11 @@ export default function Login({ isOpen, onClose }) {
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [pending2FAEmail, setPending2FAEmail] = useState("");
   const [pending2FAPassword, setPending2FAPassword] = useState(""); // ✅ Tároljuk a jelszót is
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [sessionId, setSessionId] = useState(null);
+  const [provider, setProvider] = useState(null); // 'email' vagy 'google'
   
 
   // ✅ Másolás/Beillesztés megakadályozása a jelszó mezőbe
@@ -82,7 +84,7 @@ export default function Login({ isOpen, onClose }) {
     }
   }, [formData.email]);
 
-  const { signUpUser, signInUser, msg, user, setMsg, resetPassword } = useContext(MyUserContext);
+  const { signUpUser, signInUser, msg, user, setMsg, resetPassword, signInWithGoogle, setIsAuthOpen,setShowNavbar } = useContext(MyUserContext);
 
   useEffect(() => {
     console.log("msg változott:", msg);
@@ -136,7 +138,7 @@ export default function Login({ isOpen, onClose }) {
       savedNameRef.current = '';
       
       // Bezárjuk a modalt sikeres bejelentkezés után
-      setTimeout(() => {
+      setTimeout(() => {        
         onClose();
       }, 500);
     }
@@ -151,6 +153,24 @@ export default function Login({ isOpen, onClose }) {
     setTimeout(() => {
       setIsSwitching(false);
     }, 400);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    
+    const result = await signInWithGoogle();
+    
+    // ✅ GOOGLE 2FA KEZELÉS
+    if (result.requires2FA) {
+    
+      console.log("2FA required for Google login");
+      setEmail(result.email);
+      setSessionId(result.sessionId);
+      setProvider('google');
+      setShow2FAModal(true);
+    }
+    
+    setLoading(false);
   };
 
   const handleSubmit = async (e) => {
@@ -204,6 +224,7 @@ export default function Login({ isOpen, onClose }) {
           setPending2FAPassword(formData.password);
           
           console.log("⏳ Setting show2FAModal to TRUE...");
+          setProvider('email');
           setShow2FAModal(true);
           
           // Ellenőrizzük, hogy tényleg beállítódott-e
@@ -243,16 +264,44 @@ export default function Login({ isOpen, onClose }) {
   const handle2FASuccess = async () => {
     console.log("✅ 2FA Success handler called");
     setShow2FAModal(false);
-    
+    setIsAuthOpen(false);
     try {
-      // Firebase bejelentkezés a tárolt adatokkal
+
+      console.log("🔐 Logging in with Firebase after 2FA...");
+      if (provider == 'google') {
+              // ✅ GOOGLE 2FA - Custom token-nel már be van jelentkezve
+      console.log("✅ Google 2FA login successful with custom token");
+      
+      // A signInWith2FA már megtörtént a TwoFactorLogin komponensben
+      // Csak bezárjuk a modalt és tisztítjuk a state-et
+      setMsg({ signIn: true, kijelentkezes: "Sikeres Google bejelentkezés 2FA-val!" });
+
+        setShowNavbar(true);
+      
+      
+      // Form reset
+      setFormData({
+        name: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+      });
+      
+      setEmail("");
+      setSessionId(null);
+      setProvider(null);
+      
+      // ✅ Most beállítjuk az isSubmittingRef-et
+      isSubmittingRef.current = true;
+      }
+      else {
+              // Firebase bejelentkezés a tárolt adatokkal
       const { signInWithEmailAndPassword } = await import("firebase/auth");
       const { auth } = await import("../firebase/firebaseApp");
-      
-      console.log("🔐 Logging in with Firebase after 2FA...");
-      await signInWithEmailAndPassword(auth, pending2FAEmail, pending2FAPassword);
+            await signInWithEmailAndPassword(auth, pending2FAEmail, pending2FAPassword);
       
       setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés 2FA-val!" });
+      setShowNavbar(true)
       
       // ✅ Most beállítjuk az isSubmittingRef-et, hogy a useEffect bezárja a modalt
       isSubmittingRef.current = true;
@@ -272,11 +321,17 @@ export default function Login({ isOpen, onClose }) {
       
       // ⚠️ A modal bezárását az useEffect végzi, amikor a user state megváltozik
       
+      }
+
+      
     } catch (error) {
       console.error("❌ Firebase login after 2FA error:", error);
       setMsg({ err: "Hiba történt a bejelentkezés során" });
       setPending2FAEmail("");
       setPending2FAPassword("");
+      setEmail("");
+      setSessionId(null);
+      setProvider(null);
     }
   };
 
@@ -316,6 +371,7 @@ export default function Login({ isOpen, onClose }) {
           
           if (e.target === e.currentTarget && mouseDownTarget === e.currentTarget) {
             onClose();
+            console.log("ALMA2324");
           }
           setMouseDownTarget(null);
         }}
@@ -347,6 +403,7 @@ export default function Login({ isOpen, onClose }) {
                 setFormData({...formData, password: '', confirmPassword: ''});
               } else {
                 onClose();
+                console.log("ALMA2324");
               }
             }}
             className="absolute top-4 left-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white"
@@ -842,38 +899,47 @@ transition-all duration-200 ease-out
                   </button>
 
                   {/* Divider */}
-                  <div className="relative my-5">
+                  <div className="relative my-6">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-purple-500/20" />
                     </div>
                     <div className="relative flex justify-center">
-                      <span className="px-3 text-xs text-gray-500 font-semibold" style={{
+                      <span className="px-4 text-xs text-gray-500 font-semibold uppercase tracking-wider" style={{
                         background: 'linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)'
                       }}>
-                        vagy folytatás ezekkel
+                        Vagy
                       </span>
                     </div>
                   </div>
 
-                  {/* Social Login Buttons */}
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { name: 'Google', icon: <Chrome className="w-5 h-5" /> },
-                      { name: 'GitHub', icon: <Github className="w-5 h-5" /> },
-                      { name: 'Apple', icon: <Apple className="w-5 h-5" /> }
-                    ].map((social) => (
-                      <button
-                        key={social.name}
-                        type="button"
-                        className="py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-purple-500/20 hover:border-purple-500/40 transition-all duration-300 flex items-center justify-center text-gray-400 hover:text-white group"
-                        title={social.name}
-                      >
-                        <div className="group-hover:scale-110 transition-transform">
-                          {social.icon}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                  {/* Ultra Premium Google Login Button */}
+                  <button
+                    onClick={handleGoogleSignIn}
+                    type="button"
+                    className="google-sign-in-button group"
+                  >
+                    {/* Glow effect background */}
+                    <div className="google-glow"></div>
+                    
+                    {/* Glass morphism background */}
+                    <div className="google-glass"></div>
+                    
+                    {/* Content */}
+                    <div className="google-content">
+                      <div className="google-icon-wrapper">
+                        <svg className="google-icon" viewBox="0 0 48 48">
+                          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                        </svg>
+                      </div>
+                      <span className="google-button-text">Folytatás Google-lel</span>
+                    </div>
+                    
+                    {/* Animated border */}
+                    <div className="google-border"></div>
+                  </button>
                 </form>
 
             {/* Terms */}
@@ -917,7 +983,9 @@ transition-all duration-200 ease-out
         isOpen={show2FAModal}
         onClose={handle2FAClose}
         onSuccess={handle2FASuccess}
-        email={pending2FAEmail}
+        email={email || pending2FAEmail}
+        sessionId={sessionId}
+        provider={provider}
       /> 
 
       <style jsx>{`
@@ -970,6 +1038,257 @@ transition-all duration-200 ease-out
         input[type="checkbox"]:checked {
           background-color: #a855f7;
           border-color: #a855f7;
+        }
+
+        /* Ultra Premium Google Sign-In Button - Dark Glassmorphism Theme */
+        .google-sign-in-button {
+          position: relative;
+          width: 100%;
+          height: 60px;
+          background: transparent;
+          border: none;
+          border-radius: 16px;
+          cursor: pointer;
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+          overflow: hidden;
+        }
+
+        /* Animated outer glow effect */
+        .google-glow {
+          position: absolute;
+          inset: -3px;
+          background: linear-gradient(
+            135deg,
+            rgba(168, 85, 247, 0.5),
+            rgba(236, 72, 153, 0.4),
+            rgba(168, 85, 247, 0.5)
+          );
+          background-size: 200% 200%;
+          border-radius: 17px;
+          opacity: 0;
+          filter: blur(12px);
+          transition: opacity 0.5s ease;
+          animation: gradient-shift 4s ease infinite;
+        }
+
+        @keyframes gradient-shift {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+
+        .google-sign-in-button:hover .google-glow {
+          opacity: 1;
+        }
+
+        /* Glassmorphism background layer */
+        .google-glass {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.07) 0%,
+            rgba(255, 255, 255, 0.03) 100%
+          );
+          border-radius: 16px;
+          backdrop-filter: blur(16px);
+          transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 
+            inset 0 1px 0 rgba(255, 255, 255, 0.1),
+            0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .google-sign-in-button:hover .google-glass {
+          background: linear-gradient(
+            135deg,
+            rgba(168, 85, 247, 0.15) 0%,
+            rgba(236, 72, 153, 0.1) 100%
+          );
+          box-shadow: 
+            inset 0 1px 0 rgba(255, 255, 255, 0.15),
+            0 12px 48px rgba(168, 85, 247, 0.3),
+            0 0 0 1px rgba(168, 85, 247, 0.2) inset;
+        }
+
+        /* Animated gradient border */
+        .google-border {
+          position: absolute;
+          inset: 0;
+          border-radius: 16px;
+          padding: 2px;
+          background: linear-gradient(
+            135deg,
+            rgba(168, 85, 247, 0.4),
+            rgba(236, 72, 153, 0.3),
+            rgba(168, 85, 247, 0.4)
+          );
+          background-size: 200% 200%;
+          -webkit-mask: 
+            linear-gradient(#fff 0 0) content-box, 
+            linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          transition: all 0.5s ease;
+          animation: border-flow 3s linear infinite;
+        }
+
+        @keyframes border-flow {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+
+        .google-sign-in-button:hover .google-border {
+          background: linear-gradient(
+            135deg,
+            rgba(168, 85, 247, 0.7),
+            rgba(236, 72, 153, 0.6),
+            rgba(168, 85, 247, 0.7)
+          );
+          background-size: 200% 200%;
+          padding: 2.5px;
+        }
+
+        /* Content container */
+        .google-content {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 16px;
+          height: 100%;
+          padding: 0 24px;
+        }
+
+        /* Icon with white background and shadow */
+        .google-icon-wrapper {
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(145deg, #ffffff, #f0f0f0);
+          border-radius: 9px;
+          padding: 6px;
+          box-shadow: 
+            0 4px 12px rgba(0, 0, 0, 0.25),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
+          transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .google-sign-in-button:hover .google-icon-wrapper {
+          transform: scale(1.15) rotate(-8deg);
+          box-shadow: 
+            0 6px 20px rgba(0, 0, 0, 0.3),
+            0 0 30px rgba(168, 85, 247, 0.5),
+            inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        }
+
+        .google-sign-in-button:active .google-icon-wrapper {
+          transform: scale(1.08) rotate(-5deg);
+        }
+
+        .google-icon {
+          width: 22px;
+          height: 22px;
+          filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+        }
+
+        /* Premium button text with gradient on hover */
+        .google-button-text {
+          position: relative;
+          font-size: 15.5px;
+          font-weight: 700;
+          letter-spacing: 0.4px;
+          color: rgba(255, 255, 255, 0.95);
+          text-shadow: 
+            0 2px 8px rgba(0, 0, 0, 0.3),
+            0 0 20px rgba(168, 85, 247, 0.2);
+          transition: all 0.4s ease;
+        }
+
+        .google-sign-in-button:hover .google-button-text {
+          background: linear-gradient(
+            135deg,
+            #ffffff 0%,
+            #f0abff 30%,
+            #e879f9 60%,
+            #ffffff 100%
+          );
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          text-shadow: none;
+          animation: text-shine 2s linear infinite;
+        }
+
+        @keyframes text-shine {
+          0% { background-position: 0% center; }
+          100% { background-position: 200% center; }
+        }
+
+        /* Hover scale effect for entire button */
+        .google-sign-in-button:hover {
+          transform: translateY(-3px);
+        }
+
+        .google-sign-in-button:active {
+          transform: translateY(-1px);
+        }
+
+        /* Diagonal shine sweep on hover */
+        .google-sign-in-button::after {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: linear-gradient(
+            120deg,
+            transparent,
+            rgba(255, 255, 255, 0.15) 40%,
+            rgba(255, 255, 255, 0.25) 50%,
+            rgba(255, 255, 255, 0.15) 60%,
+            transparent
+          );
+          transform: translateX(-100%) translateY(-100%) rotate(30deg);
+          transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .google-sign-in-button:hover::after {
+          transform: translateX(100%) translateY(100%) rotate(30deg);
+        }
+
+        /* Ambient light pulse */
+        .google-sign-in-button::before {
+          content: '';
+          position: absolute;
+          inset: -20px;
+          background: radial-gradient(
+            circle at center,
+            rgba(168, 85, 247, 0.15) 0%,
+            transparent 70%
+          );
+          opacity: 0;
+          transition: opacity 0.6s ease;
+          pointer-events: none;
+        }
+
+        .google-sign-in-button:hover::before {
+          opacity: 1;
+          animation: pulse-light 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-light {
+          0%, 100% {
+            transform: scale(1);
+            opacity: 0.6;
+          }
+          50% {
+            transform: scale(1.1);
+            opacity: 1;
+          }
         }
       `}</style>
     </>
