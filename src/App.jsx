@@ -33,6 +33,7 @@ function App() {
   },[isAuthOpen])
 
   const bezar = () => {
+    
     setIsAuthOpen(false);
     setShowNavbar(true);
   };

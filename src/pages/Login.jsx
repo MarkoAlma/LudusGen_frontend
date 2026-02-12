@@ -31,10 +31,19 @@ export default function Login({ isOpen, onClose }) {
   const [pending2FAPassword, setPending2FAPassword] = useState(""); // ✅ Tároljuk a jelszót is
 
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [sessionId, setSessionId] = useState(null);
   const [provider, setProvider] = useState(null); // 'email' vagy 'google'
   
+  useEffect(()=>{
+    if (isOpen) {
+    setFormData({
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      });
+    }
+  },[isOpen])
 
   // ✅ Másolás/Beillesztés megakadályozása a jelszó mezőbe
   const handlePasswordCopyPaste = (e) => {
@@ -129,17 +138,18 @@ export default function Login({ isOpen, onClose }) {
     // Csak sikeres bejelentkezés után töröljük a formot
     if (isSubmittingRef.current && user && prevUserRef.current !== user) {
       isSubmittingRef.current = false;
-      setFormData({
-        name: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-      });
+      // setFormData({
+      //   name: "",
+      //   email: "",
+      //   password: "",
+      //   confirmPassword: "",
+      // });
       savedNameRef.current = '';
       
       // Bezárjuk a modalt sikeres bejelentkezés után
       setTimeout(() => {        
         onClose();
+        setLoading(false)
       }, 500);
     }
     prevUserRef.current = user;
@@ -212,7 +222,7 @@ export default function Login({ isOpen, onClose }) {
         savedNameRef.current = "";
         
         // Először megpróbáljuk bejelentkeztetni (ez ellenőrzi a jelszót is)
-        const result = await signInUser(formData.email, formData.password);
+        const result = await signInUser(formData.email, formData.password, setLoading);
         
         // Ha 2FA szükséges, megnyitjuk a 2FA modalt
         if (result?.requires2FA) {
@@ -239,24 +249,21 @@ export default function Login({ isOpen, onClose }) {
         
         // Ha nincs 2FA és sikeres volt a bejelentkezés
         isSubmittingRef.current = true; // ← IDE TETTÜK (csak ha NINCS 2FA)
-        if (msg?.signIn) {
-          // Form reset csak sikeres bejelentkezés után
-          setFormData({
-            name: "",
-            email: "",
-            password: "",
-            confirmPassword: "",
-          });
-        }
+        // if (msg?.signIn) {
+        //   // Form reset csak sikeres bejelentkezés után
+        //   setFormData({
+        //     name: "",
+        //     email: "",
+        //     password: "",
+        //     confirmPassword: "",
+        //   });
+        // }
         // ⚠️ Ha hiba volt (rossz jelszó), NE töröljük a formot!
       }
     } catch (error) {
       isSubmittingRef.current = false;
       setMsg({ err: "HIBA" });
-    } finally {
-      if (!show2FAModal) {
-        setLoading(false);
-      }
+      setLoading(false)
     }
   };
 
@@ -265,6 +272,8 @@ export default function Login({ isOpen, onClose }) {
     console.log("✅ 2FA Success handler called");
     setShow2FAModal(false);
     setIsAuthOpen(false);
+    setShowNavbar(true)
+    // setLoading(false)
     try {
 
       console.log("🔐 Logging in with Firebase after 2FA...");
@@ -274,18 +283,15 @@ export default function Login({ isOpen, onClose }) {
       
       // A signInWith2FA már megtörtént a TwoFactorLogin komponensben
       // Csak bezárjuk a modalt és tisztítjuk a state-et
-      setMsg({ signIn: true, kijelentkezes: "Sikeres Google bejelentkezés 2FA-val!" });
-
-        setShowNavbar(true);
+      setMsg({ signIn: true,  });
       
-      
-      // Form reset
-      setFormData({
-        name: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-      });
+      // // Form reset
+      // setFormData({
+      //   name: "",
+      //   email: "",
+      //   password: "",
+      //   confirmPassword: "",
+      // });
       
       setEmail("");
       setSessionId(null);
@@ -300,19 +306,18 @@ export default function Login({ isOpen, onClose }) {
       const { auth } = await import("../firebase/firebaseApp");
             await signInWithEmailAndPassword(auth, pending2FAEmail, pending2FAPassword);
       
-      setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés 2FA-val!" });
-      setShowNavbar(true)
-      
+      setMsg({ signIn: true });
+
       // ✅ Most beállítjuk az isSubmittingRef-et, hogy a useEffect bezárja a modalt
       isSubmittingRef.current = true;
       
-      // Form reset
-      setFormData({
-        name: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-      });
+      // // Form reset
+      // setFormData({
+      //   name: "",
+      //   email: "",
+      //   password: "",
+      //   confirmPassword: "",
+      // });
       
       setPending2FAEmail("");
       setPending2FAPassword("");
@@ -371,6 +376,7 @@ export default function Login({ isOpen, onClose }) {
           
           if (e.target === e.currentTarget && mouseDownTarget === e.currentTarget) {
             onClose();
+            setLoading(false)
             console.log("ALMA2324");
           }
           setMouseDownTarget(null);
@@ -403,6 +409,7 @@ export default function Login({ isOpen, onClose }) {
                 setFormData({...formData, password: '', confirmPassword: ''});
               } else {
                 onClose();
+                setLoading(false)
                 console.log("ALMA2324");
               }
             }}

@@ -113,7 +113,7 @@ export default function Navbar({ scrollY }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             {/* Logo with extreme effects */}
-            <a href="#home">
+            <a>
               <div
                 onClick={() => navigate("/")}
                 className="flex items-center space-x-3 group cursor-pointer relative"

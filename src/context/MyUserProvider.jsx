@@ -181,7 +181,7 @@ const loadUserFromFirestore = async (currentUser) => {
     setIs2FAEnabled(false);
   };
 
-  const signInUser = async (email, password) => {
+  const signInUser = async (email, password, setLoading) => {
     setUser(null);
     try {
       // ✅ ELŐSZÖR ELLENŐRIZZÜK, HOGY SZÜKSÉGES-E A 2FA
@@ -206,6 +206,7 @@ const loadUserFromFirestore = async (currentUser) => {
             return { requires2FA: true };
           } else {
             setMsg({ incorrectSignIn: "Hibás email/jelszó páros" });
+            setLoading(false)
             return { requires2FA: false };
           }
         } catch (error) {
@@ -213,6 +214,7 @@ const loadUserFromFirestore = async (currentUser) => {
           setMsg({ 
             incorrectSignIn: error.response?.data?.message || "Hibás email/jelszó páros" 
           });
+          setLoading(false)
           return { requires2FA: false };
         }
       }
@@ -225,15 +227,17 @@ const loadUserFromFirestore = async (currentUser) => {
         setMsg({ err: "Nincs megerősítve az email!" });
         setUser(null);
         await signOut(auth);
+        setLoading(false)
         return { requires2FA: false };
       }
 
-      setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés!" });
+      setMsg({ signIn: true });
       return { requires2FA: false };
       
     } catch (error) {
       console.log(error);
       setMsg({ incorrectSignIn: error.message });
+      setLoading(false)
       return { requires2FA: false };
     }
   };
@@ -242,7 +246,7 @@ const loadUserFromFirestore = async (currentUser) => {
   const signInWith2FA = async (customToken) => {
     try {
       await signInWithCustomToken(auth, customToken);
-      setMsg({ signIn: true, kijelentkezes: "Sikeres 2FA bejelentkezés!" });
+      setMsg({ signIn: true});
       return { success: true };
     } catch (error) {
       console.error("2FA sign in error:", error);
@@ -311,7 +315,7 @@ const signInWithGoogle = async () => {
     }
 
     console.log("✅ Google sign-in successful (no 2FA)");
-    setMsg({ signIn: true, kijelentkezes: "Sikeres Google bejelentkezés!" });
+    setMsg({ signIn: true });
       setIsAuthOpen(false);
       setShowNavbar(true);
       
