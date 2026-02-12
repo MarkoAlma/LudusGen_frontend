@@ -231,7 +231,7 @@ const loadUserFromFirestore = async (currentUser) => {
         return { requires2FA: false };
       }
 
-    // setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
+    setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
       return { requires2FA: false };
       
     } catch (error) {
