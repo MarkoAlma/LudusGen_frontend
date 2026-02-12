@@ -642,7 +642,7 @@ export default function Settings() {
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-sm font-semibold text-gray-300">
-                        Kéttényezős azonosítás
+                        Kétlépcsős azonosítás
                       </span>
                       {loading2FA ? (
                         <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />

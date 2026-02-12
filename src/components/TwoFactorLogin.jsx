@@ -135,7 +135,7 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email, sess
               </div>
 
               <h2 className="text-3xl font-black text-white mb-2">
-                Kéttényezős Azonosítás
+                Kétlépcsős Azonosítás
               </h2>
               <p className="text-gray-400">
                 Add meg az autentikátor alkalmazásodban látható 6 jegyű kódot

@@ -15,7 +15,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import AuthModal from "../pages/Login";
 import { useContext } from "react";
 import { MyUserContext } from "../context/MyUserProvider";
 
@@ -490,7 +489,8 @@ export default function Navbar({ scrollY }) {
                   toggleMobileMenu();
                   navigate("/settings");
                 }}
-                className={`group relative overflow-hidden rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10`}
+                className={`group relative
+                  cursor-pointer overflow-hidden rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10`}
                 style={{
                   transitionDelay: `${(menuItems.length + 3) * 100}ms`,
                   transform: mobileMenuOpen ? 'translateY(0) scale(1)' : 'translateY(30px) scale(0.9)',
@@ -503,8 +503,8 @@ export default function Navbar({ scrollY }) {
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
                     <Settings className="w-6 h-6 text-white" />
                   </div>
-                  <h3 className="text-white font-bold text-xl mb-1">Beállítások</h3>
-                  <p className="text-white/50 text-sm">Testreszabás</p>
+                  <h3 className="text-white text-left font-bold text-xl mb-1">Beállítások</h3>
+                  <p className="text-white/50 text-sm text-left">Testreszabás</p>
                 </div>
               </button>
             )}
@@ -522,7 +522,7 @@ export default function Navbar({ scrollY }) {
                   toggleMobileMenu();
                   logout();
                 }}
-                className="w-full relative overflow-hidden group flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl hover:bg-white/10 transition-all duration-300"
+                className="w-full relative overflow-hidden cursor-pointer group flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl hover:bg-white/10 transition-all duration-300"
               >
                 <LogOut className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
                 <span className="text-white font-bold text-lg">Kijelentkezés</span>
