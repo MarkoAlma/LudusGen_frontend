@@ -179,8 +179,8 @@ export default function Navbar({ scrollY }) {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20 sm:h-24">
-            {/* Logo - Elevated Design */}
-            <a href="#home">
+            {/* Logo with extreme effects */}
+            <a>
               <div
                 onClick={() => navigate("/")}
                 className="flex items-center space-x-2 sm:space-x-4 group cursor-pointer relative"
