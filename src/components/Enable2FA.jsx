@@ -188,7 +188,7 @@ export default function Enable2FA({ isOpen, onClose }) {
                 </div>
 
                 <h2 className="text-3xl font-black text-white mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  Kéttényezős Azonosítás
+                  Kétlépcsős Azonosítás
                 </h2>
                 <p className="text-gray-400 text-sm">
                   Védd meg a fiókodat egy extra biztonsági réteggel
