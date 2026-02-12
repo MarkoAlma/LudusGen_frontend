@@ -147,10 +147,10 @@ export default function Login({ isOpen, onClose }) {
       savedNameRef.current = '';
       
       // Bezárjuk a modalt sikeres bejelentkezés után
-      setTimeout(() => {        
+     
         onClose();
         setLoading(false)
-      }, 500);
+  
     }
     prevUserRef.current = user;
   }, [user, onClose]);
@@ -273,6 +273,7 @@ export default function Login({ isOpen, onClose }) {
     setShow2FAModal(false);
     setIsAuthOpen(false);
     setShowNavbar(true)
+    setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
     // setLoading(false)
     try {
 
@@ -283,7 +284,7 @@ export default function Login({ isOpen, onClose }) {
       
       // A signInWith2FA már megtörtént a TwoFactorLogin komponensben
       // Csak bezárjuk a modalt és tisztítjuk a state-et
-      setMsg({ signIn: true,  });
+    // setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
       
       // // Form reset
       // setFormData({
@@ -306,7 +307,7 @@ export default function Login({ isOpen, onClose }) {
       const { auth } = await import("../firebase/firebaseApp");
             await signInWithEmailAndPassword(auth, pending2FAEmail, pending2FAPassword);
       
-      setMsg({ signIn: true });
+    // setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
 
       // ✅ Most beállítjuk az isSubmittingRef-et, hogy a useEffect bezárja a modalt
       isSubmittingRef.current = true;

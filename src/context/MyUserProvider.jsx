@@ -231,7 +231,7 @@ const loadUserFromFirestore = async (currentUser) => {
         return { requires2FA: false };
       }
 
-      setMsg({ signIn: true });
+    // setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
       return { requires2FA: false };
       
     } catch (error) {
@@ -246,7 +246,7 @@ const loadUserFromFirestore = async (currentUser) => {
   const signInWith2FA = async (customToken) => {
     try {
       await signInWithCustomToken(auth, customToken);
-      setMsg({ signIn: true});
+    setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
       return { success: true };
     } catch (error) {
       console.error("2FA sign in error:", error);
@@ -315,7 +315,7 @@ const signInWithGoogle = async () => {
     }
 
     console.log("✅ Google sign-in successful (no 2FA)");
-    setMsg({ signIn: true });
+        setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
       setIsAuthOpen(false);
       setShowNavbar(true);
       
