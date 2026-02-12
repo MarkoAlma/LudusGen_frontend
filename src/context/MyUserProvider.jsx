@@ -1,11 +1,14 @@
 import { useState, createContext, useEffect } from "react";
-import { auth } from "../firebase/firebaseApp";
+import { auth, db } from "../firebase/firebaseApp";
 import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithCustomToken,
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithCredential,
 } from "firebase/auth";
 import axios from "axios";
 
@@ -19,6 +22,12 @@ const MyUserProvider = ({ children }) => {
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [loading2FA, setLoading2FA] = useState(true);
 
+  useEffect(()=>{
+    console.log('====================================')
+    console.log("A 2fa változott", is2FAEnabled)
+    console.log('====================================')
+  },[is2FAEnabled])
+
   // Firebase Auth State Listener
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (currentUser) => {
@@ -29,7 +38,7 @@ const MyUserProvider = ({ children }) => {
         if (!currentUser.emailVerified) {
           console.log("❌ Email not verified, signing out");
           await signOut(auth);
-          setUser(null);
+          setUser(null); 
           setIs2FAEnabled(false);
           setLoading2FA(false);
           setMsg({ err: "Nincs megerősítve az email!" });
@@ -49,31 +58,52 @@ const MyUserProvider = ({ children }) => {
     return () => unsub();
   }, []);
 
-  // Firestore-ból betölti a user adatokat
-  const loadUserFromFirestore = async (currentUser) => {
-    try {
-      const token = await currentUser.getIdToken();
-      
-      const response = await axios.get(`http://localhost:3001/api/get-user/${currentUser.uid}`, {
+
+// Firestore-ból betölti a user adatokat
+const loadUserFromFirestore = async (currentUser) => {
+  try {
+    if (user && user.uid === currentUser.uid && user.firestoreData) {
+      console.log("✅ User already loaded from Firestore, skipping");
+      return;
+    }
+
+    const token = await currentUser.getIdToken();
+    
+    const response = await axios.get(
+      `http://localhost:3001/api/get-user/${currentUser.uid}`, 
+      {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      });
-
-      if (response.data.success) {
-        setUser({
-          ...currentUser,
-          ...response.data.user,
-          uid: currentUser.uid,
-        });
-      } else {
-        setUser(currentUser);
       }
-    } catch (error) {
-      console.error("Error loading user from Firestore:", error);
+    );
+
+    if (response.data.success) {
+      // 🔥 Megőrizzük a Firebase Auth metódusokat!
+      const mergedUser = Object.assign(
+        Object.create(Object.getPrototypeOf(currentUser)), // ← Prototype chain megőrzése!
+        currentUser,
+        response.data.user,
+        { uid: currentUser.uid }
+      );
+
+      setUser(mergedUser);
+      console.log("TÖLTÖTTKÁPI")
+    } else {
       setUser(currentUser);
+      console.log("TÖLTÖTTKÁPI")
     }
-  };
+  } catch (error) {
+    console.error("Error loading user from Firestore:", error);
+    
+    if (error.response?.status === 404) {
+      console.warn("User document not found, using Firebase Auth data only");
+    }
+    
+    setUser(currentUser);
+    console.log("TÖLTÖTTKÁPI")
+  }
+};
 
   // 2FA státusz betöltése a backend-ből
   const fetch2FAStatus = async (currentUser) => {
@@ -112,6 +142,7 @@ const MyUserProvider = ({ children }) => {
       ...prevUser,
       ...updatedData,
     }));
+    console.log("TÖLTÖTTKÁPI")
   };
 
   useEffect(() => {
@@ -220,6 +251,84 @@ const MyUserProvider = ({ children }) => {
     }
   };
 
+// ✅ OPTIMALIZÁLT GOOGLE BEJELENTKEZÉS - JAVÍTOTT
+const signInWithGoogle = async () => {
+  const provider = new GoogleAuthProvider();
+  
+  try {
+    // 1. GOOGLE POPUP
+    const result = await signInWithPopup(auth, provider);
+    const email = result.user.email;
+    
+    console.log("Google popup completed for:", email);
+
+    // 2. ELLENŐRIZZÜK A 2FA SZÜKSÉGESSÉGÉT
+    const check2FAResponse = await axios.post(
+      "http://localhost:3001/api/check-2fa-required",
+      { email }
+    );
+
+    // 3a. HA 2FA SZÜKSÉGES → kijelentkezés és 2FA flow
+    if (check2FAResponse.data.requires2FA) {
+      
+      setIs2FAEnabled(true);
+      console.log("2FA required, signing out temporarily");
+      
+      // ⚠️ Firebase ID token megszerzése KIJELENTKEZÉS ELŐTT
+      const firebaseIdToken = await result.user.getIdToken();
+      
+      // Kijelentkezés
+      await signOut(auth);
+      
+      // ✅ FIREBASE ID TOKEN küldése (nem Google OAuth token!)
+      const validateResponse = await axios.post(
+        "http://localhost:3001/api/validate-google-session",
+        { 
+          firebaseIdToken, // ← Firebase token, nem Google OAuth token
+          email 
+        }
+      );
+      
+      if (validateResponse.data.success) {
+        return { 
+          requires2FA: true, 
+          email,
+          provider: 'google',
+          sessionId: validateResponse.data.sessionId
+        };
+      } else {
+        setMsg({ incorrectSignIn: "Google bejelentkezési hiba" });
+        return { requires2FA: false };
+      }
+    }
+
+    // 3b. HA NINCS 2FA → már be van jelentkezve
+    if (!result.user.emailVerified) {
+      setMsg({ err: "Nincs megerősítve az email!" });
+      await signOut(auth);
+      setUser(null);
+      return { requires2FA: false };
+    }
+
+    console.log("✅ Google sign-in successful (no 2FA)");
+    setMsg({ signIn: true, kijelentkezes: "Sikeres Google bejelentkezés!" });
+      setIsAuthOpen(false);
+      setShowNavbar(true);
+      
+    return { requires2FA: false };
+    
+  } catch (error) {
+    console.error("Google sign-in error:", error);
+    setMsg({ incorrectSignIn: error.message });
+    
+    try {
+      await signOut(auth);
+    } catch {}
+    
+    return { requires2FA: false };
+  }
+};
+
   const resetPassword = async (email) => {
     let success = false;
     try {
@@ -258,6 +367,7 @@ const MyUserProvider = ({ children }) => {
         resetPassword,
         refresh2FAStatus,
         loadUserFromFirestore,
+        signInWithGoogle,
       }}
     >
       {children}

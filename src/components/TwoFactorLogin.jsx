@@ -4,7 +4,7 @@ import axios from "axios";
 import { signInWithCustomToken } from "firebase/auth";
 import { auth } from "../firebase/firebaseApp"; // ✅ Importáljuk az auth-ot
 
-export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email }) {
+export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email, sessionId, provider }) {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -24,15 +24,27 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email }) {
     try {
       setLoading(true);
       setError(null);
-console.log("2FA payload:", { email, code });
-
-      // 1️⃣ Backend validálja a 2FA kódot
-      const res = await axios.post("http://localhost:3001/api/login-with-2fa", {
+      console.log("2FA payload:", { email, code });
+      let res;
+    if (provider == 'google') {
+      // Google 2FA - sessionId alapú
+      res = await axios.post(
+          "http://localhost:3001/api/login-with-2fa-google",
+          { sessionId, code }
+        );
+    }else {
+      // 1️⃣ Backend validálja a 2FA kódot - email alapú
+      res = await axios.post("http://localhost:3001/api/login-with-2fa", {
         email,
         code,
       });
+    }
 
-      if (res.data.success && res.data.customToken) {
+    if (res.data.success && res.data.customToken) {
+      console.log("Siker!!%!");
+      console.log(res);
+      
+      
         // 2️⃣ Firebase bejelentkezés a Custom Token-nel
         await signInWithCustomToken(auth, res.data.customToken);
         

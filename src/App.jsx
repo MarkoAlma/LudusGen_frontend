@@ -22,21 +22,21 @@ import Settings from './pages/Settings';
 import { ProtectedRoute } from './ProtectedRoute';
 
 function App() {
-  const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg} = useContext(MyUserContext);
+  const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled} = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(()=>{
+    console.log('====================================');
+    console.log("Változott", isAuthOpen);
+    console.log('====================================');
+  },[isAuthOpen])
 
   const bezar = () => {
     setIsAuthOpen(false);
     setShowNavbar(true);
   };
 
-  useEffect(() => {
-    if (user?.emailVerified) {
-      setIsAuthOpen(false);
-      setShowNavbar(true);
-    }
-  }, [user]);
 
   // Scroll lock on modal open
   useEffect(() => {
