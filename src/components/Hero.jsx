@@ -11,7 +11,7 @@ export default function Hero() {
   return (
     <section
       id="home"
-      className="relative min-h-screen flex items-center justify-center px-[4vw] sm:px-6 lg:px-8"
+      className="relative min-h-screen flex items-center justify-center px-[4vw] sm:px-6 lg:px-8 pt-15 md:pt-0"
     >
       {/* Background Effects */}
       <div className="absolute inset-0 z-0">
