@@ -91,25 +91,27 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Newsletter - Desktop Only */}
-          <div className="hidden lg:block">
+          {/* Newsletter */}
+          <div>
             <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-cyan-500/20 rounded-3xl blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-3xl p-8 backdrop-blur-sm">
-                <h3 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
-                  <span className="text-2xl">✨</span>
-                  Iratkozz fel hírlevelünkre
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-cyan-500/20 rounded-2xl lg:rounded-3xl blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-2xl lg:rounded-3xl p-5 lg:p-8 backdrop-blur-sm">
+                <h3 className="text-base lg:text-xl font-bold text-white mb-2 lg:mb-3 flex items-center gap-2">
+                  <span className="text-lg lg:text-2xl">✨</span>
+                  <span className="lg:hidden">Hírlevél</span>
+                  <span className="hidden lg:inline">Iratkozz fel hírlevelünkre</span>
                 </h3>
-                <p className="text-gray-400 text-sm mb-6">
-                  Legfrissebb fejlesztések és exkluzív tartalmak.
+                <p className="text-gray-400 text-xs lg:text-sm mb-4 lg:mb-6">
+                  <span className="lg:hidden">Friss hírek és exkluzív tartalmak.</span>
+                  <span className="hidden lg:inline">Legfrissebb fejlesztések és exkluzív tartalmak.</span>
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-col lg:flex-row gap-2">
                   <input
                     type="email"
                     placeholder="email@example.com"
-                    className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
+                    className="flex-1 px-4 py-2.5 lg:py-3 bg-white/5 border border-white/10 rounded-xl text-sm lg:text-base text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
                   />
-                  <button className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold text-white hover:from-purple-500 hover:to-pink-500 transition-all duration-300 hover:scale-105 whitespace-nowrap">
+                  <button className="px-5 lg:px-6 py-2.5 lg:py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold text-sm lg:text-base text-white hover:from-purple-500 hover:to-pink-500 transition-all duration-300 hover:scale-105 whitespace-nowrap">
                     Feliratkozás
                   </button>
                 </div>
@@ -118,45 +120,47 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Links Grid */}
-{/* Links Grid */}
-<div className="grid grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-12 mb-10 lg:mb-12">
-  {/* Product Links */}
-  <FooterLinkColumn
-    title="Termék"
-    links={footerLinks.product}
-    barColor="from-purple-500 to-pink-500"
-    iconColor="text-purple-400"
-  />
+        {/* Links Grid - Mobile: 2 columns, Desktop: 4 columns */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-8 lg:gap-12 mb-10 lg:mb-12">
+          {/* Product Links */}
+          <div className="justify-self-start w-full">
+            <FooterLinkColumn
+              title="Termék"
+              links={footerLinks.product}
+              barColor="from-purple-500 to-pink-500"
+              iconColor="text-purple-400"
+            />
+          </div>
 
-  {/* Company Links */}
-  <FooterLinkColumn
-    title="Vállalat"
-    links={footerLinks.company}
-    barColor="from-pink-500 to-rose-500"
-    iconColor="text-pink-400"
-  />
+          {/* Company Links */}
+          <div className="justify-self-end lg:justify-self-start w-full">
+            <FooterLinkColumn
+              title="Vállalat"
+              links={footerLinks.company}
+              barColor="from-pink-500 to-rose-500"
+              iconColor="text-pink-400"
+            />
+          </div>
 
-  {/* Legal Links */}
-  <FooterLinkColumn
-    title="Jogi"
-    links={footerLinks.legal}
-    barColor="from-cyan-500 to-blue-500"
-    iconColor="text-cyan-400"
-  />
+          {/* Legal Links */}
+          <div className="justify-self-start w-full">
+            <FooterLinkColumn
+              title="Jogi"
+              links={footerLinks.legal}
+              barColor="from-cyan-500 to-blue-500"
+              iconColor="text-cyan-400"
+            />
+          </div>
 
-  {/* Resources Links - Desktop Only */}
-  <div className="hidden lg:block">
-    <FooterLinkColumn
-      title="Erőforrások"
-      links={footerLinks.resources}
-      barColor="from-amber-500 to-orange-500"
-      iconColor="text-amber-400"
-    />
-  </div>
-
-          {/* Resources Links - Desktop Only */}
-
+          {/* Resources Links */}
+          <div className="justify-self-end lg:justify-self-start w-full">
+            <FooterLinkColumn
+              title="Erőforrások"
+              links={footerLinks.resources}
+              barColor="from-amber-500 to-orange-500"
+              iconColor="text-amber-400"
+            />
+          </div>
         </div>
 
         {/* Compliance Badges */}
@@ -165,32 +169,6 @@ export default function Footer() {
             {complianceBadges.map((badge, index) => (
               <ComplianceBadge key={index} {...badge} />
             ))}
-          </div>
-        </div>
-
-        {/* Newsletter - Mobile Only */}
-        <div className="lg:hidden mb-8">
-          <div className="relative group">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-cyan-500/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="relative bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-2xl p-5 backdrop-blur-sm">
-              <h3 className="text-base font-bold text-white mb-2 flex items-center gap-2">
-                <span className="text-lg">✨</span>
-                Hírlevél
-              </h3>
-              <p className="text-gray-400 text-xs mb-4">
-                Friss hírek és exkluzív tartalmak.
-              </p>
-              <div className="flex flex-col gap-2">
-                <input
-                  type="email"
-                  placeholder="email@example.com"
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
-                />
-                <button className="w-full px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-semibold text-sm text-white hover:from-purple-500 hover:to-pink-500 transition-all duration-300">
-                  Feliratkozás
-                </button>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -218,7 +196,7 @@ export default function Footer() {
 // Footer Link Column Component
 function FooterLinkColumn({ title, links, barColor, iconColor }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 lg:space-y-4 text-left">
       <div className="flex items-center gap-2 mb-1">
         <div className={`w-1 lg:w-1.5 h-5 lg:h-6 bg-gradient-to-b ${barColor} rounded-full`} />
         <h4 className="font-bold text-white text-xs lg:text-base">{title}</h4>
