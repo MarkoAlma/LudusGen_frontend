@@ -138,16 +138,9 @@ export default function Login({ isOpen, onClose }) {
     // Csak sikeres bejelentkezés után töröljük a formot
     if (isSubmittingRef.current && user && prevUserRef.current !== user) {
       isSubmittingRef.current = false;
-      // setFormData({
-      //   name: "",
-      //   email: "",
-      //   password: "",
-      //   confirmPassword: "",
-      // });
       savedNameRef.current = '';
       
       // Bezárjuk a modalt sikeres bejelentkezés után
-     
         onClose();
         setLoading(false)
   
@@ -249,16 +242,6 @@ export default function Login({ isOpen, onClose }) {
         
         // Ha nincs 2FA és sikeres volt a bejelentkezés
         isSubmittingRef.current = true; // ← IDE TETTÜK (csak ha NINCS 2FA)
-        // if (msg?.signIn) {
-        //   // Form reset csak sikeres bejelentkezés után
-        //   setFormData({
-        //     name: "",
-        //     email: "",
-        //     password: "",
-        //     confirmPassword: "",
-        //   });
-        // }
-        // ⚠️ Ha hiba volt (rossz jelszó), NE töröljük a formot!
       }
     } catch (error) {
       isSubmittingRef.current = false;
@@ -286,14 +269,6 @@ export default function Login({ isOpen, onClose }) {
       // Csak bezárjuk a modalt és tisztítjuk a state-et
     // setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
       
-      // // Form reset
-      // setFormData({
-      //   name: "",
-      //   email: "",
-      //   password: "",
-      //   confirmPassword: "",
-      // });
-      
       setEmail("");
       setSessionId(null);
       setProvider(null);
@@ -311,14 +286,6 @@ export default function Login({ isOpen, onClose }) {
 
       // ✅ Most beállítjuk az isSubmittingRef-et, hogy a useEffect bezárja a modalt
       isSubmittingRef.current = true;
-      
-      // // Form reset
-      // setFormData({
-      //   name: "",
-      //   email: "",
-      //   password: "",
-      //   confirmPassword: "",
-      // });
       
       setPending2FAEmail("");
       setPending2FAPassword("");
@@ -396,8 +363,9 @@ export default function Login({ isOpen, onClose }) {
             transition: 'opacity 0.2s ease-out',
           }}
         >
-          {/* Close/Back Button */}
+          {/* Close/Back Button - ✅ TESZT-FIX: type="button" hozzáadva */}
           <button
+            type="button"
             style={{cursor:'pointer'}}
             onClick={() => {
               // ⚠️ Ha 2FA folyamatban van, ne engedjük bezárni
@@ -533,7 +501,9 @@ export default function Login({ isOpen, onClose }) {
                     <p className="text-sm text-gray-500 mb-8">
                       Ellenőrizd a spam mappát is, ha nem találod az emailt.
                     </p>
+                    {/* ✅ TESZT-FIX: type="button" */}
                     <button
+                      type="button"
                       onClick={() => switchMode('login')}
                       style={{ cursor: 'pointer' }}
                       className="w-full py-4 rounded-xl font-bold text-base bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2"
@@ -599,7 +569,7 @@ export default function Login({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                {/* Toggle Tabs */}
+                {/* Toggle Tabs - ✅ TESZT-FIX: type="button" hozzáadva */}
                 <div className="relative flex gap-2 mb-6 p-1 rounded-2xl bg-white/5 border border-white/10">
                   <div 
                     className="absolute top-1 bottom-1 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 transition-all duration-400 ease-out"
@@ -611,6 +581,7 @@ export default function Login({ isOpen, onClose }) {
                   />
                   
                   <button
+                    type="button"
                     style={{cursor:'pointer'}}
                     onClick={() => switchMode('login')}
                     className={`relative z-10 flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
@@ -620,6 +591,7 @@ export default function Login({ isOpen, onClose }) {
                     Bejelentkezés
                   </button>
                   <button
+                    type="button"
                     style={{cursor:'pointer'}}
                     onClick={() => switchMode('signup')}
                     className={`relative z-10 flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
@@ -847,17 +819,21 @@ transition-all duration-200 ease-out
                     </span>
                   </label>
 
-                  <a
-                  style={{cursor:'pointer'}}
+                  {/* ✅ TESZT-FIX: <a> → <button type="button"> hogy ne submitoljon */}
+                  <button
+                    type="button"
+                    style={{cursor:'pointer'}}
                     onClick={() => switchMode('forgot')}
-                    className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+                    className="text-purple-400 hover:text-purple-300 font-semibold transition-colors bg-transparent border-none p-0"
                   >
                     Elfelejtett jelszó?
-                  </a>
+                  </button>
                 </div>
               </div>
 
+                  {/* ✅ TESZT-FIX: data-testid="main-submit-btn" hozzáadva */}
                   <button
+                    data-testid="main-submit-btn"
                     style={{ cursor: (isFormValid && !loading) ? 'pointer' : 'not-allowed' }}
                     type="submit"
                     disabled={!isFormValid || loading}
