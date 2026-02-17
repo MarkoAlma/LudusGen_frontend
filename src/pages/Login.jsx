@@ -16,6 +16,7 @@ import { MyUserContext } from "../context/MyUserProvider";
 import { IoCheckmarkDoneOutline } from "react-icons/io5";
 import { FaCheck } from "react-icons/fa";
 import { useEffect, useRef } from "react";
+import axios from "axios";
 import TwoFactorLogin from "../components/TwoFactorLogin";
 
 export default function Login({ isOpen, onClose }) {
@@ -185,7 +186,12 @@ export default function Login({ isOpen, onClose }) {
     if (mode === 'forgot') {
       try {
         console.log("FORGOT HANDLER START");
-        await resetPassword(formData.email);
+        // await resetPassword(formData.email);
+
+        await axios.post('http://localhost:3001/api/forgot-password', {
+          email: formData.email
+        });
+
         console.log("Alma1222");
         setEmailKikuldese(true)
       } catch (error) {

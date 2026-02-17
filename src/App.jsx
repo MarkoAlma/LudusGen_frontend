@@ -17,7 +17,6 @@ import { Toaster } from 'react-hot-toast';
 import MyToastify from './components/MyToastify';
 import ResetPassword from './components/ResetPassword';
 import VerifyEmail from './components/VerifyEmail';
-import Enable2FA from './components/Enable2Fa';
 import Settings from './pages/Settings';
 import { ProtectedRoute } from './ProtectedRoute';
 

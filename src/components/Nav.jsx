@@ -230,7 +230,7 @@ export default function Navbar({ scrollY }) {
               ))}
 
               <button
-                onClick={() => login()}
+                onClick={() => navigate('/chat')}
                 className="relative group overflow-hidden cursor-pointer px-8 py-3 rounded-full font-bold text-base shadow-2xl"
               >
                 {/* Animated gradient background */}
