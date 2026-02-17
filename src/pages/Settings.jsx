@@ -16,6 +16,7 @@ import {
   Camera,
   Upload,
   Trash2,
+  XCircle,
 } from "lucide-react";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
@@ -55,6 +56,7 @@ export default function Settings() {
   const [disable2FACode, setDisable2FACode] = useState("");
   const [disable2FALoading, setDisable2FALoading] = useState(false);
   const [disable2FAError, setDisable2FAError] = useState("");
+  const [disable2FAMouseDownTarget, setDisable2FAMouseDownTarget] = useState(null);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -108,12 +110,10 @@ export default function Settings() {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // Email mezőt NE lehessen változtatni
     if (name === "email") return;
 
     let processedValue = value;
 
-    // Auto-capitalize name fields
     if (name === "name" || name === "displayName") {
       processedValue = capitalizeWords(value);
     }
@@ -123,7 +123,6 @@ export default function Settings() {
       [name]: processedValue,
     });
 
-    // Clear validation error for this field
     setValidationErrors({
       ...validationErrors,
       [name]: "",
@@ -166,8 +165,6 @@ export default function Settings() {
         return;
       }
 
-      console.log("📤 Sending update:", dataToSend);
-
       const res = await axios.post(
         "http://localhost:3001/api/update-profile",
         dataToSend,
@@ -178,12 +175,9 @@ export default function Settings() {
         }
       );
 
-      console.log("📥 Server response:", res.data);
-
       if (res.data.success) {
         if (res.data.user) {
           updateUser(res.data.user);
-          console.log("✅ User context updated with:", res.data.user);
         } else {
           updateUser(dataToSend);
         }
@@ -233,13 +227,11 @@ export default function Settings() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       setError("Csak képfájlokat tölthetsz fel!");
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError("A kép mérete maximum 5MB lehet!");
       return;
@@ -247,7 +239,6 @@ export default function Settings() {
 
     setSelectedFile(file);
 
-    // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreview(reader.result);
@@ -448,7 +439,6 @@ export default function Settings() {
                 {/* Card header */}
                 <div className="p-6 border-b border-purple-500/30 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    {/* Profile Picture - Clickable */}
                     <button
                       onClick={openProfileModal}
                       className="relative w-12 cursor-pointer h-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center overflow-hidden group hover:ring-4 hover:ring-purple-500/50 transition-all"
@@ -865,7 +855,6 @@ export default function Settings() {
               )}
             </div>
 
-            {/* Info */}
             <p className="mt-4 text-xs text-center text-gray-400">
               Támogatott formátumok: JPG, PNG, GIF (max. 5MB)
             </p>
@@ -882,101 +871,127 @@ export default function Settings() {
         }}
       />
 
-      {/* 2FA Disable Modal */}
+      {/* 2FA Disable Modal — UpdatePassword stílusú */}
       {showDisable2FA && (
-        <div 
-          onClick={closeDisable2FA}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in"
+          onMouseDown={(e) => setDisable2FAMouseDownTarget(e.target)}
+          onMouseUp={(e) => {
+            if (
+              e.target === e.currentTarget &&
+              disable2FAMouseDownTarget === e.currentTarget
+            ) {
+              closeDisable2FA();
+            }
+            setDisable2FAMouseDownTarget(null);
+          }}
         >
-          <div 
+          <div
+            className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-inKetto"
             onClick={(e) => e.stopPropagation()}
-            className="bg-gradient-to-br from-purple-900/90 to-cyan-900/90 border border-purple-500/30 rounded-2xl max-w-md w-full p-8 shadow-2xl animate-fadeIn"
+            style={{
+              transform: "scale(0.88)",
+              background: "linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)",
+              border: "1px solid rgba(168, 85, 247, 0.3)",
+            }}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-600 to-pink-600 flex items-center justify-center">
-                  <Shield className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">
-                    2FA Kikapcsolása
-                  </h2>
-                  <p className="text-sm text-gray-400">Biztonsági ellenőrzés</p>
-                </div>
-              </div>
-              <button
-                onClick={closeDisable2FA}
-                disabled={disable2FALoading}
-                className="p-2 cursor-pointer rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-all disabled:opacity-50"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+            {/* Close Button — bal felső sarok, mint UpdatePassword-ban */}
+            <button
+              type="button"
+              style={{ cursor: "pointer" }}
+              onClick={closeDisable2FA}
+              disabled={disable2FALoading}
+              className="absolute top-4 left-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white disabled:opacity-50"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-            {/* Warning */}
-            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-red-400 mb-1">
-                  Figyelem!
+            <div className="relative z-10 p-8">
+              {/* Title */}
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-pink-600 mb-4">
+                  <Shield className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-3xl font-black text-white mb-2">
+                  2FA Kikapcsolása
+                </h2>
+                <p className="text-gray-400">
+                  Add meg az autentikátor kódodat a megerősítéshez
                 </p>
+              </div>
+
+              {/* Warning */}
+              <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-gray-300">
-                  A 2FA kikapcsolásával csökken a fiókod biztonsága. Add meg az
-                  autentikátor kódodat a folytatáshoz.
+                  A 2FA kikapcsolásával csökken a fiókod biztonsága. Ez a lépés nem vonható vissza automatikusan.
                 </p>
               </div>
-            </div>
 
-            {/* Code Input */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-300 mb-3">
-                6 jegyű autentikátor kód
-              </label>
-              <input
-                type="text"
-                value={disable2FACode}
-                onChange={handleCodeChange}
-                maxLength={6}
-                placeholder="000000"
-                disabled={disable2FALoading}
-                className="w-full px-4 py-4 text-center text-2xl font-mono tracking-widest rounded-xl bg-black/40 border border-purple-500/30 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-50"
-                autoFocus
-              />
-              {disable2FAError && (
-                <p className="mt-2 text-sm text-red-400 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  {disable2FAError}
-                </p>
-              )}
-            </div>
+              <form onSubmit={handleDisable2FA}>
+                {/* Code Input */}
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-purple-300 mb-2">
+                    6 jegyű autentikátor kód
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={disable2FACode}
+                      onChange={handleCodeChange}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && disable2FACode.length === 6 && !disable2FALoading) {
+                          handleDisable2FA();
+                        }
+                      }}
+                      maxLength={6}
+                      placeholder="000000"
+                      disabled={disable2FALoading}
+                      autoFocus
+                      className="w-full pl-12 pr-4 py-3 rounded-xl bg-black/40 border border-purple-500/30 text-white text-center text-2xl font-mono tracking-widest placeholder-gray-600 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-50"
+                    />
+                  </div>
+                  {disable2FAError && (
+                    <div className="flex items-center gap-2 mt-2 text-sm text-red-400 validation-message">
+                      <XCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>{disable2FAError}</span>
+                    </div>
+                  )}
+                </div>
 
-            {/* Actions */}
-            <div className="flex gap-3">
-              <button
-                onClick={closeDisable2FA}
-                disabled={disable2FALoading}
-                className="flex-1 cursor-pointer px-4 py-3 rounded-xl bg-gray-600/20 hover:bg-gray-600/30 border border-gray-500/30 text-gray-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
-              >
-                Mégse
-              </button>
-              <button
-                onClick={handleDisable2FA}
-                disabled={disable2FALoading || disable2FACode.length !== 6}
-                className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-red-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-red-500/50 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {disable2FALoading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Ellenőrzés...</span>
-                  </>
-                ) : (
-                  <>
-                    <X className="w-5 h-5" />
-                    <span>Kikapcsolás</span>
-                  </>
-                )}
-              </button>
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={disable2FALoading || disable2FACode.length !== 6}
+                  style={{
+                    cursor:
+                      !disable2FALoading && disable2FACode.length === 6
+                        ? "pointer"
+                        : "not-allowed",
+                  }}
+                  className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 ${
+                    !disable2FALoading && disable2FACode.length === 6
+                      ? "bg-gradient-to-r from-red-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-red-500/50 hover:scale-105"
+                      : "bg-gradient-to-r from-red-600/40 to-pink-600/40 text-white/50"
+                  }`}
+                >
+                  {disable2FALoading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Ellenőrzés...</span>
+                    </>
+                  ) : (
+                    <>
+                      <X className="w-5 h-5" />
+                      <span>2FA Kikapcsolása</span>
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
           </div>
         </div>
@@ -984,30 +999,44 @@ export default function Settings() {
 
       <style jsx>{`
         @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .animate-slideDown {
           animation: slideDown 0.3s ease-out forwards;
         }
+
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.2s ease-out;
+        }
+
+        @keyframes scale-inKetto {
+          from { opacity: 0; transform: scale(0.72); }
+          to { opacity: 1; transform: scale(0.88); }
+        }
+        .animate-scale-inKetto {
+          animation: scale-inKetto 0.3s ease-out;
+        }
+
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
         }
         .animate-fadeIn {
           animation: fadeIn 0.2s ease-out forwards;
+        }
+
+        .validation-message {
+          opacity: 0;
+          animation: validationFadeIn 0.4s ease-out forwards;
+        }
+        @keyframes validationFadeIn {
+          from { opacity: 0; transform: translateY(-5px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </>
