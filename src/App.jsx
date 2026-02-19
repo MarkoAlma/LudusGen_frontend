@@ -19,13 +19,14 @@ import VerifyEmail from './components/VerifyEmail';
 import Settings from './pages/Settings';
 import { ProtectedRoute } from './ProtectedRoute';
 import AIChat from './ai_components/AiChat';
+import { auth } from './firebase/firebaseApp';
 
 function App() {
   const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled} = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
 // Meglévő App.jsx-ben:
-const getIdToken = () => user?.getIdToken();
+
   useEffect(()=>{
     console.log('====================================');
     console.log("Változott", isAuthOpen);
@@ -77,7 +78,7 @@ const getIdToken = () => user?.getIdToken();
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/chat" element={<ProtectedRoute>
-<AIChat user={user} getIdToken={getIdToken} /></ProtectedRoute>} />
+<AIChat user={user} getIdToken={() => auth.currentUser?.getIdToken(true)}   /></ProtectedRoute>} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
