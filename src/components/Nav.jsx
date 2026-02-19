@@ -228,9 +228,9 @@ export default function Navbar({ scrollY }) {
                   <span className="absolute inset-x-0 -bottom-1 h-[3px] bg-gradient-to-r from-purple-500 via-pink-500 to-cyan-500 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 rounded-full" />
                 </a>
               ))}
-
+              {user &&
               <button
-                onClick={() => login()}
+                onClick={() => navigate('/chat')}
                 className="relative group overflow-hidden cursor-pointer px-8 py-3 rounded-full font-bold text-base shadow-2xl"
               >
                 {/* Animated gradient background */}
@@ -250,6 +250,7 @@ export default function Navbar({ scrollY }) {
                 </div>
 
                 {/* Button text */}
+                
                 <span className="relative z-10 flex items-center font-black uppercase tracking-wide">
                   Chatelj
                   <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-2 transition-transform duration-300" />
@@ -259,6 +260,7 @@ export default function Navbar({ scrollY }) {
                 {/* Pulse effect */}
                 <div className="absolute inset-0 rounded-full bg-white/20 animate-ping opacity-0 group-hover:opacity-20" />
               </button>
+              }
 
               {/* User Section - Desktop */}
               {user ? (

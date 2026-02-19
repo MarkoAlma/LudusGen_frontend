@@ -16,6 +16,7 @@ import { MyUserContext } from "../context/MyUserProvider";
 import { IoCheckmarkDoneOutline } from "react-icons/io5";
 import { FaCheck } from "react-icons/fa";
 import { useEffect, useRef } from "react";
+import axios from "axios";
 import TwoFactorLogin from "../components/TwoFactorLogin";
 
 export default function Login({ isOpen, onClose }) {
@@ -42,8 +43,20 @@ export default function Login({ isOpen, onClose }) {
       password: "",
       confirmPassword: "",
       });
+    }else{
+      setMode("login")
     }
   },[isOpen])
+
+  useEffect(()=>{
+    setFormData({
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    });
+  },[mode])
+
 
   // ✅ Másolás/Beillesztés megakadályozása a jelszó mezőbe
   const handlePasswordCopyPaste = (e) => {
@@ -77,6 +90,9 @@ export default function Login({ isOpen, onClose }) {
   useEffect(() => {
     if (msg?.incorrectSignIn!=null) {
       setMsg({ incorrectSignIn: null });
+    }
+    if (msg?.incorrectSignUp!=null) {
+      setMsg({ incorrectSignUp: null });
     }
   }, [formData.email, formData.password]);
 
@@ -138,16 +154,9 @@ export default function Login({ isOpen, onClose }) {
     // Csak sikeres bejelentkezés után töröljük a formot
     if (isSubmittingRef.current && user && prevUserRef.current !== user) {
       isSubmittingRef.current = false;
-      // setFormData({
-      //   name: "",
-      //   email: "",
-      //   password: "",
-      //   confirmPassword: "",
-      // });
       savedNameRef.current = '';
       
       // Bezárjuk a modalt sikeres bejelentkezés után
-     
         onClose();
         setLoading(false)
   
@@ -192,7 +201,12 @@ export default function Login({ isOpen, onClose }) {
     if (mode === 'forgot') {
       try {
         console.log("FORGOT HANDLER START");
-        await resetPassword(formData.email);
+        // await resetPassword(formData.email);
+
+        await axios.post('http://localhost:3001/api/forgot-password', {
+          email: formData.email
+        });
+
         console.log("Alma1222");
         setEmailKikuldese(true)
       } catch (error) {
@@ -249,16 +263,6 @@ export default function Login({ isOpen, onClose }) {
         
         // Ha nincs 2FA és sikeres volt a bejelentkezés
         isSubmittingRef.current = true; // ← IDE TETTÜK (csak ha NINCS 2FA)
-        // if (msg?.signIn) {
-        //   // Form reset csak sikeres bejelentkezés után
-        //   setFormData({
-        //     name: "",
-        //     email: "",
-        //     password: "",
-        //     confirmPassword: "",
-        //   });
-        // }
-        // ⚠️ Ha hiba volt (rossz jelszó), NE töröljük a formot!
       }
     } catch (error) {
       isSubmittingRef.current = false;
@@ -286,14 +290,6 @@ export default function Login({ isOpen, onClose }) {
       // Csak bezárjuk a modalt és tisztítjuk a state-et
     // setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
       
-      // // Form reset
-      // setFormData({
-      //   name: "",
-      //   email: "",
-      //   password: "",
-      //   confirmPassword: "",
-      // });
-      
       setEmail("");
       setSessionId(null);
       setProvider(null);
@@ -311,14 +307,6 @@ export default function Login({ isOpen, onClose }) {
 
       // ✅ Most beállítjuk az isSubmittingRef-et, hogy a useEffect bezárja a modalt
       isSubmittingRef.current = true;
-      
-      // // Form reset
-      // setFormData({
-      //   name: "",
-      //   email: "",
-      //   password: "",
-      //   confirmPassword: "",
-      // });
       
       setPending2FAEmail("");
       setPending2FAPassword("");
@@ -351,7 +339,7 @@ export default function Login({ isOpen, onClose }) {
 
   useEffect(() => {
     if (msg?.katt) {
-      switchMode('login')
+      setIsAuthOpen(false)
     }
   }, [msg]);
 
@@ -396,8 +384,10 @@ export default function Login({ isOpen, onClose }) {
             transition: 'opacity 0.2s ease-out',
           }}
         >
-          {/* Close/Back Button */}
+          {/* Close/Back Button - ✅ TESZT-FIX: type="button" hozzáadva */}
+          {isForgot &&
           <button
+            type="button"
             style={{cursor:'pointer'}}
             onClick={() => {
               // ⚠️ Ha 2FA folyamatban van, ne engedjük bezárni
@@ -405,18 +395,32 @@ export default function Login({ isOpen, onClose }) {
                 return;
               }
               
-              if (isForgot) {
-                switchMode('login');
-                setFormData({...formData, password: '', confirmPassword: ''});
-              } else {
-                onClose();
-                setLoading(false)
-                console.log("ALMA2324");
-              }
+              switchMode('login');
+              setFormData({...formData, password: '', confirmPassword: ''});
+              
             }}
             className="absolute top-4 left-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white"
           >
-            {isForgot ? <ArrowLeft className="w-5 h-5" /> : <X className="w-5 h-5" />}
+          <ArrowLeft className="w-5 h-5" />
+          </button>
+          }
+
+          {/* Close/Back Button - ✅ TESZT-FIX: type="button" hozzáadva */}
+          
+          <button
+            type="button"
+            style={{cursor:'pointer'}}
+            onClick={() => {
+              // ⚠️ Ha 2FA folyamatban van, ne engedjük bezárni
+              if (show2FAModal) {
+                return;
+              }
+              onClose();
+              setLoading(false)
+            }}
+            className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white"
+          >
+          <X className="w-5 h-5" />
           </button>
 
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -471,17 +475,17 @@ export default function Login({ isOpen, onClose }) {
                               } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all`}
                           />
                         </div>
-                        {!isEmailValid && formData.email !== '' && (
-                          <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
-                            <XCircle className="w-3 h-3" />
-                            <span>Érvénytelen email formátum</span>
-                          </div>
-                        )}
+                      {((!isEmailValid && formData.email !== '') || (msg?.incorrectSignUp && msg?.incorrectSignUp.toLowerCase().includes("érvénytelen email cím"))) && (
+                        <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                          <XCircle className="w-3 h-3" />
+                          <span>Érvénytelen email cím</span>
+                        </div>
+                      )}
                       </div>
                       {msg?.incorrectResetPwEmail && msg.incorrectResetPwEmail.toLowerCase().includes("invalid-email") && (
                         <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
                           <XCircle className="w-3 h-3" />
-                          <span>Helytelen email cím</span>
+                          <span>Érvénytelen email cím</span>
                         </div>
                       )}
                       <button
@@ -533,7 +537,9 @@ export default function Login({ isOpen, onClose }) {
                     <p className="text-sm text-gray-500 mb-8">
                       Ellenőrizd a spam mappát is, ha nem találod az emailt.
                     </p>
+                    {/* ✅ TESZT-FIX: type="button" */}
                     <button
+                      type="button"
                       onClick={() => switchMode('login')}
                       style={{ cursor: 'pointer' }}
                       className="w-full py-4 rounded-xl font-bold text-base bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2"
@@ -599,7 +605,7 @@ export default function Login({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                {/* Toggle Tabs */}
+                {/* Toggle Tabs - ✅ TESZT-FIX: type="button" hozzáadva */}
                 <div className="relative flex gap-2 mb-6 p-1 rounded-2xl bg-white/5 border border-white/10">
                   <div 
                     className="absolute top-1 bottom-1 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 transition-all duration-400 ease-out"
@@ -611,6 +617,7 @@ export default function Login({ isOpen, onClose }) {
                   />
                   
                   <button
+                    type="button"
                     style={{cursor:'pointer'}}
                     onClick={() => switchMode('login')}
                     className={`relative z-10 flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
@@ -620,6 +627,7 @@ export default function Login({ isOpen, onClose }) {
                     Bejelentkezés
                   </button>
                   <button
+                    type="button"
                     style={{cursor:'pointer'}}
                     onClick={() => switchMode('signup')}
                     className={`relative z-10 flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-300
@@ -680,17 +688,17 @@ export default function Login({ isOpen, onClose }) {
                           } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all`}
                       />
                     </div>
-                    {!isEmailValid && formData.email !== '' && (
-                      <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
-                        <XCircle className="w-3 h-3" />
-                        <span>Érvénytelen email formátum</span>
-                      </div>
-                    )}
+                    {((!isEmailValid && formData.email !== '') || (msg?.incorrectSignUp && msg?.incorrectSignUp.toLowerCase().includes("érvénytelen email cím"))) && (
+                        <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                          <XCircle className="w-3 h-3" />
+                          <span>Érvénytelen email cím</span>
+                        </div>
+                      )}
                     
                     {!isLogin && msg?.incorrectSignUp && msg.incorrectSignUp.toLowerCase().includes("invalid-email") && (
                       <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
                         <XCircle className="w-3 h-3" />
-                        <span>Helytelen email cím</span>
+                        <span>Érvénytelen email cím</span>
                       </div>
                     )}
 
@@ -738,7 +746,6 @@ export default function Login({ isOpen, onClose }) {
                         <span>Hibás email/jelszó páros</span>
                       </div>
                     )}
-                    
 
                     {/* Jelszó validáció - csak akkor jelenik meg, ha nem minden teljesül */}
                     {!isLogin && formData.password !== '' && !isPasswordValid && (
@@ -848,17 +855,21 @@ transition-all duration-200 ease-out
                     </span>
                   </label>
 
-                  <a
-                  style={{cursor:'pointer'}}
+                  {/* ✅ TESZT-FIX: <a> → <button type="button"> hogy ne submitoljon */}
+                  <button
+                    type="button"
+                    style={{cursor:'pointer'}}
                     onClick={() => switchMode('forgot')}
-                    className="text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+                    className="text-purple-400 hover:text-purple-300 font-semibold transition-colors bg-transparent border-none p-0"
                   >
                     Elfelejtett jelszó?
-                  </a>
+                  </button>
                 </div>
               </div>
 
+                  {/* ✅ TESZT-FIX: data-testid="main-submit-btn" hozzáadva */}
                   <button
+                    data-testid="main-submit-btn"
                     style={{ cursor: (isFormValid && !loading) ? 'pointer' : 'not-allowed' }}
                     type="submit"
                     disabled={!isFormValid || loading}
