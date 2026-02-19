@@ -716,6 +716,7 @@ export default function Login({ isOpen, onClose }) {
                         <span>Hibás email/jelszó páros</span>
                       </div>
                     )}
+                    
 
                     {/* Jelszó validáció - csak akkor jelenik meg, ha nem minden teljesül */}
                     {!isLogin && formData.password !== '' && !isPasswordValid && (
