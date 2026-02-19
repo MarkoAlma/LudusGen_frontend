@@ -2,6 +2,7 @@ import { useEffect, useState, useContext } from "react";
 import axios from "axios";
 import { Shield, Smartphone, Key, Check, X, Sparkles, Copy, Download, AlertTriangle } from "lucide-react";
 import { MyUserContext } from "../context/MyUserProvider";
+import { auth } from "../firebase/firebaseApp";
 
 export default function Enable2FA({ isOpen, onClose }) {
   const { user, refresh2FAStatus } = useContext(MyUserContext);
@@ -30,13 +31,10 @@ export default function Enable2FA({ isOpen, onClose }) {
     };
   }, [isOpen, user]);
 
-  const getAuthHeaders = async () => {
-    if (!user) return {};
-    const token = await user.getIdToken();
-    return {
-      Authorization: `Bearer ${token}`,
-    };
-  };
+ const getAuthHeaders = async () => {
+  const token = await auth.currentUser.getIdToken(); // Firebase Auth instance → OK
+  return { Authorization: `Bearer ${token}` };
+};
 
   const fetchQr = async () => {
     try {

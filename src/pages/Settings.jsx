@@ -31,6 +31,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const fileInputRef = useRef(null);
+  const [mouseDownTarget, setMouseDownTarget] = useState(null);
   
   // Form states
   const [editMode, setEditMode] = useState(false);
@@ -506,6 +507,36 @@ export default function Settings() {
 
                 {/* Card body */}
                 <div className="p-6 space-y-4">
+
+                {/* Display Name */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
+                      <Sparkles className="w-4 h-4 text-purple-400" />
+                      Megjelenített név
+                    </label>
+                    <input
+                      type="text"
+                      name="displayName"
+                      value={formData.displayName}
+                      onChange={handleChange}
+                      disabled={!editMode}
+                      className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${
+                        validationErrors.displayName
+                          ? "border-red-500/50"
+                          : editMode
+                          ? "border-purple-500/30"
+                          : "border-purple-500/10"
+                      } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
+                      placeholder="pl. János"
+                    />
+                    {validationErrors.displayName && (
+                      <p className="mt-1 text-xs text-red-400 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {validationErrors.displayName}
+                      </p>
+                    )}
+                  </div>
+
                   {/* Name */}
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
@@ -531,35 +562,6 @@ export default function Settings() {
                       <p className="mt-1 text-xs text-red-400 flex items-center gap-1">
                         <AlertCircle className="w-3 h-3" />
                         {validationErrors.name}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Display Name */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
-                      <Sparkles className="w-4 h-4 text-purple-400" />
-                      Megjelenítendő név
-                    </label>
-                    <input
-                      type="text"
-                      name="displayName"
-                      value={formData.displayName}
-                      onChange={handleChange}
-                      disabled={!editMode}
-                      className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${
-                        validationErrors.displayName
-                          ? "border-red-500/50"
-                          : editMode
-                          ? "border-purple-500/30"
-                          : "border-purple-500/10"
-                      } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
-                      placeholder="pl. János"
-                    />
-                    {validationErrors.displayName && (
-                      <p className="mt-1 text-xs text-red-400 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        {validationErrors.displayName}
                       </p>
                     )}
                   </div>
@@ -697,13 +699,13 @@ export default function Settings() {
 
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">Létrehozva</span>
-                      <div className="flex items-center gap-2 text-sm text-white font-semibold">
-                        <Calendar className="w-3 h-3 text-purple-400" />
-                        {new Date(
-                          user.createdAt || Date.now()
-                        ).toLocaleDateString("hu-HU")}
-                      </div>
+                      <span className="text-xs text-gray-400">Létrehozva</span> 
+                        <div className="flex items-center gap-2 text-sm text-white font-semibold">
+                          <Calendar className="w-3 h-3 text-purple-400" />
+                          {new Date(
+                            user.createdAt._seconds * 1000
+                          ).toLocaleDateString("hu-HU")}
+                        </div>
                     </div>
 
                     <div className="flex items-center justify-between">
@@ -727,140 +729,158 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Profile Picture Modal */}
-      {showProfileModal && (
-        <div 
+{/* Profile Picture Modal */}
+{showProfileModal && (
+  <>
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4"
+      onMouseDown={(e) => setMouseDownTarget(e.target)}
+      onMouseUp={(e) => {
+        if (e.target === e.currentTarget && mouseDownTarget === e.currentTarget) {
+          closeProfileModal();
+        }
+        setMouseDownTarget(null);
+      }}
+    >
+      <div
+        className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-inKetto"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          transform: "scale(0.88)",
+          background: "linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)",
+          border: "1px solid rgba(168, 85, 247, 0.3)",
+        }}
+      >
+        {/* Close Button */}
+        <button
+          style={{ cursor: "pointer" }}
           onClick={closeProfileModal}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          disabled={uploadingImage}
+          className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white disabled:opacity-50"
         >
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            className="bg-gradient-to-br from-purple-900/90 to-cyan-900/90 border border-purple-500/30 rounded-2xl max-w-lg w-full p-8 shadow-2xl animate-fadeIn"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
-                  <Camera className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Profilkép</h2>
-                  <p className="text-sm text-gray-400">
-                    Nézd meg vagy módosítsd
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={closeProfileModal}
-                disabled={uploadingImage}
-                className="p-2 cursor-pointer rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-all disabled:opacity-50"
-              >
-                <X className="w-5 h-5" />
-              </button>
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="relative z-10 p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 mb-4">
+              <Camera className="w-8 h-8 text-white" />
             </div>
+            <h2 className="text-3xl font-black text-white mb-2">Profilkép</h2>
+            <p className="text-gray-400">Nézd meg vagy módosítsd</p>
+          </div>
 
-            {/* Current/Preview Image */}
-            <div className="mb-6">
-              <div className="w-48 h-48 mx-auto rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center overflow-hidden border-4 border-purple-500/30">
-                {imagePreview ? (
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
-                ) : user.profilePicture ? (
-                  <img
-                    src={user.profilePicture}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <User className="w-24 h-24 text-white" />
-                )}
-              </div>
-            </div>
-
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-
-            {/* Actions */}
-            <div className="space-y-3">
-              {!imagePreview ? (
-                <>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingImage}
-                    className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all disabled:opacity-50"
-                  >
-                    <Upload className="w-5 h-5" />
-                    Új kép feltöltése
-                  </button>
-
-                  {user.profilePicture && (
-                    <button
-                      onClick={handleDeleteProfilePicture}
-                      disabled={uploadingImage}
-                      className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
-                    >
-                      {uploadingImage ? (
-                        <>
-                          <div className="w-5 h-5 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin" />
-                          <span>Törlés...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Trash2 className="w-5 h-5" />
-                          <span>Profilkép törlése</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                </>
+          {/* Avatar preview */}
+          <div className="mb-6">
+            <div className="w-40 h-40 mx-auto rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center overflow-hidden"
+              style={{ border: "3px solid rgba(168, 85, 247, 0.4)" }}
+            >
+              {imagePreview ? (
+                <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+              ) : user.profilePicture ? (
+                <img src={user.profilePicture} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <div className="flex gap-3">
+                <User className="w-20 h-20 text-white" />
+              )}
+            </div>
+          </div>
+
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {/* Actions */}
+          <div className="space-y-3">
+            {!imagePreview ? (
+              <>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  style={{ cursor: !uploadingImage ? "pointer" : "not-allowed" }}
+                  className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                >
+                  <Upload className="w-5 h-5" />
+                  Új kép feltöltése
+                </button>
+
+                {user.profilePicture && (
                   <button
-                    onClick={() => {
-                      setImagePreview(null);
-                      setSelectedFile(null);
-                    }}
+                    onClick={handleDeleteProfilePicture}
                     disabled={uploadingImage}
-                    className="flex-1 cursor-pointer px-4 py-3 rounded-xl bg-gray-600/20 hover:bg-gray-600/30 border border-gray-500/30 text-gray-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
-                  >
-                    Mégse
-                  </button>
-                  <button
-                    onClick={handleUploadProfilePicture}
-                    disabled={uploadingImage}
-                    className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all disabled:opacity-50"
+                    style={{ cursor: !uploadingImage ? "pointer" : "not-allowed" }}
+                    className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-red-600/10 hover:bg-red-600/20 text-red-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                    style2={{ border: "1px solid rgba(239,68,68,0.3)" }}
                   >
                     {uploadingImage ? (
                       <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Feltöltés...</span>
+                        <div className="w-5 h-5 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin" />
+                        <span>Törlés...</span>
                       </>
                     ) : (
                       <>
-                        <Check className="w-5 h-5" />
-                        <span>Mentés</span>
+                        <Trash2 className="w-5 h-5" />
+                        <span>Profilkép törlése</span>
                       </>
                     )}
                   </button>
-                </div>
-              )}
-            </div>
-
-            <p className="mt-4 text-xs text-center text-gray-400">
-              Támogatott formátumok: JPG, PNG, GIF (max. 5MB)
-            </p>
+                )}
+              </>
+            ) : (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setImagePreview(null); setSelectedFile(null); }}
+                  disabled={uploadingImage}
+                  style={{ cursor: !uploadingImage ? "pointer" : "not-allowed" }}
+                  className="flex-1 py-4 rounded-xl font-bold text-base flex items-center justify-center transition-all duration-300 bg-white/5 hover:bg-white/10 text-gray-300 hover:scale-105 disabled:opacity-50"
+                >
+                  Mégse
+                </button>
+                <button
+                  onClick={handleUploadProfilePicture}
+                  disabled={uploadingImage}
+                  style={{ cursor: !uploadingImage ? "pointer" : "not-allowed" }}
+                  className="flex-1 py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 disabled:opacity-50"
+                >
+                  {uploadingImage ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Feltöltés...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-5 h-5" />
+                      <span>Mentés</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
+
+          <p className="mt-5 text-xs text-center text-gray-500">
+            Támogatott formátumok: JPG, PNG, GIF (max. 5MB)
+          </p>
         </div>
-      )}
+      </div>
+    </div>
+
+    <style jsx>{`
+      @keyframes scale-inKetto {
+        from { opacity: 0; transform: scale(0.72); }
+        to { opacity: 1; transform: scale(0.88); }
+      }
+      .animate-scale-inKetto {
+        animation: scale-inKetto 0.3s ease-out;
+      }
+    `}</style>
+  </>
+)}
 
       {/* 2FA Enable Modal */}
       <Enable2FA

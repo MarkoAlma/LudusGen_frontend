@@ -109,7 +109,7 @@ const loadUserFromFirestore = async (currentUser) => {
   const fetch2FAStatus = async (currentUser) => {
     try {
       setLoading2FA(true);
-      const token = await currentUser.getIdToken();
+      const token = await auth.currentUser.getIdToken();
       
       const response = await axios.get("http://localhost:3001/api/check-2fa-status", {
         headers: {
