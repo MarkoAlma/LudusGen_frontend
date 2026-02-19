@@ -43,8 +43,20 @@ export default function Login({ isOpen, onClose }) {
       password: "",
       confirmPassword: "",
       });
+    }else{
+      setMode("login")
     }
   },[isOpen])
+
+  useEffect(()=>{
+    setFormData({
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    });
+  },[mode])
+
 
   // ✅ Másolás/Beillesztés megakadályozása a jelszó mezőbe
   const handlePasswordCopyPaste = (e) => {
@@ -78,6 +90,9 @@ export default function Login({ isOpen, onClose }) {
   useEffect(() => {
     if (msg?.incorrectSignIn!=null) {
       setMsg({ incorrectSignIn: null });
+    }
+    if (msg?.incorrectSignUp!=null) {
+      setMsg({ incorrectSignUp: null });
     }
   }, [formData.email, formData.password]);
 
@@ -324,7 +339,7 @@ export default function Login({ isOpen, onClose }) {
 
   useEffect(() => {
     if (msg?.katt) {
-      switchMode('login')
+      setIsAuthOpen(false)
     }
   }, [msg]);
 
@@ -370,6 +385,7 @@ export default function Login({ isOpen, onClose }) {
           }}
         >
           {/* Close/Back Button - ✅ TESZT-FIX: type="button" hozzáadva */}
+          {isForgot &&
           <button
             type="button"
             style={{cursor:'pointer'}}
@@ -379,18 +395,32 @@ export default function Login({ isOpen, onClose }) {
                 return;
               }
               
-              if (isForgot) {
-                switchMode('login');
-                setFormData({...formData, password: '', confirmPassword: ''});
-              } else {
-                onClose();
-                setLoading(false)
-                console.log("ALMA2324");
-              }
+              switchMode('login');
+              setFormData({...formData, password: '', confirmPassword: ''});
+              
             }}
             className="absolute top-4 left-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white"
           >
-            {isForgot ? <ArrowLeft className="w-5 h-5" /> : <X className="w-5 h-5" />}
+          <ArrowLeft className="w-5 h-5" />
+          </button>
+          }
+
+          {/* Close/Back Button - ✅ TESZT-FIX: type="button" hozzáadva */}
+          
+          <button
+            type="button"
+            style={{cursor:'pointer'}}
+            onClick={() => {
+              // ⚠️ Ha 2FA folyamatban van, ne engedjük bezárni
+              if (show2FAModal) {
+                return;
+              }
+              onClose();
+              setLoading(false)
+            }}
+            className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white"
+          >
+          <X className="w-5 h-5" />
           </button>
 
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -445,17 +475,17 @@ export default function Login({ isOpen, onClose }) {
                               } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all`}
                           />
                         </div>
-                        {!isEmailValid && formData.email !== '' && (
-                          <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
-                            <XCircle className="w-3 h-3" />
-                            <span>Érvénytelen email formátum</span>
-                          </div>
-                        )}
+                      {((!isEmailValid && formData.email !== '') || (msg?.incorrectSignUp && msg?.incorrectSignUp.toLowerCase().includes("érvénytelen email cím"))) && (
+                        <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                          <XCircle className="w-3 h-3" />
+                          <span>Érvénytelen email cím</span>
+                        </div>
+                      )}
                       </div>
                       {msg?.incorrectResetPwEmail && msg.incorrectResetPwEmail.toLowerCase().includes("invalid-email") && (
                         <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
                           <XCircle className="w-3 h-3" />
-                          <span>Helytelen email cím</span>
+                          <span>Érvénytelen email cím</span>
                         </div>
                       )}
                       <button
@@ -658,17 +688,17 @@ export default function Login({ isOpen, onClose }) {
                           } text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all`}
                       />
                     </div>
-                    {!isEmailValid && formData.email !== '' && (
-                      <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
-                        <XCircle className="w-3 h-3" />
-                        <span>Érvénytelen email formátum</span>
-                      </div>
-                    )}
+                    {((!isEmailValid && formData.email !== '') || (msg?.incorrectSignUp && msg?.incorrectSignUp.toLowerCase().includes("érvénytelen email cím"))) && (
+                        <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
+                          <XCircle className="w-3 h-3" />
+                          <span>Érvénytelen email cím</span>
+                        </div>
+                      )}
                     
                     {!isLogin && msg?.incorrectSignUp && msg.incorrectSignUp.toLowerCase().includes("invalid-email") && (
                       <div className="flex items-center gap-1 mt-2 text-red-400 text-xs validation-message">
                         <XCircle className="w-3 h-3" />
-                        <span>Helytelen email cím</span>
+                        <span>Érvénytelen email cím</span>
                       </div>
                     )}
 
@@ -716,7 +746,6 @@ export default function Login({ isOpen, onClose }) {
                         <span>Hibás email/jelszó páros</span>
                       </div>
                     )}
-                    
 
                     {/* Jelszó validáció - csak akkor jelenik meg, ha nem minden teljesül */}
                     {!isLogin && formData.password !== '' && !isPasswordValid && (
