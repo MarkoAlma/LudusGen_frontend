@@ -5,7 +5,6 @@ import Navbar from './components/Nav';
 import Home from './pages/Home';
 import Footer from './components/Footer';
 import LudusGenAdmin from './pages/Admin';
-import AIChat from './pages/Chat';
 import AuthPage from './pages/Login';
 import AuthModal from './pages/Login';
 import { useContext } from 'react';
@@ -19,12 +18,14 @@ import ResetPassword from './components/ResetPassword';
 import VerifyEmail from './components/VerifyEmail';
 import Settings from './pages/Settings';
 import { ProtectedRoute } from './ProtectedRoute';
+import AIChat from './ai_components/AiChat';
 
 function App() {
   const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled} = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
-
+// Meglévő App.jsx-ben:
+const getIdToken = () => user?.getIdToken();
   useEffect(()=>{
     console.log('====================================');
     console.log("Változott", isAuthOpen);
@@ -75,7 +76,8 @@ function App() {
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />
+          <Route path="/chat" element={<ProtectedRoute>
+<AIChat user={user} getIdToken={getIdToken} /></ProtectedRoute>} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
