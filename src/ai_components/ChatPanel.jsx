@@ -386,6 +386,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
 
     try {
       const token = getIdToken ? await getIdToken() : null;
+      console.log('elso');
+      
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: {
@@ -408,6 +410,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           presence_penalty: presencePenalty,
         }),
       });
+      console.log('masod');
+      
 
       const data = await res.json();
       const aiMsg = {
