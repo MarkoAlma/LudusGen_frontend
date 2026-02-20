@@ -99,19 +99,29 @@ export const MODEL_GROUPS = [
                         tierLabel: "Ingyenes",
                         description: "Profi fejlesztőasszisztens DeepSeek ingyenes OpenRouter hozzáféréssel",
                         badge: "Free / napi limit",
-                        apiModel: "openrouter/free",
+                        apiModel: "arcee-ai/trinity-large-preview:free", //csere
                         provider: "openrouter",
                         color: "#6366f1",
                         gradient: "from-indigo-500 to-purple-500",
                         panelType: "chat",
                         defaultSystemPrompt: `You are an elite software engineer with deep expertise across all programming languages and paradigms.
-- Produce production-ready, optimized code
-- Apply SOLID principles and design patterns
-- Include comprehensive error handling
-- Write thorough technical explanations
-- Review and suggest improvements proactively
-- Respond in the same language the user writes in`
+                            - Produce production-ready, optimized code
+                            - Apply SOLID principles and design patterns
+                            - Include comprehensive error handling
+                            - Write thorough technical explanations
+                            - Review and suggest improvements proactively
+                            - Respond in the same language the user writes in`
                     },
+                    {
+                        id: "gemini-3-flash",
+                        name: "Gemini 3 Flash",
+                        apiModel: "gemini-3-flash-preview",   // ← ezt küldi a backendnek
+                        provider: "gemini",              // ← új provider
+                        color: "#4285f4",
+                        },
+                    { id: "groq-gpt120b", name: "GPT OSS 120B", apiModel: "openai/gpt-oss-120b", provider: "groq", color: "#10a37f" },
+                    { id: "groq-qwen3", name: "Qwen3 32B", apiModel: "qwen/qwen3-32b", provider: "groq", color: "#9333ea" },
+                    { id: "groq-llama70b", name: "Llama 3.3 70B", apiModel: "llama-3.3-70b-versatile", provider: "groq", color: "#f55036" },
 //                     {
 //                         id: "deepseek_coder",
 //                         name: "DeepSeek Coder V3",

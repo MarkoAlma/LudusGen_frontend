@@ -13,6 +13,42 @@ import { DEFAULT_PRESETS } from "./models";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
+// ─── Kódblokk copy gombbal ────────────────────────────
+const CodeBlock = ({ lang, code }) => {
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="relative my-2 rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
+      <div
+        className="flex items-center justify-between px-3 py-1.5"
+        style={{ background: "rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+      >
+        <span className="text-gray-500 text-xs font-mono">{lang || "code"}</span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 px-2 py-0.5 rounded-md text-xs transition-all hover:opacity-80 active:scale-95 cursor-pointer"
+          style={{
+            background: copied ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.08)",
+            color: copied ? "#4ade80" : "#9ca3af",
+            border: `1px solid ${copied ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.1)"}`,
+          }}
+        >
+          {copied
+            ? <><Check className="w-3 h-3" />&nbsp;Másolva</>
+            : <><Copy className="w-3 h-3" />&nbsp;Másolás</>}
+        </button>
+      </div>
+      <pre className="p-3 overflow-x-auto text-xs" style={{ background: "rgba(0,0,0,0.4)", color: "#e2e8f0", margin: 0 }}>
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
 // ─── Markdown-lite renderer ───────────────────────────
 const renderContent = (text) => {
   if (!text) return null;
@@ -22,16 +58,7 @@ const renderContent = (text) => {
       const lines = part.slice(3, -3).split("\n");
       const lang = lines[0] || "";
       const code = lines.slice(1).join("\n");
-      return (
-        <pre
-          key={i}
-          className="my-2 p-3 rounded-xl overflow-x-auto text-xs"
-          style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.1)", color: "#e2e8f0" }}
-        >
-          {lang && <div className="text-gray-500 text-xs mb-1">{lang}</div>}
-          <code>{code}</code>
-        </pre>
-      );
+      return <CodeBlock key={i} lang={lang} code={code} />;
     }
     const inlineParts = part.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
     return (
