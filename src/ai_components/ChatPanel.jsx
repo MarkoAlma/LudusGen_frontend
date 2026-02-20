@@ -375,7 +375,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
       if (!token) {
         throw new Error("Nincs érvényes autentikációs token. Jelentkezz be újra.");
       }
-
+      console.log('elso');
+      
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: {
@@ -396,6 +397,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           presence_penalty: presencePenalty,
         }),
       });
+      console.log('masodik');
+      
       const data = await res.json();
 
 console.log("📦 Backend válasz:", JSON.stringify(data, null, 2));
@@ -415,16 +418,16 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
       setMessages((p) => [...p, aiMsg]);
       await saveMessage(aiMsg);
     } catch (err) {
-      console.error("Chat error:", err);
-      const errMsg = {
-        role: "assistant",
-        content: `⚠️ ${err.message || "Hiba a kapcsolatban. Ellenőrizd az API kulcsokat és a backend szervert."}`,
-        model: selectedModel.id,
-        id: (Date.now() + 1).toString(),
-        isError: true,
-      };
-      setMessages((p) => [...p, errMsg]);
-    } finally {
+      // This is the key line — logs the real OpenRouter error message
+      console.error("OpenRouter hiba:", JSON.stringify(err.response?.data, null, 2));
+      console.error("Status:", err.response?.status);
+      console.error("Message:", err.message);
+
+      return res.status(500).json({
+        success: false,
+        message: err.response?.data?.error?.message || err.message || 'OpenRouter API hiba',
+      });
+    }finally {
       setIsTyping(false);
     }
   };

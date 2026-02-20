@@ -126,13 +126,12 @@ export default function AIChat({ user, getIdToken }) {
 
   const renderPanel = () => {
     const props = {
-      key: selectedAI,
       selectedModel,
       userId: user?.uid,
       getIdToken,
     };
     switch (selectedModel.panelType) {
-      case "chat":   return <ChatPanel {...props} />;
+      case "chat":   return <ChatPanel  {...props} />;
       case "image":  return <ImagePanel {...props} />;
       case "audio":  return <AudioPanel {...props} />;
       case "threed": return <Trellis2Panel {...props} />;
