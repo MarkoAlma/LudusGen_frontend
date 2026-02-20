@@ -75,40 +75,7 @@ export const MODEL_GROUPS = [
                     },
                 ],
             },
-            {
-                id: "chat_openrouter",
-                label: "OpenRouter",
-                models: [
-                    {
-                        id: "deepseek_free",
-                        name: "DeepSeek Free",
-                        tier: "lite",
-                        tierLabel: "Ingyenes",
-                        description: "Gyors, ingyenes DeepSeek modell OpenRouter-en keresztül",
-                        badge: "Free / napi limit",
-                        apiModel: "deepseek/deepseek-r1-0528:free",
-                        provider: "openrouter",
-                        color: "#6366f1",
-                        gradient: "from-indigo-500 to-purple-500",
-                        panelType: "chat",
-                        defaultSystemPrompt: "You are a helpful assistant. Respond in the same language the user writes in."
-                    },
-                    {
-                        id: "deepseek_chat",
-                        name: "DeepSeek Chat Free",
-                        tier: "lite",
-                        tierLabel: "Ingyenes",
-                        description: "DeepSeek chat modell ingyenes OpenRouter hozzáféréssel",
-                        badge: "Free / napi limit",
-                        apiModel: "deepseek/deepseek-chat-v3-0324:free",
-                        provider: "openrouter",
-                        color: "#8b5cf6",
-                        gradient: "from-purple-500 to-pink-500",
-                        panelType: "chat",
-                        defaultSystemPrompt: "You are a helpful assistant. Respond in the same language the user writes in."
-                    }
-                ]
-            },
+            
         ],
     },
 
@@ -132,7 +99,7 @@ export const MODEL_GROUPS = [
                         tierLabel: "Ingyenes",
                         description: "Profi fejlesztőasszisztens DeepSeek ingyenes OpenRouter hozzáféréssel",
                         badge: "Free / napi limit",
-                        apiModel: "deepseek/deepseek-r1-0528:free",
+                        apiModel: "openrouter/free",
                         provider: "openrouter",
                         color: "#6366f1",
                         gradient: "from-indigo-500 to-purple-500",
