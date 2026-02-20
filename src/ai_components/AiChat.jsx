@@ -39,17 +39,30 @@ const TierBadge = ({ tier, tierLabel }) => (
 const ModelBtn = ({ model, isActive, onSelect }) => (
   <button
     onClick={() => onSelect(model.id)}
-    className="w-full p-2.5 rounded-xl transition-all duration-150 text-left"
+    className="cursor-pointer w-full p-2.5 rounded-xl transition-all duration-150 text-left group"
     style={{
       background: isActive ? `${model.color}18` : "rgba(255,255,255,0.02)",
       border: isActive ? `1.5px solid ${model.color}50` : "1.5px solid rgba(255,255,255,0.05)",
       transform: isActive ? "scale(1.01)" : "scale(1)",
     }}
+    onMouseEnter={(e) => {
+      if (!isActive) {
+        e.currentTarget.style.background = `${model.color}10`;
+        e.currentTarget.style.border = `1.5px solid ${model.color}30`;
+        e.currentTarget.style.transform = "scale(1.005)";
+      }
+    }}
+    onMouseLeave={(e) => {
+      if (!isActive) {
+        e.currentTarget.style.background = "rgba(255,255,255,0.02)";
+        e.currentTarget.style.border = "1.5px solid rgba(255,255,255,0.05)";
+        e.currentTarget.style.transform = "scale(1)";
+      }
+    }}
   >
     <div className="flex items-start gap-2">
-      {/* Tier stripe */}
       <div
-        className="w-0.5 rounded-full self-stretch flex-shrink-0"
+        className="w-0.5 rounded-full self-stretch flex-shrink-0 transition-all duration-150"
         style={{
           background: model.tier === "pro"
             ? "linear-gradient(180deg,#7c3aed,#db2777)"
@@ -80,21 +93,19 @@ const ModelBtn = ({ model, isActive, onSelect }) => (
 // ─── Main component ────────────────────────────────────
 export default function AIChat({ user, getIdToken }) {
   const [selectedAI, setSelectedAI] = useState("claude_sonnet");
-  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
-  // openGroups / openCats: Set of IDs that are expanded
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState(() => new Set(["chat"]));
   const [openCats, setOpenCats] = useState(() => new Set(["chat_anthropic"]));
 
   const selectedModel = getModel(selectedAI) || ALL_MODELS[0];
 
-  // ── Auto-open group+cat when model selected ──────────
   const handleSelectModel = useCallback((modelId) => {
     setSelectedAI(modelId);
     const gId = findModelGroup(modelId);
     const cId = findModelCat(modelId);
     if (gId) setOpenGroups((p) => new Set([...p, gId]));
     if (cId) setOpenCats((p) => new Set([...p, cId]));
-    setSidebarOpen(false); // close mobile sidebar on selection
+    setSidebarOpen(false);
   }, []);
 
   const toggleGroup = useCallback((id) => {
@@ -113,16 +124,14 @@ export default function AIChat({ user, getIdToken }) {
     });
   }, []);
 
-  // ── Panel routing ────────────────────────────────────
   const renderPanel = () => {
     const props = {
-      key: selectedAI,
       selectedModel,
       userId: user?.uid,
       getIdToken,
     };
     switch (selectedModel.panelType) {
-      case "chat":   return <ChatPanel {...props} />;
+      case "chat":   return <ChatPanel  {...props} />;
       case "image":  return <ImagePanel {...props} />;
       case "audio":  return <AudioPanel {...props} />;
       case "threed": return <Trellis2Panel {...props} />;
@@ -130,7 +139,6 @@ export default function AIChat({ user, getIdToken }) {
     }
   };
 
-  // ── Sidebar content ──────────────────────────────────
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -140,9 +148,8 @@ export default function AIChat({ user, getIdToken }) {
             <Wand2 className="w-4 h-4 text-purple-400" />
             AI Modellek
           </h2>
-          {/* Mobile close */}
           <button
-            className="md:hidden p-1 rounded-lg text-gray-400 hover:text-white"
+            className="cursor-pointer md:hidden p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all"
             onClick={() => setSidebarOpen(false)}
           >
             <X className="w-4 h-4" />
@@ -155,16 +162,14 @@ export default function AIChat({ user, getIdToken }) {
       <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1 scrollbar-thin">
         {MODEL_GROUPS.map((group) => {
           const groupOpen = openGroups.has(group.id);
-          const hasActiveInGroup = group.categories.flatMap((c) => c.models).some(
-            (m) => m.id === selectedAI
-          );
+          const hasActiveInGroup = group.categories.flatMap((c) => c.models).some((m) => m.id === selectedAI);
 
           return (
             <div key={group.id}>
               {/* Group header */}
               <button
                 onClick={() => toggleGroup(group.id)}
-                className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl transition-all duration-150 mt-1"
+                className="cursor-pointer w-full flex items-center justify-between px-2.5 py-2 rounded-xl transition-all duration-150 mt-1"
                 style={{
                   background: groupOpen
                     ? `${group.color}12`
@@ -176,6 +181,18 @@ export default function AIChat({ user, getIdToken }) {
                     : hasActiveInGroup
                       ? `1px solid ${group.color}20`
                       : "1px solid rgba(255,255,255,0.05)",
+                }}
+                onMouseEnter={(e) => {
+                  if (!groupOpen && !hasActiveInGroup) {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                    e.currentTarget.style.border = "1px solid rgba(255,255,255,0.1)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!groupOpen && !hasActiveInGroup) {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.02)";
+                    e.currentTarget.style.border = "1px solid rgba(255,255,255,0.05)";
+                  }
                 }}
               >
                 <span className="flex items-center gap-2">
@@ -192,10 +209,7 @@ export default function AIChat({ user, getIdToken }) {
                     {group.label}
                   </span>
                   {hasActiveInGroup && (
-                    <CircleDot
-                      className="w-2 h-2 animate-pulse"
-                      style={{ color: group.color }}
-                    />
+                    <CircleDot className="w-2 h-2 animate-pulse" style={{ color: group.color }} />
                   )}
                 </span>
                 {groupOpen
@@ -204,7 +218,7 @@ export default function AIChat({ user, getIdToken }) {
                 }
               </button>
 
-              {/* Group body (categories + models) */}
+              {/* Group body */}
               {groupOpen && (
                 <div className="pl-2 mt-1 space-y-1">
                   {group.categories.map((cat) => {
@@ -213,24 +227,18 @@ export default function AIChat({ user, getIdToken }) {
 
                     return (
                       <div key={cat.id}>
-                        {/* Category header (only if has label) */}
                         {cat.label && (
                           <button
                             onClick={() => toggleCat(cat.id)}
-                            className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-all duration-150"
+                            className="cursor-pointer w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-all duration-150 hover:bg-white/5"
                             style={{
-                              background: hasActiveInCat
-                                ? `${group.color}10`
-                                : "transparent",
+                              background: hasActiveInCat ? `${group.color}10` : "transparent",
                             }}
                           >
                             <span className="flex items-center gap-1.5">
                               <span className="text-gray-500 text-xs">{cat.label}</span>
                               {hasActiveInCat && (
-                                <CircleDot
-                                  className="w-2 h-2 animate-pulse"
-                                  style={{ color: group.color }}
-                                />
+                                <CircleDot className="w-2 h-2 animate-pulse" style={{ color: group.color }} />
                               )}
                             </span>
                             {catOpen
@@ -240,10 +248,8 @@ export default function AIChat({ user, getIdToken }) {
                           </button>
                         )}
 
-                        {/* Models — show if cat open OR no label (auto-expanded) */}
                         {(catOpen || !cat.label) && (
                           <div className="space-y-1 mt-0.5">
-                            {/* lite/pro legend, only when 2 models */}
                             {cat.models.length === 2 && (
                               <div className="flex gap-2 px-2 pt-0.5 pb-0.5">
                                 <span className="text-xs text-gray-700 flex items-center gap-1">
@@ -305,6 +311,11 @@ export default function AIChat({ user, getIdToken }) {
               <span className="text-gray-600">Ár:</span>
               <span className="text-white font-semibold">{selectedModel.badge}</span>
             </div>
+            {selectedModel.badgeDetail && (
+              <div className="mt-0.5">
+                <span className="text-gray-700 text-xs">{selectedModel.badgeDetail}</span>
+              </div>
+            )}
             {selectedModel.provider && (
               <div className="flex justify-between">
                 <span className="text-gray-600">Provider:</span>
@@ -339,7 +350,7 @@ export default function AIChat({ user, getIdToken }) {
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 md:hidden"
+          className="fixed inset-0 z-40 bg-black/60 md:hidden cursor-pointer"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -347,7 +358,7 @@ export default function AIChat({ user, getIdToken }) {
       {/* ════════ LAYOUT ════════ */}
       <div className="relative w-full h-[95vh] md:h-[90vh] flex gap-3 z-10">
 
-        {/* ── Sidebar: mobile slide-in | desktop inline ── */}
+        {/* ── Sidebar ── */}
         <aside
           className={`
             fixed md:relative top-0 left-0 h-full z-50 md:z-auto
@@ -385,7 +396,7 @@ export default function AIChat({ user, getIdToken }) {
             <div className="flex items-center gap-3">
               {/* Mobile hamburger */}
               <button
-                className="md:hidden p-1.5 rounded-xl text-gray-400 hover:text-white transition-colors"
+                className="cursor-pointer md:hidden p-1.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all"
                 style={{ background: "rgba(255,255,255,0.05)" }}
                 onClick={() => setSidebarOpen(true)}
               >
@@ -432,7 +443,7 @@ export default function AIChat({ user, getIdToken }) {
             </div>
           </div>
 
-          {/* Panel */}
+          {/* Panel — overflow-hidden keeps scrolling inside panel, not on page */}
           <div className="flex-1 min-h-0 overflow-hidden">
             {renderPanel()}
           </div>

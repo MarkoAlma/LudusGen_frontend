@@ -7,8 +7,7 @@ import {
 import { db } from "../firebase/firebaseApp";
 import { collection, addDoc, query, orderBy, limit, getDocs, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import { DEFAULT_PRESETS } from "./models";
-
-const API_BASE = "http://localhost:3001";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const ASPECT_RATIOS = [
   { label: "1:1", w: 1024, h: 1024 },
@@ -146,10 +145,7 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
     }
   };
 
-  const addStyleTag = (tag) => {
-    setPrompt((p) => p ? `${p}, ${tag}` : tag);
-  };
-
+  const addStyleTag = (tag) => setPrompt((p) => p ? `${p}, ${tag}` : tag);
   const randomSeed = () => setSeed(Math.floor(Math.random() * 999999999).toString());
 
   const savePreset = async () => {
@@ -191,7 +187,7 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className="px-3 py-1.5 rounded-lg text-xs transition-all"
+            className="cursor-pointer px-3 py-1.5 rounded-lg text-xs transition-all hover:opacity-90 active:scale-95"
             style={{
               background: activeTab === tab.id ? `${color}20` : "transparent",
               color: activeTab === tab.id ? "white" : "#6b7280",
@@ -204,7 +200,7 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
         ))}
       </div>
 
-      {/* ── GENERATE TAB ─── */}
+      {/* ── GENERATE TAB ── */}
       {activeTab === "generate" && (
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin">
           {/* Prompt */}
@@ -218,7 +214,7 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Írd le a képet angolul... pl: a majestic mountain at sunset, dramatic lighting, 8k photography"
               rows={4}
-              className="w-full px-4 py-3 rounded-xl text-white text-sm placeholder-gray-600 resize-none focus:outline-none"
+              className="w-full px-4 py-3 rounded-xl text-white text-sm placeholder-gray-600 resize-none focus:outline-none transition-all"
               style={{
                 background: "rgba(255,255,255,0.04)",
                 border: `1px solid ${prompt ? color + "40" : "rgba(255,255,255,0.09)"}`,
@@ -234,7 +230,7 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
                 <button
                   key={tag}
                   onClick={() => addStyleTag(tag)}
-                  className="px-2 py-1 rounded-lg text-xs text-gray-400 hover:text-white transition-all hover:scale-105"
+                  className="cursor-pointer px-2 py-1 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all hover:scale-105 active:scale-100"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
                 >
                   {tag}
@@ -245,45 +241,40 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
 
           {/* Negative prompt */}
           <div>
-            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1.5 block">
-              Negatív prompt
-            </label>
+            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1.5 block">Negatív prompt</label>
             <input
               value={negativePrompt}
               onChange={(e) => setNegativePrompt(e.target.value)}
               placeholder="Amit NE tartalmazzon: blurry, low quality, watermark..."
-              className="w-full px-4 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
             />
           </div>
 
           {/* Aspect ratio */}
           <div>
-            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2 block">
-              Arány / Méret
-            </label>
+            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2 block">Arány / Méret</label>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
               {ASPECT_RATIOS.map((ar) => (
                 <button
                   key={ar.label}
                   onClick={() => setAspectRatio(ar)}
-                  className="flex flex-col items-center justify-center py-2 rounded-xl transition-all"
+                  className="cursor-pointer flex flex-col items-center justify-center py-2 rounded-xl transition-all hover:opacity-90 active:scale-95"
                   style={{
                     background: aspectRatio.label === ar.label ? `${color}20` : "rgba(255,255,255,0.03)",
                     border: aspectRatio.label === ar.label ? `1.5px solid ${color}55` : "1px solid rgba(255,255,255,0.07)",
+                    transform: aspectRatio.label === ar.label ? "scale(1.03)" : "scale(1)",
                   }}
                 >
                   <div
-                    className="mb-1 rounded-sm"
+                    className="mb-1 rounded-sm transition-all"
                     style={{
                       width: ar.w > ar.h ? 20 : ar.w === ar.h ? 14 : 10,
                       height: ar.h > ar.w ? 20 : ar.w === ar.h ? 14 : 10,
                       background: aspectRatio.label === ar.label ? color : "rgba(255,255,255,0.3)",
                     }}
                   />
-                  <span className="text-xs font-semibold" style={{ color: aspectRatio.label === ar.label ? "white" : "#6b7280" }}>
-                    {ar.label}
-                  </span>
+                  <span className="text-xs font-semibold" style={{ color: aspectRatio.label === ar.label ? "white" : "#6b7280" }}>{ar.label}</span>
                   <span className="text-xs text-gray-600">{ar.w}×{ar.h}</span>
                 </button>
               ))}
@@ -292,19 +283,18 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
 
           {/* Num images */}
           <div>
-            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2 block">
-              Képek száma: {numImages}
-            </label>
+            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2 block">Képek száma: {numImages}</label>
             <div className="flex gap-2">
               {[1, 2, 4].map((n) => (
                 <button
                   key={n}
                   onClick={() => setNumImages(n)}
-                  className="flex-1 py-2 rounded-xl text-sm font-semibold transition-all"
+                  className="cursor-pointer flex-1 py-2 rounded-xl text-sm font-semibold transition-all hover:opacity-90 active:scale-95"
                   style={{
                     background: numImages === n ? `${color}25` : "rgba(255,255,255,0.04)",
                     border: numImages === n ? `1px solid ${color}50` : "1px solid rgba(255,255,255,0.08)",
                     color: numImages === n ? "white" : "#6b7280",
+                    transform: numImages === n ? "scale(1.02)" : "scale(1)",
                   }}
                 >
                   {n}×
@@ -315,8 +305,7 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
 
           {/* Error */}
           {error && (
-            <div className="p-3 rounded-xl flex items-center gap-2"
-              style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            <div className="p-3 rounded-xl flex items-center gap-2" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)" }}>
               <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
               <p className="text-red-300 text-sm">{error}</p>
             </div>
@@ -332,14 +321,14 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
                     <a
                       href={img.url}
                       download={`image_${Date.now()}.png`}
-                      className="p-2.5 rounded-xl text-white transition-all hover:scale-110"
+                      className="cursor-pointer p-2.5 rounded-xl text-white transition-all hover:scale-110 active:scale-100"
                       style={{ background: `${color}70`, border: `1px solid ${color}` }}
                     >
                       <Download className="w-4 h-4" />
                     </a>
                     <button
                       onClick={() => navigator.clipboard.writeText(img.url)}
-                      className="p-2.5 rounded-xl text-white transition-all hover:scale-110"
+                      className="cursor-pointer p-2.5 rounded-xl text-white transition-all hover:scale-110 active:scale-100"
                       style={{ background: "rgba(255,255,255,0.2)" }}
                     >
                       <Copy className="w-4 h-4" />
@@ -354,11 +343,9 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
           <button
             onClick={handleGenerate}
             disabled={!prompt.trim() || isGenerating}
-            className="w-full py-4 rounded-2xl font-bold text-white text-sm transition-all duration-300"
+            className="cursor-pointer w-full py-4 rounded-2xl font-bold text-white text-sm transition-all duration-300 hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed"
             style={{
-              background: prompt.trim() && !isGenerating
-                ? `linear-gradient(135deg, ${color}, ${color}88)`
-                : "rgba(255,255,255,0.05)",
+              background: prompt.trim() && !isGenerating ? `linear-gradient(135deg, ${color}, ${color}88)` : "rgba(255,255,255,0.05)",
               opacity: prompt.trim() && !isGenerating ? 1 : 0.4,
               boxShadow: prompt.trim() && !isGenerating ? `0 0 30px ${color}30` : "none",
             }}
@@ -376,30 +363,28 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
         </div>
       )}
 
-      {/* ── SETTINGS TAB ─── */}
+      {/* ── SETTINGS TAB ── */}
       {activeTab === "settings" && (
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin">
           {[
-            { label: `Steps: ${steps}`, min: 1, max: selectedModel.maxSteps || 50, step: 1, val: steps, set: setSteps,
-              hint: "Több lépés = jobb minőség, de lassabb" },
-            { label: `Guidance Scale: ${guidance}`, min: 1, max: 15, step: 0.5, val: guidance, set: setGuidance,
-              hint: "Mennyire kövesse a promptot (7-8 az optimális)" },
+            { label: `Steps: ${steps}`, min: 1, max: selectedModel.maxSteps || 50, step: 1, val: steps, set: setSteps, hint: "Több lépés = jobb minőség, de lassabb" },
+            { label: `Guidance Scale: ${guidance}`, min: 1, max: 15, step: 0.5, val: guidance, set: setGuidance, hint: "Mennyire kövesse a promptot (7-8 az optimális)" },
           ].map(({ label, min, max, step, val, set, hint }) => (
-            <div key={label} className="p-4 rounded-xl space-y-2"
-              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div key={label} className="p-4 rounded-xl space-y-2" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
               <div className="flex justify-between">
                 <span className="text-white text-sm font-semibold">{label}</span>
               </div>
               <input type="range" min={min} max={max} step={step} value={val}
                 onChange={(e) => set(parseFloat(e.target.value))}
-                className="w-full" style={{ accentColor: color }} />
+                className="w-full cursor-pointer"
+                style={{ accentColor: color }}
+              />
               <p className="text-gray-600 text-xs">{hint}</p>
             </div>
           ))}
 
           {/* Seed */}
-          <div className="p-4 rounded-xl"
-            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+          <div className="p-4 rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
             <label className="text-white text-sm font-semibold block mb-2">Seed</label>
             <div className="flex gap-2">
               <input
@@ -409,13 +394,13 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
                 className="flex-1 px-3 py-2 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none"
                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
               />
-              <button onClick={randomSeed} className="p-2 rounded-xl text-gray-400 hover:text-white"
-                style={{ background: "rgba(255,255,255,0.06)" }}>
+              <button onClick={randomSeed} className="cursor-pointer p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+                style={{ background: "rgba(255,255,255,0.06)" }} title="Véletlen seed">
                 <Shuffle className="w-4 h-4" />
               </button>
               {seed && (
-                <button onClick={() => setSeed("")} className="p-2 rounded-xl text-gray-400 hover:text-white"
-                  style={{ background: "rgba(255,255,255,0.06)" }}>
+                <button onClick={() => setSeed("")} className="cursor-pointer p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+                  style={{ background: "rgba(255,255,255,0.06)" }} title="Törlés">
                   <X className="w-4 h-4" />
                 </button>
               )}
@@ -423,11 +408,11 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
             <p className="text-gray-600 text-xs mt-1">Azonos seed = azonos kép, ha a prompt is azonos</p>
           </div>
 
-          {/* Save as preset button */}
+          {/* Save preset */}
           {!presetModalOpen ? (
             <button
               onClick={() => setPresetModalOpen(true)}
-              className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+              className="cursor-pointer w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.99]"
               style={{ background: `${color}20`, border: `1px solid ${color}40`, color: "white" }}
             >
               <Bookmark className="w-4 h-4" /> Beállítások mentése presetként
@@ -443,11 +428,11 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
                 autoFocus
                 onKeyDown={(e) => e.key === "Enter" && savePreset()}
               />
-              <button onClick={savePreset} className="px-4 py-2 rounded-xl text-white text-sm font-semibold"
+              <button onClick={savePreset} className="cursor-pointer px-4 py-2 rounded-xl text-white text-sm font-semibold transition-all hover:opacity-90 active:scale-95"
                 style={{ background: `linear-gradient(135deg, ${color}, ${color}99)` }}>
                 Ment
               </button>
-              <button onClick={() => setPresetModalOpen(false)} className="p-2 rounded-xl text-gray-500"
+              <button onClick={() => setPresetModalOpen(false)} className="cursor-pointer p-2 rounded-xl text-gray-500 hover:text-gray-300 hover:bg-white/10 transition-all"
                 style={{ background: "rgba(255,255,255,0.04)" }}>
                 <X className="w-4 h-4" />
               </button>
@@ -456,7 +441,7 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
         </div>
       )}
 
-      {/* ── PRESETS TAB ─── */}
+      {/* ── PRESETS TAB ── */}
       {activeTab === "presets" && (
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 scrollbar-thin">
           {presets.map((preset) => {
@@ -464,7 +449,7 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
             return (
               <div
                 key={preset.id}
-                className="p-3 rounded-xl"
+                className="p-3 rounded-xl transition-all"
                 style={{
                   background: isActive ? `${color}15` : "rgba(255,255,255,0.02)",
                   border: isActive ? `1px solid ${color}40` : "1px solid rgba(255,255,255,0.07)",
@@ -482,7 +467,7 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
                   </div>
                   <button
                     onClick={() => applyPreset(preset)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                    className="cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-90 active:scale-95"
                     style={{
                       background: isActive ? `${color}25` : "rgba(255,255,255,0.06)",
                       color: isActive ? color : "#9ca3af",
@@ -498,7 +483,7 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
         </div>
       )}
 
-      {/* ── HISTORY TAB ─── */}
+      {/* ── HISTORY TAB ── */}
       {activeTab === "history" && (
         <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin">
           {history.length === 0 ? (
@@ -509,7 +494,7 @@ export default function ImagePanel({ selectedModel, userId, getIdToken }) {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {history.map((item) => (
-                <div key={item.id} className="group relative rounded-xl overflow-hidden cursor-pointer"
+                <div key={item.id} className="cursor-pointer group relative rounded-xl overflow-hidden hover:scale-[1.02] transition-all active:scale-[0.99]"
                   onClick={() => setPrompt(item.prompt)}>
                   {item.images?.[0]?.url && (
                     <img src={item.images[0].url} alt="" className="w-full aspect-square object-cover rounded-xl" />
