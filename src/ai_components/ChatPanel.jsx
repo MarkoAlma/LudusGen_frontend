@@ -13,6 +13,42 @@ import { DEFAULT_PRESETS } from "./models";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
+// ─── Kódblokk copy gombbal ────────────────────────────
+const CodeBlock = ({ lang, code }) => {
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="relative my-2 rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
+      <div
+        className="flex items-center justify-between px-3 py-1.5"
+        style={{ background: "rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+      >
+        <span className="text-gray-500 text-xs font-mono">{lang || "code"}</span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 px-2 py-0.5 rounded-md text-xs transition-all hover:opacity-80 active:scale-95 cursor-pointer"
+          style={{
+            background: copied ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.08)",
+            color: copied ? "#4ade80" : "#9ca3af",
+            border: `1px solid ${copied ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.1)"}`,
+          }}
+        >
+          {copied
+            ? <><Check className="w-3 h-3" />&nbsp;Másolva</>
+            : <><Copy className="w-3 h-3" />&nbsp;Másolás</>}
+        </button>
+      </div>
+      <pre className="p-3 overflow-x-auto text-xs" style={{ background: "rgba(0,0,0,0.4)", color: "#e2e8f0", margin: 0 }}>
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
 // ─── Markdown-lite renderer ───────────────────────────
 const renderContent = (text) => {
   if (!text) return null;
@@ -22,16 +58,7 @@ const renderContent = (text) => {
       const lines = part.slice(3, -3).split("\n");
       const lang = lines[0] || "";
       const code = lines.slice(1).join("\n");
-      return (
-        <pre
-          key={i}
-          className="my-2 p-3 rounded-xl overflow-x-auto text-xs"
-          style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.1)", color: "#e2e8f0" }}
-        >
-          {lang && <div className="text-gray-500 text-xs mb-1">{lang}</div>}
-          <code>{code}</code>
-        </pre>
-      );
+      return <CodeBlock key={i} lang={lang} code={code} />;
     }
     const inlineParts = part.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
     return (
@@ -53,14 +80,9 @@ const renderContent = (text) => {
 // ─── Preset modal ──────────────────────────────────────
 const PresetModal = ({ isOpen, onClose, onSave, editingPreset, modelColor }) => {
   const [form, setForm] = useState({
-    name: "",
-    description: "",
-    systemPrompt: "",
-    temperature: 0.7,
-    maxTokens: 2048,
-    topP: 0.9,
-    frequencyPenalty: 0,
-    presencePenalty: 0,
+    name: "", description: "", systemPrompt: "",
+    temperature: 0.7, maxTokens: 2048, topP: 0.9,
+    frequencyPenalty: 0, presencePenalty: 0,
   });
 
   useEffect(() => {
@@ -195,20 +217,19 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
-  const messagesEndRef = useRef(null);
+  // ── FIX: chatScrollRef a scrollozható chat div-re mutat ──
+  // scrollIntoView helyett a div.scrollTop-ot állítjuk — így csak a chat görget, nem az oldal
+  const chatScrollRef = useRef(null);
   const textareaRef = useRef(null);
   const isLoadingConversation = useRef(false);
   const prevMessageCount = useRef(0);
 
-  useEffect(() => {
-    const newCount = messages.length;
-    const added = newCount > prevMessageCount.current;
-    prevMessageCount.current = newCount;
-
-    if (added && !isLoadingConversation.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
+  // ── Scroll helper — mindig a chat containert görgetjük ──
+  const scrollToBottom = useCallback((smooth = true) => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "instant" });
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -250,12 +271,13 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
       if (msgs.length > 0) {
         prevMessageCount.current = msgs.length;
         setMessages(msgs);
+        // Betöltés után azonnal az aljára ugrás (instant, ne smooth)
+        setTimeout(() => scrollToBottom(false), 50);
       } else {
         const welcome = [{
           role: "assistant",
           content: `Szia! ${selectedModel.name} itt. Miben segíthetek? 🚀`,
-          model: selectedModel.id,
-          id: "welcome",
+          model: selectedModel.id, id: "welcome",
         }];
         prevMessageCount.current = welcome.length;
         setMessages(welcome);
@@ -264,8 +286,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
       const welcome = [{
         role: "assistant",
         content: `Szia! ${selectedModel.name} itt. Miben segíthetek? 🚀`,
-        model: selectedModel.id,
-        id: "welcome",
+        model: selectedModel.id, id: "welcome",
       }];
       prevMessageCount.current = welcome.length;
       setMessages(welcome);
@@ -294,28 +315,17 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     return sid;
   };
 
-  // ── FIX: undefined mezők kiszűrése Firestore mentés előtt ──
-  const removeUndefined = (obj) => {
-    return Object.fromEntries(
-      Object.entries(obj).filter(([, v]) => v !== undefined && v !== null)
-    );
-  };
+  const removeUndefined = (obj) =>
+    Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null));
 
   const saveMessage = async (msg) => {
     if (!userId) return;
     try {
       const sessionId = getCurrentSessionId();
       const msgData = removeUndefined({
-        role: msg.role,
-        content: msg.content,
-        model: msg.model,
-        id: msg.id,
-        sessionId,
-        modelId: selectedModel.id,
-        modelName: selectedModel.name,
-        timestamp: serverTimestamp(),
-        createdAt: new Date().toISOString(),
-        // usage csak akkor kerül be, ha ténylegesen megvan
+        role: msg.role, content: msg.content, model: msg.model, id: msg.id,
+        sessionId, modelId: selectedModel.id, modelName: selectedModel.name,
+        timestamp: serverTimestamp(), createdAt: new Date().toISOString(),
         ...(msg.usage ? { usage: msg.usage } : {}),
         ...(msg.isError ? { isError: true } : {}),
       });
@@ -358,23 +368,34 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     if (activePresetId === presetId) setActivePresetId("default_balanced");
   };
 
+  // ─── FŐ KÜLDÉS — streaming támogatással ───────────────
   const handleSend = async () => {
-    
     if (!input.trim() || isTyping) return;
-    const userMsg = { role: "user", content: input.trim(), model: selectedModel.id, id: Date.now().toString() };
+
+    const userMsg = {
+      role: "user", content: input.trim(),
+      model: selectedModel.id, id: Date.now().toString(),
+    };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     await saveMessage(userMsg);
     setInput("");
     setIsTyping(true);
+    // Felhasználói üzenet után görgetés
+    setTimeout(() => scrollToBottom(), 50);
+
+    // AI placeholder — ezt frissítjük streamelés közben
+    const aiMsgId = (Date.now() + 1).toString();
+    const placeholder = {
+      role: "assistant", content: "",
+      model: selectedModel.id, id: aiMsgId, isStreaming: true,
+    };
+    setMessages((prev) => [...prev, placeholder]);
+    setTimeout(() => scrollToBottom(), 50);
 
     try {
-      // ── FIX: mindig lekérjük a friss tokent ──
       const token = getIdToken ? await getIdToken() : null;
-
-      if (!token) {
-        throw new Error("Nincs érvényes autentikációs token. Jelentkezz be újra.");
-      }
+      if (!token) throw new Error("Nincs érvényes autentikációs token. Jelentkezz be újra.");
 
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
@@ -387,43 +408,87 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           provider: selectedModel.provider,
           messages: [
             ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-            ...newMessages.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.content })),
+            ...newMessages.filter((m) => m.role !== "system").map((m) => ({
+              role: m.role, content: m.content,
+            })),
           ],
-          temperature,
-          max_tokens: maxTokens,
-          top_p: topP,
-          frequency_penalty: frequencyPenalty,
-          presence_penalty: presencePenalty,
+          temperature, max_tokens: maxTokens, top_p: topP,
+          frequency_penalty: frequencyPenalty, presence_penalty: presencePenalty,
         }),
       });
-      const data = await res.json();
 
-console.log("📦 Backend válasz:", JSON.stringify(data, null, 2));
-console.log("📝 content érték:", data.content);
-console.log("✅ res.ok:", res.ok, "status:", res.status);
       if (!res.ok) {
-        throw new Error(data.message || `Szerver hiba: ${res.status}`);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `Szerver hiba: ${res.status}`);
       }
 
-      const aiMsg = {
-        role: "assistant",
-        content: data.content || "Hiba történt a válasz generálásakor.",
-        model: selectedModel.id,
-        id: (Date.now() + 1).toString(),
-        ...(data.usage ? { usage: data.usage } : {}),
-      };
-      setMessages((p) => [...p, aiMsg]);
-      await saveMessage(aiMsg);
+      const contentType = res.headers.get("content-type") || "";
+
+      // ── SSE streaming (OpenRouter) ──────────────────────────────
+      if (contentType.includes("text/event-stream")) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let accumulated = "";
+        let leftover = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const text = leftover + decoder.decode(value, { stream: true });
+          const lines = text.split("\n");
+          leftover = lines.pop();
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data: ")) continue;
+            const raw = trimmed.slice(6);
+            if (raw === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed.error) throw new Error(parsed.error);
+              const delta = parsed.delta || "";
+              if (delta) {
+                accumulated += delta;
+                setMessages((prev) =>
+                  prev.map((m) => m.id === aiMsgId ? { ...m, content: accumulated } : m)
+                );
+                // ── FIX: csak a chat div-et görgetjük, nem az oldalt ──
+                scrollToBottom();
+              }
+            } catch { /* csonka JSON — kihagyjuk */ }
+          }
+        }
+
+        // Streamelés kész
+        const finalMsg = {
+          role: "assistant", content: accumulated,
+          model: selectedModel.id, id: aiMsgId,
+        };
+        setMessages((prev) => prev.map((m) => m.id === aiMsgId ? finalMsg : m));
+        await saveMessage(finalMsg);
+
+      // ── Normál JSON válasz (Anthropic, OpenAI) ──────────────────
+      } else {
+        const data = await res.json();
+        const finalMsg = {
+          role: "assistant",
+          content: data.content || "Hiba történt a válasz generálásakor.",
+          model: selectedModel.id, id: aiMsgId,
+          ...(data.usage ? { usage: data.usage } : {}),
+        };
+        setMessages((prev) => prev.map((m) => m.id === aiMsgId ? finalMsg : m));
+        await saveMessage(finalMsg);
+        setTimeout(() => scrollToBottom(), 50);
+      }
+
     } catch (err) {
-      console.error("Chat error:", err);
-      const errMsg = {
-        role: "assistant",
-        content: `⚠️ ${err.message || "Hiba a kapcsolatban. Ellenőrizd az API kulcsokat és a backend szervert."}`,
-        model: selectedModel.id,
-        id: (Date.now() + 1).toString(),
-        isError: true,
-      };
-      setMessages((p) => [...p, errMsg]);
+      console.error("Chat hiba:", err.message);
+      setMessages((prev) =>
+        prev.map((m) => m.id === aiMsgId
+          ? { role: "assistant", content: `❌ Hiba: ${err.message}`, model: selectedModel.id, id: aiMsgId, isError: true }
+          : m)
+      );
     } finally {
       setIsTyping(false);
     }
@@ -440,8 +505,7 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
     const welcome = [{
       role: "assistant",
       content: `Új beszélgetés kezdve! ${selectedModel.name} készen áll. 🚀`,
-      model: selectedModel.id,
-      id: Date.now().toString(),
+      model: selectedModel.id, id: Date.now().toString(),
     }];
     prevMessageCount.current = welcome.length;
     setMessages(welcome);
@@ -474,9 +538,7 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
             <span className="hidden sm:inline">{tab.label}</span>
           </button>
         ))}
-
         <div className="flex-1" />
-
         {activeTab === "chat" && (
           <button
             onClick={clearConversation}
@@ -492,7 +554,15 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
       {/* ── Tab: CHAT ── */}
       {activeTab === "chat" && (
         <>
-          <div className="flex-1 overflow-y-auto px-3 md:px-5 py-3 space-y-3 scrollbar-thin">
+          {/*
+            ── FIX: ref={chatScrollRef} a scrollozható div-re ──
+            overflow-y-auto + h-full biztosítja, hogy CSAK ez a div görget,
+            nem az oldal — scrollTo/scrollTop csak ezen a elemen működik
+          */}
+          <div
+            ref={chatScrollRef}
+            className="flex-1 overflow-y-auto px-3 md:px-5 py-3 space-y-3 scrollbar-thin"
+          >
             {messages.map((msg) => {
               const isUser = msg.role === "user";
               return (
@@ -524,8 +594,28 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
                             }
                       }
                     >
-                      {renderContent(msg.content)}
+                      {msg.isStreaming && !msg.content ? (
+                        // Dots amíg az első token megérkezik
+                        <div className="flex gap-1 py-1">
+                          {[0, 0.15, 0.3].map((d, i) => (
+                            <div key={i} className="w-1.5 h-1.5 rounded-full animate-bounce"
+                              style={{ animationDelay: `${d}s`, background: color }} />
+                          ))}
+                        </div>
+                      ) : (
+                        <>
+                          {renderContent(msg.content)}
+                          {/* Villogó kurzor streamelés közben */}
+                          {msg.isStreaming && (
+                            <span
+                              className="inline-block w-[2px] h-[1em] ml-0.5 align-middle rounded-sm animate-pulse"
+                              style={{ background: color }}
+                            />
+                          )}
+                        </>
+                      )}
                     </div>
+
                     <div className="flex items-center gap-2 px-1">
                       <span className="text-gray-700 text-xs">
                         {new Date().toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })}
@@ -552,7 +642,8 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
               );
             })}
 
-            {isTyping && (
+            {/* Dots csak ha nincs még streaming üzenet */}
+            {isTyping && !messages.some((m) => m.isStreaming) && (
               <div className="flex gap-2.5">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${color}40`, border: `1px solid ${color}30` }}>
                   <Bot className="w-3.5 h-3.5 text-white" />
@@ -566,7 +657,6 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Input area */}
@@ -601,9 +691,7 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
                 style={{
                   background: "rgba(255,255,255,0.04)",
                   border: `1px solid ${input ? color + "40" : "rgba(255,255,255,0.08)"}`,
-                  minHeight: "48px",
-                  maxHeight: "160px",
-                  overflowY: "auto",
+                  minHeight: "48px", maxHeight: "160px", overflowY: "auto",
                 }}
               />
               <button
@@ -688,14 +776,11 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
               <Plus className="w-3 h-3" /> Új preset
             </button>
           </div>
-
           <div className="space-y-2">
             {presets.map((preset) => {
               const isActive = activePresetId === preset.id;
               return (
-                <div
-                  key={preset.id}
-                  className="p-3 rounded-xl transition-all"
+                <div key={preset.id} className="p-3 rounded-xl transition-all"
                   style={{
                     background: isActive ? `${color}15` : "rgba(255,255,255,0.02)",
                     border: isActive ? `1px solid ${color}45` : "1px solid rgba(255,255,255,0.07)",
@@ -720,8 +805,7 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
                       </div>
                     </div>
                     <div className="flex gap-1.5 flex-shrink-0">
-                      <button
-                        onClick={() => applyPreset(preset)}
+                      <button onClick={() => applyPreset(preset)}
                         className="cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-90 active:scale-95"
                         style={isActive
                           ? { background: `${color}25`, color, border: `1px solid ${color}40` }
@@ -731,15 +815,13 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
                       </button>
                       {!preset.isDefault && (
                         <>
-                          <button
-                            onClick={() => { setEditingPreset(preset); setPresetModalOpen(true); }}
+                          <button onClick={() => { setEditingPreset(preset); setPresetModalOpen(true); }}
                             className="cursor-pointer p-1.5 rounded-lg text-gray-600 hover:text-gray-400 hover:bg-white/10 transition-all"
                             style={{ background: "rgba(255,255,255,0.04)" }}
                           >
                             <Settings2 className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => deletePreset(preset.id)}
+                          <button onClick={() => deletePreset(preset.id)}
                             className="cursor-pointer p-1.5 rounded-lg text-red-600 hover:text-red-400 transition-all"
                             style={{ background: "rgba(239,68,68,0.08)" }}
                           >
@@ -771,8 +853,7 @@ console.log("✅ res.ok:", res.ok, "status:", res.status);
           ) : (
             <div className="space-y-2">
               {conversations.map((conv) => (
-                <div
-                  key={conv.id}
+                <div key={conv.id}
                   className="cursor-pointer p-3 rounded-xl hover:bg-white/5 transition-all active:scale-[0.99]"
                   style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
                 >
