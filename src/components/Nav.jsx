@@ -145,6 +145,7 @@ export default function Navbar({ scrollY }) {
       {/* DESKTOP NAVBAR - PREMIUM DESIGN */}
       {/* ============================================ */}
       <nav
+      id="top-nav"
         ref={navRef}
         className={`fixed top-0 w-full p-0 z-[60] transition-all duration-500 ${
           mobileMenuOpen 
