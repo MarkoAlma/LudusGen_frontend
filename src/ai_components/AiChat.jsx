@@ -24,9 +24,9 @@ import {
 import ChatPanel from "./ChatPanel";
 import ImagePanel from "./ImagePanel";
 import AudioPanel from "./AudioPanel";
-import Trellis2Panel from "./Trellis2panel";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useContext } from "react";
+import Trellis2Panel from "./meshy/Meshy";
 
 // ─── Group icon map ────────────────────────────────────
 const GroupIcon = ({ group, className = "w-4 h-4" }) => {
