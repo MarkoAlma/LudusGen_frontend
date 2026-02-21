@@ -80,7 +80,7 @@ export const MODEL_GROUPS = [
     },
 
     // ─── KÓD ─────────────────────────────────────────────
-    {
+   {
         id: "code",
         label: "Kód",
         emoji: "💻",
@@ -116,6 +116,13 @@ export const MODEL_GROUPS = [
                         id: "gemini-3-flash",
                         name: "Gemini 3 Flash",
                         apiModel: "gemini-3-flash-preview",   // ← ezt küldi a backendnek
+                        provider: "gemini",              // ← új provider
+                        color: "#4285f4",
+                        },
+                    {
+                        id: "gemini-2.5-pro",
+                        name: "gemini-2.5-pro",
+                        apiModel: "gemini-2.5-pro",   // ← ezt küldi a backendnek
                         provider: "gemini",              // ← új provider
                         color: "#4285f4",
                         },
@@ -167,54 +174,6 @@ export const MODEL_GROUPS = [
 - Write thorough technical explanations
 - Review and suggest improvements proactively
 - Respond in the same language the user writes in`,
-                    },
-                ],
-            },
-        ],
-    },
-
-    // ─── KÉP ─────────────────────────────────────────────
-    {
-        id: "image",
-        label: "Kép",
-        emoji: "🖼️",
-        color: "#f59e0b",
-        defaultOpen: false,
-        categories: [
-            {
-                id: "img_gen",
-                label: null,
-                models: [
-                    {
-                        id: "flux_schnell",
-                        name: "Flux Schnell",
-                        tier: "lite", tierLabel: "Gyors",
-                        description: "Black Forest Labs — ultragyors",
-                        badge: "~$0.003 / kép",
-                        priceNote: "< 1 sec",
-                        apiId: "fal-ai/flux/schnell",
-                        provider: "fal",
-                        color: "#fbbf24",
-                        gradient: "from-yellow-400 to-amber-400",
-                        panelType: "image",
-                        outputNote: "1024×1024",
-                        maxSteps: 4,
-                    },   { id: "nemotron-nano-12b-v2-vl", name: "Nemotron Nano 12B v2 VL", apiModel: "nvidia/nemotron-nano-12b-v2-vl:free", provider: "nvidia", color: "#10a37f" },
-
-                    {
-                        id: "flux_pro",
-                        name: "Flux Pro 1.1",
-                        tier: "pro", tierLabel: "Prémium",
-                        description: "Black Forest Labs — prémium minőség",
-                        badge: "~$0.04 / kép",
-                        priceNote: "5–10 sec",
-                        apiId: "fal-ai/flux-pro/v1.1",
-                        provider: "fal",
-                        color: "#f59e0b",
-                        gradient: "from-amber-500 to-orange-500",
-                        panelType: "image",
-                        outputNote: "Up to 2048px",
-                        maxSteps: 50,
                     },
                 ],
             },

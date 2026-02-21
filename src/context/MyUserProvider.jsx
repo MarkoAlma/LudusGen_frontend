@@ -23,7 +23,14 @@ const MyUserProvider = ({ children }) => {
   const [showNavbar, setShowNavbar] = useState(true);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [loading2FA, setLoading2FA] = useState(true);
+// UserContext vagy valahol központilag
+// UserContext vagy valahol központilag
+const [navHeight, setNavHeight] = useState(0);
 
+useEffect(() => {
+  const navEl = document.getElementById("top-nav");
+  if (navEl) setNavHeight(navEl.offsetHeight);
+}, []);
   useEffect(() => {
     console.log("A 2fa változott", is2FAEnabled);
   }, [is2FAEnabled]);
@@ -309,6 +316,7 @@ const MyUserProvider = ({ children }) => {
         signInUser,
         signInWith2FA,
         msg,
+        navHeight,
         setMsg,
         setUser,
         updateUser,
