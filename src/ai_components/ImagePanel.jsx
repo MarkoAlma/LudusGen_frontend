@@ -1,514 +1,506 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
-  Wand2, Download, Loader2, CheckCircle2, XCircle,
-  Settings2, Bookmark, History, Plus, Trash2, Copy, X,
-  RefreshCw, Shuffle, Sliders,
+  Sparkles, Download, RefreshCw, Settings2,
+  ChevronDown, ChevronUp, Loader2, AlertCircle,
+  ImageIcon, Wand2, ZoomIn, X,
 } from "lucide-react";
-import { db } from "../firebase/firebaseApp";
-import { collection, addDoc, query, orderBy, limit, getDocs, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
-import { DEFAULT_PRESETS } from "./models";
+
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const ASPECT_RATIOS = [
-  { label: "1:1", w: 1024, h: 1024 },
-  { label: "16:9", w: 1792, h: 1024 },
-  { label: "9:16", w: 1024, h: 1792 },
-  { label: "4:3", w: 1344, h: 1024 },
-  { label: "3:4", w: 1024, h: 1344 },
-  { label: "3:2", w: 1536, h: 1024 },
+  { label: "1:1",  value: "1:1",  w: 1024, h: 1024 },
+  { label: "16:9", value: "16:9", w: 1344, h: 768  },
+  { label: "9:16", value: "9:16", w: 768,  h: 1344 },
+  { label: "4:3",  value: "4:3",  w: 1152, h: 896  },
+  { label: "3:2",  value: "3:2",  w: 1216, h: 832  },
+  { label: "2:3",  value: "2:3",  w: 832,  h: 1216 },
 ];
 
-const STYLE_TAGS = [
-  "photorealistic", "cinematic", "oil painting", "watercolor", "anime",
-  "digital art", "concept art", "illustration", "sketch", "3D render",
-  "film noir", "neon lights", "golden hour", "studio lighting", "bokeh",
-  "macro photography", "aerial view", "low angle", "high contrast",
-  "minimalist", "baroque", "cyberpunk", "steampunk", "fantasy",
+const PROVIDER_META = {
+  "google-image": { label: "Gemini",       color: "#4285f4", dot: "#34a853" },
+  "stability":    { label: "Stability AI", color: "#7c3aed", dot: "#a78bfa" },
+  "cloudflare":   { label: "Cloudflare",   color: "#f6821f", dot: "#fbbf24" },
+  "fal":          { label: "fal.ai",       color: "#10b981", dot: "#34d399" },
+};
+
+const EXAMPLE_PROMPTS = [
+  "Cyberpunk cityscape at night",
+  "Cute cat in a photo studio",
+  "Abstract digital art",
+  "Mountain, golden hour",
 ];
 
-const QUALITY_TAGS = [
-  "8k uhd", "high resolution", "detailed", "sharp focus", "masterpiece",
-  "best quality", "professional photography", "award winning",
-];
+const getProvider = (m) => m.provider || "fal";
+
+const Lightbox = ({ src, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    style={{ background: "rgba(0,0,0,0.93)", backdropFilter: "blur(16px)" }}
+    onClick={onClose}>
+    <button onClick={onClose}
+      className="absolute top-4 right-4 p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-all cursor-pointer">
+      <X className="w-5 h-5" />
+    </button>
+    <img src={src} alt="Full size"
+      className="rounded-2xl shadow-2xl object-contain"
+      style={{ maxHeight: "90vh", maxWidth: "90vw" }}
+      onClick={(e) => e.stopPropagation()} />
+  </div>
+);
 
 export default function ImagePanel({ selectedModel, userId, getIdToken }) {
-  const [activeTab, setActiveTab] = useState("generate");
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
-  const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[0]);
-  const [steps, setSteps] = useState(selectedModel.maxSteps > 10 ? 28 : 4);
-  const [guidance, setGuidance] = useState(7.5);
-  const [seed, setSeed] = useState("");
-  const [numImages, setNumImages] = useState(1);
-
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState([]);
   const [error, setError] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [numImages, setNumImages] = useState(1);
+  const [seed, setSeed] = useState("");
+  const [steps, setSteps] = useState(28);
+  const [guidance, setGuidance] = useState(7.5);
 
-  const [presets, setPresets] = useState(DEFAULT_PRESETS.image);
-  const [activePresetId, setActivePresetId] = useState("img_photorealistic");
-  const [history, setHistory] = useState([]);
-  const [presetModalOpen, setPresetModalOpen] = useState(false);
-  const [newPresetName, setNewPresetName] = useState("");
-
-  const color = selectedModel.color;
-
-  useEffect(() => {
-    loadHistory();
-    loadUserPresets();
-  }, [userId, selectedModel.id]);
-
-  const loadHistory = async () => {
-    if (!userId) return;
-    try {
-      const ref = collection(db, "image_generations", userId, selectedModel.id);
-      const q = query(ref, orderBy("createdAt", "desc"), limit(20));
-      const snap = await getDocs(q);
-      setHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    } catch (e) { console.error(e); }
-  };
-
-  const loadUserPresets = async () => {
-    if (!userId) return;
-    try {
-      const ref = collection(db, "presets", userId, "image");
-      const snap = await getDocs(ref);
-      const userPresets = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      if (userPresets.length) setPresets([...DEFAULT_PRESETS.image, ...userPresets]);
-    } catch (e) {}
-  };
-
-  const applyPreset = (preset) => {
-    if (preset.positivePrefix) setPrompt((p) => (preset.positivePrefix + p.replace(/^[^,]+,\s*/g, "")));
-    if (preset.negativePrompt !== undefined) setNegativePrompt(preset.negativePrompt);
-    if (preset.width) setAspectRatio(ASPECT_RATIOS.find(a => a.w === preset.width) || ASPECT_RATIOS[0]);
-    if (preset.steps) setSteps(preset.steps);
-    if (preset.guidance) setGuidance(preset.guidance);
-    setActivePresetId(preset.id);
-  };
-
-  const saveToHistory = async (images, promptUsed) => {
-    if (!userId) return;
-    try {
-      await addDoc(collection(db, "image_generations", userId, selectedModel.id), {
-        images,
-        prompt: promptUsed,
-        negativePrompt,
-        width: aspectRatio.w,
-        height: aspectRatio.h,
-        steps,
-        guidance,
-        seed: seed || null,
-        modelId: selectedModel.id,
-        createdAt: serverTimestamp(),
-      });
-      await loadHistory();
-    } catch (e) { console.error(e); }
-  };
+  const color = selectedModel.color || "#7c3aed";
+  const provider = getProvider(selectedModel);
+  const providerMeta = PROVIDER_META[provider] || PROVIDER_META["fal"];
+  const isGoogleImage = provider === "google-image";
+  const isStability = provider === "stability";
+  const isCloudflare = provider === "cloudflare";
+  const isFal = !isStability && !isGoogleImage && !isCloudflare;
+  const singleImage = isStability || isGoogleImage || isCloudflare;
+  const selectedAR = ASPECT_RATIOS.find((a) => a.value === aspectRatio) || ASPECT_RATIOS[0];
+  const imgCount = singleImage ? 1 : Math.min(numImages, 4);
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || isGenerating) return;
     setIsGenerating(true);
     setError(null);
     setGeneratedImages([]);
-
     try {
       const token = getIdToken ? await getIdToken() : null;
+      if (!token) throw new Error("Nincs érvényes autentikációs token.");
       const res = await fetch(`${API_BASE}/api/generate-image`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          apiId: selectedModel.apiId,
-          prompt,
-          negative_prompt: negativePrompt || undefined,
-          image_size: { width: aspectRatio.w, height: aspectRatio.h },
+          prompt: prompt.trim(),
+          provider,
+          apiId: selectedModel.apiModel,
+          negative_prompt: negativePrompt.trim() || undefined,
+          aspect_ratio: aspectRatio,
+          image_size: { width: selectedAR.w, height: selectedAR.h },
+          num_images: singleImage ? 1 : Math.min(numImages, 4),
+          seed: seed ? parseInt(seed) : undefined,
           num_inference_steps: steps,
           guidance_scale: guidance,
-          seed: seed ? parseInt(seed) : undefined,
-          num_images: numImages,
         }),
       });
-
       const data = await res.json();
-      if (!data.success) throw new Error(data.message);
-
-      const images = data.images || [];
-      setGeneratedImages(images);
-      await saveToHistory(images, prompt);
+      if (!data.success) throw new Error(data.message || "Képgenerálási hiba");
+      setGeneratedImages(data.images || []);
     } catch (err) {
-      setError(err.message || "Generálási hiba");
+      setError(err.message);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const addStyleTag = (tag) => setPrompt((p) => p ? `${p}, ${tag}` : tag);
-  const randomSeed = () => setSeed(Math.floor(Math.random() * 999999999).toString());
-
-  const savePreset = async () => {
-    if (!newPresetName.trim()) return;
-    const preset = {
-      name: newPresetName,
-      positivePrefix: "",
-      negativePrompt,
-      width: aspectRatio.w,
-      height: aspectRatio.h,
-      steps,
-      guidance,
-      createdAt: new Date().toISOString(),
-    };
-    if (userId) {
-      try {
-        const ref = collection(db, "presets", userId, "image");
-        const docRef = await addDoc(ref, preset);
-        preset.id = docRef.id;
-      } catch (e) {}
-    } else {
-      preset.id = Date.now().toString();
-    }
-    setPresets((p) => [...p, preset]);
-    setNewPresetName("");
-    setPresetModalOpen(false);
+  const downloadImage = async (url, index) => {
+    try {
+      if (url.startsWith("data:")) {
+        const a = document.createElement("a"); a.href = url;
+        a.download = `ludusgen_${Date.now()}_${index + 1}.png`; a.click(); return;
+      }
+      const blob = await (await fetch(url)).blob();
+      const bu = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = bu;
+      a.download = `ludusgen_${Date.now()}_${index + 1}.png`; a.click();
+      URL.revokeObjectURL(bu);
+    } catch {}
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Tabs */}
-      <div className="flex gap-1 px-3 pt-2 flex-shrink-0">
-        {[
-          { id: "generate", label: "🖼️ Generálás" },
-          { id: "settings", label: "⚙️ Beállítások" },
-          { id: "presets", label: `📌 Presetek (${presets.length})` },
-          { id: "history", label: `📂 Előzmények (${history.length})` },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className="cursor-pointer px-3 py-1.5 rounded-lg text-xs transition-all hover:opacity-90 active:scale-95"
-            style={{
-              background: activeTab === tab.id ? `${color}20` : "transparent",
-              color: activeTab === tab.id ? "white" : "#6b7280",
-              border: activeTab === tab.id ? `1px solid ${color}40` : "1px solid transparent",
-              fontWeight: activeTab === tab.id ? 600 : 400,
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+    <>
+      {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
 
-      {/* ── GENERATE TAB ── */}
-      {activeTab === "generate" && (
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin">
-          {/* Prompt */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Prompt *</label>
-              <span className="text-gray-600 text-xs">{prompt.length} kar</span>
+      {/*
+        ROOT: position:absolute inset-0 — ez a legfontosabb.
+        A komponens teljesen kitölti a szülőt, és sosem növeszti azt.
+        overflow:hidden minden szinten megakadályozza a scrollt.
+      */}
+      <div style={{ position: "absolute", inset: 0, display: "flex", overflow: "hidden" }}>
+
+        {/* ══ BAL: Controls ══ */}
+        <div style={{
+          width: 264,
+          flexShrink: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflowY: "auto",
+          overflowX: "hidden",
+          borderRight: "1px solid rgba(255,255,255,0.06)",
+          background: "rgba(6,6,18,0.7)",
+        }}>
+          {/* Header */}
+          <div style={{ padding: "16px 16px 8px", flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: 8, flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: `${color}20`, border: `1px solid ${color}35`,
+              }}>
+                <Wand2 style={{ width: 14, height: 14, color }} />
+              </div>
+              <span style={{ color: "white", fontWeight: 600, fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {selectedModel.name}
+              </span>
+              <span style={{
+                flexShrink: 0, fontSize: 11, padding: "2px 8px", borderRadius: 999, fontWeight: 500,
+                display: "flex", alignItems: "center", gap: 5,
+                background: `${providerMeta.color}12`, color: providerMeta.color,
+                border: `1px solid ${providerMeta.color}28`,
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: providerMeta.dot, flexShrink: 0 }} />
+                {providerMeta.label}
+              </span>
             </div>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Írd le a képet angolul... pl: a majestic mountain at sunset, dramatic lighting, 8k photography"
-              rows={4}
-              className="w-full px-4 py-3 rounded-xl text-white text-sm placeholder-gray-600 resize-none focus:outline-none transition-all"
+          </div>
+
+          {/* Scrollable controls body */}
+          <div style={{ flex: 1, padding: "0 16px", display: "flex", flexDirection: "column", gap: 16, paddingBottom: 8 }}>
+
+            {/* Prompt */}
+            <div>
+              <label style={{ color: "#6b7280", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 6 }}>Prompt</label>
+              <div style={{ position: "relative" }}>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleGenerate(); }}
+                  placeholder="Írd le a képet részletesen..."
+                  rows={4}
+                  style={{
+                    width: "100%", padding: "10px 12px", borderRadius: 12, color: "white",
+                    fontSize: 13, resize: "none", outline: "none", lineHeight: 1.55, boxSizing: "border-box",
+                    background: "rgba(255,255,255,0.04)",
+                    border: `1px solid ${prompt ? color + "45" : "rgba(255,255,255,0.08)"}`,
+                    fontFamily: "inherit",
+                  }}
+                />
+                <span style={{ position: "absolute", bottom: 8, right: 10, color: "#4b5563", fontSize: 11, pointerEvents: "none" }}>{prompt.length}</span>
+              </div>
+            </div>
+
+            {/* Negative prompt */}
+            {!isGoogleImage && (
+              <div>
+                <label style={{ color: "#6b7280", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 6 }}>
+                  Negatív <span style={{ color: "#4b5563", fontWeight: 400, textTransform: "none" }}>(opcionális)</span>
+                </label>
+                <textarea
+                  value={negativePrompt}
+                  onChange={(e) => setNegativePrompt(e.target.value)}
+                  placeholder="Mit ne tartalmazzon..."
+                  rows={2}
+                  style={{
+                    width: "100%", padding: "8px 12px", borderRadius: 12, color: "white",
+                    fontSize: 13, resize: "none", outline: "none", boxSizing: "border-box",
+                    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                    fontFamily: "inherit",
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Aspect ratio */}
+            <div>
+              <label style={{ color: "#6b7280", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>Képarány</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                {ASPECT_RATIOS.map((ar) => {
+                  const isActive = aspectRatio === ar.value;
+                  const bw = ar.w >= ar.h ? 18 : Math.round((ar.w / ar.h) * 18);
+                  const bh = ar.h >= ar.w ? 18 : Math.round((ar.h / ar.w) * 18);
+                  return (
+                    <button key={ar.value} onClick={() => setAspectRatio(ar.value)}
+                      style={{
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                        padding: "8px 4px", borderRadius: 12, cursor: "pointer",
+                        background: isActive ? `${color}18` : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${isActive ? color + "55" : "rgba(255,255,255,0.07)"}`,
+                        transition: "all 0.15s",
+                      }}>
+                      <div style={{ width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{
+                          width: bw, height: bh, borderRadius: 2,
+                          background: isActive ? color : "rgba(255,255,255,0.18)",
+                          opacity: isActive ? 0.85 : 0.4,
+                        }} />
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: isActive ? color : "#6b7280" }}>{ar.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Num images fal */}
+            {isFal && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <label style={{ color: "#6b7280", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>Képek száma</label>
+                  <span style={{ fontSize: 11, fontWeight: 700, color }}>{numImages}</span>
+                </div>
+                <input type="range" min={1} max={4} step={1} value={numImages}
+                  onChange={(e) => setNumImages(parseInt(e.target.value))}
+                  style={{ width: "100%", cursor: "pointer", accentColor: color }} />
+              </div>
+            )}
+
+            {/* Advanced */}
+            <button onClick={() => setShowAdvanced((p) => !p)}
               style={{
-                background: "rgba(255,255,255,0.04)",
-                border: `1px solid ${prompt ? color + "40" : "rgba(255,255,255,0.09)"}`,
-              }}
-            />
-          </div>
+                display: "flex", alignItems: "center", gap: 8, color: "#6b7280",
+                fontSize: 12, background: "none", border: "none", cursor: "pointer", padding: 0, width: "100%",
+              }}>
+              <Settings2 style={{ width: 14, height: 14, flexShrink: 0 }} />
+              <span>Speciális</span>
+              <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
+              {showAdvanced
+                ? <ChevronUp style={{ width: 12, height: 12, flexShrink: 0 }} />
+                : <ChevronDown style={{ width: 12, height: 12, flexShrink: 0 }} />}
+            </button>
 
-          {/* Style tags */}
-          <div>
-            <label className="text-gray-500 text-xs mb-2 block">Stílus tagek (kattints a hozzáadáshoz):</label>
-            <div className="flex flex-wrap gap-1.5">
-              {STYLE_TAGS.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => addStyleTag(tag)}
-                  className="cursor-pointer px-2 py-1 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all hover:scale-105 active:scale-100"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Negative prompt */}
-          <div>
-            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-1.5 block">Negatív prompt</label>
-            <input
-              value={negativePrompt}
-              onChange={(e) => setNegativePrompt(e.target.value)}
-              placeholder="Amit NE tartalmazzon: blurry, low quality, watermark..."
-              className="w-full px-4 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
-            />
-          </div>
-
-          {/* Aspect ratio */}
-          <div>
-            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2 block">Arány / Méret</label>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-              {ASPECT_RATIOS.map((ar) => (
-                <button
-                  key={ar.label}
-                  onClick={() => setAspectRatio(ar)}
-                  className="cursor-pointer flex flex-col items-center justify-center py-2 rounded-xl transition-all hover:opacity-90 active:scale-95"
-                  style={{
-                    background: aspectRatio.label === ar.label ? `${color}20` : "rgba(255,255,255,0.03)",
-                    border: aspectRatio.label === ar.label ? `1.5px solid ${color}55` : "1px solid rgba(255,255,255,0.07)",
-                    transform: aspectRatio.label === ar.label ? "scale(1.03)" : "scale(1)",
-                  }}
-                >
-                  <div
-                    className="mb-1 rounded-sm transition-all"
+            {showAdvanced && (
+              <div style={{ borderRadius: 12, padding: 12, display: "flex", flexDirection: "column", gap: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div>
+                  <label style={{ color: "#6b7280", fontSize: 12, display: "block", marginBottom: 6 }}>Seed <span style={{ color: "#4b5563" }}>(opcionális)</span></label>
+                  <input type="number" value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="pl. 42"
                     style={{
-                      width: ar.w > ar.h ? 20 : ar.w === ar.h ? 14 : 10,
-                      height: ar.h > ar.w ? 20 : ar.w === ar.h ? 14 : 10,
-                      background: aspectRatio.label === ar.label ? color : "rgba(255,255,255,0.3)",
-                    }}
-                  />
-                  <span className="text-xs font-semibold" style={{ color: aspectRatio.label === ar.label ? "white" : "#6b7280" }}>{ar.label}</span>
-                  <span className="text-xs text-gray-600">{ar.w}×{ar.h}</span>
-                </button>
-              ))}
-            </div>
+                      width: "100%", padding: "8px 12px", borderRadius: 8, color: "white", fontSize: 13,
+                      outline: "none", boxSizing: "border-box", background: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.08)", fontFamily: "inherit",
+                    }} />
+                </div>
+                {isFal && (<>
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <label style={{ color: "#6b7280", fontSize: 12 }}>Steps</label>
+                      <span style={{ fontSize: 11, fontWeight: 700, color }}>{steps}</span>
+                    </div>
+                    <input type="range" min={1} max={50} step={1} value={steps}
+                      onChange={(e) => setSteps(parseInt(e.target.value))}
+                      style={{ width: "100%", cursor: "pointer", accentColor: color }} />
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <label style={{ color: "#6b7280", fontSize: 12 }}>Guidance</label>
+                      <span style={{ fontSize: 11, fontWeight: 700, color }}>{guidance}</span>
+                    </div>
+                    <input type="range" min={1} max={15} step={0.5} value={guidance}
+                      onChange={(e) => setGuidance(parseFloat(e.target.value))}
+                      style={{ width: "100%", cursor: "pointer", accentColor: color }} />
+                  </div>
+                </>)}
+              </div>
+            )}
           </div>
 
-          {/* Num images */}
-          <div>
-            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2 block">Képek száma: {numImages}</label>
-            <div className="flex gap-2">
-              {[1, 2, 4].map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setNumImages(n)}
-                  className="cursor-pointer flex-1 py-2 rounded-xl text-sm font-semibold transition-all hover:opacity-90 active:scale-95"
-                  style={{
-                    background: numImages === n ? `${color}25` : "rgba(255,255,255,0.04)",
-                    border: numImages === n ? `1px solid ${color}50` : "1px solid rgba(255,255,255,0.08)",
-                    color: numImages === n ? "white" : "#6b7280",
-                    transform: numImages === n ? "scale(1.02)" : "scale(1)",
-                  }}
-                >
-                  {n}×
-                </button>
-              ))}
-            </div>
+          {/* Generate button — pinned bottom */}
+          <div style={{ padding: "12px 16px 16px", flexShrink: 0 }}>
+            <button onClick={handleGenerate} disabled={!prompt.trim() || isGenerating}
+              style={{
+                width: "100%", padding: "12px 0", borderRadius: 12, fontSize: 13, fontWeight: 600,
+                color: "white", border: "none", cursor: prompt.trim() && !isGenerating ? "pointer" : "not-allowed",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                background: prompt.trim() && !isGenerating ? `linear-gradient(135deg, ${color}, ${color}aa)` : "rgba(255,255,255,0.05)",
+                opacity: prompt.trim() && !isGenerating ? 1 : 0.4,
+                boxShadow: prompt.trim() && !isGenerating ? `0 4px 20px ${color}28` : "none",
+                transition: "all 0.2s",
+              }}>
+              {isGenerating
+                ? <><Loader2 style={{ width: 16, height: 16, animation: "spin 1s linear infinite" }} /> Generálás...</>
+                : <><Sparkles style={{ width: 16, height: 16 }} /> Generálás</>}
+            </button>
+            <p style={{ textAlign: "center", color: "#4b5563", fontSize: 11, marginTop: 6 }}>Ctrl+Enter</p>
           </div>
+        </div>
+
+        {/* ══ JOBB: Canvas — position:relative, a kép absolute inset-0 benne ══ */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
           {/* Error */}
           {error && (
-            <div className="p-3 rounded-xl flex items-center gap-2" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)" }}>
-              <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-              <p className="text-red-300 text-sm">{error}</p>
-            </div>
-          )}
-
-          {/* Generated images */}
-          {generatedImages.length > 0 && (
-            <div className={`grid gap-3 ${generatedImages.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-              {generatedImages.map((img, i) => (
-                <div key={i} className="relative rounded-xl overflow-hidden group">
-                  <img src={img.url} alt={`Generated ${i + 1}`} className="w-full rounded-xl" />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-3 rounded-xl">
-                    <a
-                      href={img.url}
-                      download={`image_${Date.now()}.png`}
-                      className="cursor-pointer p-2.5 rounded-xl text-white transition-all hover:scale-110 active:scale-100"
-                      style={{ background: `${color}70`, border: `1px solid ${color}` }}
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(img.url)}
-                      className="cursor-pointer p-2.5 rounded-xl text-white transition-all hover:scale-110 active:scale-100"
-                      style={{ background: "rgba(255,255,255,0.2)" }}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Generate button */}
-          <button
-            onClick={handleGenerate}
-            disabled={!prompt.trim() || isGenerating}
-            className="cursor-pointer w-full py-4 rounded-2xl font-bold text-white text-sm transition-all duration-300 hover:opacity-90 active:scale-[0.99] disabled:cursor-not-allowed"
-            style={{
-              background: prompt.trim() && !isGenerating ? `linear-gradient(135deg, ${color}, ${color}88)` : "rgba(255,255,255,0.05)",
-              opacity: prompt.trim() && !isGenerating ? 1 : 0.4,
-              boxShadow: prompt.trim() && !isGenerating ? `0 0 30px ${color}30` : "none",
-            }}
-          >
-            {isGenerating ? (
-              <span className="flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" /> Generálás...
-              </span>
-            ) : (
-              <span className="flex items-center justify-center gap-2">
-                <Wand2 className="w-4 h-4" /> Kép generálása
-              </span>
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* ── SETTINGS TAB ── */}
-      {activeTab === "settings" && (
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin">
-          {[
-            { label: `Steps: ${steps}`, min: 1, max: selectedModel.maxSteps || 50, step: 1, val: steps, set: setSteps, hint: "Több lépés = jobb minőség, de lassabb" },
-            { label: `Guidance Scale: ${guidance}`, min: 1, max: 15, step: 0.5, val: guidance, set: setGuidance, hint: "Mennyire kövesse a promptot (7-8 az optimális)" },
-          ].map(({ label, min, max, step, val, set, hint }) => (
-            <div key={label} className="p-4 rounded-xl space-y-2" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
-              <div className="flex justify-between">
-                <span className="text-white text-sm font-semibold">{label}</span>
-              </div>
-              <input type="range" min={min} max={max} step={step} value={val}
-                onChange={(e) => set(parseFloat(e.target.value))}
-                className="w-full cursor-pointer"
-                style={{ accentColor: color }}
-              />
-              <p className="text-gray-600 text-xs">{hint}</p>
-            </div>
-          ))}
-
-          {/* Seed */}
-          <div className="p-4 rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
-            <label className="text-white text-sm font-semibold block mb-2">Seed</label>
-            <div className="flex gap-2">
-              <input
-                value={seed}
-                onChange={(e) => setSeed(e.target.value)}
-                placeholder="Véletlenszerű (üres)"
-                className="flex-1 px-3 py-2 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
-              />
-              <button onClick={randomSeed} className="cursor-pointer p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all active:scale-90"
-                style={{ background: "rgba(255,255,255,0.06)" }} title="Véletlen seed">
-                <Shuffle className="w-4 h-4" />
+            <div style={{
+              margin: "12px 12px 0", padding: "10px 12px", borderRadius: 12, flexShrink: 0,
+              display: "flex", alignItems: "flex-start", gap: 8,
+              background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
+            }}>
+              <AlertCircle style={{ width: 15, height: 15, color: "#f87171", flexShrink: 0, marginTop: 1 }} />
+              <p style={{ color: "#fca5a5", fontSize: 12, lineHeight: 1.5, flex: 1 }}>{error}</p>
+              <button onClick={() => setError(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", flexShrink: 0, padding: 0 }}>
+                <X style={{ width: 13, height: 13 }} />
               </button>
-              {seed && (
-                <button onClick={() => setSeed("")} className="cursor-pointer p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all active:scale-90"
-                  style={{ background: "rgba(255,255,255,0.06)" }} title="Törlés">
-                  <X className="w-4 h-4" />
+            </div>
+          )}
+
+          {/* Toolbar */}
+          {(generatedImages.length > 0 || isGenerating) && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", flexShrink: 0,
+              borderBottom: "1px solid rgba(255,255,255,0.05)",
+            }}>
+              <span style={{ color: "#6b7280", fontSize: 11 }}>
+                {isGenerating ? "Generálás..." : `${generatedImages.length} kép · ${selectedAR.w}×${selectedAR.h} · ${aspectRatio}`}
+              </span>
+              <div style={{ flex: 1 }} />
+              {!isGenerating && (
+                <button onClick={handleGenerate}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8,
+                    fontSize: 12, color: "#9ca3af", cursor: "pointer",
+                    background: "none", border: "1px solid rgba(255,255,255,0.08)",
+                  }}>
+                  <RefreshCw style={{ width: 12, height: 12 }} /> Újra
                 </button>
               )}
             </div>
-            <p className="text-gray-600 text-xs mt-1">Azonos seed = azonos kép, ha a prompt is azonos</p>
-          </div>
-
-          {/* Save preset */}
-          {!presetModalOpen ? (
-            <button
-              onClick={() => setPresetModalOpen(true)}
-              className="cursor-pointer w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.99]"
-              style={{ background: `${color}20`, border: `1px solid ${color}40`, color: "white" }}
-            >
-              <Bookmark className="w-4 h-4" /> Beállítások mentése presetként
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <input
-                value={newPresetName}
-                onChange={(e) => setNewPresetName(e.target.value)}
-                placeholder="Preset neve..."
-                className="flex-1 px-3 py-2 rounded-xl text-white text-sm focus:outline-none"
-                style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${color}40` }}
-                autoFocus
-                onKeyDown={(e) => e.key === "Enter" && savePreset()}
-              />
-              <button onClick={savePreset} className="cursor-pointer px-4 py-2 rounded-xl text-white text-sm font-semibold transition-all hover:opacity-90 active:scale-95"
-                style={{ background: `linear-gradient(135deg, ${color}, ${color}99)` }}>
-                Ment
-              </button>
-              <button onClick={() => setPresetModalOpen(false)} className="cursor-pointer p-2 rounded-xl text-gray-500 hover:text-gray-300 hover:bg-white/10 transition-all"
-                style={{ background: "rgba(255,255,255,0.04)" }}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
           )}
-        </div>
-      )}
 
-      {/* ── PRESETS TAB ── */}
-      {activeTab === "presets" && (
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 scrollbar-thin">
-          {presets.map((preset) => {
-            const isActive = activePresetId === preset.id;
-            return (
-              <div
-                key={preset.id}
-                className="p-3 rounded-xl transition-all"
-                style={{
-                  background: isActive ? `${color}15` : "rgba(255,255,255,0.02)",
-                  border: isActive ? `1px solid ${color}40` : "1px solid rgba(255,255,255,0.07)",
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-white font-semibold text-sm">{preset.name}</span>
-                    {preset.description && <p className="text-gray-500 text-xs mt-0.5">{preset.description}</p>}
-                    <div className="flex gap-2 mt-1 text-xs text-gray-600">
-                      {preset.steps && <span>Steps: {preset.steps}</span>}
-                      {preset.guidance && <span>CFG: {preset.guidance}</span>}
-                      {preset.width && <span>{preset.width}×{preset.height}</span>}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => applyPreset(preset)}
-                    className="cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-90 active:scale-95"
-                    style={{
-                      background: isActive ? `${color}25` : "rgba(255,255,255,0.06)",
-                      color: isActive ? color : "#9ca3af",
-                      border: `1px solid ${isActive ? color + "40" : "transparent"}`,
-                    }}
-                  >
-                    {isActive ? "✓ Aktív" : "Alkalmaz"}
-                  </button>
+          {/*
+            A KULCS: position:relative konténer, flex:1.
+            Minden tartalom benne position:absolute inset-0.
+            Így a kép SOHA nem tolja ki a konténert, mindig a rendelkezésre álló
+            helyet tölti ki — görgetés nélkül, bármilyen képarányban.
+          */}
+          <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
+
+            {/* Empty state */}
+            {!isGenerating && generatedImages.length === 0 && !error && (
+              <div style={{
+                position: "absolute", inset: 0,
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16,
+              }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: 16,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: `${color}0d`, border: `1px solid ${color}18`,
+                }}>
+                  <ImageIcon style={{ width: 32, height: 32, color: `${color}40` }} />
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <p style={{ color: "#6b7280", fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Még nincs kép</p>
+                  <p style={{ color: "#374151", fontSize: 12 }}>Írj egy promptot a bal oldalon</p>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", maxWidth: 360 }}>
+                  {EXAMPLE_PROMPTS.map((ex) => (
+                    <button key={ex} onClick={() => setPrompt(ex)}
+                      style={{
+                        fontSize: 12, padding: "6px 12px", borderRadius: 999, cursor: "pointer",
+                        background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#9ca3af",
+                      }}>
+                      {ex}
+                    </button>
+                  ))}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+            )}
 
-      {/* ── HISTORY TAB ── */}
-      {activeTab === "history" && (
-        <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin">
-          {history.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 gap-3">
-              <History className="w-10 h-10 text-gray-700" />
-              <p className="text-gray-500 text-sm">Még nincs generálási előzmény</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {history.map((item) => (
-                <div key={item.id} className="cursor-pointer group relative rounded-xl overflow-hidden hover:scale-[1.02] transition-all active:scale-[0.99]"
-                  onClick={() => setPrompt(item.prompt)}>
-                  {item.images?.[0]?.url && (
-                    <img src={item.images[0].url} alt="" className="w-full aspect-square object-cover rounded-xl" />
-                  )}
-                  <div className="absolute bottom-0 left-0 right-0 p-2 rounded-b-xl opacity-0 group-hover:opacity-100 transition-all"
-                    style={{ background: "linear-gradient(to top, rgba(0,0,0,0.8), transparent)" }}>
-                    <p className="text-white text-xs truncate">{item.prompt}</p>
+            {/* Loading */}
+            {isGenerating && (
+              <div style={{
+                position: "absolute", inset: 0, padding: 16,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
+              }}>
+                {Array.from({ length: imgCount }).map((_, i) => (
+                  <div key={i} style={{
+                    borderRadius: 16, display: "flex", flexDirection: "column",
+                    alignItems: "center", justifyContent: "center", gap: 10,
+                    // fill available space while preserving aspect ratio
+                    aspectRatio: `${selectedAR.w} / ${selectedAR.h}`,
+                    maxWidth: imgCount > 1 ? "calc(50% - 6px)" : "100%",
+                    maxHeight: "100%",
+                    // width auto so aspect-ratio + maxHeight drives the size
+                    width: "auto",
+                    height: "100%",
+                    background: `${color}10`,
+                    border: `1px solid ${color}20`,
+                    animation: "shimmer 2s ease-in-out infinite",
+                  }}>
+                    <Loader2 style={{ width: 28, height: 28, color: `${color}60`, animation: "spin 1s linear infinite" }} />
+                    <span style={{ color: `${color}60`, fontSize: 12 }}>Generálás...</span>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+
+            {/* Generated images */}
+            {!isGenerating && generatedImages.length > 0 && (
+              <div style={{
+                position: "absolute", inset: 0, padding: 16,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
+              }}>
+                {generatedImages.map((img, i) => (
+                  <div key={i}
+                    className="group"
+                    style={{
+                      position: "relative", borderRadius: 16, overflow: "hidden",
+                      border: `1px solid ${color}25`,
+                      // CSS aspect-ratio + max constraints = fills space without scroll
+                      aspectRatio: `${selectedAR.w} / ${selectedAR.h}`,
+                      maxWidth: generatedImages.length > 1 ? "calc(50% - 6px)" : "100%",
+                      maxHeight: "100%",
+                      width: "auto",
+                      height: "100%",
+                      flexShrink: 0,
+                    }}>
+                    <img src={img.url} alt={`Generated ${i + 1}`}
+                      style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", background: "rgba(0,0,0,0.2)" }} />
+                    {/* Hover overlay */}
+                    <div className="img-overlay"
+                      style={{
+                        position: "absolute", inset: 0, opacity: 0, transition: "opacity 0.2s",
+                        background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 55%)",
+                        display: "flex", alignItems: "flex-end", justifyContent: "space-between", padding: 12,
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                      onMouseLeave={(e) => e.currentTarget.style.opacity = 0}
+                    >
+                      <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{img.width && `${img.width}×${img.height}`}</span>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={() => setLightboxSrc(img.url)}
+                          style={{
+                            padding: 8, borderRadius: 10, color: "white", cursor: "pointer",
+                            background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", border: "none",
+                          }}
+                          title="Teljes méret">
+                          <ZoomIn style={{ width: 14, height: 14 }} />
+                        </button>
+                        <button onClick={() => downloadImage(img.url, i)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 6, padding: "8px 12px",
+                            borderRadius: 10, color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                            background: `${color}cc`, backdropFilter: "blur(8px)", border: "none",
+                          }}>
+                          <Download style={{ width: 14, height: 14 }} /> Letöltés
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      )}
-    </div>
+      </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes shimmer {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+      `}</style>
+    </>
   );
 }
