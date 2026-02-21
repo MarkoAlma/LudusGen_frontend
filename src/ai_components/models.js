@@ -180,6 +180,50 @@ export const MODEL_GROUPS = [
         ],
     },
 
+    // ─── KÉP ─────────────────────────────────────────────
+    {
+        id: "image",
+        label: "Kép",
+        emoji: "🖼️",
+        color: "#f59e0b",
+        defaultOpen: false,
+        categories: [
+            {
+                id: "img_gen",
+                label: null,
+                models: [
+                   
+                    {
+    id: "gemini-image",
+    name: "Gemini Image Gen",
+    apiModel: "gemini-2.5-flash-image",
+    provider: "google-image",
+    color: "#4285f4",
+    badge: "Google",
+    badgeDetail: "Gemini 2.5 Flash képgenerálás",
+    description: "Google Gemini képgeneráló",
+    tier: "pro",
+    tierLabel: "Pro",
+    panelType: "image",
+  },
+    {
+    id: "cf-sdxl",
+    name: "Stable Diffusion XL (Cloudflare)",
+    apiModel: "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+    provider: "cloudflare",
+    color: "#f6821f",
+    badge: "Cloudflare",
+    panelType: "image",
+    tier: "free",
+    tierLabel: "Free",
+    description: "SDXL képgenerálás",
+    },
+                ],
+            },
+            
+        ],
+    },
+
     // ─── HANG ─────────────────────────────────────────────
     {
         id: "audio",
