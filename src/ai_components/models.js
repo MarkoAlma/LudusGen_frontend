@@ -199,7 +199,8 @@ export const MODEL_GROUPS = [
                         panelType: "image",
                         outputNote: "1024×1024",
                         maxSteps: 4,
-                    },
+                    },   { id: "nemotron-nano-12b-v2-vl", name: "Nemotron Nano 12B v2 VL", apiModel: "nvidia/nemotron-nano-12b-v2-vl:free", provider: "nvidia", color: "#10a37f" },
+
                     {
                         id: "flux_pro",
                         name: "Flux Pro 1.1",

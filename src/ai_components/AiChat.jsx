@@ -159,7 +159,7 @@ export default function AIChat({ user, getIdToken }) {
       </div>
 
       {/* Scrollable model list */}
-      <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1 scrollbar-thin">
+      <div className="flex-1  overflow-y-auto px-3 pb-4 space-y-1 scrollbar-thin">
         {MODEL_GROUPS.map((group) => {
           const groupOpen = openGroups.has(group.id);
           const hasActiveInGroup = group.categories.flatMap((c) => c.models).some((m) => m.id === selectedAI);
