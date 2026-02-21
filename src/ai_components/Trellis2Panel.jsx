@@ -7,6 +7,7 @@
  * - Remesh modal (Polycount, Topology)
  * - Camera presets, auto-rotate, view modes, lighting
  * - History sidebar
+ * - Animate modal: GIF previews from Meshy CDN
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -15,17 +16,21 @@ import {
   Box, ChevronDown, ChevronUp, Loader2, CheckCircle2, AlertCircle,
   Trash2, RefreshCw, Sparkles, Move3d,
   Clock, Info, Wand2, Sun, Eye, Camera,
-  Play, Square, TriangleRight, X, Maximize2,
-  Paintbrush2, Settings, Sliders, Image,
-  Zap, Search, Plus, Check, ChevronLeft, ChevronRight,
-  PersonStanding, Music2, Pause,
+  Play, Square, X, Maximize2,
+  Paintbrush2, Settings, Image,
+  Search, Plus, Check, PersonStanding, Music2, Pause,
 } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 const PROMPT_MAX = 600;
 const LS_KEY = 'meshy_panel_history_v1';
 const POLL_MS = 2500;
 const API_BASE = '/api/meshy';
+const MESHY_GIF_BASE = 'https://cdn.meshy.ai/webapp-assets/feature-demo/animation/preview/biped';
+
+// ─── GIF URL helper ───────────────────────────────────────────────────────
+const getAnimGifUrl = (slug) => `${MESHY_GIF_BASE}/${slug}.gif`;
 
 // ─── localStorage ─────────────────────────────────────────────────────────
 const loadHistory = () => { try { const r = localStorage.getItem(LS_KEY); return r ? JSON.parse(r) : []; } catch { return []; } };
@@ -37,6 +42,125 @@ const hexToInt = (h) => h ? parseInt(h.replace('#', ''), 16) : null;
 const fileToDataURI = (file) => new Promise((res, rej) => {
   const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file);
 });
+
+// ─── Animation Library ────────────────────────────────────────────────────
+// slug = exact filename (without .gif) on Meshy CDN biped path
+export const ANIMATION_LIBRARY = [
+  // ── Walking / Locomotion ──
+  { id: 'casual_walk',                      label: 'Casual Walk',                      slug: 'Casual_Walk',                         category: 'walking'  },
+  { id: 'slow_orc_walk',                    label: 'Slow Orc Walk',                    slug: 'Slow_Orc_Walk',                       category: 'walking'  },
+  { id: 'unsteady_walk',                    label: 'Unsteady Walk',                    slug: 'Unsteady_Walk',                       category: 'walking'  },
+  { id: 'walking',                          label: 'Walking',                          slug: 'Walking',                             category: 'walking'  },
+  { id: 'walking_2',                        label: 'Walking 2',                        slug: 'Walking_2',                           category: 'walking'  },
+  { id: 'walking_woman',                    label: 'Walking Woman',                    slug: 'Walking_Woman',                       category: 'walking'  },
+  { id: 'walking_with_phone',               label: 'Walking with Phone',               slug: 'Walking_with_Phone',                  category: 'walking'  },
+  { id: 'carry_heavy_cannon_forward',       label: 'Carry Heavy Cannon Forward',       slug: 'Carry_Heavy_Cannon_Forward',          category: 'walking'  },
+  { id: 'carry_heavy_object_walk',          label: 'Carry Heavy Object Walk',          slug: 'Carry_Heavy_Object_Walk',             category: 'walking'  },
+  { id: 'carry_water_bucket_walk',          label: 'Carry Water Bucket Walk',          slug: 'Carry_Water_Bucket_Walk',             category: 'walking'  },
+  { id: 'confident_strut',                  label: 'Confident Strut',                  slug: 'Confident_Strut',                     category: 'walking'  },
+  { id: 'crawl_backward',                   label: 'Crawl Backward',                   slug: 'Crawl_Backward',                      category: 'walking'  },
+  { id: 'elderly_shaky_walk',               label: 'Elderly Shaky Walk',               slug: 'Elderly_Shaky_Walk',                  category: 'walking'  },
+  { id: 'flirty_strut',                     label: 'Flirty Strut',                     slug: 'Flirty_Strut',                        category: 'walking'  },
+  { id: 'frankenstein_walk',                label: 'Frankenstein Walk',                slug: 'Frankenstein_Walk',                   category: 'walking'  },
+  { id: 'funky_walk',                       label: 'Funky Walk',                       slug: 'Funky_Walk',                          category: 'walking'  },
+  { id: 'hot_walk',                         label: 'Hot Walk',                         slug: 'Hot_Walk',                            category: 'walking'  },
+  { id: 'injured_walk',                     label: 'Injured Walk',                     slug: 'Injured_Walk',                        category: 'walking'  },
+  { id: 'injured_walk_backward',            label: 'Injured Walk Backward',            slug: 'Injured_Walk_Backward',               category: 'walking'  },
+  { id: 'limping_walk',                     label: 'Limping Walk',                     slug: 'Limping_Walk',                        category: 'walking'  },
+  { id: 'limping_walk_1',                   label: 'Limping Walk 1',                   slug: 'Limping_Walk_1',                      category: 'walking'  },
+  { id: 'limping_walk_2',                   label: 'Limping Walk 2',                   slug: 'Limping_Walk_2',                      category: 'walking'  },
+  { id: 'limping_walk_3',                   label: 'Limping Walk 3',                   slug: 'Limping_Walk_3',                      category: 'walking'  },
+  { id: 'proud_strut',                      label: 'Proud Strut',                      slug: 'Proud_Strut',                         category: 'walking'  },
+  { id: 'quick_walk',                       label: 'Quick Walk',                       slug: 'Quick_Walk',                          category: 'walking'  },
+  { id: 'red_carpet_walk',                  label: 'Red Carpet Walk',                  slug: 'Red_Carpet_Walk',                     category: 'walking'  },
+  { id: 'run_to_walk_transition',           label: 'Run to Walk Transition',           slug: 'Run_to_Walk_Transition',              category: 'walking'  },
+  { id: 'skip_forward',                     label: 'Skip Forward',                     slug: 'Skip_Forward',                        category: 'walking'  },
+  { id: 'sneaky_walk',                      label: 'Sneaky Walk',                      slug: 'Sneaky_Walk',                         category: 'walking'  },
+  { id: 'spear_walk',                       label: 'Spear Walk',                       slug: 'Spear_Walk',                          category: 'walking'  },
+  { id: 'stage_walk',                       label: 'Stage Walk',                       slug: 'Stage_Walk',                          category: 'walking'  },
+  { id: 'step_back',                        label: 'Step Back',                        slug: 'Step_Back',                           category: 'walking'  },
+  { id: 'step_hip_hop_dance',               label: 'Step Hip Hop Dance',               slug: 'Step_Hip_Hop_Dance',                  category: 'walking'  },
+  { id: 'stumble_walk',                     label: 'Stumble Walk',                     slug: 'Stumble_Walk',                        category: 'walking'  },
+  { id: 'stylish_walk',                     label: 'Stylish Walk',                     slug: 'Stylish_Walk',                        category: 'walking'  },
+  { id: 'texting_walk',                     label: 'Texting Walk',                     slug: 'Texting_Walk',                        category: 'walking'  },
+  { id: 'thoughtful_walk',                  label: 'Thoughtful Walk',                  slug: 'Thoughtful_Walk',                     category: 'walking'  },
+  { id: 'tightrope_walk',                   label: 'Tightrope Walk',                   slug: 'Tightrope_Walk',                      category: 'walking'  },
+  { id: 'walk_backward',                    label: 'Walk Backward',                    slug: 'Walk_Backward',                       category: 'walking'  },
+  { id: 'walk_backward_with_bow',           label: 'Walk Backward with Bow',           slug: 'Walk_Backward_with_Bow',              category: 'walking'  },
+  { id: 'walk_backward_with_bow_1',         label: 'Walk Backward with Bow 1',         slug: 'Walk_Backward_with_Bow_1',            category: 'walking'  },
+  { id: 'walk_backward_with_grenade',       label: 'Walk Backward with Grenade',       slug: 'Walk_Backward_with_Grenade',          category: 'walking'  },
+  { id: 'walk_backward_with_gun_1',         label: 'Walk Backward with Gun 1',         slug: 'Walk_Backward_with_Gun_1',            category: 'walking'  },
+  { id: 'walk_backward_with_sword',         label: 'Walk Backward with Sword',         slug: 'Walk_Backward_with_Sword',            category: 'walking'  },
+  { id: 'walk_backward_sword_shield',       label: 'Walk Backward with Sword & Shield',slug: 'Walk_Backward_with_Sword_%26_Shield', category: 'walking'  },
+  { id: 'walk_fight_back',                  label: 'Walk Fight Back',                  slug: 'Walk_Fight_Back',                     category: 'walking'  },
+  { id: 'walk_fight_forward',               label: 'Walk Fight Forward',               slug: 'Walk_Fight_Forward',                  category: 'walking'  },
+  { id: 'walk_with_umbrella',               label: 'Walk with Umbrella',               slug: 'Walk_with_Umbrella',                  category: 'walking'  },
+  { id: 'walk_with_walker_support',         label: 'Walk with Walker Support',         slug: 'Walk_with_Walker_Support',            category: 'walking'  },
+
+  // ── Running ──
+  { id: 'running',                          label: 'Running',                          slug: 'Running',                             category: 'running'  },
+  { id: 'sprint',                           label: 'Sprint',                           slug: 'Sprint',                              category: 'running'  },
+  { id: 'run_fast',                         label: 'Run Fast',                         slug: 'Run_Fast',                            category: 'running'  },
+  { id: 'run_backward',                     label: 'Run Backward',                     slug: 'Run_Backward',                        category: 'running'  },
+  { id: 'run_with_gun',                     label: 'Run with Gun',                     slug: 'Run_with_Gun',                        category: 'running'  },
+  { id: 'run_with_sword',                   label: 'Run with Sword',                   slug: 'Run_with_Sword',                      category: 'running'  },
+  { id: 'zombie_run',                       label: 'Zombie Run',                       slug: 'Zombie_Run',                          category: 'running'  },
+
+  // ── Idle / Locomotion base ──
+  { id: 'idle',                             label: 'Idle',                             slug: 'Idle',                                category: 'idle'     },
+  { id: 'idle_2',                           label: 'Idle 2',                           slug: 'Idle_2',                              category: 'idle'     },
+  { id: 'breathing_idle',                   label: 'Breathing Idle',                   slug: 'Breathing_Idle',                      category: 'idle'     },
+  { id: 'combat_idle',                      label: 'Combat Idle',                      slug: 'Combat_Idle',                         category: 'idle'     },
+  { id: 'sitting_idle',                     label: 'Sitting Idle',                     slug: 'Sitting_Idle',                        category: 'idle'     },
+  { id: 'jump',                             label: 'Jump',                             slug: 'Jump',                                category: 'idle'     },
+  { id: 'jump_forward',                     label: 'Jump Forward',                     slug: 'Jump_Forward',                        category: 'idle'     },
+
+  // ── Dance ──
+  { id: 'all_night_dance',                  label: 'All Night Dance',                  slug: 'All_Night_Dance',                     category: 'dance'    },
+  { id: 'boom_dance',                       label: 'Boom Dance',                       slug: 'Boom_Dance',                          category: 'dance'    },
+  { id: 'dance_hip_hop',                    label: 'Hip Hop Dance',                    slug: 'Hip_Hop_Dance',                       category: 'dance'    },
+  { id: 'breakdance',                       label: 'Breakdance',                       slug: 'Breakdance',                          category: 'dance'    },
+  { id: 'salsa_dance',                      label: 'Salsa Dance',                      slug: 'Salsa_Dance',                         category: 'dance'    },
+  { id: 'twerking',                         label: 'Twerking',                         slug: 'Twerking',                            category: 'dance'    },
+  { id: 'macarena',                         label: 'Macarena',                         slug: 'Macarena',                            category: 'dance'    },
+
+  // ── Gesture ──
+  { id: 'agree_gesture',                    label: 'Agree Gesture',                    slug: 'Agree_Gesture',                       category: 'gesture'  },
+  { id: 'alert',                            label: 'Alert',                            slug: 'Alert',                               category: 'gesture'  },
+  { id: 'wave',                             label: 'Wave',                             slug: 'Wave',                                category: 'gesture'  },
+  { id: 'bow',                              label: 'Bow',                              slug: 'Bow',                                 category: 'gesture'  },
+  { id: 'clap',                             label: 'Clap',                             slug: 'Clap',                                category: 'gesture'  },
+  { id: 'salute',                           label: 'Salute',                           slug: 'Salute',                              category: 'gesture'  },
+  { id: 'talking',                          label: 'Talking',                          slug: 'Talking',                             category: 'gesture'  },
+  { id: 'angry',                            label: 'Angry',                            slug: 'Angry',                               category: 'gesture'  },
+  { id: 'sad_idle',                         label: 'Sad Idle',                         slug: 'Sad_Idle',                            category: 'gesture'  },
+  { id: 'cheering',                         label: 'Cheering',                         slug: 'Cheering',                            category: 'gesture'  },
+  { id: 'pray',                             label: 'Pray',                             slug: 'Pray',                                category: 'gesture'  },
+  { id: 'thinking',                         label: 'Thinking',                         slug: 'Thinking',                            category: 'gesture'  },
+
+  // ── Combat ──
+  { id: 'attack',                           label: 'Attack',                           slug: 'Attack',                              category: 'combat'   },
+  { id: 'be_hit_flyup',                     label: 'BeHit FlyUp',                      slug: 'Be_Hit_Flyup',                        category: 'combat'   },
+  { id: 'boxing_practice',                  label: 'Boxing Practice',                  slug: 'Boxing_Practice',                     category: 'combat'   },
+  { id: 'kick',                             label: 'Kick',                             slug: 'Kick',                                category: 'combat'   },
+  { id: 'sword_slash',                      label: 'Sword Slash',                      slug: 'Sword_Slash',                         category: 'combat'   },
+  { id: 'shooting',                         label: 'Shooting',                         slug: 'Shooting',                            category: 'combat'   },
+  { id: 'blocking',                         label: 'Blocking',                         slug: 'Blocking',                            category: 'combat'   },
+  { id: 'punching',                         label: 'Punching',                         slug: 'Punching',                            category: 'combat'   },
+
+  // ── Action ──
+  { id: 'arise',                            label: 'Arise',                            slug: 'Arise',                               category: 'action'   },
+  { id: 'crouch',                           label: 'Crouch',                           slug: 'Crouch',                              category: 'action'   },
+  { id: 'dead',                             label: 'Dead',                             slug: 'Dead',                                category: 'action'   },
+  { id: 'falling',                          label: 'Falling',                          slug: 'Falling',                             category: 'action'   },
+  { id: 'roll',                             label: 'Roll',                             slug: 'Roll',                                category: 'action'   },
+  { id: 'sit_idle',                         label: 'Sit Idle',                         slug: 'Sit_Idle',                            category: 'action'   },
+  { id: 'pickup',                           label: 'Pick Up',                          slug: 'Pick_Up',                             category: 'action'   },
+  { id: 'climbing',                         label: 'Climbing',                         slug: 'Climbing',                            category: 'action'   },
+  { id: 'swimming',                         label: 'Swimming',                         slug: 'Swimming',                            category: 'action'   },
+];
+
+const ANIM_CATEGORIES = ['all', 'walking', 'running', 'idle', 'dance', 'gesture', 'combat', 'action'];
 
 // ─── Tooltip ──────────────────────────────────────────────────────────────
 function Tooltip({ text, children, side = 'top', delay = 300 }) {
@@ -259,7 +383,6 @@ function DownloadModal({ onClose, activeItem, color }) {
   return (
     <Modal title="Download Settings" onClose={onClose} width={340}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Resize */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ color: '#d1d5db', fontSize: 13, fontWeight: 600 }}>Resize</span>
@@ -272,8 +395,6 @@ function DownloadModal({ onClose, activeItem, color }) {
             <span style={{ position: 'absolute', top: 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.35)', transition: 'left 0.2s', left: resize ? 22 : 3 }} />
           </button>
         </div>
-
-        {/* Height + Unit + Fullscreen */}
         {resize && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{ color: '#9ca3af', fontSize: 11 }}>Height</span>
@@ -288,8 +409,6 @@ function DownloadModal({ onClose, activeItem, color }) {
             </div>
           </div>
         )}
-
-        {/* Origin */}
         {resize && (
           <div>
             <span style={{ color: '#9ca3af', fontSize: 11, display: 'block', marginBottom: 6 }}>Origin</span>
@@ -303,8 +422,6 @@ function DownloadModal({ onClose, activeItem, color }) {
             </div>
           </div>
         )}
-
-        {/* Format */}
         <div>
           <span style={{ color: '#9ca3af', fontSize: 11, display: 'block', marginBottom: 6 }}>Format</span>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
@@ -316,8 +433,6 @@ function DownloadModal({ onClose, activeItem, color }) {
             ))}
           </div>
         </div>
-
-        {/* Download button */}
         <button onClick={handleDownload}
           style={{ width: '100%', padding: '13px 0', borderRadius: 13, fontSize: 14, fontWeight: 800, color: '#0a0a0a', background: `linear-gradient(135deg,${color},#84cc16)`, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: `0 6px 24px ${color}55` }}>
           <Download style={{ width: 16, height: 16 }} /> Download
@@ -357,7 +472,6 @@ function EditTextureModal({ onClose, color, uvLayer, setUvLayer }) {
   const handleRetexture = async () => {
     if (retexturing) return;
     setRetexturing(true);
-    // Simulate retexture
     setTimeout(() => {
       setHistory((h) => [{ prompt: texturePrompt || 'Custom retexture', ts: Date.now() }, ...h]);
       setRetexturing(false);
@@ -367,9 +481,7 @@ function EditTextureModal({ onClose, color, uvLayer, setUvLayer }) {
   return (
     <Modal title="Edit Texture" onClose={onClose} width={900}>
       <div style={{ display: 'flex', gap: 0, height: 600 }}>
-        {/* Left panel */}
         <div style={{ width: 320, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 14, paddingRight: 20, borderRight: '1px solid rgba(255,255,255,0.07)', overflowY: 'auto' }}>
-          {/* History */}
           <div>
             <p style={{ color: '#9ca3af', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>History</p>
             <div style={{ minHeight: 80, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -383,33 +495,21 @@ function EditTextureModal({ onClose, color, uvLayer, setUvLayer }) {
               ))}
             </div>
           </div>
-
           <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
-
-          {/* Prompt */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <span style={{ color: '#9ca3af', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Prompt</span>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: color, fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}>
-                ↑ Import original prompt
-              </button>
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: color, fontSize: 10, fontWeight: 600 }}>↑ Import original prompt</button>
             </div>
             <div style={{ position: 'relative' }}>
               <textarea value={texturePrompt} onChange={(e) => setTexturePrompt(e.target.value.slice(0, 800))} placeholder="Describe the desired texture…" rows={4}
-                style={{ width: '100%', resize: 'none', borderRadius: 10, fontSize: 11, color: '#e5e7eb', lineHeight: 1.55, padding: '10px 10px 22px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                onFocus={(e) => { e.target.style.borderColor = `${color}55`; }}
-                onBlur={(e)  => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+                style={{ width: '100%', resize: 'none', borderRadius: 10, fontSize: 11, color: '#e5e7eb', lineHeight: 1.55, padding: '10px 10px 22px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
               <span style={{ position: 'absolute', bottom: 7, right: 9, color: '#4b5563', fontSize: 10 }}>{texturePrompt.length}/800</span>
             </div>
           </div>
-
-          {/* Strength */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ color: '#9ca3af', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Prompt Influence Strength</span>
-                <Tooltip text="Mennyire kövesse a textúra a promptot"><Info style={{ width: 11, height: 11, color: '#374151' }} /></Tooltip>
-              </div>
+              <span style={{ color: '#9ca3af', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Prompt Influence Strength</span>
               <span style={{ color: color, fontSize: 11, fontWeight: 700 }}>{Math.round(strength * 100)}%</span>
             </div>
             <div style={{ position: 'relative', height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)' }}>
@@ -417,14 +517,10 @@ function EditTextureModal({ onClose, color, uvLayer, setUvLayer }) {
               <input type="range" min={0} max={1} step={0.01} value={strength} onChange={(e) => setStrength(Number(e.target.value))} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', margin: 0 }} />
             </div>
           </div>
-
-          {/* Upload Image Reference */}
           <div>
             <p style={{ color: '#9ca3af', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Upload Image Reference</p>
             <div onClick={() => fileRef.current?.click()}
-              style={{ height: refPreview ? 'auto' : 90, borderRadius: 10, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.03)', border: '1.5px dashed rgba(255,255,255,0.12)', overflow: 'hidden', transition: 'all 0.2s', padding: refPreview ? 0 : 12 }}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); handleRefImage(e.dataTransfer.files[0]); }}>
+              style={{ height: refPreview ? 'auto' : 90, borderRadius: 10, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.03)', border: '1.5px dashed rgba(255,255,255,0.12)', overflow: 'hidden', padding: refPreview ? 0 : 12 }}>
               {refPreview ? (
                 <div style={{ position: 'relative', width: '100%' }}>
                   <img src={refPreview} alt="" style={{ width: '100%', objectFit: 'cover', borderRadius: 10, maxHeight: 120 }} />
@@ -443,17 +539,12 @@ function EditTextureModal({ onClose, color, uvLayer, setUvLayer }) {
             </div>
             <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleRefImage(e.target.files?.[0])} />
           </div>
-
-          {/* Retexture button */}
           <button onClick={handleRetexture} disabled={retexturing}
             style={{ width: '100%', padding: '11px 0', borderRadius: 12, fontSize: 13, fontWeight: 800, color: '#0a0a0a', background: retexturing ? 'rgba(132,204,22,0.4)' : 'linear-gradient(90deg,#a3e635,#65a30d)', border: 'none', cursor: retexturing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
             {retexturing ? <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Retexturing…</> : <><Paintbrush2 style={{ width: 14, height: 14 }} /> Retexture</>}
           </button>
         </div>
-
-        {/* Right preview */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingLeft: 20 }}>
-          {/* UV Layer tabs */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
             {UV_LAYERS.map((layer) => (
               <button key={layer.id} onClick={() => setUvLayer(layer.id)}
@@ -462,43 +553,20 @@ function EditTextureModal({ onClose, color, uvLayer, setUvLayer }) {
               </button>
             ))}
           </div>
-
-          {/* Texture preview area */}
           <div style={{ flex: 1, borderRadius: 14, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
             <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
             <div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
-              {retexturing ? (
-                <>
-                  <Loader2 style={{ width: 32, height: 32, color, animation: 'spin 1s linear infinite', marginBottom: 12 }} />
-                  <p style={{ color: '#6b7280', fontSize: 12 }}>Retexturing… kérjük várjon</p>
-                </>
-              ) : (
-                <>
-                  <div style={{ width: 60, height: 60, borderRadius: 16, background: `${color}20`, border: `1px solid ${color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                    <Image style={{ width: 26, height: 26, color }} />
-                  </div>
-                  <p style={{ color: '#4b5563', fontSize: 12 }}>
-                    {uvLayer === 'base_color' ? 'Alap színtextúra' : uvLayer === 'roughness' ? 'Érdességtérkép (Roughness)' : uvLayer === 'metallic' ? 'Fémes felület térkép' : uvLayer === 'normal' ? 'Normáltérkép' : 'Emissive (világítási) térkép'} előnézet
-                  </p>
-                  <p style={{ color: '#1f2937', fontSize: 11, marginTop: 4 }}>Generálj modellt a megtekintéshez</p>
-                </>
-              )}
+              <div style={{ width: 60, height: 60, borderRadius: 16, background: `${color}20`, border: `1px solid ${color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <Image style={{ width: 26, height: 26, color }} />
+              </div>
+              <p style={{ color: '#4b5563', fontSize: 12 }}>Textúra előnézet</p>
             </div>
           </div>
-
-          {/* Bottom toolbar */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12 }}>
             <div style={{ display: 'flex', gap: 6 }}>
-              {[
-                { tip: 'Kamera visszaállítása', icon: <Camera style={{ width: 14, height: 14 }} /> },
-                { tip: 'Drótváz', icon: <Grid3x3 style={{ width: 14, height: 14 }} /> },
-                { tip: 'UV szerkesztő', icon: <Layers style={{ width: 14, height: 14 }} /> },
-                { tip: 'Undo', icon: <RotateCcw style={{ width: 14, height: 14 }} /> },
-              ].map((btn, i) => (
+              {[{ tip: 'Kamera visszaállítása', icon: <Camera style={{ width: 14, height: 14 }} /> }, { tip: 'Drótváz', icon: <Grid3x3 style={{ width: 14, height: 14 }} /> }, { tip: 'UV szerkesztő', icon: <Layers style={{ width: 14, height: 14 }} /> }, { tip: 'Undo', icon: <RotateCcw style={{ width: 14, height: 14 }} /> }].map((btn, i) => (
                 <Tooltip key={i} text={btn.tip} side="top">
-                  <button style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}>
-                    {btn.icon}
-                  </button>
+                  <button style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}>{btn.icon}</button>
                 </Tooltip>
               ))}
             </div>
@@ -519,27 +587,17 @@ function RemeshModal({ onClose, color, params, setParam }) {
   const [polycountMode, setPolycountMode] = useState('fixed');
   const [polycountPreset, setPolycountPreset] = useState('10k');
   const [loading, setLoading] = useState(false);
-
   const PRESETS = ['Custom', '3K', '10K', '30K', '100K'];
   const PRESET_VALUES = { '3K': 3000, '10K': 10000, '30K': 30000, '100K': 100000 };
-
-  const handleConfirm = () => {
-    if (loading) return;
-    setLoading(true);
-    setTimeout(() => { setLoading(false); onClose(); }, 1500);
-  };
-
+  const handleConfirm = () => { if (loading) return; setLoading(true); setTimeout(() => { setLoading(false); onClose(); }, 1500); };
   return (
     <Modal title="Remesh" onClose={onClose} width={320}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        {/* Target Polycount */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
             <span style={{ color: '#d1d5db', fontSize: 13, fontWeight: 600 }}>Target Polycount</span>
             <span style={{ fontSize: 13 }}>👑</span>
-            <Tooltip text="A végső mesh maximális poligonszáma"><Info style={{ width: 12, height: 12, color: '#374151' }} /></Tooltip>
           </div>
-          {/* Fixed / Adaptive */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             {['fixed', 'adaptive'].map((m) => (
               <button key={m} onClick={() => setPolycountMode(m)}
@@ -548,7 +606,6 @@ function RemeshModal({ onClose, color, params, setParam }) {
               </button>
             ))}
           </div>
-          {/* Presets */}
           <div style={{ display: 'flex', gap: 6 }}>
             {PRESETS.map((p) => (
               <button key={p} onClick={() => { setPolycountPreset(p); if (PRESET_VALUES[p]) setParam('target_polycount', PRESET_VALUES[p]); }}
@@ -557,21 +614,9 @@ function RemeshModal({ onClose, color, params, setParam }) {
               </button>
             ))}
           </div>
-          {polycountPreset === 'Custom' && (
-            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ color: '#9ca3af', fontSize: 11 }}>Custom:</span>
-              <input type="number" value={params.target_polycount} onChange={(e) => setParam('target_polycount', Number(e.target.value))}
-                style={{ flex: 1, padding: '6px 10px', borderRadius: 9, fontSize: 12, color: '#e5e7eb', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', outline: 'none' }} />
-            </div>
-          )}
         </div>
-
-        {/* Topology */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
-            <span style={{ color: '#d1d5db', fontSize: 13, fontWeight: 600 }}>Topology</span>
-            <Tooltip text="Quad: négyzetes poligonok · Triangle: háromszögek"><Info style={{ width: 12, height: 12, color: '#374151' }} /></Tooltip>
-          </div>
+          <span style={{ color: '#d1d5db', fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 8 }}>Topology</span>
           <div style={{ display: 'flex', gap: 8 }}>
             {['quad', 'triangle'].map((t) => (
               <button key={t} onClick={() => setParam('topology', t)}
@@ -581,14 +626,10 @@ function RemeshModal({ onClose, color, params, setParam }) {
             ))}
           </div>
         </div>
-
-        {/* Info row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#6b7280', fontSize: 12 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock style={{ width: 12, height: 12 }} /> 1 min</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>🟡 0</span>
+          <span>🟡 0</span>
         </div>
-
-        {/* Confirm */}
         <button onClick={handleConfirm} disabled={loading}
           style={{ width: '100%', padding: '13px 0', borderRadius: 13, fontSize: 14, fontWeight: 800, color: '#0a0a0a', background: loading ? 'rgba(132,204,22,0.4)' : 'linear-gradient(90deg,#a3e635,#65a30d)', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
           {loading ? <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Remeshing…</> : '✓ Confirm'}
@@ -599,600 +640,112 @@ function RemeshModal({ onClose, color, params, setParam }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// ANIMATE MODAL — Meshy animation library + added list
+// ANIMATE MODAL — GIF previews from Meshy CDN
 // ══════════════════════════════════════════════════════════════════════════
 
-// ── Animated Mannequin — uses SVG SMIL animations for each pose ───────────
-// Each animation is defined as a set of keyframe "poses" (joint angles via
-// rotate transforms on <g> groups) that loop continuously.
-// Structure: torso pivot at (50,35), limbs hang from shoulder/hip joints.
-
-function MannequinSVG({ pose, size = 80, animColor = '#84cc16' }) {
-  // Unique ID prefix so multiple instances don't clash
-  const uid = `mn_${pose}_${size}`;
-
-  // We define each animation as an SVG with SMIL <animateTransform> on each limb group.
-  // All figures share the same body structure; only the animation values differ.
-  // Body structure (in 100×110 viewBox):
-  //   Head:  circle at (50, 14) r=9
-  //   Neck:  (50,23)→(50,28)
-  //   Torso: (50,28)→(50,52) — pivot at (50,28)
-  //   Hips:  (50,52)
-  //   LUpperArm: pivots at (50,32) → (38,44)
-  //   LForeArm:  pivots at (38,44) → (34,58)
-  //   RUpperArm: pivots at (50,32) → (62,44)
-  //   RForeArm:  pivots at (62,44) → (66,58)
-  //   LThigh:    pivots at (50,52) → (44,68)
-  //   LShin:     pivots at (44,68) → (42,84)
-  //   RThigh:    pivots at (50,52) → (56,68)
-  //   RShin:     pivots at (56,68) → (58,84)
-
-  // Animation configs: each limb gets { values: "deg;deg;deg", dur, begin }
-  // Angles are rotation degrees around the pivot point of each bone.
-  const ANIM = {
-    idle: {
-      torso:   { vals:'0;1;0;-1;0',            dur:'3s'  },
-      lUA:     { vals:'-8;-5;-8;-11;-8',        dur:'3s'  },
-      lFA:     { vals:'12;10;12;14;12',          dur:'3s'  },
-      rUA:     { vals:'8;11;8;5;8',             dur:'3s'  },
-      rFA:     { vals:'12;14;12;10;12',          dur:'3s'  },
-      lTh:     { vals:'2;3;2;1;2',              dur:'3s'  },
-      lSh:     { vals:'4;3;4;5;4',              dur:'3s'  },
-      rTh:     { vals:'-2;-1;-2;-3;-2',         dur:'3s'  },
-      rSh:     { vals:'4;5;4;3;4',              dur:'3s'  },
-      head:    { vals:'0;1;0;-1;0',             dur:'3s'  },
-    },
-    casual_walk: {
-      torso:   { vals:'4;0;-4;0;4',             dur:'0.9s' },
-      lUA:     { vals:'-30;0;30;0;-30',          dur:'0.9s' },
-      lFA:     { vals:'20;10;5;10;20',           dur:'0.9s' },
-      rUA:     { vals:'30;0;-30;0;30',           dur:'0.9s' },
-      rFA:     { vals:'5;10;20;10;5',            dur:'0.9s' },
-      lTh:     { vals:'35;10;-20;10;35',         dur:'0.9s' },
-      lSh:     { vals:'-20;-5;0;-5;-20',         dur:'0.9s' },
-      rTh:     { vals:'-20;10;35;10;-20',        dur:'0.9s' },
-      rSh:     { vals:'0;-5;-20;-5;0',           dur:'0.9s' },
-      head:    { vals:'-2;0;2;0;-2',             dur:'0.9s' },
-    },
-    run3: {
-      torso:   { vals:'8;0;-8;0;8',             dur:'0.55s' },
-      lUA:     { vals:'-50;-10;40;-10;-50',      dur:'0.55s' },
-      lFA:     { vals:'30;10;5;10;30',           dur:'0.55s' },
-      rUA:     { vals:'40;-10;-50;-10;40',       dur:'0.55s' },
-      rFA:     { vals:'5;10;30;10;5',            dur:'0.55s' },
-      lTh:     { vals:'50;20;-30;20;50',         dur:'0.55s' },
-      lSh:     { vals:'-30;-10;5;-10;-30',       dur:'0.55s' },
-      rTh:     { vals:'-30;20;50;20;-30',        dur:'0.55s' },
-      rSh:     { vals:'5;-10;-30;-10;5',         dur:'0.55s' },
-      head:    { vals:'5;0;-5;0;5',              dur:'0.55s' },
-    },
-    jump: {
-      torso:   { vals:'-5;-8;0;-8;-5',          dur:'1.1s' },
-      lUA:     { vals:'-80;-60;-20;-60;-80',     dur:'1.1s' },
-      lFA:     { vals:'-20;-30;-10;-30;-20',     dur:'1.1s' },
-      rUA:     { vals:'-80;-60;-20;-60;-80',     dur:'1.1s' },
-      rFA:     { vals:'-20;-30;-10;-30;-20',     dur:'1.1s' },
-      lTh:     { vals:'-20;-40;20;-40;-20',      dur:'1.1s' },
-      lSh:     { vals:'40;60;0;60;40',           dur:'1.1s' },
-      rTh:     { vals:'-20;-40;20;-40;-20',      dur:'1.1s' },
-      rSh:     { vals:'40;60;0;60;40',           dur:'1.1s' },
-      head:    { vals:'-5;-8;0;-8;-5',           dur:'1.1s' },
-    },
-    all_night_dance: {
-      torso:   { vals:'10;-5;-10;5;10',          dur:'0.7s' },
-      lUA:     { vals:'-90;-60;-110;-60;-90',    dur:'0.7s' },
-      lFA:     { vals:'-30;-60;-10;-60;-30',     dur:'0.7s' },
-      rUA:     { vals:'60;90;40;90;60',           dur:'0.7s' },
-      rFA:     { vals:'40;20;60;20;40',           dur:'0.7s' },
-      lTh:     { vals:'-15;10;-25;10;-15',        dur:'0.7s' },
-      lSh:     { vals:'30;10;50;10;30',           dur:'0.7s' },
-      rTh:     { vals:'20;-10;30;-10;20',         dur:'0.7s' },
-      rSh:     { vals:'10;40;5;40;10',            dur:'0.7s' },
-      head:    { vals:'10;-5;-10;5;10',           dur:'0.7s' },
-    },
-    boom_dance: {
-      torso:   { vals:'15;-10;15;-10;15',         dur:'0.65s' },
-      lUA:     { vals:'-40;-80;-20;-80;-40',      dur:'0.65s' },
-      lFA:     { vals:'-40;-80;-20;-80;-40',      dur:'0.65s' },
-      rUA:     { vals:'80;40;100;40;80',           dur:'0.65s' },
-      rFA:     { vals:'60;20;80;20;60',            dur:'0.65s' },
-      lTh:     { vals:'20;-10;30;-10;20',          dur:'0.65s' },
-      lSh:     { vals:'-20;10;-30;10;-20',         dur:'0.65s' },
-      rTh:     { vals:'-20;10;-30;10;-20',         dur:'0.65s' },
-      rSh:     { vals:'10;-20;20;-20;10',          dur:'0.65s' },
-      head:    { vals:'10;-15;10;-15;10',          dur:'0.65s' },
-    },
-    dance_hip_hop: {
-      torso:   { vals:'0;12;0;-12;0',             dur:'0.5s' },
-      lUA:     { vals:'-70;-30;-90;-30;-70',       dur:'0.5s' },
-      lFA:     { vals:'-50;-20;-70;-20;-50',       dur:'0.5s' },
-      rUA:     { vals:'30;70;10;70;30',            dur:'0.5s' },
-      rFA:     { vals:'20;50;10;50;20',            dur:'0.5s' },
-      lTh:     { vals:'10;30;-10;30;10',           dur:'0.5s' },
-      lSh:     { vals:'-10;-30;10;-30;-10',        dur:'0.5s' },
-      rTh:     { vals:'-10;-30;10;-30;-10',        dur:'0.5s' },
-      rSh:     { vals:'10;30;-10;30;10',           dur:'0.5s' },
-      head:    { vals:'0;8;0;-8;0',               dur:'0.5s' },
-    },
-    attack: {
-      torso:   { vals:'15;5;15;5;15',             dur:'0.4s' },
-      lUA:     { vals:'-20;-50;-10;-50;-20',       dur:'0.4s' },
-      lFA:     { vals:'10;30;5;30;10',             dur:'0.4s' },
-      rUA:     { vals:'70;20;80;20;70',            dur:'0.4s' },
-      rFA:     { vals:'-20;40;-30;40;-20',         dur:'0.4s' },
-      lTh:     { vals:'20;10;25;10;20',            dur:'0.4s' },
-      lSh:     { vals:'-10;-5;-15;-5;-10',         dur:'0.4s' },
-      rTh:     { vals:'-15;-5;-20;-5;-15',         dur:'0.4s' },
-      rSh:     { vals:'5;15;0;15;5',              dur:'0.4s' },
-      head:    { vals:'10;5;10;5;10',              dur:'0.4s' },
-    },
-    boxing_practice: {
-      torso:   { vals:'10;-10;10;-10;10',          dur:'0.45s' },
-      lUA:     { vals:'50;10;70;10;50',            dur:'0.45s' },
-      lFA:     { vals:'-30;-60;-10;-60;-30',       dur:'0.45s' },
-      rUA:     { vals:'10;50;-10;50;10',           dur:'0.45s' },
-      rFA:     { vals:'-60;-30;-80;-30;-60',       dur:'0.45s' },
-      lTh:     { vals:'15;5;20;5;15',             dur:'0.45s' },
-      lSh:     { vals:'-10;-5;-15;-5;-10',        dur:'0.45s' },
-      rTh:     { vals:'-10;-5;-15;-5;-10',        dur:'0.45s' },
-      rSh:     { vals:'5;15;0;15;5',              dur:'0.45s' },
-      head:    { vals:'0;8;0;-8;0',               dur:'0.45s' },
-    },
-    kick: {
-      torso:   { vals:'-5;-15;-5;-15;-5',          dur:'0.6s' },
-      lUA:     { vals:'-20;-40;-10;-40;-20',        dur:'0.6s' },
-      lFA:     { vals:'20;30;10;30;20',             dur:'0.6s' },
-      rUA:     { vals:'30;10;40;10;30',             dur:'0.6s' },
-      rFA:     { vals:'10;30;5;30;10',              dur:'0.6s' },
-      lTh:     { vals:'20;10;30;10;20',             dur:'0.6s' },
-      lSh:     { vals:'-10;-5;-15;-5;-10',          dur:'0.6s' },
-      rTh:     { vals:'-70;-30;-90;-30;-70',        dur:'0.6s' },
-      rSh:     { vals:'80;40;100;40;80',            dur:'0.6s' },
-      head:    { vals:'-5;-10;-5;-10;-5',           dur:'0.6s' },
-    },
-    wave: {
-      torso:   { vals:'0;2;0;-2;0',               dur:'2s'   },
-      lUA:     { vals:'-10;-5;-10;-15;-10',        dur:'2s'   },
-      lFA:     { vals:'15;10;15;20;15',            dur:'2s'   },
-      rUA:     { vals:'-80;-110;-80;-60;-80',      dur:'0.6s' },
-      rFA:     { vals:'-30;-50;-20;-50;-30',       dur:'0.6s' },
-      lTh:     { vals:'2;4;2;0;2',                dur:'2s'   },
-      lSh:     { vals:'4;2;4;6;4',                dur:'2s'   },
-      rTh:     { vals:'-2;0;-2;-4;-2',            dur:'2s'   },
-      rSh:     { vals:'4;6;4;2;4',                dur:'2s'   },
-      head:    { vals:'10;15;10;5;10',             dur:'0.6s' },
-    },
-    clap: {
-      torso:   { vals:'0;3;0;-3;0',               dur:'0.5s' },
-      lUA:     { vals:'40;50;35;50;40',            dur:'0.5s' },
-      lFA:     { vals:'-60;-40;-70;-40;-60',       dur:'0.5s' },
-      rUA:     { vals:'40;50;35;50;40',            dur:'0.5s' },
-      rFA:     { vals:'-60;-40;-70;-40;-60',       dur:'0.5s' },
-      lTh:     { vals:'5;3;5;7;5',                dur:'0.5s' },
-      lSh:     { vals:'5;7;5;3;5',                dur:'0.5s' },
-      rTh:     { vals:'-5;-3;-5;-7;-5',           dur:'0.5s' },
-      rSh:     { vals:'5;3;5;7;5',                dur:'0.5s' },
-      head:    { vals:'0;5;0;-5;0',               dur:'0.5s' },
-    },
-    agree_gesture: {
-      torso:   { vals:'0;3;0;-3;0',               dur:'1.2s' },
-      lUA:     { vals:'-15;-10;-20;-10;-15',       dur:'1.2s' },
-      lFA:     { vals:'20;15;25;15;20',            dur:'1.2s' },
-      rUA:     { vals:'-60;-80;-50;-80;-60',       dur:'0.5s' },
-      rFA:     { vals:'-40;-20;-50;-20;-40',       dur:'0.5s' },
-      lTh:     { vals:'5;3;5;7;5',                dur:'1.2s' },
-      lSh:     { vals:'5;7;5;3;5',                dur:'1.2s' },
-      rTh:     { vals:'-5;-7;-5;-3;-5',           dur:'1.2s' },
-      rSh:     { vals:'5;3;5;7;5',                dur:'1.2s' },
-      head:    { vals:'5;8;3;8;5',                dur:'0.5s' },
-    },
-    salute: {
-      torso:   { vals:'0;1;0;-1;0',               dur:'2s'   },
-      lUA:     { vals:'-10;-8;-10;-12;-10',        dur:'2s'   },
-      lFA:     { vals:'15;12;15;18;15',            dur:'2s'   },
-      rUA:     { vals:'-90;-85;-90;-95;-90',       dur:'1.5s' },
-      rFA:     { vals:'0;5;0;-5;0',               dur:'1.5s' },
-      lTh:     { vals:'2;3;2;1;2',                dur:'2s'   },
-      lSh:     { vals:'4;3;4;5;4',                dur:'2s'   },
-      rTh:     { vals:'-2;-1;-2;-3;-2',           dur:'2s'   },
-      rSh:     { vals:'4;5;4;3;4',                dur:'2s'   },
-      head:    { vals:'8;10;8;6;8',               dur:'1.5s' },
-    },
-    bow: {
-      torso:   { vals:'50;45;50;55;50',            dur:'2s'   },
-      lUA:     { vals:'30;25;30;35;30',            dur:'2s'   },
-      lFA:     { vals:'10;8;10;12;10',             dur:'2s'   },
-      rUA:     { vals:'30;25;30;35;30',            dur:'2s'   },
-      rFA:     { vals:'10;8;10;12;10',             dur:'2s'   },
-      lTh:     { vals:'10;8;10;12;10',             dur:'2s'   },
-      lSh:     { vals:'-5;-3;-5;-7;-5',           dur:'2s'   },
-      rTh:     { vals:'10;8;10;12;10',             dur:'2s'   },
-      rSh:     { vals:'-5;-3;-5;-7;-5',           dur:'2s'   },
-      head:    { vals:'0;-5;0;5;0',               dur:'2s'   },
-    },
-    crouch: {
-      torso:   { vals:'10;12;8;12;10',             dur:'1.8s' },
-      lUA:     { vals:'10;5;15;5;10',             dur:'1.8s' },
-      lFA:     { vals:'20;15;25;15;20',            dur:'1.8s' },
-      rUA:     { vals:'10;15;5;15;10',             dur:'1.8s' },
-      rFA:     { vals:'20;25;15;25;20',            dur:'1.8s' },
-      lTh:     { vals:'60;55;65;55;60',            dur:'1.8s' },
-      lSh:     { vals:'-50;-45;-55;-45;-50',       dur:'1.8s' },
-      rTh:     { vals:'60;65;55;65;60',            dur:'1.8s' },
-      rSh:     { vals:'-50;-55;-45;-55;-50',       dur:'1.8s' },
-      head:    { vals:'0;2;0;-2;0',               dur:'1.8s' },
-    },
-    sneak_walk: {
-      torso:   { vals:'20;22;18;22;20',            dur:'1s'   },
-      lUA:     { vals:'10;-10;20;-10;10',          dur:'1s'   },
-      lFA:     { vals:'30;10;40;10;30',            dur:'1s'   },
-      rUA:     { vals:'-10;10;-20;10;-10',         dur:'1s'   },
-      rFA:     { vals:'10;30;5;30;10',             dur:'1s'   },
-      lTh:     { vals:'30;60;10;60;30',            dur:'1s'   },
-      lSh:     { vals:'-20;-40;-5;-40;-20',        dur:'1s'   },
-      rTh:     { vals:'60;30;80;30;60',            dur:'1s'   },
-      rSh:     { vals:'-40;-20;-55;-20;-40',       dur:'1s'   },
-      head:    { vals:'10;12;8;12;10',             dur:'1s'   },
-    },
-    sit_idle: {
-      torso:   { vals:'0;2;0;-2;0',               dur:'4s'   },
-      lUA:     { vals:'20;18;20;22;20',            dur:'4s'   },
-      lFA:     { vals:'30;28;32;28;30',            dur:'4s'   },
-      rUA:     { vals:'20;22;18;22;20',            dur:'4s'   },
-      rFA:     { vals:'30;32;28;32;30',            dur:'4s'   },
-      lTh:     { vals:'90;88;90;92;90',            dur:'4s'   },
-      lSh:     { vals:'-80;-78;-80;-82;-80',       dur:'4s'   },
-      rTh:     { vals:'90;92;88;92;90',            dur:'4s'   },
-      rSh:     { vals:'-80;-82;-78;-82;-80',       dur:'4s'   },
-      head:    { vals:'0;3;0;-3;0',               dur:'4s'   },
-    },
-    falling: {
-      torso:   { vals:'-60;-50;-70;-50;-60',       dur:'0.8s' },
-      lUA:     { vals:'-80;-60;-100;-60;-80',      dur:'0.8s' },
-      lFA:     { vals:'-40;-20;-60;-20;-40',       dur:'0.8s' },
-      rUA:     { vals:'-60;-80;-40;-80;-60',       dur:'0.8s' },
-      rFA:     { vals:'-60;-40;-80;-40;-60',       dur:'0.8s' },
-      lTh:     { vals:'-30;-10;-50;-10;-30',       dur:'0.8s' },
-      lSh:     { vals:'30;50;10;50;30',            dur:'0.8s' },
-      rTh:     { vals:'-50;-70;-30;-70;-50',       dur:'0.8s' },
-      rSh:     { vals:'60;40;80;40;60',            dur:'0.8s' },
-      head:    { vals:'-50;-40;-60;-40;-50',       dur:'0.8s' },
-    },
-    dead: {
-      torso:   { vals:'90;88;90;92;90',            dur:'5s'   },
-      lUA:     { vals:'80;78;80;82;80',            dur:'5s'   },
-      lFA:     { vals:'20;18;20;22;20',            dur:'5s'   },
-      rUA:     { vals:'100;98;100;102;100',         dur:'5s'   },
-      rFA:     { vals:'30;28;30;32;30',            dur:'5s'   },
-      lTh:     { vals:'20;18;20;22;20',            dur:'5s'   },
-      lSh:     { vals:'10;8;10;12;10',             dur:'5s'   },
-      rTh:     { vals:'30;28;30;32;30',            dur:'5s'   },
-      rSh:     { vals:'15;13;15;17;15',            dur:'5s'   },
-      head:    { vals:'90;88;90;92;90',            dur:'5s'   },
-    },
-    be_hit_flyup: {
-      torso:   { vals:'-30;-20;-40;-20;-30',       dur:'0.7s' },
-      lUA:     { vals:'-60;-80;-40;-80;-60',       dur:'0.7s' },
-      lFA:     { vals:'-30;-50;-10;-50;-30',       dur:'0.7s' },
-      rUA:     { vals:'-80;-60;-100;-60;-80',      dur:'0.7s' },
-      rFA:     { vals:'-50;-30;-70;-30;-50',       dur:'0.7s' },
-      lTh:     { vals:'-40;-20;-60;-20;-40',       dur:'0.7s' },
-      lSh:     { vals:'20;40;0;40;20',             dur:'0.7s' },
-      rTh:     { vals:'-60;-40;-80;-40;-60',       dur:'0.7s' },
-      rSh:     { vals:'50;30;70;30;50',            dur:'0.7s' },
-      head:    { vals:'-20;-10;-30;-10;-20',       dur:'0.7s' },
-    },
-    arise: {
-      torso:   { vals:'-10;-5;-15;-5;-10',         dur:'1.5s' },
-      lUA:     { vals:'-100;-80;-120;-80;-100',     dur:'1.5s' },
-      lFA:     { vals:'-30;-10;-50;-10;-30',        dur:'1.5s' },
-      rUA:     { vals:'-100;-120;-80;-120;-100',    dur:'1.5s' },
-      rFA:     { vals:'-30;-50;-10;-50;-30',        dur:'1.5s' },
-      lTh:     { vals:'-10;-5;-15;-5;-10',          dur:'1.5s' },
-      lSh:     { vals:'10;8;12;8;10',              dur:'1.5s' },
-      rTh:     { vals:'-10;-15;-5;-15;-10',         dur:'1.5s' },
-      rSh:     { vals:'10;12;8;12;10',             dur:'1.5s' },
-      head:    { vals:'-10;-5;-15;-5;-10',          dur:'1.5s' },
-    },
-    alert: {
-      torso:   { vals:'0;2;0;-2;0',               dur:'1.5s' },
-      lUA:     { vals:'30;25;35;25;30',            dur:'1.5s' },
-      lFA:     { vals:'-20;-15;-25;-15;-20',       dur:'1.5s' },
-      rUA:     { vals:'30;35;25;35;30',            dur:'1.5s' },
-      rFA:     { vals:'-20;-25;-15;-25;-20',       dur:'1.5s' },
-      lTh:     { vals:'10;8;12;8;10',              dur:'1.5s' },
-      lSh:     { vals:'-5;-3;-7;-3;-5',           dur:'1.5s' },
-      rTh:     { vals:'10;12;8;12;10',             dur:'1.5s' },
-      rSh:     { vals:'-5;-7;-3;-7;-5',           dur:'1.5s' },
-      head:    { vals:'5;8;2;8;5',                dur:'0.6s' },
-    },
-    roll: {
-      torso:   { vals:'0;90;180;270;360',          dur:'1.4s' },
-      lUA:     { vals:'-50;-80;-120;-80;-50',      dur:'1.4s' },
-      lFA:     { vals:'-30;-60;-90;-60;-30',       dur:'1.4s' },
-      rUA:     { vals:'-50;-80;-120;-80;-50',      dur:'1.4s' },
-      rFA:     { vals:'-30;-60;-90;-60;-30',       dur:'1.4s' },
-      lTh:     { vals:'60;90;120;90;60',           dur:'1.4s' },
-      lSh:     { vals:'-40;-70;-100;-70;-40',      dur:'1.4s' },
-      rTh:     { vals:'60;90;120;90;60',           dur:'1.4s' },
-      rSh:     { vals:'-40;-70;-100;-70;-40',      dur:'1.4s' },
-      head:    { vals:'0;90;180;270;360',          dur:'1.4s' },
-    },
-  };
-
-  const a = ANIM[pose] || ANIM.idle;
-
-  // Helper: SMIL animateTransform rotating around a pivot point
-  const AT = ({ vals, dur, begin = '0s', pivot }) => (
-    <animateTransform
-      attributeName="transform"
-      type="rotate"
-      values={vals.split(';').map(v => `${v} ${pivot[0]} ${pivot[1]}`).join(';')}
-      dur={dur}
-      begin={begin}
-      repeatCount="indefinite"
-      calcMode="spline"
-      keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"
-    />
-  );
-
-  const C = { // clay colors with shading
-    bodyLight: '#d6cec4',
-    body:      '#c4bbb0',
-    bodyDark:  '#a8a098',
-    joint:     '#8e8880',
-    shadow:    'rgba(0,0,0,0.3)',
-  };
-
-  const W = { torso: 9, upper: 7, lower: 6, head: 9 }; // stroke widths (at 100px)
-  const sc = size / 100;
-
-  // Limb segment renderer — draws a rounded stroke bone with end-cap spheres
-  const Bone = ({ x1, y1, x2, y2, w, light = false }) => (
-    <g>
-      <line x1={x1} y1={y1} x2={x2} y2={y2}
-        stroke={light ? C.bodyLight : C.body}
-        strokeWidth={w} strokeLinecap="round" />
-      <circle cx={x2} cy={y2} r={w * 0.55} fill={C.joint} />
-    </g>
-  );
-
-  return (
-    <svg
-      width={size} height={size}
-      viewBox="0 0 100 100"
-      style={{ display: 'block', overflow: 'visible' }}
-    >
-      <defs>
-        <filter id={`${uid}_shadow`} x="-30%" y="-30%" width="160%" height="160%">
-          <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="rgba(0,0,0,0.4)" />
-        </filter>
-        <radialGradient id={`${uid}_headGrad`} cx="40%" cy="35%" r="60%">
-          <stop offset="0%" stopColor={C.bodyLight} />
-          <stop offset="100%" stopColor={C.bodyDark} />
-        </radialGradient>
-        <radialGradient id={`${uid}_limbGrad`} cx="30%" cy="30%" r="70%">
-          <stop offset="0%" stopColor={C.body} />
-          <stop offset="100%" stopColor={C.bodyDark} />
-        </radialGradient>
-      </defs>
-
-      {/* Ground shadow */}
-      <ellipse cx="50" cy="97" rx="18" ry="3" fill={C.shadow} />
-
-      {/* ── Root group — whole body wobbles slightly ── */}
-      <g filter={`url(#${uid}_shadow)`}>
-
-        {/* ── Torso (pivots at shoulder line 50,32) ── */}
-        <g>
-          <AT vals={a.torso.vals} dur={a.torso.dur} pivot={[50,32]} />
-
-          {/* Spine */}
-          <line x1="50" y1="28" x2="50" y2="52"
-            stroke={C.body} strokeWidth={W.torso} strokeLinecap="round" />
-          {/* Chest sphere */}
-          <circle cx="50" cy="36" r="5.5" fill={C.bodyLight} opacity="0.6" />
-
-          {/* Hips */}
-          <line x1="40" y1="52" x2="60" y2="52"
-            stroke={C.bodyDark} strokeWidth={W.upper * 0.85} strokeLinecap="round" />
-
-          {/* Shoulders */}
-          <line x1="36" y1="32" x2="64" y2="32"
-            stroke={C.body} strokeWidth={W.torso * 0.75} strokeLinecap="round" />
-          <circle cx="36" cy="32" r="3.5" fill={C.joint} />
-          <circle cx="64" cy="32" r="3.5" fill={C.joint} />
-          <circle cx="40" cy="52" r="3.5" fill={C.joint} />
-          <circle cx="60" cy="52" r="3.5" fill={C.joint} />
-
-          {/* ── Head ── */}
-          <g>
-            <AT vals={a.head.vals} dur={a.head.dur} pivot={[50,24]} />
-            {/* Neck */}
-            <line x1="50" y1="23" x2="50" y2="27"
-              stroke={C.bodyDark} strokeWidth="5" strokeLinecap="round" />
-            {/* Head sphere */}
-            <circle cx="50" cy="15" r={W.head}
-              fill={`url(#${uid}_headGrad)`}
-              stroke={C.bodyDark} strokeWidth="0.8" />
-            {/* Highlight */}
-            <circle cx="46" cy="12" r="3.5" fill="rgba(255,255,255,0.22)" />
-          </g>
-
-          {/* ── Left Upper Arm (pivots at left shoulder 36,32) ── */}
-          <g>
-            <AT vals={a.lUA.vals} dur={a.lUA.dur} pivot={[36,32]} />
-            <line x1="36" y1="32" x2="30" y2="46"
-              stroke={C.bodyDark} strokeWidth={W.upper} strokeLinecap="round" />
-            <circle cx="30" cy="46" r="3.2" fill={C.joint} />
-
-            {/* ── Left Forearm (pivots at left elbow 30,46) ── */}
-            <g>
-              <AT vals={a.lFA.vals} dur={a.lFA.dur} pivot={[30,46]} />
-              <line x1="30" y1="46" x2="26" y2="60"
-                stroke={C.bodyDark} strokeWidth={W.lower} strokeLinecap="round" />
-              <circle cx="26" cy="60" r="2.5" fill={C.joint} />
-              {/* Hand */}
-              <circle cx="24" cy="63" r="2.8" fill={C.body} />
-            </g>
-          </g>
-
-          {/* ── Right Upper Arm (pivots at right shoulder 64,32) ── */}
-          <g>
-            <AT vals={a.rUA.vals} dur={a.rUA.dur} pivot={[64,32]} />
-            <line x1="64" y1="32" x2="70" y2="46"
-              stroke={C.body} strokeWidth={W.upper} strokeLinecap="round" />
-            <circle cx="70" cy="46" r="3.2" fill={C.joint} />
-
-            {/* ── Right Forearm ── */}
-            <g>
-              <AT vals={a.rFA.vals} dur={a.rFA.dur} pivot={[70,46]} />
-              <line x1="70" y1="46" x2="74" y2="60"
-                stroke={C.body} strokeWidth={W.lower} strokeLinecap="round" />
-              <circle cx="74" cy="60" r="2.5" fill={C.joint} />
-              {/* Hand */}
-              <circle cx="76" cy="63" r="2.8" fill={C.bodyLight} />
-            </g>
-          </g>
-
-          {/* ── Left Thigh (pivots at left hip 44,52) ── */}
-          <g>
-            <AT vals={a.lTh.vals} dur={a.lTh.dur} pivot={[44,52]} />
-            <line x1="44" y1="52" x2="40" y2="68"
-              stroke={C.bodyDark} strokeWidth={W.upper} strokeLinecap="round" />
-            <circle cx="40" cy="68" r="3.2" fill={C.joint} />
-
-            {/* ── Left Shin ── */}
-            <g>
-              <AT vals={a.lSh.vals} dur={a.lSh.dur} pivot={[40,68]} />
-              <line x1="40" y1="68" x2="38" y2="84"
-                stroke={C.bodyDark} strokeWidth={W.lower} strokeLinecap="round" />
-              <circle cx="38" cy="84" r="2.5" fill={C.joint} />
-              {/* Foot */}
-              <ellipse cx="35" cy="86" rx="5" ry="2.5" fill={C.bodyDark} />
-            </g>
-          </g>
-
-          {/* ── Right Thigh (pivots at right hip 56,52) ── */}
-          <g>
-            <AT vals={a.rTh.vals} dur={a.rTh.dur} pivot={[56,52]} />
-            <line x1="56" y1="52" x2="60" y2="68"
-              stroke={C.body} strokeWidth={W.upper} strokeLinecap="round" />
-            <circle cx="60" cy="68" r="3.2" fill={C.joint} />
-
-            {/* ── Right Shin ── */}
-            <g>
-              <AT vals={a.rSh.vals} dur={a.rSh.dur} pivot={[60,68]} />
-              <line x1="60" y1="68" x2="62" y2="84"
-                stroke={C.body} strokeWidth={W.lower} strokeLinecap="round" />
-              <circle cx="62" cy="84" r="2.5" fill={C.joint} />
-              {/* Foot */}
-              <ellipse cx="65" cy="86" rx="5" ry="2.5" fill={C.body} />
-            </g>
-          </g>
-        </g>
-      </g>
-
-      {/* Color ring glow at base when active */}
-      <ellipse cx="50" cy="97" rx="14" ry="2.5"
-        fill="none" stroke={animColor} strokeWidth="1.5" opacity="0.6">
-        <animate attributeName="opacity" values="0.6;1;0.6" dur="1.2s" repeatCount="indefinite" />
-        <animate attributeName="rx" values="14;16;14" dur="1.2s" repeatCount="indefinite" />
-      </ellipse>
-    </svg>
-  );
-}
-
-const ANIMATION_LIBRARY = [
-  { id: 'agree_gesture',    label: 'Agree Gesture',   category: 'gesture'   },
-  { id: 'alert',            label: 'Alert',           category: 'gesture'   },
-  { id: 'all_night_dance',  label: 'All Night Dance', category: 'dance'     },
-  { id: 'arise',            label: 'Arise',           category: 'action'    },
-  { id: 'attack',           label: 'Attack',          category: 'combat'    },
-  { id: 'be_hit_flyup',     label: 'BeHit FlyUp',     category: 'combat'    },
-  { id: 'boom_dance',       label: 'Boom Dance',      category: 'dance'     },
-  { id: 'boxing_practice',  label: 'Boxing Practice', category: 'combat'    },
-  { id: 'casual_walk',      label: 'Casual Walk',     category: 'locomotion'},
-  { id: 'dead',             label: 'Dead',            category: 'action'    },
-  { id: 'idle',             label: 'Idle',            category: 'locomotion'},
-  { id: 'run3',             label: 'Run 3',           category: 'locomotion'},
-  { id: 'jump',             label: 'Jump',            category: 'locomotion'},
-  { id: 'wave',             label: 'Wave',            category: 'gesture'   },
-  { id: 'bow',              label: 'Bow',             category: 'gesture'   },
-  { id: 'clap',             label: 'Clap',            category: 'gesture'   },
-  { id: 'crouch',           label: 'Crouch',          category: 'action'    },
-  { id: 'dance_hip_hop',    label: 'Hip Hop Dance',   category: 'dance'     },
-  { id: 'falling',          label: 'Falling',         category: 'action'    },
-  { id: 'kick',             label: 'Kick',            category: 'combat'    },
-  { id: 'roll',             label: 'Roll',            category: 'action'    },
-  { id: 'salute',           label: 'Salute',          category: 'gesture'   },
-  { id: 'sit_idle',         label: 'Sit Idle',        category: 'locomotion'},
-  { id: 'sneak_walk',       label: 'Sneak Walk',      category: 'locomotion'},
-];
-
-const ANIM_CATEGORIES = ['all', 'locomotion', 'dance', 'gesture', 'combat', 'action'];
-
-// ── AnimCard — hover reveals "+ Add" button overlay ───────────────────────
-function AnimCard({ anim, isAdded, isLoading, isPlaying, color, onPlay, onAdd }) {
+// ── AnimCard — GIF thumbnail with hover overlay ───────────────────────────
+function AnimCard({ anim, isAdded, isLoading, color, onAdd }) {
   const [hovered, setHovered] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ borderRadius: 10, overflow: 'hidden', border: `1px solid ${isAdded ? color + '50' : hovered ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.07)'}`, background: isAdded ? `${color}12` : hovered ? 'rgba(255,255,255,0.05)' : '#111120', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', position: 'relative' }}>
+      style={{
+        borderRadius: 10,
+        overflow: 'hidden',
+        border: `1px solid ${isAdded ? color + '60' : hovered ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.07)'}`,
+        background: isAdded ? `${color}14` : hovered ? 'rgba(255,255,255,0.05)' : '#111120',
+        cursor: 'pointer',
+        transition: 'border-color 0.15s, background 0.15s',
+        position: 'relative',
+      }}>
 
-      {/* Thumbnail area — mannequin figure */}
-      <div style={{ height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', background: hovered ? '#1c1c30' : '#141422', position: 'relative', transition: 'background 0.2s' }}
-        onClick={onPlay}>
-        <MannequinSVG pose={anim.id} size={84} animColor={color} />
+      {/* Thumbnail — GIF from Meshy CDN */}
+      <div
+        style={{
+          height: 100,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: hovered ? '#1c1c30' : '#141422',
+          position: 'relative',
+          overflow: 'hidden',
+          transition: 'background 0.2s',
+        }}>
+        {!imgError ? (
+          <img
+            src={getAnimGifUrl(anim.slug)}
+            alt={anim.label}
+            onError={() => setImgError(true)}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
+        ) : (
+          // Fallback when GIF fails to load
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <PersonStanding style={{ width: 28, height: 28, color: '#2d3748' }} />
+            <span style={{ color: '#2d3748', fontSize: 9, textAlign: 'center', padding: '0 4px' }}>{anim.label}</span>
+          </div>
+        )}
 
         {/* "Added" badge top-right */}
         {isAdded && (
-          <div style={{ position: 'absolute', top: 5, right: 5, fontSize: 9, fontWeight: 800, color: color, background: `${color}20`, border: `1px solid ${color}50`, borderRadius: 999, padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 3 }}>
+          <div style={{
+            position: 'absolute', top: 5, right: 5,
+            fontSize: 9, fontWeight: 800, color: color,
+            background: `${color}25`, border: `1px solid ${color}55`,
+            borderRadius: 999, padding: '2px 6px',
+            display: 'flex', alignItems: 'center', gap: 3,
+          }}>
             <Check style={{ width: 8, height: 8 }} /> Added
           </div>
         )}
 
-        {/* Hover: "+ Add" overlay button */}
-        {hovered && !isAdded && (
+        {/* Hover overlay — "+ Add" or "Remove" */}
+        {hovered && (
           <button
             onClick={(e) => { e.stopPropagation(); onAdd(); }}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>
+            style={{
+              position: 'absolute', inset: 0,
+              width: '100%', height: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              background: isAdded ? 'rgba(239,68,68,0.4)' : 'rgba(0,0,0,0.55)',
+              border: 'none', cursor: 'pointer',
+              fontSize: 12, fontWeight: 800, color: '#fff', letterSpacing: '0.02em',
+            }}>
             {isLoading
               ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
-              : <><Plus style={{ width: 13, height: 13 }} /> Add</>
+              : isAdded
+                ? <><X style={{ width: 13, height: 13 }} /> Remove</>
+                : <><Plus style={{ width: 13, height: 13 }} /> Add</>
             }
-          </button>
-        )}
-
-        {/* Remove overlay when added + hovered */}
-        {hovered && isAdded && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onAdd(); }}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'rgba(239,68,68,0.35)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 800, color: '#fff' }}>
-            <X style={{ width: 13, height: 13 }} /> Remove
           </button>
         )}
       </div>
 
-      {/* Label row */}
-      <div style={{ padding: '5px 8px', background: '#0d0d1c' }}>
-        <span style={{ color: '#b0afc0', fontSize: 10, fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{anim.label}</span>
+      {/* Label */}
+      <div style={{ padding: '5px 8px', background: '#0d0d1c', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <span style={{ color: '#b0afc0', fontSize: 9.5, fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{anim.label}</span>
       </div>
     </div>
   );
 }
 
+// ── AnimateModal ───────────────────────────────────────────────────────────
 function AnimateModal({ onClose, color, modelUrl }) {
-  const [tab, setTab] = useState('library'); // library | added
+  const [tab, setTab] = useState('library');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
-  const [added, setAdded] = useState([]); // array of animation ids
-  const [playing, setPlaying] = useState(null); // currently previewing
-  const [addingId, setAddingId] = useState(null); // loading state
+  const [added, setAdded] = useState([]);
+  const [playing, setPlaying] = useState(null);
+  const [addingId, setAddingId] = useState(null);
 
-  // Mesh info (mock — would come from real model)
   const meshInfo = { topology: 'Triangle', faces: 9988, vertices: 4934 };
 
   const filtered = useMemo(() => {
@@ -1206,14 +759,10 @@ function AnimateModal({ onClose, color, modelUrl }) {
   const addedAnims = ANIMATION_LIBRARY.filter((a) => added.includes(a.id));
 
   const handleAdd = (id) => {
-    if (added.includes(id)) return;
+    if (added.includes(id)) { handleRemove(id); return; }
     setAddingId(id);
-    setTimeout(() => {
-      setAdded((prev) => [...prev, id]);
-      setAddingId(null);
-    }, 600);
+    setTimeout(() => { setAdded((prev) => [...prev, id]); setAddingId(null); }, 500);
   };
-
   const handleRemove = (id) => setAdded((prev) => prev.filter((a) => a !== id));
   const handlePlay = (id) => setPlaying((p) => p === id ? null : id);
 
@@ -1222,7 +771,7 @@ function AnimateModal({ onClose, color, modelUrl }) {
       <div style={{ display: 'flex', width: '100%', height: '100%' }} onClick={(e) => e.stopPropagation()}>
 
         {/* ── Left sidebar ── */}
-        <div style={{ width: 220, background: '#0a0a1a', borderRight: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div style={{ width: 240, background: '#0a0a1a', borderRight: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           {/* Header */}
           <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -1236,7 +785,7 @@ function AnimateModal({ onClose, color, modelUrl }) {
             {/* Search */}
             <div style={{ position: 'relative' }}>
               <Search style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, color: '#4b5563' }} />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search animation"
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search animation…"
                 style={{ width: '100%', padding: '6px 8px 6px 26px', borderRadius: 9, fontSize: 11, color: '#e5e7eb', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
                 onFocus={(e) => { e.target.style.borderColor = `${color}55`; }}
                 onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
@@ -1255,9 +804,6 @@ function AnimateModal({ onClose, color, modelUrl }) {
                 {t.count > 0 && <span style={{ fontSize: 9, background: color, color: '#fff', padding: '1px 5px', borderRadius: 999, fontWeight: 800 }}>{t.count}</span>}
               </button>
             ))}
-            <button style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#4b5563', padding: 4 }}>
-              ☰
-            </button>
           </div>
 
           {/* Category filter (library only) */}
@@ -1272,30 +818,30 @@ function AnimateModal({ onClose, color, modelUrl }) {
             </div>
           )}
 
+          {/* Count badge */}
+          {tab === 'library' && (
+            <div style={{ padding: '2px 10px 4px' }}>
+              <span style={{ color: '#374151', fontSize: 10 }}>{filtered.length} animáció</span>
+            </div>
+          )}
+
           {/* Animation grid */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px', scrollbarWidth: 'thin' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px 8px', scrollbarWidth: 'thin' }}>
             {tab === 'library' ? (
               filtered.length === 0 ? (
                 <p style={{ color: '#374151', fontSize: 11, textAlign: 'center', marginTop: 30 }}>Nincs találat</p>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  {filtered.map((anim) => {
-                    const isAdded = added.includes(anim.id);
-                    const isLoading = addingId === anim.id;
-                    const isPlaying = playing === anim.id;
-                    return (
-                      <AnimCard
-                        key={anim.id}
-                        anim={anim}
-                        isAdded={isAdded}
-                        isLoading={isLoading}
-                        isPlaying={isPlaying}
-                        color={color}
-                        onPlay={() => handlePlay(anim.id)}
-                        onAdd={() => isAdded ? handleRemove(anim.id) : handleAdd(anim.id)}
-                      />
-                    );
-                  })}
+                  {filtered.map((anim) => (
+                    <AnimCard
+                      key={anim.id}
+                      anim={anim}
+                      isAdded={added.includes(anim.id)}
+                      isLoading={addingId === anim.id}
+                      color={color}
+                      onAdd={() => handleAdd(anim.id)}
+                    />
+                  ))}
                 </div>
               )
             ) : (
@@ -1313,12 +859,18 @@ function AnimateModal({ onClose, color, modelUrl }) {
                   {addedAnims.map((anim) => {
                     const isPlaying = playing === anim.id;
                     return (
-                      <div key={anim.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', transition: 'all 0.15s' }}
+                      <div key={anim.id}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 9, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', transition: 'all 0.15s' }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}>
-                        {/* Mini figure */}
-                        <div style={{ width: 36, height: 36, borderRadius: 8, background: '#181828', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <MannequinSVG pose={anim.id} size={32} isPlaying={isPlaying} animColor={color} />
+                        {/* Mini GIF thumbnail */}
+                        <div style={{ width: 40, height: 40, borderRadius: 8, background: '#181828', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                          <img
+                            src={getAnimGifUrl(anim.slug)}
+                            alt={anim.label}
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ color: '#d1d5db', fontSize: 11, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{anim.label}</p>
@@ -1343,7 +895,7 @@ function AnimateModal({ onClose, color, modelUrl }) {
           </div>
         </div>
 
-        {/* ── Main 3D area (placeholder) ── */}
+        {/* ── Main 3D area ── */}
         <div style={{ flex: 1, position: 'relative', background: '#0d0d1f', display: 'flex', flexDirection: 'column' }}>
           {/* Top icon row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -1362,7 +914,7 @@ function AnimateModal({ onClose, color, modelUrl }) {
             ))}
           </div>
 
-          {/* Mesh info overlay */}
+          {/* Mesh info */}
           <div style={{ position: 'absolute', top: 56, left: 16, zIndex: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}>
             {[['Topology', meshInfo.topology], ['Faces', meshInfo.faces.toLocaleString()], ['Vertices', meshInfo.vertices.toLocaleString()]].map(([k, v]) => (
               <div key={k} style={{ display: 'flex', gap: 24, marginBottom: 2 }}>
@@ -1372,72 +924,49 @@ function AnimateModal({ onClose, color, modelUrl }) {
             ))}
           </div>
 
-          {/* 3D Viewport (dark grid placeholder) */}
+          {/* Viewport */}
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-            {/* Grid pattern */}
             <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '48px 48px', backgroundPosition: 'center center' }} />
             <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7) 100%)' }} />
 
-            {/* Rig visualization (colored arrows/bones like in screenshot) */}
-            {modelUrl ? (
-              <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                {/* Animated skeleton arrows */}
-                <div style={{ position: 'relative', width: 180, height: 320 }}>
-                  {/* Head */}
-                  <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '12px solid transparent', borderRight: '12px solid transparent', borderBottom: `28px solid ${color}`, filter: `drop-shadow(0 0 8px ${color}88)` }} />
-                  {/* Torso arrows */}
-                  {[{ top: 35, left: 30, rot: -30, h: 50 }, { top: 35, right: 30, rot: 30, h: 50 }].map((s, i) => (
-                    <div key={i} style={{ position: 'absolute', ...s, width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderBottom: `${s.h}px solid ${color}`, transform: `rotate(${s.rot}deg)`, filter: `drop-shadow(0 0 6px ${color}88)`, animation: playing ? 'pulse 0.8s ease-in-out infinite' : 'none' }} />
-                  ))}
-                  {/* Arm arrows */}
-                  {[{ top: 80, left: 0, rot: -50, h: 60 }, { top: 80, right: 0, rot: 50, h: 60 }].map((s, i) => (
-                    <div key={i} style={{ position: 'absolute', ...s, width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: `${s.h}px solid ${color}`, transform: `rotate(${s.rot}deg)`, filter: `drop-shadow(0 0 6px ${color}88)`, animation: playing ? `pulse ${0.6 + i * 0.2}s ease-in-out infinite` : 'none' }} />
-                  ))}
-                  {/* Leg arrows */}
-                  {[{ top: 160, left: 40, rot: -10, h: 80 }, { top: 160, right: 40, rot: 10, h: 80 }].map((s, i) => (
-                    <div key={i} style={{ position: 'absolute', ...s, width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent', borderBottom: `${s.h}px solid ${color}`, transform: `rotate(${s.rot}deg)`, filter: `drop-shadow(0 0 6px ${color}88)`, animation: playing ? `pulse ${0.9 + i * 0.15}s ease-in-out infinite` : 'none' }} />
-                  ))}
-                  {/* Foot arrows */}
-                  {[{ top: 260, left: 30, rot: -5, h: 40 }, { top: 260, right: 30, rot: 5, h: 40 }].map((s, i) => (
-                    <div key={i} style={{ position: 'absolute', ...s, width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: `${s.h}px solid ${color}`, transform: `rotate(${s.rot}deg)`, filter: `drop-shadow(0 0 6px ${color}88)` }} />
-                  ))}
+            {/* Playing animation preview — show large GIF */}
+            {playing ? (
+              <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 200, height: 300, borderRadius: 16, overflow: 'hidden', border: `1px solid ${color}40`, background: '#0a0a1a' }}>
+                  <img
+                    src={getAnimGifUrl(ANIMATION_LIBRARY.find((a) => a.id === playing)?.slug || '')}
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
                 </div>
-                {playing && (
-                  <div style={{ color, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5, background: `${color}18`, padding: '4px 12px', borderRadius: 999, border: `1px solid ${color}40` }}>
-                    <Music2 style={{ width: 12, height: 12, animation: 'pulse 1s ease-in-out infinite' }} />
-                    {ANIMATION_LIBRARY.find((a) => a.id === playing)?.label || 'Playing…'}
-                  </div>
-                )}
+                <div style={{ color, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, background: `${color}18`, padding: '5px 14px', borderRadius: 999, border: `1px solid ${color}40` }}>
+                  <Music2 style={{ width: 12, height: 12 }} />
+                  {ANIMATION_LIBRARY.find((a) => a.id === playing)?.label || 'Playing…'}
+                </div>
               </div>
             ) : (
               <div style={{ position: 'relative', zIndex: 2, textAlign: 'center' }}>
                 <PersonStanding style={{ width: 48, height: 48, color: '#1f2937', marginBottom: 12 }} />
-                <p style={{ color: '#374151', fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>Nincs betöltött modell</p>
-                <p style={{ color: '#1f2937', fontSize: 11 }}>Generálj egy 3D modellt az animáláshoz</p>
+                <p style={{ color: '#374151', fontSize: 13, fontWeight: 600, margin: '0 0 6px' }}>
+                  {modelUrl ? 'Válassz animációt az előnézethez' : 'Nincs betöltött modell'}
+                </p>
+                <p style={{ color: '#1f2937', fontSize: 11 }}>
+                  {modelUrl ? 'Kattints egy animációra a Library-ban' : 'Generálj egy 3D modellt az animáláshoz'}
+                </p>
               </div>
             )}
           </div>
 
           {/* Bottom bar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            {/* Add Animations button */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
             <button onClick={() => setTab('library')}
               style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 20px', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#d1d5db', transition: 'all 0.15s' }}
               onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}>
               <PersonStanding style={{ width: 15, height: 15 }} /> Add Animations
             </button>
-
-            {/* Divider */}
             <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.08)' }} />
-
-            {/* Share-like buttons */}
             <div style={{ display: 'flex', gap: 6 }}>
-              <Tooltip text="Auto Rigging beállítások" side="top">
-                <button style={{ width: 32, height: 32, borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}>
-                  ⚙️
-                </button>
-              </Tooltip>
               <Tooltip text="Export animáció (GLB+animáció)" side="top">
                 <button style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, border: 'none', background: 'rgba(255,255,255,0.06)', color: '#9ca3af', cursor: 'pointer' }}>
                   <Download style={{ width: 13, height: 13 }} />
@@ -1445,13 +974,10 @@ function AnimateModal({ onClose, color, modelUrl }) {
                   <span style={{ color: '#e5e7eb', fontWeight: 800 }}>+250</span>
                 </button>
               </Tooltip>
-              <button
-                style={{ width: 36, height: 36, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#a3e635,#65a30d)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(132,204,22,0.4)' }}>
+              <button style={{ width: 36, height: 36, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#a3e635,#65a30d)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(132,204,22,0.4)' }}>
                 <Download style={{ width: 16, height: 16, color: '#0a0a0a' }} />
               </button>
             </div>
-
-            {/* Added count badge */}
             {added.length > 0 && (
               <div style={{ position: 'absolute', bottom: 54, right: 20, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 999, background: `${color}20`, border: `1px solid ${color}40`, color }}>
                 <Check style={{ width: 12, height: 12 }} />
@@ -1463,7 +989,7 @@ function AnimateModal({ onClose, color, modelUrl }) {
           {/* Bottom prompt bar */}
           <div style={{ padding: '6px 16px', borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <span style={{ color: '#374151', fontSize: 10, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {modelUrl ? 'Realistic AAA-quality 3D character… / Highly realistic PBR textures…' : 'Nincs aktív modell'}
+              {modelUrl ? 'Realistic AAA-quality 3D character…' : 'Nincs aktív modell'}
             </span>
             <button style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#6b7280', cursor: 'pointer', flexShrink: 0 }}>
               ↺ Reuse prompt
@@ -1551,7 +1077,6 @@ function ThreeViewer({ color, viewMode, lightMode, showGrid, modelUrl, onReady }
   return <div ref={mountRef} className="w-full h-full" style={{ cursor, touchAction: 'none', userSelect: 'none' }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerUp} />;
 }
 
-// Scene helpers
 function loadScript(src) { return new Promise((res, rej) => { if (document.querySelector(`script[src="${src}"]`)) { res(); return; } const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
 function syncCamera(camera, c) { camera.position.set(c.panX + c.radius * Math.sin(c.phi) * Math.sin(c.theta), c.panY + c.radius * Math.cos(c.phi), c.radius * Math.sin(c.phi) * Math.cos(c.theta)); camera.lookAt(c.panX, c.panY, 0); }
 function buildPlaceholder(THREE, color) { const geo = new THREE.TorusKnotGeometry(0.7, 0.26, 140, 22); const mat = new THREE.MeshStandardMaterial({ color: hexToInt(color) || 0x7c3aed, metalness: 0.4, roughness: 0.3 }); const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.userData.isPlaceholder = true; return m; }
@@ -1611,7 +1136,6 @@ const defaultParams = () => ({
 export default function Trellis2Panel({ selectedModel, getIdToken }) {
   const color = selectedModel?.color || '#06b6d4';
 
-  // form
   const [inputMode, setInputMode] = useState('text');
   const [prompt, setPrompt] = useState('');
   const [modelName, setModelName] = useState('');
@@ -1621,7 +1145,6 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
   const [imagePreview, setImagePreview] = useState(null);
   const [dragOver, setDragOver] = useState(false);
 
-  // generation
   const [taskId, setTaskId] = useState(null);
   const [taskType, setTaskType] = useState('text-to-3d');
   const [genStatus, setGenStatus] = useState('idle');
@@ -1632,23 +1155,19 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
   const [previewTaskId, setPreviewTaskId] = useState(null);
   const [refining, setRefining] = useState(false);
 
-  // viewer
   const [viewMode, setViewMode] = useState('solid');
   const [lightMode, setLightMode] = useState('studio');
   const [showGrid, setShowGrid] = useState(true);
   const [autoSpin, setAutoSpin] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
 
-  // UV texture layer
   const [uvLayer, setUvLayer] = useState('base_color');
 
-  // modals
   const [showDownload, setShowDownload] = useState(false);
   const [showEditTexture, setShowEditTexture] = useState(false);
   const [showRemesh, setShowRemesh] = useState(false);
   const [showAnimate, setShowAnimate] = useState(false);
 
-  // history
   const [history, setHistory] = useState(() => loadHistory());
   const [activeItem, setActiveItem] = useState(() => loadHistory()[0] ?? null);
   const [histSearch, setHistSearch] = useState('');
@@ -1770,15 +1289,12 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
         .animate-spin { animation: spin 1s linear infinite; }
         .animate-pulse { animation: pulse 2s ease-in-out infinite; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-        @keyframes mannequinPulse { 0%{transform:translateY(0px) rotate(-1deg)} 100%{transform:translateY(-4px) rotate(1deg)} }
       `}</style>
 
       <div style={{ display: 'flex', height: '100%', overflow: 'hidden', fontFamily: "'SF Pro Display',-apple-system,system-ui,sans-serif" }}>
 
         {/* ════ LEFT PANEL ════ */}
         <aside style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,0.06)', background: 'rgba(8,8,20,0.5)', scrollbarWidth: 'thin' }}>
-
-          {/* Header tabs */}
           <div style={{ padding: '10px 10px 0' }}>
             <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
               {[
@@ -1795,18 +1311,10 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
               ))}
             </div>
 
-            {/* Image upload or Prompt */}
             {inputMode === 'image' ? (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span style={{ color: '#9ca3af', fontSize: 11, fontWeight: 600 }}>Image</span>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {['📋 Paste', '🔗 URL', '🗂️ History'].map((a, i) => (
-                      <Tooltip key={i} text={a} side="bottom">
-                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, opacity: 0.4, padding: '2px 3px' }}>{a.split(' ')[0]}</button>
-                      </Tooltip>
-                    ))}
-                  </div>
                 </div>
                 <div onClick={() => fileInputRef.current?.click()} onDrop={handleDrop} onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)}
                   style={{ height: 120, borderRadius: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: dragOver ? `${color}18` : imagePreview ? 'transparent' : 'rgba(255,255,255,0.03)', border: `1.5px dashed ${dragOver ? color : imagePreview ? 'transparent' : 'rgba(255,255,255,0.12)'}`, overflow: 'hidden', transition: 'all 0.2s', marginBottom: 10 }}>
@@ -1848,7 +1356,6 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
             )}
           </div>
 
-          {/* Settings */}
           <div style={{ padding: '2px 10px 6px', flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }}>
             {errorMsg && (
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '7px 9px', borderRadius: 9, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', marginBottom: 8 }}>
@@ -1860,8 +1367,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
             {inputMode === 'image' && (
               <MeshyRow label="Name" tip="Opcionális név">
                 <input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="Give your generation a name"
-                  style={{ width: '100%', padding: '6px 10px', borderRadius: 9, fontSize: 11, color: '#e5e7eb', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                  onFocus={(e) => { e.target.style.borderColor = `${color}55`; }} onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; }} />
+                  style={{ width: '100%', padding: '6px 10px', borderRadius: 9, fontSize: 11, color: '#e5e7eb', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
               </MeshyRow>
             )}
 
@@ -1937,8 +1443,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
               <div>
                 <p style={{ color: '#6b7280', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Textúra prompt</p>
                 <textarea value={params.texture_prompt} maxLength={600} onChange={(e) => setParam('texture_prompt', e.target.value.slice(0, 600))} placeholder="Pl. dark fantasy armor, worn leather…" rows={2}
-                  style={{ width: '100%', resize: 'none', borderRadius: 8, fontSize: 10, color: '#e5e7eb', lineHeight: 1.5, padding: '6px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                  onFocus={(e) => { e.target.style.borderColor = `${color}55`; }} onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+                  style={{ width: '100%', resize: 'none', borderRadius: 8, fontSize: 10, color: '#e5e7eb', lineHeight: 1.5, padding: '6px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
               </div>
             </Collapsible>
           </div>
@@ -1974,10 +1479,8 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
 
         {/* ════ CENTER — 3D VIEWER ════ */}
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-
           {/* Top toolbar */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(8,8,20,0.3)' }}>
-            {/* View modes */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <span style={{ color: '#374151', fontSize: 10, fontWeight: 600, marginRight: 4 }}>NÉZET</span>
               {[
@@ -1996,9 +1499,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
               ))}
             </div>
 
-            {/* Right controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {/* UV Layer selector (visible when UV mode) */}
               {viewMode === 'uv' && (
                 <>
                   <span style={{ color: '#374151', fontSize: 10, fontWeight: 600, marginRight: 2 }}>LAYER</span>
@@ -2023,8 +1524,8 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
                 <IconBtn key={l.id} icon={l.icon} tip={l.tip} active={lightMode === l.id} color={color} onClick={() => setLightMode(l.id)} side="bottom" />
               ))}
               <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
-              <IconBtn icon={<Grid3x3 />}      tip={showGrid ? 'Rács elrejtése' : 'Rács megjelenítése'} active={showGrid}   color={color} onClick={() => setShowGrid((v) => !v)} />
-              <IconBtn icon={<TriangleRight />} tip={rightOpen ? 'Előzmények bezárása' : 'Előzmények megnyitása'} active={rightOpen} color={color} onClick={() => setRightOpen((v) => !v)} />
+              <IconBtn icon={<Grid3x3 />}     tip={showGrid ? 'Rács elrejtése' : 'Rács megjelenítése'} active={showGrid}   color={color} onClick={() => setShowGrid((v) => !v)} />
+              <IconBtn icon={<ChevronRight />} tip={rightOpen ? 'Előzmények bezárása' : 'Előzmények megnyitása'} active={rightOpen} color={color} onClick={() => setRightOpen((v) => !v)} />
             </div>
           </div>
 
@@ -2037,7 +1538,6 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
             <ThreeViewer color={color} viewMode={viewMode} lightMode={lightMode} showGrid={showGrid} modelUrl={modelUrl}
               onReady={(s) => { sceneRef.current = s; s.autoSpin = autoSpin; }} />
 
-            {/* Generating overlay */}
             {isRunning && (
               <div style={{ position: 'absolute', inset: 0, zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(6,6,18,0.8)', backdropFilter: 'blur(8px)', pointerEvents: 'none' }}>
                 <div style={{ width: 68, height: 68, borderRadius: 20, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${color}18`, border: `1px solid ${color}45` }}>
@@ -2054,7 +1554,6 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
 
           {/* Bottom toolbar */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px', flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(8,8,20,0.3)' }}>
-            {/* Camera */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <span style={{ color: '#374151', fontSize: 10, fontWeight: 600, marginRight: 3 }}>KAMERA</span>
               <IconBtn icon={<RotateCcw />} tip="Kamera visszaállítása" onClick={() => camPreset('reset')} />
@@ -2070,9 +1569,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
               </Tooltip>
             </div>
 
-            {/* Action buttons */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {/* Remesh */}
               <Tooltip text="Remesh modál megnyitása" side="top">
                 <button onClick={() => setShowRemesh(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 10, fontSize: 11, fontWeight: 700, color: '#d1d5db', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', transition: 'all 0.15s' }}
@@ -2082,7 +1579,6 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
                 </button>
               </Tooltip>
 
-              {/* Edit Texture */}
               <Tooltip text="Textúra szerkesztő megnyitása" side="top">
                 <button onClick={() => setShowEditTexture(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 10, fontSize: 11, fontWeight: 700, color: '#d1d5db', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', transition: 'all 0.15s' }}
@@ -2092,7 +1588,6 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
                 </button>
               </Tooltip>
 
-              {/* Animate */}
               <Tooltip text="Animáció hozzáadása" side="top">
                 <button onClick={() => setShowAnimate(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 10, fontSize: 11, fontWeight: 700, color: '#d1d5db', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', transition: 'all 0.15s' }}
@@ -2102,7 +1597,6 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
                 </button>
               </Tooltip>
 
-              {/* Download */}
               <Tooltip text="Letöltési beállítások" side="top">
                 <button onClick={() => setShowDownload(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 10, fontSize: 11, fontWeight: 700, color: '#fff', background: `linear-gradient(90deg,${color}cc,${color})`, border: 'none', cursor: 'pointer', transition: 'all 0.15s', boxShadow: `0 3px 12px ${color}44` }}

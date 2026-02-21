@@ -1,13 +1,32 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Wand2, Box, Star, CircleDot, ChevronRight, ChevronDown,
-  MessageSquare, Image, Music, Code, Cpu, Menu, X,
+  Wand2,
+  Box,
+  Star,
+  CircleDot,
+  ChevronRight,
+  ChevronDown,
+  MessageSquare,
+  Image,
+  Music,
+  Code,
+  Cpu,
+  Menu,
+  X,
 } from "lucide-react";
-import { MODEL_GROUPS, ALL_MODELS, getModel, findModelGroup, findModelCat } from "./models";
+import {
+  MODEL_GROUPS,
+  ALL_MODELS,
+  getModel,
+  findModelGroup,
+  findModelCat,
+} from "./models";
 import ChatPanel from "./ChatPanel";
 import ImagePanel from "./ImagePanel";
 import AudioPanel from "./AudioPanel";
 import Trellis2Panel from "./Trellis2panel";
+import { MyUserContext } from "../context/MyUserProvider";
+import { useContext } from "react";
 
 // ─── Group icon map ────────────────────────────────────
 const GroupIcon = ({ group, className = "w-4 h-4" }) => {
@@ -27,8 +46,15 @@ const TierBadge = ({ tier, tierLabel }) => (
     className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-bold flex-shrink-0"
     style={
       tier === "pro"
-        ? { background: "linear-gradient(90deg,#7c3aed,#db2777)", color: "#fff" }
-        : { background: "rgba(255,255,255,0.09)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.12)" }
+        ? {
+            background: "linear-gradient(90deg,#7c3aed,#db2777)",
+            color: "#fff",
+          }
+        : {
+            background: "rgba(255,255,255,0.09)",
+            color: "#9ca3af",
+            border: "1px solid rgba(255,255,255,0.12)",
+          }
     }
   >
     {tier === "pro" ? "⭐" : "⚡"} {tierLabel}
@@ -42,7 +68,9 @@ const ModelBtn = ({ model, isActive, onSelect }) => (
     className="cursor-pointer w-full p-2.5 rounded-xl transition-all duration-150 text-left group"
     style={{
       background: isActive ? `${model.color}18` : "rgba(255,255,255,0.02)",
-      border: isActive ? `1.5px solid ${model.color}50` : "1.5px solid rgba(255,255,255,0.05)",
+      border: isActive
+        ? `1.5px solid ${model.color}50`
+        : "1.5px solid rgba(255,255,255,0.05)",
       transform: isActive ? "scale(1.01)" : "scale(1)",
     }}
     onMouseEnter={(e) => {
@@ -64,24 +92,35 @@ const ModelBtn = ({ model, isActive, onSelect }) => (
       <div
         className="w-0.5 rounded-full self-stretch flex-shrink-0 transition-all duration-150"
         style={{
-          background: model.tier === "pro"
-            ? "linear-gradient(180deg,#7c3aed,#db2777)"
-            : "rgba(255,255,255,0.18)",
+          background:
+            model.tier === "pro"
+              ? "linear-gradient(180deg,#7c3aed,#db2777)"
+              : "rgba(255,255,255,0.18)",
           minHeight: "36px",
         }}
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1 mb-0.5">
-          <span className="text-white font-semibold text-xs truncate">{model.name}</span>
+          <span className="text-white font-semibold text-xs truncate">
+            {model.name}
+          </span>
           <div className="flex items-center gap-1 flex-shrink-0">
-            {isActive && <CircleDot className="w-2.5 h-2.5 text-green-400 animate-pulse" />}
+            {isActive && (
+              <CircleDot className="w-2.5 h-2.5 text-green-400 animate-pulse" />
+            )}
             <TierBadge tier={model.tier} tierLabel={model.tierLabel} />
           </div>
         </div>
-        <p className="text-gray-500 text-xs leading-snug truncate">{model.description}</p>
+        <p className="text-gray-500 text-xs leading-snug truncate">
+          {model.description}
+        </p>
         <span
           className="inline-block mt-1 text-xs font-semibold px-1.5 py-0.5 rounded-full"
-          style={{ background: `${model.color}18`, color: model.color, border: `1px solid ${model.color}35` }}
+          style={{
+            background: `${model.color}18`,
+            color: model.color,
+            border: `1px solid ${model.color}35`,
+          }}
         >
           {model.badge}
         </span>
@@ -96,7 +135,7 @@ export default function AIChat({ user, getIdToken }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState(() => new Set(["chat"]));
   const [openCats, setOpenCats] = useState(() => new Set(["chat_anthropic"]));
-
+const {navHeight} = useContext(MyUserContext);
   const selectedModel = getModel(selectedAI) || ALL_MODELS[0];
 
   const handleSelectModel = useCallback((modelId) => {
@@ -131,11 +170,16 @@ export default function AIChat({ user, getIdToken }) {
       getIdToken,
     };
     switch (selectedModel.panelType) {
-      case "chat":   return <ChatPanel  {...props} />;
-      case "image":  return <ImagePanel {...props} />;
-      case "audio":  return <AudioPanel {...props} />;
-      case "threed": return <Trellis2Panel {...props} />;
-      default:       return <ChatPanel {...props} />;
+      case "chat":
+        return <ChatPanel {...props} />;
+      case "image":
+        return <ImagePanel {...props} />;
+      case "audio":
+        return <AudioPanel {...props} />;
+      case "threed":
+        return <Trellis2Panel {...props} />;
+      default:
+        return <ChatPanel {...props} />;
     }
   };
 
@@ -155,14 +199,18 @@ export default function AIChat({ user, getIdToken }) {
             <X className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-gray-600 text-xs mt-0.5">Válassz egyet az indításhoz</p>
+        <p className="text-gray-600 text-xs mt-0.5">
+          Válassz egyet az indításhoz
+        </p>
       </div>
 
       {/* Scrollable model list */}
       <div className="flex-1  overflow-y-auto px-3 pb-4 space-y-1 scrollbar-thin">
         {MODEL_GROUPS.map((group) => {
           const groupOpen = openGroups.has(group.id);
-          const hasActiveInGroup = group.categories.flatMap((c) => c.models).some((m) => m.id === selectedAI);
+          const hasActiveInGroup = group.categories
+            .flatMap((c) => c.models)
+            .some((m) => m.id === selectedAI);
 
           return (
             <div key={group.id}>
@@ -185,37 +233,49 @@ export default function AIChat({ user, getIdToken }) {
                 onMouseEnter={(e) => {
                   if (!groupOpen && !hasActiveInGroup) {
                     e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                    e.currentTarget.style.border = "1px solid rgba(255,255,255,0.1)";
+                    e.currentTarget.style.border =
+                      "1px solid rgba(255,255,255,0.1)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!groupOpen && !hasActiveInGroup) {
                     e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-                    e.currentTarget.style.border = "1px solid rgba(255,255,255,0.05)";
+                    e.currentTarget.style.border =
+                      "1px solid rgba(255,255,255,0.05)";
                   }
                 }}
               >
                 <span className="flex items-center gap-2">
                   <span
                     className="w-6 h-6 rounded-lg flex items-center justify-center text-xs flex-shrink-0"
-                    style={{ background: `${group.color}20`, color: group.color }}
+                    style={{
+                      background: `${group.color}20`,
+                      color: group.color,
+                    }}
                   >
                     {group.emoji}
                   </span>
                   <span
                     className="text-xs font-bold"
-                    style={{ color: (groupOpen || hasActiveInGroup) ? "white" : "#9ca3af" }}
+                    style={{
+                      color:
+                        groupOpen || hasActiveInGroup ? "white" : "#9ca3af",
+                    }}
                   >
                     {group.label}
                   </span>
                   {hasActiveInGroup && (
-                    <CircleDot className="w-2 h-2 animate-pulse" style={{ color: group.color }} />
+                    <CircleDot
+                      className="w-2 h-2 animate-pulse"
+                      style={{ color: group.color }}
+                    />
                   )}
                 </span>
-                {groupOpen
-                  ? <ChevronDown className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                  : <ChevronRight className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                }
+                {groupOpen ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                )}
               </button>
 
               {/* Group body */}
@@ -223,7 +283,9 @@ export default function AIChat({ user, getIdToken }) {
                 <div className="pl-2 mt-1 space-y-1">
                   {group.categories.map((cat) => {
                     const catOpen = openCats.has(cat.id);
-                    const hasActiveInCat = cat.models.some((m) => m.id === selectedAI);
+                    const hasActiveInCat = cat.models.some(
+                      (m) => m.id === selectedAI,
+                    );
 
                     return (
                       <div key={cat.id}>
@@ -232,19 +294,27 @@ export default function AIChat({ user, getIdToken }) {
                             onClick={() => toggleCat(cat.id)}
                             className="cursor-pointer w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-all duration-150 hover:bg-white/5"
                             style={{
-                              background: hasActiveInCat ? `${group.color}10` : "transparent",
+                              background: hasActiveInCat
+                                ? `${group.color}10`
+                                : "transparent",
                             }}
                           >
                             <span className="flex items-center gap-1.5">
-                              <span className="text-gray-500 text-xs">{cat.label}</span>
+                              <span className="text-gray-500 text-xs">
+                                {cat.label}
+                              </span>
                               {hasActiveInCat && (
-                                <CircleDot className="w-2 h-2 animate-pulse" style={{ color: group.color }} />
+                                <CircleDot
+                                  className="w-2 h-2 animate-pulse"
+                                  style={{ color: group.color }}
+                                />
                               )}
                             </span>
-                            {catOpen
-                              ? <ChevronDown className="w-3 h-3 text-gray-600" />
-                              : <ChevronRight className="w-3 h-3 text-gray-600" />
-                            }
+                            {catOpen ? (
+                              <ChevronDown className="w-3 h-3 text-gray-600" />
+                            ) : (
+                              <ChevronRight className="w-3 h-3 text-gray-600" />
+                            )}
                           </button>
                         )}
 
@@ -253,11 +323,13 @@ export default function AIChat({ user, getIdToken }) {
                             {cat.models.length === 2 && (
                               <div className="flex gap-2 px-2 pt-0.5 pb-0.5">
                                 <span className="text-xs text-gray-700 flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-gray-600" /> Gyors
+                                  <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />{" "}
+                                  Gyors
                                 </span>
                                 <span className="text-gray-700 text-xs">·</span>
                                 <span className="text-xs text-purple-500 flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-600" /> Prémium
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />{" "}
+                                  Prémium
                                 </span>
                               </div>
                             )}
@@ -295,31 +367,46 @@ export default function AIChat({ user, getIdToken }) {
           <div className="space-y-1 text-xs">
             <div className="flex justify-between gap-2">
               <span className="text-gray-600">Modell:</span>
-              <span className="text-white font-semibold text-right truncate">{selectedModel.name}</span>
+              <span className="text-white font-semibold text-right truncate">
+                {selectedModel.name}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Típus:</span>
-              <span className="font-semibold" style={{ color: selectedModel.color }}>
-                {selectedModel.panelType === "chat" ? "💬 Chat"
-                  : selectedModel.panelType === "image" ? "🖼️ Kép"
-                  : selectedModel.panelType === "audio" ? "🎵 Hang"
-                  : selectedModel.panelType === "threed" ? `🧊 ${selectedModel.inputType === "image" ? "Kép" : "Szöveg"} → 3D`
-                  : "—"}
+              <span
+                className="font-semibold"
+                style={{ color: selectedModel.color }}
+              >
+                {selectedModel.panelType === "chat"
+                  ? "💬 Chat"
+                  : selectedModel.panelType === "image"
+                    ? "🖼️ Kép"
+                    : selectedModel.panelType === "audio"
+                      ? "🎵 Hang"
+                      : selectedModel.panelType === "threed"
+                        ? `🧊 ${selectedModel.inputType === "image" ? "Kép" : "Szöveg"} → 3D`
+                        : "—"}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Ár:</span>
-              <span className="text-white font-semibold">{selectedModel.badge}</span>
+              <span className="text-white font-semibold">
+                {selectedModel.badge}
+              </span>
             </div>
             {selectedModel.badgeDetail && (
               <div className="mt-0.5">
-                <span className="text-gray-700 text-xs">{selectedModel.badgeDetail}</span>
+                <span className="text-gray-700 text-xs">
+                  {selectedModel.badgeDetail}
+                </span>
               </div>
             )}
             {selectedModel.provider && (
               <div className="flex justify-between">
                 <span className="text-gray-600">Provider:</span>
-                <span className="text-gray-400 font-medium">{selectedModel.provider}</span>
+                <span className="text-gray-400 font-medium">
+                  {selectedModel.provider}
+                </span>
               </div>
             )}
           </div>
@@ -330,9 +417,10 @@ export default function AIChat({ user, getIdToken }) {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-2 md:p-4 relative overflow-hidden"
+      className="min-h-screen flex items-end justify-center p-2 md:p-4 relative overflow-hidden"
       style={{
-        background: "radial-gradient(ellipse at top, #1a0b2e 0%, #0a0118 50%, #000000 100%)",
+        background:
+          "radial-gradient(ellipse at top, #1a0b2e 0%, #0a0118 50%, #000000 100%)",
         fontFamily: "'SF Pro Display', -apple-system, system-ui, sans-serif",
       }}
     >
@@ -356,8 +444,10 @@ export default function AIChat({ user, getIdToken }) {
       )}
 
       {/* ════════ LAYOUT ════════ */}
-      <div className="relative w-full h-[95vh] md:h-[90vh] flex gap-3 z-10">
-
+      <div
+        className="relative w-full pt-10  flex gap-3 z-10"
+        style={{ height: `calc(100vh - ${navHeight}px)` }}
+      >
         {/* ── Sidebar ── */}
         <aside
           className={`
@@ -372,7 +462,8 @@ export default function AIChat({ user, getIdToken }) {
             backdropFilter: "blur(24px)",
             background: "rgba(12,12,30,0.75)",
             border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07)",
+            boxShadow:
+              "0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07)",
           }}
         >
           <SidebarContent />
@@ -412,15 +503,21 @@ export default function AIChat({ user, getIdToken }) {
                   color: "white",
                 }}
               >
-                {selectedModel.panelType === "chat" ? "💬"
-                  : selectedModel.panelType === "image" ? "🖼️"
-                  : selectedModel.panelType === "audio" ? "🎵"
-                  : selectedModel.panelType === "threed" ? "🧊"
-                  : "✦"}
+                {selectedModel.panelType === "chat"
+                  ? "💬"
+                  : selectedModel.panelType === "image"
+                    ? "🖼️"
+                    : selectedModel.panelType === "audio"
+                      ? "🎵"
+                      : selectedModel.panelType === "threed"
+                        ? "🧊"
+                        : "✦"}
               </div>
 
               <div>
-                <h3 className="font-bold text-white text-sm leading-tight">{selectedModel.name}</h3>
+                <h3 className="font-bold text-white text-sm leading-tight">
+                  {selectedModel.name}
+                </h3>
                 <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                   <CircleDot className="w-1.5 h-1.5 text-green-400 animate-pulse" />
                   {selectedModel.description}
@@ -429,7 +526,10 @@ export default function AIChat({ user, getIdToken }) {
             </div>
 
             <div className="flex items-center gap-2">
-              <TierBadge tier={selectedModel.tier} tierLabel={selectedModel.tierLabel} />
+              <TierBadge
+                tier={selectedModel.tier}
+                tierLabel={selectedModel.tierLabel}
+              />
               <span
                 className="hidden sm:block text-xs font-medium px-2.5 py-1 rounded-full"
                 style={{
@@ -444,33 +544,63 @@ export default function AIChat({ user, getIdToken }) {
           </div>
 
           {/* Panel — overflow-hidden keeps scrolling inside panel, not on page */}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            {renderPanel()}
-          </div>
+          <div className="flex-1 min-h-0 overflow-hidden">{renderPanel()}</div>
         </main>
       </div>
 
       <style jsx>{`
         @keyframes float {
-          0%,100% { transform:translate(0,0) scale(1); }
-          33% { transform:translate(25px,-25px) scale(1.08); }
-          66% { transform:translate(-18px,18px) scale(0.92); }
+          0%,
+          100% {
+            transform: translate(0, 0) scale(1);
+          }
+          33% {
+            transform: translate(25px, -25px) scale(1.08);
+          }
+          66% {
+            transform: translate(-18px, 18px) scale(0.92);
+          }
         }
         @keyframes float-delayed {
-          0%,100% { transform:translate(0,0) scale(1); }
-          33% { transform:translate(-25px,25px) scale(0.92); }
-          66% { transform:translate(18px,-18px) scale(1.08); }
+          0%,
+          100% {
+            transform: translate(0, 0) scale(1);
+          }
+          33% {
+            transform: translate(-25px, 25px) scale(0.92);
+          }
+          66% {
+            transform: translate(18px, -18px) scale(1.08);
+          }
         }
         @keyframes float-slow {
-          0%,100% { transform:translate(0,0) scale(1); }
-          50% { transform:translate(0,25px) scale(1.04); }
+          0%,
+          100% {
+            transform: translate(0, 0) scale(1);
+          }
+          50% {
+            transform: translate(0, 25px) scale(1.04);
+          }
         }
-        .animate-float { animation: float 22s ease-in-out infinite; }
-        .animate-float-delayed { animation: float-delayed 28s ease-in-out infinite; }
-        .animate-float-slow { animation: float-slow 32s ease-in-out infinite; }
-        .scrollbar-thin::-webkit-scrollbar { width: 4px; }
-        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-        .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.07); border-radius: 2px; }
+        .animate-float {
+          animation: float 22s ease-in-out infinite;
+        }
+        .animate-float-delayed {
+          animation: float-delayed 28s ease-in-out infinite;
+        }
+        .animate-float-slow {
+          animation: float-slow 32s ease-in-out infinite;
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 4px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.07);
+          border-radius: 2px;
+        }
       `}</style>
     </div>
   );
