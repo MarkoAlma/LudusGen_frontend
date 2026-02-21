@@ -1,6 +1,6 @@
 // modals/DownloadModal.jsx
 import React, { useState } from 'react';
-import { Modal } from '../ui/primitives';
+import { Modal } from '../ui/Primitives';
 
 export default function DownloadModal({ onClose, activeItem, color }) {
   const [resize, setResize] = useState(false);
