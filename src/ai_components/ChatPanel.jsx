@@ -165,7 +165,7 @@ const PresetModal = ({ isOpen, onClose, onSave, editingPreset, modelColor }) => 
               <span className="text-xs font-semibold text-gray-300">Modell paraméterek</span>
             </div>
             <Slider label="Temperature" field="temperature" min={0} max={2} step={0.05} hint="0 = determinisztikus · 1 = kiegyensúlyozott · 2 = kreatív" />
-            <Slider label="Max tokens" field="maxTokens" min={128} max={8192} step={128} hint="Maximális válaszhossz tokenekben" />
+            <Slider label="Max tokens" field="maxTokens" min={128} max={16384} step={128} hint="Maximális válaszhossz tokenekben" />
             <Slider label="Top P" field="topP" min={0} max={1} step={0.05} hint="Nucleus sampling — általában ne módosítsd a temperature-rel együtt" />
             <Slider label="Frequency penalty" field="frequencyPenalty" min={-2} max={2} step={0.1} hint="Negatív: ismétlés ↑ · Pozitív: ismétlés ↓" />
             <Slider label="Presence penalty" field="presencePenalty" min={-2} max={2} step={0.1} hint="Pozitív: új témák bevezetése ↑" />
@@ -217,14 +217,13 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
-  // ── FIX: chatScrollRef a scrollozható chat div-re mutat ──
-  // scrollIntoView helyett a div.scrollTop-ot állítjuk — így csak a chat görget, nem az oldal
   const chatScrollRef = useRef(null);
   const textareaRef = useRef(null);
   const isLoadingConversation = useRef(false);
   const prevMessageCount = useRef(0);
+  // ── FIX: ref-ben tároljuk az aktuális streaming üzenet id-jét ──
+  const streamingMsgIdRef = useRef(null);
 
-  // ── Scroll helper — mindig a chat containert görgetjük ──
   const scrollToBottom = useCallback((smooth = true) => {
     const el = chatScrollRef.current;
     if (!el) return;
@@ -271,7 +270,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
       if (msgs.length > 0) {
         prevMessageCount.current = msgs.length;
         setMessages(msgs);
-        // Betöltés után azonnal az aljára ugrás (instant, ne smooth)
         setTimeout(() => scrollToBottom(false), 50);
       } else {
         const welcome = [{
@@ -376,22 +374,36 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
       role: "user", content: input.trim(),
       model: selectedModel.id, id: Date.now().toString(),
     };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
-    await saveMessage(userMsg);
-    setInput("");
-    setIsTyping(true);
-    // Felhasználói üzenet után görgetés
-    setTimeout(() => scrollToBottom(), 50);
 
-    // AI placeholder — ezt frissítjük streamelés közben
-    const aiMsgId = (Date.now() + 1).toString();
+    const aiMsgId = `ai_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    streamingMsgIdRef.current = aiMsgId;
+
     const placeholder = {
       role: "assistant", content: "",
       model: selectedModel.id, id: aiMsgId, isStreaming: true,
     };
-    setMessages((prev) => [...prev, placeholder]);
+
+    // ── FIX: user üzenet + placeholder EGYETLEN atomikus setMessages hívásban ──
+    // Ez megakadályozza, hogy React StrictMode / concurrent mode
+    // duplán adja hozzá a placeholdert két külön functional update-ből.
+    setMessages((prev) => {
+      // Idempotency: ha valami miatt már benne van, ne add hozzá újra
+      const withUser = prev.some((m) => m.id === userMsg.id)
+        ? prev
+        : [...prev, userMsg];
+      const withPlaceholder = withUser.some((m) => m.id === aiMsgId)
+        ? withUser
+        : [...withUser, placeholder];
+      return withPlaceholder;
+    });
+
+    setInput("");
+    setIsTyping(true);
     setTimeout(() => scrollToBottom(), 50);
+
+    // newMessages a API híváshoz (a placeholder nélkül)
+    const currentMessages = [...messages, userMsg];
+    await saveMessage(userMsg);
 
     try {
       const token = getIdToken ? await getIdToken() : null;
@@ -408,7 +420,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           provider: selectedModel.provider,
           messages: [
             ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-            ...newMessages.filter((m) => m.role !== "system").map((m) => ({
+            ...currentMessages.filter((m) => m.role !== "system").map((m) => ({
               role: m.role, content: m.content,
             })),
           ],
@@ -424,7 +436,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
 
       const contentType = res.headers.get("content-type") || "";
 
-      // ── SSE streaming (OpenRouter) ──────────────────────────────
+      // ── SSE streaming ──────────────────────────────────────
       if (contentType.includes("text/event-stream")) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
@@ -453,22 +465,28 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
                 setMessages((prev) =>
                   prev.map((m) => m.id === aiMsgId ? { ...m, content: accumulated } : m)
                 );
-                // ── FIX: csak a chat div-et görgetjük, nem az oldalt ──
                 scrollToBottom();
               }
             } catch { /* csonka JSON — kihagyjuk */ }
           }
         }
 
-        // Streamelés kész
+        // ── Streamelés kész: placeholder cseréje végleges üzenetre ──
         const finalMsg = {
           role: "assistant", content: accumulated,
           model: selectedModel.id, id: aiMsgId,
+          // isStreaming szándékosan NINCS itt → eltűnik a kurzor
         };
+        // ── FIX: setIsTyping(false) + setMessages egyszerre, MIELŐTT a saveMessage fut ──
+        // Ha külön hívnánk őket (isTyping=true marad saveMessage közben),
+        // az isTyping=true && !isStreaming feltétel igaz lenne → dots jelenik meg.
+        // Ha pedig onSnapshot listener van az appban, a saveMessage Firestore write
+        // visszaolvashat és duplán adja hozzá az üzenetet — ezért deduplication is kell.
+        setIsTyping(false);
         setMessages((prev) => prev.map((m) => m.id === aiMsgId ? finalMsg : m));
         await saveMessage(finalMsg);
 
-      // ── Normál JSON válasz (Anthropic, OpenAI) ──────────────────
+      // ── Normál JSON válasz ─────────────────────────────────
       } else {
         const data = await res.json();
         const finalMsg = {
@@ -477,6 +495,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           model: selectedModel.id, id: aiMsgId,
           ...(data.usage ? { usage: data.usage } : {}),
         };
+        setIsTyping(false);
         setMessages((prev) => prev.map((m) => m.id === aiMsgId ? finalMsg : m));
         await saveMessage(finalMsg);
         setTimeout(() => scrollToBottom(), 50);
@@ -490,7 +509,9 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           : m)
       );
     } finally {
+      // setIsTyping(false) már a sikeres ágban meghívva, de error esetére itt is kell
       setIsTyping(false);
+      streamingMsgIdRef.current = null;
     }
   };
 
@@ -554,16 +575,12 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
       {/* ── Tab: CHAT ── */}
       {activeTab === "chat" && (
         <>
-          {/*
-            ── FIX: ref={chatScrollRef} a scrollozható div-re ──
-            overflow-y-auto + h-full biztosítja, hogy CSAK ez a div görget,
-            nem az oldal — scrollTo/scrollTop csak ezen a elemen működik
-          */}
           <div
             ref={chatScrollRef}
             className="flex-1 overflow-y-auto px-3 md:px-5 py-3 space-y-3 scrollbar-thin"
           >
-            {messages.map((msg) => {
+            {/* ── FIX: deduplication — onSnapshot vagy egyéb ok miatt ne jelenjen meg kétszer ── */}
+            {messages.filter((m, i, arr) => arr.findIndex((x) => x.id === m.id) === i).map((msg) => {
               const isUser = msg.role === "user";
               return (
                 <div
@@ -595,7 +612,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
                       }
                     >
                       {msg.isStreaming && !msg.content ? (
-                        // Dots amíg az első token megérkezik
                         <div className="flex gap-1 py-1">
                           {[0, 0.15, 0.3].map((d, i) => (
                             <div key={i} className="w-1.5 h-1.5 rounded-full animate-bounce"
@@ -605,7 +621,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
                       ) : (
                         <>
                           {renderContent(msg.content)}
-                          {/* Villogó kurzor streamelés közben */}
                           {msg.isStreaming && (
                             <span
                               className="inline-block w-[2px] h-[1em] ml-0.5 align-middle rounded-sm animate-pulse"
@@ -642,7 +657,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
               );
             })}
 
-            {/* Dots csak ha nincs még streaming üzenet */}
+            {/* Dots csak ha nincs már streaming üzenet */}
             {isTyping && !messages.some((m) => m.isStreaming) && (
               <div className="flex gap-2.5">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${color}40`, border: `1px solid ${color}30` }}>
@@ -733,7 +748,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
 
           {[
             { label: "Temperature", key: "temperature", min: 0, max: 2, step: 0.05, val: temperature, set: setTemperature, hint: "0 = determinisztikus · 0.7 = kiegyensúlyozott · 2 = random" },
-            { label: "Max Tokens", key: "maxTokens", min: 128, max: 8192, step: 128, val: maxTokens, set: setMaxTokens, hint: "Maximális válaszhossz tokenekben (~1 token ≈ ¾ szó)" },
+            { label: "Max Tokens", key: "maxTokens", min: 128, max: 16384, step: 128, val: maxTokens, set: setMaxTokens, hint: "Maximális válaszhossz tokenekben (~1 token ≈ ¾ szó)" },
             { label: "Top P", key: "topP", min: 0, max: 1, step: 0.05, val: topP, set: setTopP, hint: "Nucleus sampling — ne módosítsd temperature-rel együtt" },
             { label: "Frequency Penalty", key: "freq", min: -2, max: 2, step: 0.1, val: frequencyPenalty, set: setFrequencyPenalty, hint: "Pozitív: ismétlések csökkentése" },
             { label: "Presence Penalty", key: "pres", min: -2, max: 2, step: 0.1, val: presencePenalty, set: setPresencePenalty, hint: "Pozitív: új témák bevezetése" },
