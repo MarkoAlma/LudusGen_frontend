@@ -136,10 +136,11 @@ export const MODEL_GROUPS = [
                     { id: "mistral-large",   name: "Mistral Large (Mistral)",    apiModel: "mistral-large-latest",    provider: "mistral", color: "#f97316" },
                     { id: "nvidia-glm5",   name: "Z.ai GLM 5 (NVIDIA)",    apiModel: "z-ai/glm5",    provider: "nvidia", color: "#16f921" },
                     { id: "nvidia-kimi",   name: "Kimi 2.5 (NVIDIA)",    apiModel: "moonshotai/kimi-k2.5",    provider: "nvidia", color: "#16f921" },
-                    { id: "qwen3.5-397b", name: "Qwen 3.5 397B (NVIDIA)", apiModel: "qwen/qwen3.5-397b-a17b", provider: "nvidia", color: "#46f536" },
+                    { id: "qwen3.5-397b", name: "Qwen 3.5 397B (img also)(NVIDIA)", apiModel: "qwen/qwen3.5-397b-a17b", provider: "nvidia", color: "#46f536" },
                     { id: "qwen3-coder-480b", name: "Qwen 3 Coder 480B (NVIDIA)", apiModel: "qwen/qwen3-coder-480b-a35b-instruct", provider: "nvidia", color: "#16f921" },
                     { id: "mistralai-devstral-2-123b-instruct-2512", name: "DevStral 2 123B (coding) (NVIDIA)", apiModel: "mistralai/devstral-2-123b-instruct-2512", provider: "nvidia", color: "#16f921" },
                     { id: "deepseek-v3.2", name: "DeepSeek v3.2 (NVIDIA)", apiModel: "deepseek-ai/deepseek-v3.2", provider: "nvidia", color: "#16f921"},
+                    { id: "google-gemma-3-27b-it", name: "Gemma 3 27B IT (img also) (NVIDIA)", apiModel: "google/gemma-3-27b-it", provider: "nvidia", color: "#16f921" },
                  
 
                     
