@@ -99,6 +99,7 @@ const renderContent = (text) => {
       lang = firstLine === "py" ? "python" : firstLine;
       code = lines.slice(1).join("\n");
     }
+    
 
     // Maradék ``` vagy """ eltávolítása a végéről
     code = code.replace(/```$/, "").replace(/"""$/, "");
