@@ -134,7 +134,13 @@ export const MODEL_GROUPS = [
                     { id: "cerebras-qwen235b",  name: "Qwen 3 235B (Cerebras) (Nem jo)",        apiModel: "qwen-3-235b-a22b-instruct-2507", provider: "cerebras", color: "#8b5cf6" },
                     { id: "cerebras-zaiglm",    name: "Z.ai GLM 4.7 (Cerebras) (Nem jo)",       apiModel: "zai-glm-4.7",                   provider: "cerebras", color: "#a855f7" },
                     { id: "mistral-large",   name: "Mistral Large (Mistral)",    apiModel: "mistral-large-latest",    provider: "mistral", color: "#f97316" },
-                    
+                    { id: "nvidia-glm5",   name: "Z.ai GLM 5 (NVIDIA)",    apiModel: "z-ai/glm5",    provider: "nvidia", color: "#16f921" },
+                    { id: "nvidia-kimi",   name: "Kimi 2.5 (NVIDIA)",    apiModel: "moonshotai/kimi-k2.5",    provider: "nvidia", color: "#16f921" },
+                    { id: "qwen3.5-397b", name: "Qwen 3.5 397B (NVIDIA)", apiModel: "qwen/qwen3.5-397b-a17b", provider: "nvidia", color: "#46f536" },
+                    { id: "qwen3-coder-480b", name: "Qwen 3 Coder 480B (NVIDIA)", apiModel: "qwen/qwen3-coder-480b-a35b-instruct", provider: "nvidia", color: "#16f921" },
+                    { id: "mistralai-devstral-2-123b-instruct-2512", name: "DevStral 2 123B (coding) (NVIDIA)", apiModel: "mistralai/devstral-2-123b-instruct-2512", provider: "nvidia", color: "#16f921" },
+                    { id: "deepseek-v3.2", name: "DeepSeek v3.2 (NVIDIA)", apiModel: "deepseek-ai/deepseek-v3.2", provider: "nvidia", color: "#16f921"},
+                 
 
                     
 
@@ -218,6 +224,35 @@ export const MODEL_GROUPS = [
     tierLabel: "Free",
     description: "SDXL képgenerálás",
     },
+    {
+    id: "nvidia-sd3-medium",
+    name: "Stable Diffusion 3 Medium (NVIDIA)",
+    apiModel: "stabilityai/stable-diffusion-3-medium",
+    provider: "nvidia-image",
+    color: "#16f921",
+    badge: "NVIDIA",
+    panelType: "image",
+},
+    {
+    id: "nvidia-flux-dev",
+    name: "Flux 1 Dev (NVIDIA)",
+    apiModel: "black-forest-labs/flux.1-dev",
+    provider: "nvidia-image",
+    color: "#16f921",
+    badge: "NVIDIA",
+    panelType: "image",
+},
+//     {
+//     id: "nvidia-flux-kontext-dev",
+//     name: "Flux 1 Kontext Dev (NVIDIA)",
+//     apiModel: "black-forest-labs/flux.1-kontext-dev",
+//     provider: "nvidia-image",
+//     color: "#16f921",
+//     badge: "NVIDIA",
+//     panelType: "image",
+// },
+
+
                 ],
             },
             
