@@ -24,9 +24,10 @@ import {
 import ChatPanel from "./ChatPanel";
 import ImagePanel from "./ImagePanel";
 import AudioPanel from "./AudioPanel";
-import Trellis2Panel from "./Trellis2panel";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useContext } from "react";
+import Trellis2Panel from "./meshy/Meshy";
+import TrellisPanel from "./trellis/TrellisPanel";
 
 // ─── Group icon map ────────────────────────────────────
 const GroupIcon = ({ group, className = "w-4 h-4" }) => {
@@ -135,7 +136,7 @@ export default function AIChat({ user, getIdToken }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState(() => new Set(["chat"]));
   const [openCats, setOpenCats] = useState(() => new Set(["chat_anthropic"]));
-const {navHeight} = useContext(MyUserContext);
+  const { navHeight } = useContext(MyUserContext);
   const selectedModel = getModel(selectedAI) || ALL_MODELS[0];
 
   const handleSelectModel = useCallback((modelId) => {
@@ -178,6 +179,9 @@ const {navHeight} = useContext(MyUserContext);
         return <AudioPanel {...props} />;
       case "threed":
         return <Trellis2Panel {...props} />;
+
+      case "trellis":
+        return <TrellisPanel {...props} />;
       default:
         return <ChatPanel {...props} />;
     }

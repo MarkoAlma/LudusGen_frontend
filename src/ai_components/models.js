@@ -75,19 +75,17 @@ export const MODEL_GROUPS = [
                     },
                 ],
             },
-            
         ],
     },
 
     // ─── KÓD ─────────────────────────────────────────────
-   {
+    {
         id: "code",
         label: "Kód",
         emoji: "💻",
         color: "#3b82f6",
         defaultOpen: false,
         categories: [
-
             {
                 id: "code_models",
                 label: null,
@@ -95,11 +93,10 @@ export const MODEL_GROUPS = [
                     {
                         id: "deepseek_code",
                         name: "DeepSeek Code Free",
-                        tier: "lite",
-                        tierLabel: "Ingyenes",
+                        tier: "lite", tierLabel: "Ingyenes",
                         description: "Profi fejlesztőasszisztens DeepSeek ingyenes OpenRouter hozzáféréssel",
                         badge: "Free / napi limit",
-                        apiModel: "arcee-ai/trinity-large-preview:free", //csere
+                        apiModel: "arcee-ai/trinity-large-preview:free",
                         provider: "openrouter",
                         color: "#6366f1",
                         gradient: "from-indigo-500 to-purple-500",
@@ -196,64 +193,49 @@ export const MODEL_GROUPS = [
                 id: "img_gen",
                 label: null,
                 models: [
-                   
                     {
-    id: "gemini-image",
-    name: "Gemini Image Gen",
-    apiModel: "gemini-2.5-flash-image",
-    provider: "google-image",
-    color: "#4285f4",
-    badge: "Google",
-    badgeDetail: "Gemini 2.5 Flash képgenerálás",
-    description: "Google Gemini képgeneráló",
-    tier: "pro",
-    tierLabel: "Pro",
-    panelType: "image",
-  },
-    {
-    id: "cf-sdxl",
-    name: "Stable Diffusion XL (Cloudflare)",
-    apiModel: "@cf/stabilityai/stable-diffusion-xl-base-1.0",
-    provider: "cloudflare",
-    color: "#f6821f",
-    badge: "Cloudflare",
-    panelType: "image",
-    tier: "free",
-    tierLabel: "Free",
-    description: "SDXL képgenerálás",
-    },
-    {
-    id: "nvidia-sd3-medium",
-    name: "Stable Diffusion 3 Medium (NVIDIA)",
-    apiModel: "stabilityai/stable-diffusion-3-medium",
-    provider: "nvidia-image",
-    color: "#16f921",
-    badge: "NVIDIA",
-    panelType: "image",
-},
-    {
-    id: "nvidia-flux-dev",
-    name: "Flux 1 Dev (NVIDIA)",
-    apiModel: "black-forest-labs/flux.1-dev",
-    provider: "nvidia-image",
-    color: "#16f921",
-    badge: "NVIDIA",
-    panelType: "image",
-},
-//     {
-//     id: "nvidia-flux-kontext-dev",
-//     name: "Flux 1 Kontext Dev (NVIDIA)",
-//     apiModel: "black-forest-labs/flux.1-kontext-dev",
-//     provider: "nvidia-image",
-//     color: "#16f921",
-//     badge: "NVIDIA",
-//     panelType: "image",
-// },
-
-
+                        id: "gemini-image",
+                        name: "Gemini Image Gen",
+                        apiModel: "gemini-2.5-flash-image",
+                        provider: "google-image",
+                        color: "#4285f4",
+                        badge: "Google",
+                        badgeDetail: "Gemini 2.5 Flash képgenerálás",
+                        description: "Google Gemini képgeneráló",
+                        tier: "pro", tierLabel: "Pro",
+                        panelType: "image",
+                    },
+                    {
+                        id: "cf-sdxl",
+                        name: "Stable Diffusion XL (Cloudflare)",
+                        apiModel: "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+                        provider: "cloudflare",
+                        color: "#f6821f",
+                        badge: "Cloudflare",
+                        panelType: "image",
+                        tier: "free", tierLabel: "Free",
+                        description: "SDXL képgenerálás",
+                    },
+                    {
+                        id: "nvidia-sd3-medium",
+                        name: "Stable Diffusion 3 Medium (NVIDIA)",
+                        apiModel: "stabilityai/stable-diffusion-3-medium",
+                        provider: "nvidia-image",
+                        color: "#16f921",
+                        badge: "NVIDIA",
+                        panelType: "image",
+                    },
+                    {
+                        id: "nvidia-flux-dev",
+                        name: "Flux 1 Dev (NVIDIA)",
+                        apiModel: "black-forest-labs/flux.1-dev",
+                        provider: "nvidia-image",
+                        color: "#16f921",
+                        badge: "NVIDIA",
+                        panelType: "image",
+                    },
                 ],
             },
-            
         ],
     },
 
@@ -366,7 +348,7 @@ export const MODEL_GROUPS = [
                         gradient: "from-sky-400 to-cyan-400",
                         inputType: "image",
                         outputNote: "GLB / OBJ",
-                        panelType: "threed",
+                        panelType: "threed",        // → Trellis2Panel (Meshy)
                     },
                     {
                         id: "trellis2",
@@ -381,7 +363,21 @@ export const MODEL_GROUPS = [
                         gradient: "from-cyan-500 to-indigo-500",
                         inputType: "image",
                         outputNote: "GLB (PBR)",
-                        panelType: "threed",
+                        panelType: "threed",        // → Trellis2Panel (Meshy)
+                    },
+                    {
+                        id: "nvidia_trellis",
+                        name: "Trellis (NVIDIA)",
+                        tier: "pro", tierLabel: "Prémium",
+                        description: "microsoft/trellis — NVIDIA NIM",
+                        badge: "NVIDIA NIM",
+                        priceNote: "~30 sec",
+                        provider: "nvidia",
+                        color: "#a78bfa",
+                        gradient: "from-violet-500 to-purple-600",
+                        inputType: "image",
+                        outputNote: "GLB",
+                        panelType: "trellis",       // → TrellisPanel (NVIDIA)
                     },
                 ],
             },
@@ -487,7 +483,7 @@ export const DEFAULT_PRESETS = {
             id: "default_code",
             name: "💻 Kód asszisztens",
             description: "Fejlesztési feladatokhoz",
-            systemPrompt: `You are an expert software engineer. 
+            systemPrompt: `You are an expert software engineer.
 - Write clean, production-ready code with comments
 - Explain your solutions step by step
 - Point out edge cases and potential bugs
