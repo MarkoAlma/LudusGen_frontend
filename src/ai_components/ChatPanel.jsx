@@ -278,7 +278,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
   const [copiedId, setCopiedId] = useState(null);
 
   // ── Képfeltöltés state ──
-  const [attachedImage, setAttachedImage] = useState(null); // { dataUrl, mimeType, name }
+  const [attachedImage, setAttachedImage] = useState(null);
   const fileInputRef = useRef(null);
 
   const chatScrollRef = useRef(null);
@@ -383,7 +383,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     if (!userId) return;
     try {
       const sessionId = getCurrentSessionId();
-      // Ha a content array (vision üzenet), stringgé alakítjuk mentéshez
       const contentToSave = Array.isArray(msg.content)
         ? msg.content.find((p) => p.type === "text")?.text || ""
         : msg.content;
@@ -399,7 +398,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
         createdAt: new Date().toISOString(),
         ...(msg.usage ? { usage: msg.usage } : {}),
         ...(msg.isError ? { isError: true } : {}),
-        // Képet nem mentjük Firestore-ba (méret limit), csak a szöveget
       });
       await addDoc(collection(db, "conversations", userId, selectedModel.id), msgData);
     } catch (e) { console.error("Save message error:", e); }
@@ -459,9 +457,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
 
   // ─── FŐ KÜLDÉS — streaming támogatással ───────────────
   const handleSend = async () => {
-    if (!input.trim() || isTyping) return;
+    if ((!input.trim() && !attachedImage) || isTyping) return;
 
-    // Ha van csatolt kép, multimodális content array-t építünk
     const userContent = attachedImage
       ? [
           { type: "image_url", image_url: { url: attachedImage.dataUrl } },
@@ -474,7 +471,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
       content: userContent,
       model: selectedModel.id,
       id: Date.now().toString(),
-      // attachedImagePreview csak UI megjelenítéshez, Firestore-ba NEM kerül
       attachedImagePreview: attachedImage?.dataUrl ?? null,
     };
 
@@ -497,7 +493,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     });
 
     setInput("");
-    setAttachedImage(null); // preview törlése küldés után
+    setAttachedImage(null);
     setIsTyping(true);
     setTimeout(() => scrollToBottom(), 50);
 
@@ -507,6 +503,16 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     try {
       const token = getIdToken ? await getIdToken() : null;
       if (!token) throw new Error("Nincs érvényes autentikációs token. Jelentkezz be újra.");
+
+      // ── FIX: "welcome" üzenetet kiszűrjük az API hívásból ──────────────
+      // clearConversation() után a messages[0] egy assistant welcome üzenet
+      // (id: "welcome"). Ha ezt elküldjük az API-nak, a lista assistant
+      // üzenettel kezdődik → az NVIDIA és más API-k 400-as hibával dobják vissza,
+      // mert az első üzenetnek user típusúnak kell lennie.
+      const apiMessages = currentMessages
+        .filter((m) => m.role !== "system")
+        .filter((m) => m.id !== "welcome")   // ← FIX: welcome üzenet kiszűrése
+        .map((m) => ({ role: m.role, content: m.content }));
 
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
@@ -519,10 +525,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           provider: selectedModel.provider,
           messages: [
             ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-            ...currentMessages.filter((m) => m.role !== "system").map((m) => ({
-              role: m.role,
-              content: m.content, // array vagy string, a backend kezeli
-            })),
+            ...apiMessages,
           ],
           temperature, max_tokens: maxTokens, top_p: topP,
           frequency_penalty: frequencyPenalty, presence_penalty: presencePenalty,
@@ -608,7 +611,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
   };
 
   const copyMessage = (id, text) => {
-    // Ha a content array, csak a szöveges részt másoljuk
     const textToCopy = Array.isArray(text)
       ? text.find((p) => p.type === "text")?.text || ""
       : text;
@@ -622,7 +624,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     const welcome = [{
       role: "assistant",
       content: `Új beszélgetés kezdve! ${selectedModel.name} készen áll. 🚀`,
-      model: selectedModel.id, id: Date.now().toString(),
+      model: selectedModel.id, id: "welcome",
     }];
     prevMessageCount.current = welcome.length;
     setMessages(welcome);
@@ -811,7 +813,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
             )}
 
             <div className="flex gap-2 items-end">
-              {/* ── Kép feltöltő gomb — csak vision-képes modellnél jelenik meg ── */}
               {selectedModel.supportsVision && (
                 <>
                   <input
