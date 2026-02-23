@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Send, Settings2, Bookmark, Trash2, Plus, ChevronDown, ChevronUp,
   Sparkles, User, Bot, RefreshCw, Copy, Check, Sliders, X,
-  MessageSquare, History, Zap,
+  MessageSquare, History, Zap, ImagePlus,
 } from "lucide-react";
 import { db } from "../firebase/firebaseApp";
 import {
@@ -49,16 +49,12 @@ const CodeBlock = ({ lang, code }) => {
   );
 };
 
-// ─── Markdown-lite renderer ───────────────────────────
 // ─── Markdown-lite renderer (streaming-safe) ───────────────────────
 const renderContent = (text) => {
   if (!text) return null;
 
-  // 1. Először keressük meg a lezárt kódblokkokat
   const parts = text.split(/(```[\s\S]*?```)/g);
 
-  // 2. Ellenőrizzük, hogy az utolsó rész tartalmaz-e nyitott (lezáratlan) kódblokkot
-  //    Ez streaming közben fordulhat elő: a záró ``` még nem érkezett meg.
   const lastPart = parts[parts.length - 1];
   const openBlockMatch = lastPart.match(/^([\s\S]*?)(```[\s\S]*)$/);
 
@@ -66,32 +62,21 @@ const renderContent = (text) => {
   let openBlock = null;
 
   if (openBlockMatch) {
-    // Az utolsó részt kettévágjuk:
-    //   - ami a ``` előtt van → normál szöveg
-    //   - ami a ```-tól kezdődik → befejezetlen kódblokk
     const beforeCode = openBlockMatch[1];
-    const incompleteCode = openBlockMatch[2]; // pl. "```python\nprint('hello')\n"
-
+    const incompleteCode = openBlockMatch[2];
     processedParts = [...parts.slice(0, -1), beforeCode];
     openBlock = incompleteCode;
   }
 
   const renderCodeBlock = (raw, key) => {
-    // raw: "```python\nkód..." vagy "```python\nkód...```"
     let content = raw.startsWith("```") ? raw.slice(3) : raw;
-
-    // Záró ``` eltávolítása, ha van
-    if (content.endsWith("```")) {
-      content = content.slice(0, -3);
-    }
+    if (content.endsWith("```")) content = content.slice(0, -3);
 
     const lines = content.split("\n");
     const firstLine = lines[0].trim().toLowerCase();
-
     let lang = "";
     let code = content;
 
-    // Nyelvmegjelölés detektálása (python, py, js, javascript, stb.)
     const knownLangs = ["python", "py", "javascript", "js", "typescript", "ts",
                         "jsx", "tsx", "html", "css", "bash", "sh", "json",
                         "sql", "java", "c", "cpp", "c++", "rust", "go"];
@@ -99,11 +84,8 @@ const renderContent = (text) => {
       lang = firstLine === "py" ? "python" : firstLine;
       code = lines.slice(1).join("\n");
     }
-    
 
-    // Maradék ``` vagy """ eltávolítása a végéről
     code = code.replace(/```$/, "").replace(/"""$/, "");
-
     return <CodeBlock key={key} lang={lang} code={code} />;
   };
 
@@ -138,18 +120,21 @@ const renderContent = (text) => {
   return (
     <>
       {processedParts.map((part, i) => {
-        if (part.startsWith("```")) {
-          // Lezárt kódblokk
-          return renderCodeBlock(part, i);
-        }
-        // Normál szöveg inline formázással
+        if (part.startsWith("```")) return renderCodeBlock(part, i);
         return renderInline(part, i);
       })}
-
-      {/* Streaming közben lezáratlan kódblokk — azonnal kódként rendereljük */}
       {openBlock && renderCodeBlock(openBlock, "streaming-open")}
     </>
   );
+};
+
+// ─── Üzenet tartalom renderer (kezeli az array content-et is) ────────
+const renderMessageContent = (content) => {
+  if (Array.isArray(content)) {
+    const textPart = content.find((p) => p.type === "text")?.text || "";
+    return renderContent(textPart);
+  }
+  return renderContent(content);
 };
 
 // ─── Preset modal ──────────────────────────────────────
@@ -292,11 +277,14 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
+  // ── Képfeltöltés state ──
+  const [attachedImage, setAttachedImage] = useState(null); // { dataUrl, mimeType, name }
+  const fileInputRef = useRef(null);
+
   const chatScrollRef = useRef(null);
   const textareaRef = useRef(null);
   const isLoadingConversation = useRef(false);
   const prevMessageCount = useRef(0);
-  // ── FIX: ref-ben tároljuk az aktuális streaming üzenet id-jét ──
   const streamingMsgIdRef = useRef(null);
 
   const scrollToBottom = useCallback((smooth = true) => {
@@ -395,12 +383,23 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     if (!userId) return;
     try {
       const sessionId = getCurrentSessionId();
+      // Ha a content array (vision üzenet), stringgé alakítjuk mentéshez
+      const contentToSave = Array.isArray(msg.content)
+        ? msg.content.find((p) => p.type === "text")?.text || ""
+        : msg.content;
       const msgData = removeUndefined({
-        role: msg.role, content: msg.content, model: msg.model, id: msg.id,
-        sessionId, modelId: selectedModel.id, modelName: selectedModel.name,
-        timestamp: serverTimestamp(), createdAt: new Date().toISOString(),
+        role: msg.role,
+        content: contentToSave,
+        model: msg.model,
+        id: msg.id,
+        sessionId,
+        modelId: selectedModel.id,
+        modelName: selectedModel.name,
+        timestamp: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         ...(msg.usage ? { usage: msg.usage } : {}),
         ...(msg.isError ? { isError: true } : {}),
+        // Képet nem mentjük Firestore-ba (méret limit), csak a szöveget
       });
       await addDoc(collection(db, "conversations", userId, selectedModel.id), msgData);
     } catch (e) { console.error("Save message error:", e); }
@@ -441,13 +440,42 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     if (activePresetId === presetId) setActivePresetId("default_balanced");
   };
 
+  // ─── Képválasztás kezelő ──────────────────────────────
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Maximum 10 MB méretű képet csatolhatsz!");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setAttachedImage({ dataUrl: ev.target.result, mimeType: file.type, name: file.name });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   // ─── FŐ KÜLDÉS — streaming támogatással ───────────────
   const handleSend = async () => {
     if (!input.trim() || isTyping) return;
 
+    // Ha van csatolt kép, multimodális content array-t építünk
+    const userContent = attachedImage
+      ? [
+          { type: "image_url", image_url: { url: attachedImage.dataUrl } },
+          { type: "text", text: input.trim() },
+        ]
+      : input.trim();
+
     const userMsg = {
-      role: "user", content: input.trim(),
-      model: selectedModel.id, id: Date.now().toString(),
+      role: "user",
+      content: userContent,
+      model: selectedModel.id,
+      id: Date.now().toString(),
+      // attachedImagePreview csak UI megjelenítéshez, Firestore-ba NEM kerül
+      attachedImagePreview: attachedImage?.dataUrl ?? null,
     };
 
     const aiMsgId = `ai_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -458,11 +486,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
       model: selectedModel.id, id: aiMsgId, isStreaming: true,
     };
 
-    // ── FIX: user üzenet + placeholder EGYETLEN atomikus setMessages hívásban ──
-    // Ez megakadályozza, hogy React StrictMode / concurrent mode
-    // duplán adja hozzá a placeholdert két külön functional update-ből.
     setMessages((prev) => {
-      // Idempotency: ha valami miatt már benne van, ne add hozzá újra
       const withUser = prev.some((m) => m.id === userMsg.id)
         ? prev
         : [...prev, userMsg];
@@ -473,10 +497,10 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     });
 
     setInput("");
+    setAttachedImage(null); // preview törlése küldés után
     setIsTyping(true);
     setTimeout(() => scrollToBottom(), 50);
 
-    // newMessages a API híváshoz (a placeholder nélkül)
     const currentMessages = [...messages, userMsg];
     await saveMessage(userMsg);
 
@@ -496,7 +520,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           messages: [
             ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
             ...currentMessages.filter((m) => m.role !== "system").map((m) => ({
-              role: m.role, content: m.content,
+              role: m.role,
+              content: m.content, // array vagy string, a backend kezeli
             })),
           ],
           temperature, max_tokens: maxTokens, top_p: topP,
@@ -546,17 +571,10 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           }
         }
 
-        // ── Streamelés kész: placeholder cseréje végleges üzenetre ──
         const finalMsg = {
           role: "assistant", content: accumulated,
           model: selectedModel.id, id: aiMsgId,
-          // isStreaming szándékosan NINCS itt → eltűnik a kurzor
         };
-        // ── FIX: setIsTyping(false) + setMessages egyszerre, MIELŐTT a saveMessage fut ──
-        // Ha külön hívnánk őket (isTyping=true marad saveMessage közben),
-        // az isTyping=true && !isStreaming feltétel igaz lenne → dots jelenik meg.
-        // Ha pedig onSnapshot listener van az appban, a saveMessage Firestore write
-        // visszaolvashat és duplán adja hozzá az üzenetet — ezért deduplication is kell.
         setIsTyping(false);
         setMessages((prev) => prev.map((m) => m.id === aiMsgId ? finalMsg : m));
         await saveMessage(finalMsg);
@@ -584,14 +602,17 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           : m)
       );
     } finally {
-      // setIsTyping(false) már a sikeres ágban meghívva, de error esetére itt is kell
       setIsTyping(false);
       streamingMsgIdRef.current = null;
     }
   };
 
   const copyMessage = (id, text) => {
-    navigator.clipboard.writeText(text);
+    // Ha a content array, csak a szöveges részt másoljuk
+    const textToCopy = Array.isArray(text)
+      ? text.find((p) => p.type === "text")?.text || ""
+      : text;
+    navigator.clipboard.writeText(textToCopy);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -654,7 +675,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
             ref={chatScrollRef}
             className="flex-1 overflow-y-auto px-3 md:px-5 py-3 space-y-3 scrollbar-thin"
           >
-            {/* ── FIX: deduplication — onSnapshot vagy egyéb ok miatt ne jelenjen meg kétszer ── */}
             {messages.filter((m, i, arr) => arr.findIndex((x) => x.id === m.id) === i).map((msg) => {
               const isUser = msg.role === "user";
               return (
@@ -686,6 +706,16 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
                             }
                       }
                     >
+                      {/* ── Csatolt kép megjelenítése user üzenetnél ── */}
+                      {msg.attachedImagePreview && (
+                        <img
+                          src={msg.attachedImagePreview}
+                          alt="csatolt kép"
+                          className="max-w-xs rounded-xl mb-2 block"
+                          style={{ border: `1px solid ${color}30`, maxHeight: "300px", objectFit: "contain" }}
+                        />
+                      )}
+
                       {msg.isStreaming && !msg.content ? (
                         <div className="flex gap-1 py-1">
                           {[0, 0.15, 0.3].map((d, i) => (
@@ -695,7 +725,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
                         </div>
                       ) : (
                         <>
-                          {renderContent(msg.content)}
+                          {renderMessageContent(msg.content)}
                           {msg.isStreaming && (
                             <span
                               className="inline-block w-[2px] h-[1em] ml-0.5 align-middle rounded-sm animate-pulse"
@@ -732,7 +762,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
               );
             })}
 
-            {/* Dots csak ha nincs már streaming üzenet */}
             {isTyping && !messages.some((m) => m.isStreaming) && (
               <div className="flex gap-2.5">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${color}40`, border: `1px solid ${color}30` }}>
@@ -760,7 +789,52 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
                 <span className="text-gray-700 text-xs">· T:{temperature} · {maxTokens} tok</span>
               </div>
             )}
+
+            {/* ── Kép preview ── */}
+            {attachedImage && (
+              <div className="relative inline-block mb-2 ml-1">
+                <img
+                  src={attachedImage.dataUrl}
+                  alt="preview"
+                  className="h-20 w-auto rounded-xl object-cover"
+                  style={{ border: `1px solid ${color}40` }}
+                />
+                <button
+                  onClick={() => setAttachedImage(null)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-white cursor-pointer transition-opacity hover:opacity-80"
+                  style={{ background: "rgba(239,68,68,0.9)" }}
+                  title="Kép eltávolítása"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
             <div className="flex gap-2 items-end">
+              {/* ── Kép feltöltő gomb — csak vision-képes modellnél jelenik meg ── */}
+              {selectedModel.supportsVision && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageSelect}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="cursor-pointer p-3 rounded-2xl transition-all flex-shrink-0 hover:opacity-90 active:scale-95"
+                    style={{
+                      background: attachedImage ? `${color}30` : "rgba(255,255,255,0.05)",
+                      border: `1px solid ${attachedImage ? color + "50" : "rgba(255,255,255,0.08)"}`,
+                    }}
+                    title="Kép csatolása"
+                  >
+                    <ImagePlus className="w-4 h-4" style={{ color: attachedImage ? color : "#6b7280" }} />
+                  </button>
+                </>
+              )}
+
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -775,23 +849,23 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
                     handleSend();
                   }
                 }}
-                placeholder="Írj egy üzenetet..."
+                placeholder={attachedImage ? "Írj a képről..." : "Írj egy üzenetet..."}
                 rows={1}
                 className="flex-1 px-4 py-3 rounded-2xl text-white text-sm placeholder-gray-600 resize-none focus:outline-none transition-all"
                 style={{
                   background: "rgba(255,255,255,0.04)",
-                  border: `1px solid ${input ? color + "40" : "rgba(255,255,255,0.08)"}`,
+                  border: `1px solid ${input || attachedImage ? color + "40" : "rgba(255,255,255,0.08)"}`,
                   minHeight: "48px", maxHeight: "160px", overflowY: "auto",
                 }}
               />
               <button
                 onClick={handleSend}
-                disabled={!input.trim() || isTyping}
+                disabled={(!input.trim() && !attachedImage) || isTyping}
                 className="cursor-pointer p-3 rounded-2xl transition-all duration-200 flex-shrink-0 hover:opacity-90 active:scale-95 disabled:cursor-not-allowed"
                 style={{
-                  background: input.trim() && !isTyping ? `linear-gradient(135deg, ${color}, ${color}bb)` : "rgba(255,255,255,0.05)",
-                  opacity: input.trim() && !isTyping ? 1 : 0.4,
-                  boxShadow: input.trim() && !isTyping ? `0 0 20px ${color}30` : "none",
+                  background: (input.trim() || attachedImage) && !isTyping ? `linear-gradient(135deg, ${color}, ${color}bb)` : "rgba(255,255,255,0.05)",
+                  opacity: (input.trim() || attachedImage) && !isTyping ? 1 : 0.4,
+                  boxShadow: (input.trim() || attachedImage) && !isTyping ? `0 0 20px ${color}30` : "none",
                 }}
               >
                 <Send className="w-4 h-4 text-white" />
@@ -800,6 +874,9 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
             <p className="text-xs text-gray-700 mt-1.5 px-1 flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
               Enter = küldés · Shift+Enter = új sor
+              {selectedModel.supportsVision && (
+                <span className="ml-2 text-gray-600">· Képcsatolás támogatott</span>
+              )}
             </p>
           </div>
         </>
