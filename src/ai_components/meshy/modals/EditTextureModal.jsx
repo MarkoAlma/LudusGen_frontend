@@ -1,7 +1,7 @@
 // modals/EditTextureModal.jsx
 import React, { useState, useRef } from 'react';
 import { Upload, Loader2, X, Image, Camera, Grid3x3, Layers, RotateCcw, Paintbrush2 } from 'lucide-react';
-import { Modal } from '../ui/Primitives';
+import { Modal, Tooltip } from '../ui/Primitives';
 
 const UV_LAYERS = [
   { id: 'base_color', label: 'Base Color', icon: '🎨' },
