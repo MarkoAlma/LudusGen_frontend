@@ -232,6 +232,7 @@ if (viewMode === 'clay' || viewMode === 'uv') {
   return;
 }
 
+
   const k = strength;
 
   if (mode === "studio") {
