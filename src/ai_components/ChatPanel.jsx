@@ -95,19 +95,85 @@ const CodeBlock = ({ lang, code }) => {
 };
 
 // ─── Markdown-lite renderer ───────────────────────────
+// ─── Markdown-lite renderer (streaming-safe) ───────────────────────
 const renderContent = (text) => {
   if (!text) return null;
+
+  // 1. Először keressük meg a lezárt kódblokkokat
   const parts = text.split(/(```[\s\S]*?```)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith("```")) {
-      const lines = part.slice(3, -3).split("\n");
-      const lang = lines[0] || "";
-      const code = lines.slice(1).join("\n");
-      return <CodeBlock key={i} lang={lang} code={code} />;
+
+  // 2. Ellenőrizzük, hogy az utolsó rész tartalmaz-e nyitott (lezáratlan) kódblokkot
+  //    Ez streaming közben fordulhat elő: a záró ``` még nem érkezett meg.
+  const lastPart = parts[parts.length - 1];
+  const openBlockMatch = lastPart.match(/^([\s\S]*?)(```[\s\S]*)$/);
+
+  let processedParts = parts;
+  let openBlock = null;
+
+  if (openBlockMatch) {
+    // Az utolsó részt kettévágjuk:
+    //   - ami a ``` előtt van → normál szöveg
+    //   - ami a ```-tól kezdődik → befejezetlen kódblokk
+    const beforeCode = openBlockMatch[1];
+    const incompleteCode = openBlockMatch[2]; // pl. "```python\nprint('hello')\n"
+
+    processedParts = [...parts.slice(0, -1), beforeCode];
+    openBlock = incompleteCode;
+  }
+
+  const renderCodeBlock = (raw, key) => {
+    // raw: "```python\nkód..." vagy "```python\nkód...```"
+    let content = raw.startsWith("```") ? raw.slice(3) : raw;
+
+    // Záró ``` eltávolítása, ha van
+    if (content.endsWith("```")) {
+      content = content.slice(0, -3);
     }
+
+    const lines = content.split("\n");
+    const firstLine = lines[0].trim().toLowerCase();
+
+    let lang = "";
+    let code = content;
+
+    // Nyelvmegjelölés detektálása (python, py, js, javascript, stb.)
+    const knownLangs = [
+      "python",
+      "py",
+      "javascript",
+      "js",
+      "typescript",
+      "ts",
+      "jsx",
+      "tsx",
+      "html",
+      "css",
+      "bash",
+      "sh",
+      "json",
+      "sql",
+      "java",
+      "c",
+      "cpp",
+      "c++",
+      "rust",
+      "go",
+    ];
+    if (knownLangs.includes(firstLine)) {
+      lang = firstLine === "py" ? "python" : firstLine;
+      code = lines.slice(1).join("\n");
+    }
+
+    // Maradék ``` vagy """ eltávolítása a végéről
+    code = code.replace(/```$/, "").replace(/"""$/, "");
+
+    return <CodeBlock key={key} lang={lang} code={code} />;
+  };
+
+  const renderInline = (part, key) => {
     const inlineParts = part.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
     return (
-      <span key={i}>
+      <span key={key}>
         {inlineParts.map((p, j) => {
           if (p.startsWith("`") && p.endsWith("`"))
             return (
@@ -125,16 +191,32 @@ const renderContent = (text) => {
                 {p.slice(2, -2)}
               </strong>
             );
-          return p.split("\n").map((line, k) => (
+          return p.split("\n").map((line, k, arr) => (
             <React.Fragment key={k}>
               {line}
-              {k < p.split("\n").length - 1 && <br />}
+              {k < arr.length - 1 && <br />}
             </React.Fragment>
           ));
         })}
       </span>
     );
-  });
+  };
+
+  return (
+    <>
+      {processedParts.map((part, i) => {
+        if (part.startsWith("```")) {
+          // Lezárt kódblokk
+          return renderCodeBlock(part, i);
+        }
+        // Normál szöveg inline formázással
+        return renderInline(part, i);
+      })}
+
+      {/* Streaming közben lezáratlan kódblokk — azonnal kódként rendereljük */}
+      {openBlock && renderCodeBlock(openBlock, "streaming-open")}
+    </>
+  );
 };
 
 // ─── Preset modal ──────────────────────────────────────
@@ -299,7 +381,7 @@ const PresetModal = ({
               label="Max tokens"
               field="maxTokens"
               min={128}
-              max={16384 * 8}
+              max={32768 * 8}
               step={128}
               hint="Maximális válaszhossz tokenekben"
             />
@@ -1094,7 +1176,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
               label: "Max Tokens",
               key: "maxTokens",
               min: 128,
-              max: 16384 * 8,
+              max: 32768 * 8,
               step: 128,
               val: maxTokens,
               set: setMaxTokens,

@@ -109,22 +109,57 @@ export const MODEL_GROUPS = [
                             - Review and suggest improvements proactively
                             - Respond in the same language the user writes in`
                     },
-                    { id: "gemini-3-flash",  name: "Gemini 3 Flash",  apiModel: "gemini-3-flash-preview", provider: "gemini",   color: "#4285f4", panelType: "chat" },
-                    { id: "gemini-2.5-pro",  name: "gemini-2.5-pro",  apiModel: "gemini-2.5-pro",         provider: "gemini",   color: "#4285f4", panelType: "chat" },
-                    { id: "groq-gpt120b",    name: "GPT OSS 120B",    apiModel: "openai/gpt-oss-120b",     provider: "groq",     color: "#10a37f", panelType: "chat" },
-                    { id: "groq-qwen3",      name: "Qwen3 32B",       apiModel: "qwen/qwen3-32b",          provider: "groq",     color: "#9333ea", panelType: "chat" },
-                    { id: "groq-llama70b",   name: "Llama 3.3 70B",   apiModel: "llama-3.3-70b-versatile", provider: "groq",     color: "#f55036", panelType: "chat" },
-                    { id: "cerebras-llama8b",  name: "Llama 3.1 8B (Cerebras)",          apiModel: "llama3.1-8b",                    provider: "cerebras", color: "#818cf8", panelType: "chat" },
-                    { id: "cerebras-gpt120b",  name: "GPT OSS 120B (Cerebras)",           apiModel: "gpt-oss-120b",                   provider: "cerebras", color: "#6366f1", panelType: "chat" },
-                    { id: "cerebras-qwen235b", name: "Qwen 3 235B (Cerebras) (Nem jo)",  apiModel: "qwen-3-235b-a22b-instruct-2507", provider: "cerebras", color: "#8b5cf6", panelType: "chat" },
-                    { id: "cerebras-zaiglm",   name: "Z.ai GLM 4.7 (Cerebras) (Nem jo)", apiModel: "zai-glm-4.7",                    provider: "cerebras", color: "#a855f7", panelType: "chat" },
-                    { id: "mistral-large",     name: "Mistral Large (Mistral)",           apiModel: "mistral-large-latest",           provider: "mistral",  color: "#f97316", panelType: "chat" },
-                    { id: "nvidia-glm5",       name: "Z.ai GLM 5 (NVIDIA)",              apiModel: "z-ai/glm5",                      provider: "nvidia",   color: "#16f921", panelType: "chat" },
-                    { id: "nvidia-kimi",       name: "Kimi 2.5 (NVIDIA)",                apiModel: "moonshotai/kimi-k2.5",           provider: "nvidia",   color: "#16f921", panelType: "chat" },
-                    { id: "qwen3.5-397b",      name: "Qwen 3.5 397B (NVIDIA)",           apiModel: "qwen/qwen3.5-397b-a17b",         provider: "nvidia",   color: "#46f536", panelType: "chat" },
-                    { id: "qwen3-coder-480b",  name: "Qwen 3 Coder 480B (NVIDIA)",       apiModel: "qwen/qwen3-coder-480b-a35b-instruct", provider: "nvidia", color: "#16f921", panelType: "chat" },
-                    { id: "mistralai-devstral-2-123b-instruct-2512", name: "DevStral 2 123B (coding) (NVIDIA)", apiModel: "mistralai/devstral-2-123b-instruct-2512", provider: "nvidia", color: "#16f921", panelType: "chat" },
-                    { id: "deepseek-v3.2",     name: "DeepSeek v3.2 (NVIDIA)",           apiModel: "deepseek-ai/deepseek-v3.2",      provider: "nvidia",   color: "#16f921", panelType: "chat" },
+                    {
+                        id: "gemini-3-flash",
+                        name: "Gemini 3 Flash",
+                        apiModel: "gemini-3-flash-preview",   // ← ezt küldi a backendnek
+                        provider: "gemini",              // ← új provider
+                        color: "#4285f4",
+                        },
+                    {
+                        id: "gemini-2.5-pro",
+                        name: "gemini-2.5-pro",
+                        apiModel: "gemini-2.5-pro",   // ← ezt küldi a backendnek
+                        provider: "gemini",              // ← új provider
+                        color: "#4285f4",
+                        },
+                    { id: "groq-gpt120b", name: "GPT OSS 120B", apiModel: "openai/gpt-oss-120b", provider: "groq", color: "#10a37f" },
+                    { id: "groq-qwen3", name: "Qwen3 32B", apiModel: "qwen/qwen3-32b", provider: "groq", color: "#9333ea" },
+                    { id: "groq-llama70b", name: "Llama 3.3 70B", apiModel: "llama-3.3-70b-versatile", provider: "groq", color: "#f55036" },
+                    { id: "cerebras-llama8b",   name: "Llama 3.1 8B (Cerebras)",      apiModel: "llama3.1-8b",                   provider: "cerebras", color: "#818cf8" },
+                    { id: "cerebras-gpt120b",   name: "GPT OSS 120B (Cerebras)",       apiModel: "gpt-oss-120b",                  provider: "cerebras", color: "#6366f1" },
+                    { id: "cerebras-qwen235b",  name: "Qwen 3 235B (Cerebras) (Nem jo)",        apiModel: "qwen-3-235b-a22b-instruct-2507", provider: "cerebras", color: "#8b5cf6" },
+                    { id: "cerebras-zaiglm",    name: "Z.ai GLM 4.7 (Cerebras) (Nem jo)",       apiModel: "zai-glm-4.7",                   provider: "cerebras", color: "#a855f7" },
+                    { id: "mistral-large",   name: "Mistral Large (Mistral)",    apiModel: "mistral-large-latest",    provider: "mistral", color: "#f97316" },
+                    { id: "nvidia-glm5",   name: "Z.ai GLM 5 (NVIDIA)",    apiModel: "z-ai/glm5",    provider: "nvidia", color: "#16f921" },
+                    { id: "nvidia-kimi",   name: "Kimi 2.5 (NVIDIA)",    apiModel: "moonshotai/kimi-k2.5",    provider: "nvidia", color: "#16f921" },
+                    { id: "qwen3.5-397b", name: "Qwen 3.5 397B (img also)(NVIDIA)", apiModel: "qwen/qwen3.5-397b-a17b", provider: "nvidia", color: "#46f536" },
+                    { id: "qwen3-coder-480b", name: "Qwen 3 Coder 480B (NVIDIA)", apiModel: "qwen/qwen3-coder-480b-a35b-instruct", provider: "nvidia", color: "#16f921" },
+                    { id: "mistralai-devstral-2-123b-instruct-2512", name: "DevStral 2 123B (coding) (NVIDIA)", apiModel: "mistralai/devstral-2-123b-instruct-2512", provider: "nvidia", color: "#16f921" },
+                    { id: "deepseek-v3.2", name: "DeepSeek v3.2 (NVIDIA)", apiModel: "deepseek-ai/deepseek-v3.2", provider: "nvidia", color: "#16f921"},
+                    { id: "google-gemma-3-27b-it", name: "Gemma 3 27B IT (img also) (NVIDIA)", apiModel: "google/gemma-3-27b-it", provider: "nvidia", color: "#16f921" },
+                 
+
+                    
+
+//                     {
+//                         id: "deepseek_coder",
+//                         name: "DeepSeek Coder V3",
+//                         tier: "lite", tierLabel: "Gyors",
+//                         description: "Specializált kód modell, ingyenes",
+//                         badge: "Ingyenes",
+//                         apiModel: "deepseek/deepseek-coder-v2-instruct",
+//                         provider: "deepseek-chat",
+//                         color: "#3b82f6",
+//                         gradient: "from-blue-400 to-indigo-400",
+//                         panelType: "chat",
+//                         defaultSystemPrompt: `You are an expert programmer and software architect. 
+// - Write clean, efficient, well-documented code
+// - Follow best practices and design patterns
+// - Explain your code clearly
+// - Point out potential issues or improvements
+// - Respond in the same language the user writes in`,
+//                     },
                     {
                         id: "gpt4o_code",
                         name: "GPT-4o Code",
