@@ -165,7 +165,7 @@ const PresetModal = ({ isOpen, onClose, onSave, editingPreset, modelColor }) => 
               <span className="text-xs font-semibold text-gray-300">Modell paraméterek</span>
             </div>
             <Slider label="Temperature" field="temperature" min={0} max={2} step={0.05} hint="0 = determinisztikus · 1 = kiegyensúlyozott · 2 = kreatív" />
-            <Slider label="Max tokens" field="maxTokens" min={128} max={16384} step={128} hint="Maximális válaszhossz tokenekben" />
+            <Slider label="Max tokens" field="maxTokens" min={128} max={16384*8} step={128} hint="Maximális válaszhossz tokenekben" />
             <Slider label="Top P" field="topP" min={0} max={1} step={0.05} hint="Nucleus sampling — általában ne módosítsd a temperature-rel együtt" />
             <Slider label="Frequency penalty" field="frequencyPenalty" min={-2} max={2} step={0.1} hint="Negatív: ismétlés ↑ · Pozitív: ismétlés ↓" />
             <Slider label="Presence penalty" field="presencePenalty" min={-2} max={2} step={0.1} hint="Pozitív: új témák bevezetése ↑" />
@@ -748,7 +748,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
 
           {[
             { label: "Temperature", key: "temperature", min: 0, max: 2, step: 0.05, val: temperature, set: setTemperature, hint: "0 = determinisztikus · 0.7 = kiegyensúlyozott · 2 = random" },
-            { label: "Max Tokens", key: "maxTokens", min: 128, max: 16384, step: 128, val: maxTokens, set: setMaxTokens, hint: "Maximális válaszhossz tokenekben (~1 token ≈ ¾ szó)" },
+            { label: "Max Tokens", key: "maxTokens", min: 128, max: 16384*8, step: 128, val: maxTokens, set: setMaxTokens, hint: "Maximális válaszhossz tokenekben (~1 token ≈ ¾ szó)" },
             { label: "Top P", key: "topP", min: 0, max: 1, step: 0.05, val: topP, set: setTopP, hint: "Nucleus sampling — ne módosítsd temperature-rel együtt" },
             { label: "Frequency Penalty", key: "freq", min: -2, max: 2, step: 0.1, val: frequencyPenalty, set: setFrequencyPenalty, hint: "Pozitív: ismétlések csökkentése" },
             { label: "Presence Penalty", key: "pres", min: -2, max: 2, step: 0.1, val: presencePenalty, set: setPresencePenalty, hint: "Pozitív: új témák bevezetése" },

@@ -51,10 +51,19 @@ export default function ThreeViewer({
       const scene    = new THREE.Scene();
       const camera   = new THREE.PerspectiveCamera(45, W / H, 0.01, 10000);
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      
+      renderer.outputEncoding = THREE.sRGBEncoding;        // ← ADD HOZZÁ
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;  // ← ADD HOZZÁ
+      renderer.toneMappingExposure = 1.0;                  // ← ADD HOZZÁ
       renderer.setSize(W, H);
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       el.appendChild(renderer.domElement);
 
       const grid = new THREE.GridHelper(20, 40,
