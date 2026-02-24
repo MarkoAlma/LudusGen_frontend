@@ -7,34 +7,62 @@ import {
 import { db } from "../firebase/firebaseApp";
 import {
   collection, addDoc, query, orderBy, limit, getDocs,
-  serverTimestamp, deleteDoc, doc, setDoc, onSnapshot,
+  serverTimestamp, deleteDoc, doc, setDoc, getDoc, onSnapshot,
 } from "firebase/firestore";
 import { DEFAULT_PRESETS } from "./models";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-// ─── Kódblokk copy gombbal ────────────────────────────
+// ─── Kódblokk copy gombbal — sticky header ──────────────────────────────────
 const CodeBlock = ({ lang, code, isStreaming }) => {
   const [copied, setCopied] = React.useState(false);
+  const [isStuck, setIsStuck] = React.useState(false);
+  const sentinelRef = React.useRef(null);
+
+  // IntersectionObserver: ha a sentinel (1px-es div a header felett)
+  // kigörget → sticky módban vagyunk → border-radius eltűnik
+  React.useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsStuck(!entry.isIntersecting),
+      { threshold: 1.0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
   const handleCopy = () => {
     if (isStreaming) return;
     navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
   return (
-    <div className="relative my-2 rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.1)", overflow: "clip"  }}>
-      {/* ── Sticky fejléc: a chat scroll containerben ragad a tetejére ── */}
+    <div
+      className="relative my-2"
+      style={{
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: "0.75rem",
+        // overflow: hidden SZÁNDÉKOSAN NINCS — az blokkolná a sticky-t
+      }}
+    >
+      {/* Sentinel: 1px láthatatlan div, ha ez kigörget → isStuck=true */}
+      <div ref={sentinelRef} style={{ height: "1px", marginTop: "-1px" }} />
+
+      {/* Sticky header */}
       <div
         className="flex items-center justify-between px-3 py-1.5"
         style={{
-          background: "rgba(18,18,40,0.97)",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
           position: "sticky",
-          top: "-0.75rem",   // kompenzálja a chat konténer py-3 (12px) padding-top-ját
-          marginTop: "-1px", // 1px overlap: megszünteti a border-radius okozta mikro-rést
+          top: "-0.75rem",
           zIndex: 10,
+          background: "rgba(18,18,40,0.97)",
           backdropFilter: "blur(8px)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          // sticky módban nincs felső border-radius
+          borderRadius: isStuck ? "0" : "0.75rem 0.75rem 0 0",
         }}
       >
         <span className="text-gray-500 text-xs font-mono">{lang || "code"}</span>
@@ -49,20 +77,37 @@ const CodeBlock = ({ lang, code, isStreaming }) => {
               ? "rgba(255,255,255,0.03)"
               : "rgba(255,255,255,0.08)",
             color: copied ? "#4ade80" : isStreaming ? "#4b5563" : "#9ca3af",
-            border: `1px solid ${copied ? "rgba(34,197,94,0.3)" : isStreaming ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.1)"}`,
+            border: `1px solid ${
+              copied
+                ? "rgba(34,197,94,0.3)"
+                : isStreaming
+                ? "rgba(255,255,255,0.05)"
+                : "rgba(255,255,255,0.1)"
+            }`,
             cursor: isStreaming ? "not-allowed" : "pointer",
             opacity: isStreaming ? 0.5 : 1,
           }}
           title={isStreaming ? "Várd meg amíg a kód elkészül..." : "Másolás"}
         >
-          {copied
-            ? <><Check className="w-3 h-3" />&nbsp;Másolva</>
-            : isStreaming
-            ? <><Copy className="w-3 h-3" />&nbsp;Generálás...</>
-            : <><Copy className="w-3 h-3" />&nbsp;Másolás</>}
+          {copied ? (
+            <><Check className="w-3 h-3" />&nbsp;Másolva</>
+          ) : isStreaming ? (
+            <><Copy className="w-3 h-3" />&nbsp;Generálás...</>
+          ) : (
+            <><Copy className="w-3 h-3" />&nbsp;Másolás</>
+          )}
         </button>
       </div>
-      <pre className="p-3 overflow-x-auto text-xs" style={{ background: "rgba(0,0,0,0.4)", color: "#e2e8f0", margin: 0 }}>
+
+      <pre
+        className="p-3 overflow-x-auto text-xs"
+        style={{
+          background: "rgba(0,0,0,0.4)",
+          color: "#e2e8f0",
+          margin: 0,
+          borderRadius: "0 0 0.75rem 0.75rem",
+        }}
+      >
         <code>{code}</code>
       </pre>
     </div>
@@ -88,7 +133,7 @@ const renderContent = (text, isStreaming = false) => {
     openBlock = incompleteCode;
   }
 
-  const renderCodeBlock = (raw, key, streaming = isStreaming) => {
+  const renderCodeBlock = (raw, key) => {
     let content = raw.startsWith("```") ? raw.slice(3) : raw;
     if (content.endsWith("```")) content = content.slice(0, -3);
 
@@ -143,7 +188,7 @@ const renderContent = (text, isStreaming = false) => {
         if (part.startsWith("```")) return renderCodeBlock(part, i);
         return renderInline(part, i);
       })}
-      {openBlock && renderCodeBlock(openBlock, "streaming-open", isStreaming)}
+      {openBlock && renderCodeBlock(openBlock, "streaming-open")}
     </>
   );
 };
@@ -318,30 +363,28 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
   const streamingMsgIdRef = useRef(null);
   const abortControllerRef = useRef(null);
 
-  // ── Smart scroll logika ──
-  // true  = user felgörgetett, ne scrollozzunk automatikusan
-  // false = user az alján van, kövessük az AI-t
+  // Smart scroll state
   const userScrolledUp = useRef(false);
-  // Megakadályozza, hogy a programmatikus scroll ne zavarja a detektálást
   const isProgrammaticScroll = useRef(false);
 
-  // ── Scroll + Wheel esemény figyelők ──
-  // A wheel event csak valódi felhasználói inputra tüzel — layout shift, code block
-  // renderelés, DOM átrendeződés NEM váltja ki. Ezért sokkal megbízhatóbb mint
-  // a scroll irány alapú detektálás, ami code block streameléskor hamis pozitívokat ad.
+  // ── Firestore helper ──────────────────────────────────────────────────────
+  const getSessionRef = useCallback((sessionId) =>
+    doc(db, "conversations", userId, selectedModel.id, sessionId),
+  [userId, selectedModel.id]);
+
+  const getMessagesRef = useCallback((sessionId) =>
+    collection(db, "conversations", userId, selectedModel.id, sessionId, "messages"),
+  [userId, selectedModel.id]);
+
+  // ── Wheel + Touch scroll detektálás ──
   useEffect(() => {
     const el = chatScrollRef.current;
     if (!el) return;
 
-    // ── Wheel event: egyetlen felfelé mozdulattal azonnal lekapcsol az auto-scroll ──
-    // Lefelé görgetésnél: ha elértük az alját, visszakapcsol
-    // (programmatikus scroll NEM váltja ki ezt az eventet → nincs race condition)
     const handleWheel = (e) => {
       if (e.deltaY < 0) {
-        // Bármilyen kis felfelé görgetés → auto-scroll ki
         userScrolledUp.current = true;
       } else if (e.deltaY > 0) {
-        // Lefelé görgetés → ha majdnem az alján van, auto-scroll vissza
         const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
         if (distanceFromBottom < 60) {
           userScrolledUp.current = false;
@@ -349,18 +392,13 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
       }
     };
 
-    // ── Touch scroll (mobil) ──
     let touchStartY = 0;
-    const handleTouchStart = (e) => {
-      touchStartY = e.touches[0].clientY;
-    };
+    const handleTouchStart = (e) => { touchStartY = e.touches[0].clientY; };
     const handleTouchMove = (e) => {
       const deltaY = touchStartY - e.touches[0].clientY;
       if (deltaY < 0) {
-        // Ujj lefelé mozog = tartalom felfelé görget → auto-scroll ki
         userScrolledUp.current = true;
       } else if (deltaY > 0) {
-        // Ujj felfelé mozog = tartalom lefelé görget → ha az alján van, vissza
         const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
         if (distanceFromBottom < 60) {
           userScrolledUp.current = false;
@@ -378,17 +416,15 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     };
   }, []);
 
-  // ── Azonnali görgetés (instant = nincs animáció, nem zavarja a streamet) ──
+  // ── Scroll segédfüggvények ──
   const scrollToBottomInstant = useCallback(() => {
     const el = chatScrollRef.current;
     if (!el) return;
     isProgrammaticScroll.current = true;
     el.scrollTop = el.scrollHeight;
-    // Kis delay után engedjük újra a user scroll detektálást
     setTimeout(() => { isProgrammaticScroll.current = false; }, 50);
   }, []);
 
-  // ── Sima görgetés (üzenetküldéskor, betöltéskor) ──
   const scrollToBottomSmooth = useCallback(() => {
     const el = chatScrollRef.current;
     if (!el) return;
@@ -397,7 +433,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     setTimeout(() => { isProgrammaticScroll.current = false; }, 500);
   }, []);
 
-  // ── Streaming közben: csak akkor görget, ha a user nincs felgörgetett állapotban ──
   const scrollToBottomIfNeeded = useCallback(() => {
     if (!userScrolledUp.current) {
       scrollToBottomInstant();
@@ -423,32 +458,31 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     loadCurrentConversation();
   }, [userId, selectedModel.id]);
 
+  // ─── Session lista betöltése ─────────────────────────────────────────────
   const loadConversationList = async () => {
     try {
       const ref = collection(db, "conversations", userId, selectedModel.id);
-      const q = query(ref, orderBy("createdAt", "desc"), limit(20));
+      const q = query(ref, orderBy("updatedAt", "desc"), limit(20));
       const snap = await getDocs(q);
-      const sessions = {};
-      snap.docs.forEach((d) => {
-        const data = d.data();
-        const sid = data.sessionId || "default";
-        if (!sessions[sid]) sessions[sid] = { id: sid, messages: [], createdAt: data.createdAt };
-        sessions[sid].messages.push(data);
-      });
-      setConversations(Object.values(sessions).slice(0, 10));
-    } catch (e) { console.error("Load conversation list error:", e); }
+      const sessions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setConversations(sessions);
+    } catch (e) {
+      console.error("Load conversation list error:", e);
+    }
   };
 
+  // ─── Aktív session üzeneteinek betöltése ────────────────────────
   const loadCurrentConversation = async () => {
     if (!userId) return;
     isLoadingConversation.current = true;
     setLoadingHistory(true);
     try {
       const sessionId = getCurrentSessionId();
-      const ref = collection(db, "conversations", userId, selectedModel.id);
-      const q = query(ref, orderBy("timestamp", "asc"), limit(100));
+      const messagesRef = getMessagesRef(sessionId);
+      const q = query(messagesRef, orderBy("timestamp", "asc"), limit(200));
       const snap = await getDocs(q);
-      const msgs = snap.docs.map((d) => d.data()).filter((m) => m.sessionId === sessionId);
+      const msgs = snap.docs.map((d) => d.data());
+
       if (msgs.length > 0) {
         prevMessageCount.current = msgs.length;
         setMessages(msgs);
@@ -498,19 +532,21 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
   const removeUndefined = (obj) =>
     Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null));
 
+  // ─── Üzenet mentése ─────────────────────────────────────────────────────
   const saveMessage = async (msg) => {
     if (!userId) return;
     try {
       const sessionId = getCurrentSessionId();
+
       const contentToSave = Array.isArray(msg.content)
         ? msg.content.find((p) => p.type === "text")?.text || ""
         : msg.content;
+
       const msgData = removeUndefined({
         role: msg.role,
         content: contentToSave,
         model: msg.model,
         id: msg.id,
-        sessionId,
         modelId: selectedModel.id,
         modelName: selectedModel.name,
         timestamp: serverTimestamp(),
@@ -518,8 +554,27 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
         ...(msg.usage ? { usage: msg.usage } : {}),
         ...(msg.isError ? { isError: true } : {}),
       });
-      await addDoc(collection(db, "conversations", userId, selectedModel.id), msgData);
-    } catch (e) { console.error("Save message error:", e); }
+
+      await addDoc(getMessagesRef(sessionId), msgData);
+
+      await setDoc(
+        getSessionRef(sessionId),
+        removeUndefined({
+          sessionId,
+          modelId: selectedModel.id,
+          modelName: selectedModel.name,
+          ...(msg.role === "user" && contentToSave
+            ? { title: contentToSave.slice(0, 60) }
+            : {}),
+          lastMessage: contentToSave.slice(0, 100),
+          lastRole: msg.role,
+          updatedAt: serverTimestamp(),
+        }),
+        { merge: true }
+      );
+    } catch (e) {
+      console.error("Save message error:", e);
+    }
   };
 
   const applyPreset = (preset) => {
@@ -620,7 +675,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
       textareaRef.current.style.height = "auto";
     }
 
-    // ── Üzenetküldéskor mindig legörgetünk és reseteljük a flag-et ──
     userScrolledUp.current = false;
     setTimeout(() => scrollToBottomSmooth(), 30);
 
@@ -636,11 +690,9 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
         .filter((m) => m.id !== "welcome")
         .map((m) => ({ role: m.role, content: m.content }));
 
-      // ── AbortController a leállításhoz ──
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      // ── Félbemaradt tartalom nyilvántartása (abort esetén menthetjük) ──
       let streamAccumulated = "";
 
       const res = await fetch(`${API_BASE}/api/chat`, {
@@ -698,18 +750,16 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
               const delta = parsed.delta || "";
               if (delta) {
                 accumulated += delta;
-                streamAccumulated = accumulated; // ── abort esetén elérhető a catch-ből ──
+                streamAccumulated = accumulated;
                 setMessages((prev) =>
                   prev.map((m) => m.id === aiMsgId ? { ...m, content: accumulated } : m)
                 );
-                // ── Instant görgetés csak ha user nincs felgörgetett állapotban ──
                 scrollToBottomIfNeeded();
               }
             } catch { /* csonka JSON — kihagyjuk */ }
           }
         }
 
-        // Mentjük az eddig legenerált tartalmat (abort esetén is)
         const finalMsg = {
           role: "assistant", content: accumulated,
           model: selectedModel.id, id: aiMsgId,
@@ -735,20 +785,17 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
 
     } catch (err) {
       if (err.name === "AbortError") {
-        // Felhasználó leállította — félbemaradt szöveget mentjük, hogy folytatható legyen
         console.log("Generálás leállítva.");
         setMessages((prev) =>
           prev.map((m) => m.id === aiMsgId ? { ...m, isStreaming: false } : m)
         );
-        // ── Partial tartalom mentése Firestore-ba, hogy a context megmaradjon ──
         if (streamAccumulated) {
-          const partialMsg = {
+          await saveMessage({
             role: "assistant",
             content: streamAccumulated,
             model: selectedModel.id,
             id: aiMsgId,
-          };
-          await saveMessage(partialMsg);
+          });
         }
       } else {
         console.error("Chat hiba:", err.message);
@@ -774,6 +821,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // ─── Új beszélgetés ──────────────────────────────────
   const clearConversation = () => {
     sessionStorage.removeItem(`chat_session_${selectedModel.id}`);
     const welcome = [{
@@ -784,6 +832,13 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     prevMessageCount.current = welcome.length;
     setMessages(welcome);
     userScrolledUp.current = false;
+  };
+
+  // ─── History-ból session betöltése ───────────────────
+  const loadSessionFromHistory = async (sessionId) => {
+    sessionStorage.setItem(`chat_session_${selectedModel.id}`, sessionId);
+    await loadCurrentConversation();
+    setActiveTab("chat");
   };
 
   // ── Generálás leállítása ──
@@ -807,7 +862,10 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              setActiveTab(tab.id);
+              if (tab.id === "history") loadConversationList();
+            }}
             className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all hover:opacity-90 active:scale-95"
             style={{
               background: activeTab === tab.id ? `${color}20` : "transparent",
@@ -1222,15 +1280,41 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
             </div>
           ) : (
             <div className="space-y-2">
-              {conversations.map((conv) => (
-                <div key={conv.id}
-                  className="cursor-pointer p-3 rounded-xl hover:bg-white/5 transition-all active:scale-[0.99]"
-                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
-                >
-                  <p className="text-white text-xs font-semibold">{conv.messages[0]?.content?.slice(0, 60)}...</p>
-                  <p className="text-gray-600 text-xs mt-1">{conv.messages.length} üzenet · {conv.createdAt || ""}</p>
-                </div>
-              ))}
+              {conversations.map((conv) => {
+                const isActive = sessionStorage.getItem(`chat_session_${selectedModel.id}`) === (conv.sessionId || conv.id);
+                return (
+                  <div
+                    key={conv.sessionId || conv.id}
+                    onClick={() => loadSessionFromHistory(conv.sessionId || conv.id)}
+                    className="cursor-pointer p-3 rounded-xl hover:bg-white/5 transition-all active:scale-[0.99]"
+                    style={{
+                      background: isActive ? `${color}12` : "rgba(255,255,255,0.03)",
+                      border: isActive ? `1px solid ${color}35` : "1px solid rgba(255,255,255,0.07)",
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-xs font-semibold truncate">
+                          {conv.title || conv.lastMessage || "Névtelen beszélgetés"}
+                        </p>
+                        <p className="text-gray-600 text-xs mt-0.5 truncate">
+                          {conv.lastRole === "assistant" ? "🤖" : "👤"} {conv.lastMessage?.slice(0, 55)}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        {isActive && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold" style={{ background: `${color}25`, color }}>
+                            Aktív
+                          </span>
+                        )}
+                        <span className="text-gray-700 text-xs">
+                          {conv.updatedAt?.toDate?.()?.toLocaleDateString("hu-HU", { month: "short", day: "numeric" }) || ""}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

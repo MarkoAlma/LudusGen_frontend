@@ -602,4 +602,3 @@ export default function AIChat({ user, getIdToken }) {
     
   );
 }
-
