@@ -56,8 +56,6 @@ export function createSunLight(THREE, scene) {
   scene.add(sun.target);
   scene.add(sun);
 
-  // Galaxy-distance: direction is essentially perfectly parallel, will never
-  // visibly shift no matter how the camera orbits. ~4.9M units away.
   sun.position.set(2000000, 4000000, 2000000);
   sun.target.position.set(0, 0, 0);
 
@@ -81,95 +79,8 @@ export function createSunLight(THREE, scene) {
 export function setSunLightProps(sunLight, show, color, intensity) {
   if (!sunLight) return;
   sunLight.color.setHex(hexToInt(color) || 0xffffff);
-  // Soft dramatic: gentle curve, never harsh
   sunLight.intensity = show ? Math.max(0.08, intensity * 2.5) : 0;
   if (sunLight.shadow) sunLight.shadow.radius = 4;
-}
-
-function hexWithAlpha(hex, alpha) {
-  const n = parseInt((hex || "#ffffff").replace("#", ""), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
-}
-
-function buildGlowPlane(THREE, color, size, opacity) {
-  const DIM = 512;
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = DIM;
-  const ctx = canvas.getContext("2d");
-  const cx = DIM / 2;
-  const grad = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
-  grad.addColorStop(0.0, hexWithAlpha(color, 1.0));
-  grad.addColorStop(0.25, hexWithAlpha(color, 0.6));
-  grad.addColorStop(0.6, hexWithAlpha(color, 0.18));
-  grad.addColorStop(1.0, "rgba(0,0,0,0)");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, DIM, DIM);
-
-  const tex = new THREE.CanvasTexture(canvas);
-  const geo = new THREE.PlaneGeometry(1, 1);
-  const mat = new THREE.MeshBasicMaterial({
-    map: tex,
-    transparent: true,
-    opacity: Math.max(0, Math.min(1, opacity)),
-    depthTest: false,   // ← volt: true — ez okozta a z-fightingot
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.scale.set(size, size, 1);
-  mesh.renderOrder = 999;  // ← volt: -1 — renderelődjön a modell UTÁN
-  mesh.userData.isBgLight = true;
-  return mesh;
-}
-
-export function setBgLight(
-  s,
-  show,
-  color = "#ffffff",
-  size = 4,
-  intensity = 0.1,
-) {
-  const { THREE, scene } = s;
-  if (!THREE || !scene) return;
-
-  if (s.bgLight && s.bgLight.userData.bgLightColor !== color) {
-    scene.remove(s.bgLight);
-    s.bgLight.material.map?.dispose();
-    s.bgLight.material.dispose();
-    s.bgLight.geometry.dispose();
-    s.bgLight = null;
-  }
-
-  if (!s.bgLight) {
-    s.bgLight = buildGlowPlane(THREE, color, size, Math.min(1, intensity * 3));
-    s.bgLight.userData.bgLightColor = color;
-    scene.add(s.bgLight);
-  }
-
-  s.bgLight.visible = show;
-  s.bgLight.scale.set(size, size, 1);
-  s.bgLight.material.opacity = Math.min(1, intensity * 3);
-  s.bgLight.material.needsUpdate = true;
-
-  setSunLightProps(s.sunLight, show, color, intensity);
-}
-
-export function updateBgLightPosition(s) {
-  if (!s.camera || !s.THREE || !s.bgLight) return;
-
-  if (!s._camDir) s._camDir = new s.THREE.Vector3();
-  s._camDir.copy(s.camera.position).normalize();
-
-  const PUSH = 3.5;
-  const hLen =
-    Math.sqrt(s._camDir.x * s._camDir.x + s._camDir.z * s._camDir.z) || 1;
-  s.bgLight.position.set(
-    (s._camDir.x / hLen) * PUSH,
-    0.5,
-    (s._camDir.z / hLen) * PUSH,
-  );
-  s.bgLight.lookAt(s.camera.position);
 }
 
 export function setSceneBg(s, bgColor) {
@@ -217,22 +128,28 @@ export function applyLights(
   const toRemove = lightGroup.children.filter((c) => !c.userData.isBackLight);
   toRemove.forEach((c) => lightGroup.remove(c));
 
-// applyLights — clay/uv ág
-if (viewMode === 'clay' || viewMode === 'uv') {
-  lightGroup.add(new THREE.AmbientLight(0xffffff, 0.35));  // volt: 0.85 — túl erős!
-  const key = new THREE.DirectionalLight(0xffffff, 0.9);   // volt: 1.4
-  key.position.set(3, 6, 4);
-  lightGroup.add(key);
-  const fill = new THREE.DirectionalLight(0xffffff, 0.25); // volt: 0.6
-  fill.position.set(-4, 2, -3);
-  lightGroup.add(fill);
-  const back = new THREE.DirectionalLight(0xddeeff, 0.15); // volt: 0.4
-  back.position.set(0, -1, -6);
-  lightGroup.add(back);
-  lightGroup.rotation.y = 0;
-  return;
-}
+  // ── UV / Base Color: MeshBasicMaterial ignores lights — keep scene clean
+  if (viewMode === 'uv') {
+    lightGroup.rotation.y = 0;
+    return;
+  }
 
+  // ── Clay: soft even studio lighting — form reads from the matte material, not harsh shadows
+  if (viewMode === 'clay') {
+    lightGroup.add(new THREE.HemisphereLight(0xe8dccf, 0x1a1310, 0.04)); // warm sky / cool ground
+    const key = new THREE.DirectionalLight(0xfff8f0, 1.1);               // soft front-top key
+    key.position.set(3, 6, 5);
+    key.castShadow = true;
+    lightGroup.add(key);
+    const fill = new THREE.DirectionalLight(0xddeeff, 0.45);             // cool left fill
+    fill.position.set(-5, 3, 0);
+    lightGroup.add(fill);
+    const back = new THREE.DirectionalLight(0xffeedd, 0.3);              // warm back rim
+    back.position.set(0, 2, -6);
+    lightGroup.add(back);
+    lightGroup.rotation.y = 0;
+    return;
+  }
 
   const k = strength;
 
@@ -271,7 +188,8 @@ if (viewMode === 'clay' || viewMode === 'uv') {
 
   lightGroup.rotation.y = (rotation * Math.PI) / 180;
 }
-// threeHelpers.js — applyViewMode javítva
+
+// ── applyViewMode ────────────────────────────────────────────────────────────
 export function applyViewMode(s, mode) {
   const { THREE, scene, origMaterials } = s;
   if (!THREE) return;
@@ -285,28 +203,26 @@ export function applyViewMode(s, mode) {
     const orig = origMaterials.get(node.uuid);
     node.castShadow = true;
 
-// applyViewMode — clay material
-if (mode === 'clay') {
-  if (node.geometry && node.geometry.attributes.position) {
-    node.geometry.computeVertexNormals();
-  }
-  const buildClay = () => new THREE.MeshStandardMaterial({
-    color: '#544c40',      // volt: 0xc2bdb8 — melegebb, sötétebb agyagszín
-    metalness: 0,
-    roughness: 0.92,      // volt: 0.85 — erősebb diffúz, kevesebb spekulár
-    envMapIntensity: 0,
-    side: THREE.DoubleSide,
-  });
-  node.material = Array.isArray(orig)
-    ? orig.map(() => buildClay())
-    : buildClay();
-}else if (mode === 'normal') {
-      // ← KULCS FIX: az eredeti GLTFLoader material-t adjuk vissza
-      // Ez tartalmazza a helyes metalness/envMap beállításokat
+    if (mode === 'clay') {
+      if (node.geometry && node.geometry.attributes.position) {
+        node.geometry.computeVertexNormals();
+      }
+      const buildClay = () => new THREE.MeshStandardMaterial({
+        color: 0xd4b896,      // klasszikus meleg clay szín
+        metalness: 0,
+        roughness: 0.85,
+        envMapIntensity: 0,
+        side: THREE.DoubleSide,
+      });
+      node.material = Array.isArray(orig)
+        ? orig.map(() => buildClay())
+        : buildClay();
+
+    } else if (mode === 'normal') {
       node.material = orig;
 
     } else if (mode === 'uv') {
-      // UV/Base Color: MeshBasicMaterial = NEM kell fény, csak a textúra
+      // Base Color: MeshBasicMaterial = pure texture, zero lighting influence
       const buildBasic = (m) => {
         const map = (m?.map) ?? null;
         if (map) {
@@ -396,22 +312,20 @@ export function loadGLB(
       const scaledBox = new THREE.Box3().setFromObject(model);
       model.position.y = -1 - scaledBox.min.y;
 
-model.traverse((n) => {
-  if (n.isMesh) {
-    // FIX: Trellis models often lack or have broken vertex normals
-    if (n.geometry) {
-      if (!n.geometry.attributes.normal) {
-        n.geometry.computeVertexNormals();
-      } else {
-        // Recompute anyway for Trellis — their normals can be inverted/corrupted
-        n.geometry.computeVertexNormals();
-      }
-    }
-    s.origMaterials.set(n.uuid, n.material);
-  }
-});
+      model.traverse((n) => {
+        if (n.isMesh) {
+          if (n.geometry) {
+            if (!n.geometry.attributes.normal) {
+              n.geometry.computeVertexNormals();
+            } else {
+              n.geometry.computeVertexNormals();
+            }
+          }
+          s.origMaterials.set(n.uuid, n.material);
+        }
+      });
 
-applyViewMode(s, currentViewMode);
+      applyViewMode(s, currentViewMode);
       scene.add(model);
       s.model = model;
       s.cam.radius = 5;

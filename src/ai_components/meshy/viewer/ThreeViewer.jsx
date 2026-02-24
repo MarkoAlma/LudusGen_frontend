@@ -4,8 +4,7 @@ import {
   loadScript, syncCamera, buildPlaceholder,
   createSunLight, setSunLightProps,
   applyLights, applyViewMode, applyWireframeOverlay,
-  setSceneBg, setBgLight, updateBgLightPosition,
-  setGridColor, loadGLB,
+  setSceneBg, setGridColor, loadGLB,
 } from './threeHelpers';
 
 export default function ThreeViewer({
@@ -22,10 +21,6 @@ export default function ThreeViewer({
   autoSpin = false,
   onSpinStop,
   bgColor = 'default',
-  bgLightOn = true,
-  bgLightColor = '#ffffff',
-  bgLightSize = 4,
-  bgLightIntensity = 0.10,
   gridColor1 = '#1e1e3a',
   gridColor2 = '#111128',
 }) {
@@ -51,19 +46,14 @@ export default function ThreeViewer({
       const scene    = new THREE.Scene();
       const camera   = new THREE.PerspectiveCamera(45, W / H, 0.01, 10000);
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      
-      renderer.outputEncoding = THREE.sRGBEncoding;        // ← ADD HOZZÁ
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;  // ← ADD HOZZÁ
-      renderer.toneMappingExposure = 1.4;                  // ← ADD HOZZÁ
+
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.4;
       renderer.setSize(W, H);
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-      renderer.outputEncoding = THREE.sRGBEncoding;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.4;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       el.appendChild(renderer.domElement);
 
       const grid = new THREE.GridHelper(20, 40,
@@ -89,7 +79,6 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       const lightGroup = new THREE.Group();
       scene.add(lightGroup);
 
-      // Sun: frozen world matrix — renderer cannot move it
       const sunLight = createSunLight(THREE, scene);
 
       const cam = { theta: 0.4, phi: Math.PI / 3, radius: 6, panX: 0, panY: 0 };
@@ -98,7 +87,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       S.current = {
         THREE, scene, camera, renderer, grid, lightGroup, placeholder,
         model: null, origMaterials: new Map(), cam,
-        bgLight: null, sunLight, _camDir: null,
+        sunLight, _camDir: null,
         autoSpin, lightAutoRotate, lightAutoRotateSpeed,
         drag: { active: false, mode: 'orbit', x: 0, y: 0 },
         frame: null,
@@ -107,7 +96,6 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       applyLights(S.current, lightMode, color, lightStrength, lightRotation, dramaticColor, viewMode);
       applyViewMode(S.current, viewMode);
       setSceneBg(S.current, bgColor);
-      setBgLight(S.current, bgLightOn, bgLightColor, bgLightSize, bgLightIntensity);
 
       const clock = new THREE.Clock();
       const loop = () => {
@@ -122,7 +110,6 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
           S.current.lightGroup.rotation.y += S.current.lightAutoRotateSpeed * dt;
         }
 
-        updateBgLightPosition(S.current);
         renderer.render(scene, camera);
       };
       loop();
@@ -149,10 +136,6 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   useEffect(() => { if (S.current) S.current.autoSpin = autoSpin; }, [autoSpin]);
   useEffect(() => { if (S.current?.scene) setSceneBg(S.current, bgColor); }, [bgColor]);
-  useEffect(() => {
-    if (!S.current?.scene) return;
-    setBgLight(S.current, bgLightOn, bgLightColor, bgLightSize, bgLightIntensity);
-  }, [bgLightOn, bgLightColor, bgLightSize, bgLightIntensity]);
 
   useEffect(() => {
     if (S.current?.grid) {
