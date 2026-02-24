@@ -6,7 +6,7 @@ import {
   Download, Loader2, AlertCircle, Trash2,
   RotateCcw, Camera, Move3d, Layers, Play, Square,
   Sparkles, Clock, ChevronRight, Sliders,
-  Box, Type,
+  Box, Type, Wand2, Zap,
 } from 'lucide-react';
 
 import ThreeViewer from '../meshy/viewer/ThreeViewer';
@@ -69,14 +69,85 @@ const fmtDate = (d) => {
   });
 };
 
+// ── randomSeed alapból FALSE ──────────────────────────────────────────────────
 const defaultParams = () => ({
   slat_cfg_scale:      3.0,
   ss_cfg_scale:        7.5,
   slat_sampling_steps: 25,
   ss_sampling_steps:   25,
   seed:                0,
-  randomSeed:          true,
+  randomSeed:          false,
 });
+
+// ── Gyors presetek (több opció, gyenge/optimalizált) ──────────────────────────
+const TRELLIS_PRESETS = [
+  {
+    label: 'Ultra',
+    emoji: '⚡',
+    tip: 'Ultra gyors — alacsony minőség, ~15 mp',
+    slat_cfg: 2.5, ss_cfg: 6.0,
+    slat_steps: 8,  ss_steps: 8,
+  },
+  {
+    label: 'Gyors',
+    emoji: '🚀',
+    tip: 'Gyors — közepes minőség, ~20 mp',
+    slat_cfg: 3.0, ss_cfg: 7.5,
+    slat_steps: 12, ss_steps: 12,
+  },
+  {
+    label: 'Normál',
+    emoji: '⚖️',
+    tip: 'Normál — jó minőség, ~30 mp',
+    slat_cfg: 3.0, ss_cfg: 7.5,
+    slat_steps: 25, ss_steps: 25,
+  },
+  {
+    label: 'Minőség',
+    emoji: '✨',
+    tip: 'Magas minőség — ~50 mp',
+    slat_cfg: 3.5, ss_cfg: 8.0,
+    slat_steps: 40, ss_steps: 40,
+  },
+  {
+    label: 'Max',
+    emoji: '💎',
+    tip: 'Maximum minőség — ~70 mp',
+    slat_cfg: 4.0, ss_cfg: 9.0,
+    slat_steps: 50, ss_steps: 50,
+  },
+];
+
+// ── Prompt enhancer system prompt ─────────────────────────────────────────────
+const ENHANCE_SYSTEM = `You are a friendly but strict prompt enhancer for 3D generative AI.
+Task: Take a short or simple user prompt and turn it into a compact, visually clear 3D prompt (1–2 lines) suitable for all audiences.
+
+Rules:
+- Preserve the original character's visual intent, age, physique, and iconic features, but do not include copyrighted or licensed names
+- Include precise body proportions for athletic or muscular characters (e.g., defined arms, shoulders, chest) but always use a neutral standing pose
+- Focus only on the character: exclude environment, lighting, background, or mood entirely
+- Add essential details: materials, subtle textures, style, but stay concise
+- You can add small creative storytelling touches if they fit naturally
+- Completely block NSFW, sexual, or explicit content
+- Replace known character names with neutral descriptive terms if necessary
+- Always output something, even if the prompt is very short or vague
+- Output only the enhanced prompt
+- Keep it generation-friendly and Trellis-compatible`;
+
+// ── Prompt dechanter system prompt ───────────────────────────────────────────
+const DECHANTER_SYSTEM = `You are a strict prompt simplifier for 3D generative AI.
+Task: Simplify a user prompt to be compact, safe, and generation-friendly for all audiences.
+
+Rules:
+- Preserve the original character's visual intent, age, physique, and iconic features, but do not include copyrighted or licensed names
+- Include precise body proportions for athletic or muscular characters (e.g., defined arms, shoulders, chest) but always use a neutral standing pose
+- Focus only on the character: exclude environment, lighting, background, or mood entirely
+- Keep essential keywords only: subject, pose, visibility, body type, and subtle material/texture hints
+- Completely block NSFW, sexual, or explicit content
+- Replace known character names with neutral descriptive terms if necessary
+- Always output something, even if the prompt is very short or vague
+- Output only the simplified prompt
+- Keep prompts Trellis-compatible and safe for all audiences`;
 
 // ── Standalone GLB fetcher ────────────────────────────────────────────────────
 async function fetchGlbAsBlob(modelUrl, getIdToken) {
@@ -108,12 +179,8 @@ async function fetchGlbAsBlob(modelUrl, getIdToken) {
 const TRELLIS_COLLECTION = 'trellis_history';
 
 async function loadHistoryFromFirestore(userId) {
-  if (!userId) {
-    console.warn('loadHistory: userId hiányzik');
-    return [];
-  }
+  if (!userId) return [];
   try {
-    console.log('Firestore betoltes, userId:', userId);
     const q = query(
       collection(db, TRELLIS_COLLECTION),
       where('userId', '==', userId),
@@ -121,7 +188,6 @@ async function loadHistoryFromFirestore(userId) {
       limit(30)
     );
     const snap = await getDocs(q);
-    console.log('Firestore talalatok szama:', snap.size);
     return snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(i => i.status === 'succeeded' && i.model_url);
@@ -384,7 +450,6 @@ function WireframeControl({ active, onToggle, opacity, onOpacityChange, color, o
   );
 }
 
-// ── FIX: onDownload prop hozzáadva, <a> helyett <button> a letöltéshez ────────
 function HistoryCard({ item, isActive, onSelect, onReuse, onDownload, color }) {
   return (
     <button onClick={() => onSelect(item)} style={{
@@ -430,7 +495,6 @@ function HistoryCard({ item, isActive, onSelect, onReuse, onDownload, color }) {
               ↩ Újra
             </button>
             {item.model_url && (
-              // FIX: <a href> helyett <button onClick> — proxyn keresztül tölti le
               <button
                 onClick={e => { e.stopPropagation(); onDownload(item); }}
                 style={{
@@ -450,7 +514,7 @@ function HistoryCard({ item, isActive, onSelect, onReuse, onDownload, color }) {
   );
 }
 
-function PromptInput({ value, onChange, onSubmit, color, disabled }) {
+function PromptInput({ value, onChange, onSubmit, onEnhance, enhancing, onDechance, dechantig, color, disabled }) {
   const MAX_CHARS = 1000;
   const remaining = MAX_CHARS - value.length;
   const isOverLimit = remaining < 0;
@@ -492,9 +556,57 @@ function PromptInput({ value, onChange, onSubmit, color, disabled }) {
           {remaining}
         </span>
       </div>
-      <p style={{ color: '#2d3748', fontSize: 9, margin: '4px 0 0', textAlign: 'right' }}>
-        Ctrl+Enter a generáláshoz
-      </p>
+
+      {/* Enhance + Dechance button row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+        <p style={{ color: '#2d3748', fontSize: 9, margin: 0 }}>
+          Ctrl+Enter a generáláshoz
+        </p>
+        <div style={{ display: 'flex', gap: 5 }}>
+          <Tooltip text={!value.trim() ? 'Írj be egy promptot először' : 'Prompt egyszerűsítése (timeout után)'} side="top">
+            <button
+              onClick={onDechance}
+              disabled={!value.trim() || dechantig || disabled}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '4px 9px', borderRadius: 7, fontSize: 10, fontWeight: 700,
+                cursor: (!value.trim() || dechantig || disabled) ? 'not-allowed' : 'pointer',
+                border: 'none', transition: 'all 0.15s',
+                background: dechantig ? 'rgba(251,146,60,0.18)' : 'rgba(251,146,60,0.12)',
+                color: '#fb923c',
+                outline: '1px solid rgba(251,146,60,0.3)',
+                opacity: (!value.trim() || disabled) ? 0.4 : 1,
+              }}
+            >
+              {dechantig
+                ? <><Loader2 style={{ width: 10, height: 10 }} className="animate-spin" /> Egyszerűsítés…</>
+                : <><Zap style={{ width: 10, height: 10 }} /> Simplify</>
+              }
+            </button>
+          </Tooltip>
+          <Tooltip text={!value.trim() ? 'Írj be egy promptot először' : 'AI prompt fejlesztés'} side="top">
+            <button
+              onClick={onEnhance}
+              disabled={!value.trim() || enhancing || disabled}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '4px 9px', borderRadius: 7, fontSize: 10, fontWeight: 700,
+                cursor: (!value.trim() || enhancing || disabled) ? 'not-allowed' : 'pointer',
+                border: 'none', transition: 'all 0.15s',
+                background: enhancing ? `${color}18` : `${color}22`,
+                color,
+                outline: `1px solid ${color}40`,
+                opacity: (!value.trim() || disabled) ? 0.4 : 1,
+              }}
+            >
+              {enhancing
+                ? <><Loader2 style={{ width: 10, height: 10 }} className="animate-spin" /> Fejlesztés…</>
+                : <><Wand2 style={{ width: 10, height: 10 }} /> Enhance</>
+              }
+            </button>
+          </Tooltip>
+        </div>
+      </div>
     </div>
   );
 }
@@ -511,6 +623,11 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
   const [modelUrl, setModelUrl]   = useState(null);
   const [params, setParams]       = useState(defaultParams());
 
+  // Prompt enhancer / dechanter
+  const [enhancing, setEnhancing]   = useState(false);
+  const [dechantig, setDechantig]   = useState(false);
+  const [timedOut,  setTimedOut]    = useState(false);
+
   const [viewMode, setViewMode]                 = useState('clay');
   const [lightMode, setLightMode]               = useState('studio');
   const [showGrid, setShowGrid]                 = useState(true);
@@ -526,10 +643,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
   const [lightAutoRotate, setLightAutoRotate]           = useState(false);
   const [lightAutoRotateSpeed, setLightAutoRotateSpeed] = useState(0.5);
   const [dramaticColor, setDramaticColor]               = useState('#4400ff');
-  const [bgLightOn, setBgLightOn]                       = useState(true);
-  const [bgLightColor, setBgLightColor]                 = useState('#ffffff');
-  const [bgLightSize, setBgLightSize]                   = useState(4);
-  const [bgLightIntensity, setBgLightIntensity]         = useState(0.1);
   const [gridColor1, setGridColor1]                     = useState('#1e1e3a');
   const [gridColor2, setGridColor2]                     = useState('#111128');
 
@@ -541,7 +654,12 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
   const [activeItem, setActiveItem]         = useState(null);
   const [histSearch, setHistSearch]         = useState('');
 
-  const sceneRef = useRef(null);
+  const sceneRef    = useRef(null);
+  const abortRef    = useRef(null);
+  const timeoutRef  = useRef(null);
+  // ── Előző modelUrl mentése leállításkor való visszaállításhoz ─────────────
+  const prevModelUrlRef = useRef(null);
+
   const setParam = useCallback((k, v) => setParams(p => ({ ...p, [k]: v })), []);
 
   // ── Firestore history betöltése ───────────────────────────────────────────
@@ -563,10 +681,16 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
           if (latest.model_url) {
             try {
               const blobUrl = await fetchGlbAsBlob(latest.model_url, getIdToken);
-              if (!cancelled) setModelUrl(blobUrl);
+              if (!cancelled) {
+                setModelUrl(blobUrl);
+                prevModelUrlRef.current = blobUrl;
+              }
             } catch (err) {
               console.warn('GLB auto-load hiba:', err.message);
-              if (!cancelled) setModelUrl(latest.model_url);
+              if (!cancelled) {
+                setModelUrl(latest.model_url);
+                prevModelUrlRef.current = latest.model_url;
+              }
             }
           }
         }
@@ -586,12 +710,124 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
     return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
   }, [getIdToken]);
 
+  // ── Prompt Enhancer ───────────────────────────────────────────────────────
+  const handleEnhance = useCallback(async () => {
+    if (!prompt.trim() || enhancing) return;
+    setEnhancing(true);
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('http://localhost:3001/api/chat', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model:    'gpt-oss-120b',
+          provider: 'cerebras',
+          messages: [
+            { role: 'system', content: ENHANCE_SYSTEM },
+            { role: 'user',   content: prompt.trim() },
+          ],
+          temperature: 0.7,
+          max_tokens:  500,
+        }),
+      });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = '';
+      let buf = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) continue;
+          const raw = trimmed.slice(6);
+          if (raw === '[DONE]') continue;
+          try { accumulated += JSON.parse(raw).delta || ''; } catch {}
+        }
+      }
+
+      if (accumulated.trim()) setPrompt(accumulated.trim());
+    } catch (err) {
+      console.error('Enhance hiba:', err);
+    } finally {
+      setEnhancing(false);
+    }
+  }, [prompt, enhancing, authHeaders]);
+
+  // ── Prompt Dechanter ─────────────────────────────────────────────────────
+  const handleDechance = useCallback(async () => {
+    if (!prompt.trim() || dechantig) return;
+    setDechantig(true);
+    try {
+      const headers = await authHeaders();
+      const res = await fetch('http://localhost:3001/api/chat', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model:    'gpt-oss-120b',
+          provider: 'cerebras',
+          messages: [
+            { role: 'system', content: DECHANTER_SYSTEM },
+            { role: 'user',   content: prompt.trim() },
+          ],
+          temperature: 0.4,
+          max_tokens:  300,
+        }),
+      });
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = '';
+      let buf = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) continue;
+          const raw = trimmed.slice(6);
+          if (raw === '[DONE]') continue;
+          try { accumulated += JSON.parse(raw).delta || ''; } catch {}
+        }
+      }
+
+      if (accumulated.trim()) {
+        setPrompt(accumulated.trim());
+        setTimedOut(false);
+      }
+    } catch (err) {
+      console.error('Dechance hiba:', err);
+    } finally {
+      setDechantig(false);
+    }
+  }, [prompt, dechantig, authHeaders]);
+
   // ── Generate ──────────────────────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
     if (genStatus === 'pending' || !prompt.trim() || prompt.length > 1000) return;
     setErrorMsg('');
+    // ── Előző modell mentése, hogy leállítás után visszatölthessük ──────────
+    prevModelUrlRef.current = modelUrl;
     setModelUrl(null);
     setGenStatus('pending');
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setTimedOut(false);
+
+    // ── 70 másodperc timeout ─────────────────────────────────────────────────
+    timeoutRef.current = setTimeout(() => {
+      controller.abort();
+      setTimedOut(true);
+    }, 70_000);
 
     try {
       const headers = await authHeaders();
@@ -602,6 +838,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       const res = await fetch('http://localhost:3001/api/trellis', {
         method: 'POST',
         headers,
+        signal: controller.signal,
         body: JSON.stringify({
           prompt:              prompt.trim(),
           slat_cfg_scale:      params.slat_cfg_scale,
@@ -615,7 +852,9 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       const data = await res.json();
 
       if (!data.success) {
-        setGenStatus('failed');
+        // Hiba esetén előző modell visszaállítása
+        setModelUrl(prevModelUrlRef.current);
+        setGenStatus(prevModelUrlRef.current ? 'succeeded' : 'failed');
         setErrorMsg(data.message ?? 'Trellis generálás sikertelen');
         return;
       }
@@ -623,6 +862,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       const glbUrl = data.glb_url ?? data.model_url ?? null;
       const blobUrl = await fetchGlbAsBlob(glbUrl, getIdToken);
       setModelUrl(blobUrl);
+      prevModelUrlRef.current = blobUrl;
       setGenStatus('succeeded');
 
       const itemData = {
@@ -651,10 +891,28 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       setActiveItem(newItem);
 
     } catch (err) {
-      setGenStatus('failed');
-      setErrorMsg(err.message ?? 'Hálózati hiba');
+      if (err.name === 'AbortError') {
+        // ── Leállításkor az előző modell visszaállítása ──────────────────────
+        setModelUrl(prevModelUrlRef.current);
+        setGenStatus(prevModelUrlRef.current ? 'succeeded' : 'idle');
+        setErrorMsg('');
+      } else {
+        // Hálózati hiba esetén is visszaállítás
+        setModelUrl(prevModelUrlRef.current);
+        setGenStatus(prevModelUrlRef.current ? 'succeeded' : 'failed');
+        setErrorMsg(err.message ?? 'Hálózati hiba');
+      }
+    } finally {
+      abortRef.current = null;
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
-  }, [genStatus, prompt, params, authHeaders, userId, getIdToken]);
+  }, [genStatus, prompt, params, authHeaders, userId, getIdToken, modelUrl]);
+
+  const handleStop = useCallback(() => {
+    setTimedOut(false);
+    abortRef.current?.abort();
+  }, []);
 
   const handleSelectHistory = useCallback(async (item) => {
     setActiveItem(item);
@@ -663,8 +921,10 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       try {
         const blobUrl = await fetchGlbAsBlob(item.model_url, getIdToken);
         setModelUrl(blobUrl);
+        prevModelUrlRef.current = blobUrl;
       } catch {
         setModelUrl(item.model_url);
+        prevModelUrlRef.current = item.model_url;
       }
     }
   }, [getIdToken]);
@@ -674,7 +934,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
     setErrorMsg('');
   }, []);
 
-  // ── Download: aktív modell (blob URL) ─────────────────────────────────────
   const handleDownload = useCallback(() => {
     if (!modelUrl) return;
     const a = document.createElement('a');
@@ -683,7 +942,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
     a.click();
   }, [modelUrl]);
 
-  // ── FIX: History card letöltés — proxyn keresztül, nem direct B2 URL ──────
   const handleDownloadItem = useCallback(async (item) => {
     try {
       const blobUrl = await fetchGlbAsBlob(item.model_url, getIdToken);
@@ -691,7 +949,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       a.href = blobUrl;
       a.download = `trellis_${item.id ?? Date.now()}.glb`;
       a.click();
-      // Blob URL felszabadítása rövid késleltetés után
       setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
     } catch (err) {
       console.error('GLB letöltés sikertelen:', err);
@@ -709,6 +966,14 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
   }, []);
 
   const toggleAutoSpin = useCallback(() => setAutoSpin(v => !v), []);
+
+  // ── Aktív preset azonosítása ──────────────────────────────────────────────
+  const activePresetLabel = useMemo(() => {
+    const p = TRELLIS_PRESETS.find(
+      pr => pr.slat_steps === params.slat_sampling_steps && pr.ss_steps === params.ss_sampling_steps
+    );
+    return p?.label ?? null;
+  }, [params.slat_sampling_steps, params.ss_sampling_steps]);
 
   const isRunning = genStatus === 'pending';
   const canGen    = !isRunning && !!prompt.trim() && prompt.length <= 1000;
@@ -780,6 +1045,10 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
               value={prompt}
               onChange={setPrompt}
               onSubmit={handleGenerate}
+              onEnhance={handleEnhance}
+              enhancing={enhancing}
+              onDechance={handleDechance}
+              dechantig={dechantig}
               color={color}
               disabled={isRunning}
             />
@@ -807,7 +1076,35 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
               </div>
             </div>
 
-            {errorMsg && (
+            {timedOut && (
+              <div style={{
+                padding: '9px 11px', borderRadius: 9, marginBottom: 12,
+                background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.3)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                  <Clock style={{ width: 12, height: 12, color: '#fb923c', flexShrink: 0 }} />
+                  <p style={{ color: '#fdba74', fontSize: 10, fontWeight: 700, margin: 0 }}>
+                    Időtúllépés (1:10)
+                  </p>
+                </div>
+                <p style={{ color: '#9a6034', fontSize: 9, margin: '0 0 7px', lineHeight: 1.5 }}>
+                  Csökkentsd a Sampling Steps értékét, vagy egyszerűsítsd a promptot a Simplify gombbal.
+                </p>
+                <button onClick={handleDechance} disabled={dechantig} style={{
+                  width: '100%', padding: '5px 0', borderRadius: 7, fontSize: 10, fontWeight: 700,
+                  cursor: dechantig ? 'not-allowed' : 'pointer', border: 'none',
+                  background: dechantig ? 'rgba(251,146,60,0.12)' : 'rgba(251,146,60,0.2)',
+                  color: '#fb923c', outline: '1px solid rgba(251,146,60,0.35)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                }}>
+                  {dechantig
+                    ? <><Loader2 style={{ width: 10, height: 10 }} className="animate-spin" /> Egyszerűsítés…</>
+                    : <><Zap style={{ width: 10, height: 10 }} /> Prompt egyszerűsítése</>
+                  }
+                </button>
+              </div>
+            )}
+            {!timedOut && errorMsg && (
               <div style={{
                 display: 'flex', alignItems: 'flex-start', gap: 6, padding: '7px 9px',
                 borderRadius: 9, background: 'rgba(239,68,68,0.12)',
@@ -818,6 +1115,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
               </div>
             )}
 
+            {/* ── Trellis Beállítások ─────────────────────────────────────── */}
             <div style={{
               background: 'rgba(255,255,255,0.02)',
               border: '1px solid rgba(255,255,255,0.07)',
@@ -830,6 +1128,16 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
               }}>
                 <Sliders style={{ width: 12, height: 12, color }} />
                 <span style={{ color: '#e5e7eb', fontSize: 11, fontWeight: 800 }}>Trellis beállítások</span>
+                {/* Aktív preset badge */}
+                {activePresetLabel && (
+                  <span style={{
+                    fontSize: 9, padding: '1px 6px', borderRadius: 4,
+                    background: `${color}20`, color, border: `1px solid ${color}30`,
+                    fontWeight: 700,
+                  }}>
+                    {TRELLIS_PRESETS.find(p => p.label === activePresetLabel)?.emoji} {activePresetLabel}
+                  </span>
+                )}
                 <span style={{
                   marginLeft: 'auto', fontSize: 9, color: '#374151', transition: 'transform 0.2s',
                   display: 'inline-block', transform: settingsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -838,14 +1146,67 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
 
               {settingsOpen && (
                 <div style={{ padding: '0 12px 12px' }}>
+                  {/* ── Preset gombok (5 db) ─────────────────────────────── */}
+                  <div style={{ marginBottom: 14 }}>
+                    <p style={{ color: '#4b5563', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 7px' }}>
+                      Gyors preset
+                    </p>
+                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                      {TRELLIS_PRESETS.map(p => {
+                        const isActive = params.slat_sampling_steps === p.slat_steps
+                          && params.ss_sampling_steps === p.ss_steps;
+                        return (
+                          <Tooltip key={p.label} text={p.tip} side="top">
+                            <button
+                              onClick={() => {
+                                setParam('slat_cfg_scale', p.slat_cfg);
+                                setParam('ss_cfg_scale', p.ss_cfg);
+                                setParam('slat_sampling_steps', p.slat_steps);
+                                setParam('ss_sampling_steps', p.ss_steps);
+                              }}
+                              style={{
+                                flex: '1 1 auto', minWidth: 44,
+                                padding: '5px 4px', borderRadius: 8,
+                                fontSize: 10, fontWeight: 700,
+                                border: 'none', cursor: 'pointer',
+                                background: isActive ? `${color}28` : 'rgba(255,255,255,0.04)',
+                                color: isActive ? color : '#6b7280',
+                                outline: isActive ? `1px solid ${color}50` : '1px solid rgba(255,255,255,0.06)',
+                                transition: 'all 0.15s',
+                                display: 'flex', flexDirection: 'column',
+                                alignItems: 'center', gap: 2,
+                              }}
+                            >
+                              <span style={{ fontSize: 13, lineHeight: 1 }}>{p.emoji}</span>
+                              <span style={{ fontSize: 9 }}>{p.label}</span>
+                              <span style={{ fontSize: 8, opacity: 0.6 }}>{p.slat_steps}s</span>
+                            </button>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                    {/* Idő becslés az aktív presethez */}
+                    {activePresetLabel && (() => {
+                      const est = { 'Ultra': '~10–15 mp', 'Gyors': '~18–22 mp', 'Normál': '~28–35 mp', 'Minőség': '~45–55 mp', 'Max': '~60–70 mp' };
+                      return (
+                        <p style={{ color: '#4b5563', fontSize: 9, margin: '6px 0 0', textAlign: 'center' }}>
+                          Becsült idő: <span style={{ color, fontWeight: 700 }}>{est[activePresetLabel]}</span>
+                        </p>
+                      );
+                    })()}
+                  </div>
+
+                  <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '0 0 14px' }} />
+
                   <MiniSlider label="SLAT CFG Scale" value={params.slat_cfg_scale} min={1} max={10} step={0.1}
                     onChange={v => setParam('slat_cfg_scale', v)} color={color} display={params.slat_cfg_scale.toFixed(1)} />
                   <MiniSlider label="SS CFG Scale" value={params.ss_cfg_scale} min={1} max={10} step={0.1}
                     onChange={v => setParam('ss_cfg_scale', v)} color={color} display={params.ss_cfg_scale.toFixed(1)} />
-                  <MiniSlider label="SLAT Sampling Steps" value={params.slat_sampling_steps} min={10} max={50} step={1}
+                  <MiniSlider label="SLAT Sampling Steps" value={params.slat_sampling_steps} min={4} max={50} step={1}
                     onChange={v => setParam('slat_sampling_steps', v)} color={color} display={`${params.slat_sampling_steps}`} />
-                  <MiniSlider label="SS Sampling Steps" value={params.ss_sampling_steps} min={10} max={50} step={1}
+                  <MiniSlider label="SS Sampling Steps" value={params.ss_sampling_steps} min={4} max={50} step={1}
                     onChange={v => setParam('ss_sampling_steps', v)} color={color} display={`${params.ss_sampling_steps}`} />
+
                   <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0 14px' }} />
 
                   <ToggleRow
@@ -879,35 +1240,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
                       </span>
                     </div>
                   )}
-
-                  <div style={{ marginTop: 4 }}>
-                    <p style={{ color: '#4b5563', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>
-                      Gyors preset
-                    </p>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {[
-                        { label: 'Gyors',   slat_cfg: 3,   ss_cfg: 7.5, slat_steps: 12, ss_steps: 12 },
-                        { label: 'Normál',  slat_cfg: 3,   ss_cfg: 7.5, slat_steps: 25, ss_steps: 25 },
-                        { label: 'Minőség', slat_cfg: 3.5, ss_cfg: 8,   slat_steps: 40, ss_steps: 40 },
-                      ].map(p => (
-                        <button key={p.label} onClick={() => {
-                          setParam('slat_cfg_scale', p.slat_cfg);
-                          setParam('ss_cfg_scale', p.ss_cfg);
-                          setParam('slat_sampling_steps', p.slat_steps);
-                          setParam('ss_sampling_steps', p.ss_steps);
-                        }} style={{
-                          flex: 1, padding: '5px 0', borderRadius: 8, fontSize: 10, fontWeight: 700,
-                          border: 'none', cursor: 'pointer',
-                          background: params.slat_sampling_steps === p.slat_steps ? `${color}28` : 'rgba(255,255,255,0.04)',
-                          color: params.slat_sampling_steps === p.slat_steps ? color : '#6b7280',
-                          outline: params.slat_sampling_steps === p.slat_steps ? `1px solid ${color}50` : '1px solid rgba(255,255,255,0.06)',
-                          transition: 'all 0.15s',
-                        }}>
-                          {p.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
@@ -916,37 +1248,49 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
           <div style={{ padding: '10px 12px', flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 8 }}>
               <span style={{ color: '#6b7280', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Clock style={{ width: 11, height: 11 }} /> ~30 mp
+                <Clock style={{ width: 11, height: 11 }} />
+                {activePresetLabel
+                  ? { 'Ultra': '~10–15 mp', 'Gyors': '~18–22 mp', 'Normál': '~28–35 mp', 'Minőség': '~45–55 mp', 'Max': '~60–70 mp' }[activePresetLabel]
+                  : '~30 mp'
+                }
               </span>
               <span style={{ color: '#4b5563', fontSize: 10 }}>microsoft/trellis</span>
             </div>
-            <Tooltip
-              text={!canGen
-                ? (!prompt.trim() ? 'Írj be egy promptot' : prompt.length > 1000 ? 'Prompt túl hosszú' : 'Generálás folyamatban')
-                : 'Trellis 3D generálás indítása'}
-              side="top"
-            >
-              <button onClick={handleGenerate} disabled={!canGen} style={{
+            {isRunning ? (
+              <button onClick={handleStop} style={{
                 width: '100%', padding: '12px 0', borderRadius: 12,
                 fontSize: 13, fontWeight: 800, color: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                cursor: canGen ? 'pointer' : 'not-allowed', border: 'none',
-                background: isRunning
-                  ? 'rgba(255,255,255,0.07)'
-                  : canGen
+                cursor: 'pointer', border: 'none', transition: 'all 0.2s',
+                background: 'rgba(239,68,68,0.18)',
+                outline: '1px solid rgba(239,68,68,0.4)',
+              }}>
+                <Square style={{ width: 13, height: 13 }} /> Leállítás
+              </button>
+            ) : (
+              <Tooltip
+                text={!canGen
+                  ? (!prompt.trim() ? 'Írj be egy promptot' : prompt.length > 1000 ? 'Prompt túl hosszú' : '')
+                  : 'Trellis 3D generálás indítása'}
+                side="top"
+              >
+                <button onClick={handleGenerate} disabled={!canGen} style={{
+                  width: '100%', padding: '12px 0', borderRadius: 12,
+                  fontSize: 13, fontWeight: 800, color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                  cursor: canGen ? 'pointer' : 'not-allowed', border: 'none',
+                  background: canGen
                     ? `linear-gradient(135deg,${color},#8b5cf6)`
                     : 'rgba(255,255,255,0.06)',
-                boxShadow: canGen && !isRunning ? `0 4px 24px ${color}50` : 'none',
-                opacity: !canGen ? 0.45 : 1,
-                transition: 'all 0.2s',
-                animation: canGen && !isRunning ? 'trellisPulse 2.5s infinite' : 'none',
-              }}>
-                {isRunning
-                  ? <><Loader2 style={{ width: 15, height: 15 }} className="animate-spin" /> Generálás…</>
-                  : <><Sparkles style={{ width: 15, height: 15 }} /> Trellis Generate</>
-                }
-              </button>
-            </Tooltip>
+                  boxShadow: canGen ? `0 4px 24px ${color}50` : 'none',
+                  opacity: !canGen ? 0.45 : 1,
+                  transition: 'all 0.2s',
+                  animation: canGen ? 'trellisPulse 2.5s infinite' : 'none',
+                }}>
+                  <Sparkles style={{ width: 15, height: 15 }} /> Trellis Generate
+                </button>
+              </Tooltip>
+            )}
             {modelUrl && (
               <button onClick={handleDownload} style={{
                 marginTop: 6, width: '100%', padding: '8px 0', borderRadius: 10,
@@ -1008,10 +1352,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
                 lightAutoRotate={lightAutoRotate} setLightAutoRotate={setLightAutoRotate}
                 lightAutoRotateSpeed={lightAutoRotateSpeed} setLightAutoRotateSpeed={setLightAutoRotateSpeed}
                 dramaticColor={dramaticColor} setDramaticColor={setDramaticColor}
-                bgLightOn={bgLightOn} setBgLightOn={setBgLightOn}
-                bgLightColor={bgLightColor} setBgLightColor={setBgLightColor}
-                bgLightSize={bgLightSize} setBgLightSize={setBgLightSize}
-                bgLightIntensity={bgLightIntensity} setBgLightIntensity={setBgLightIntensity}
                 gridColor1={gridColor1} setGridColor1={setGridColor1}
                 gridColor2={gridColor2} setGridColor2={setGridColor2}
                 color={color}
@@ -1053,8 +1393,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
               dramaticColor={dramaticColor}
               wireframeOverlay={wireframeOverlay} wireOpacity={wireOpacity} wireHexColor={wireHexColor}
               autoSpin={autoSpin} bgColor={bgColor}
-              bgLightOn={bgLightOn} bgLightColor={bgLightColor}
-              bgLightSize={bgLightSize} bgLightIntensity={bgLightIntensity}
               gridColor1={gridColor1} gridColor2={gridColor2}
               onSpinStop={() => setAutoSpin(false)}
               onReady={s => { sceneRef.current = s; }}
@@ -1101,7 +1439,11 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
                   „{prompt}"
                 </p>
                 <p style={{ color: '#4b5563', fontSize: 11, margin: '0 0 20px' }}>
-                  NVIDIA microsoft/trellis · ~30 másodperc
+                  NVIDIA microsoft/trellis · {
+                    activePresetLabel
+                      ? { 'Ultra': '~10–15 mp', 'Gyors': '~18–22 mp', 'Normál': '~28–35 mp', 'Minőség': '~45–55 mp', 'Max': '~60–70 mp' }[activePresetLabel]
+                      : '~30 mp'
+                  }
                 </p>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {[0,1,2,3,4].map(i => (
@@ -1115,6 +1457,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
               </div>
             )}
 
+            {/* ── Üres állapot: csak ha NINCS model és NEM fut és NEM tölt ── */}
             {!isRunning && !modelUrl && !historyLoading && (
               <div style={{
                 position: 'absolute', inset: 0, zIndex: 5,
