@@ -139,6 +139,7 @@ export const MODEL_GROUPS = [
                     { id: "deepseek-v3.2", name: "DeepSeek v3.2 (NVIDIA)", apiModel: "deepseek-ai/deepseek-v3.2", provider: "nvidia", color: "#16f921", defaultTemperature: 0.3, defaultMaxTokens: 2048, defaultTopP: 0.95 },
                     { id: "google-gemma-3-27b-it", name: "(img) Gemma 3 27B IT (NVIDIA)", apiModel: "google/gemma-3-27b-it", provider: "nvidia", color: "#16f921", supportsVision: true, defaultTemperature: 0.8, defaultMaxTokens: 2048, defaultTopP: 0.95 },
 
+                    
 //                     {
 //                         id: "deepseek_coder",
 //                         name: "DeepSeek Coder V3",
