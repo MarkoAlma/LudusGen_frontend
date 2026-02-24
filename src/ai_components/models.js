@@ -131,7 +131,7 @@ export const MODEL_GROUPS = [
                     { id: "cerebras-qwen235b",  name: "Qwen 3 235B (Cerebras) (Nem jo)",        apiModel: "qwen-3-235b-a22b-instruct-2507", provider: "cerebras", color: "#8b5cf6" },
                     { id: "cerebras-zaiglm",    name: "Z.ai GLM 4.7 (Cerebras) (Nem jo)",       apiModel: "zai-glm-4.7",                   provider: "cerebras", color: "#a855f7" },
                     { id: "mistral-large",   name: "Mistral Large (Mistral)",    apiModel: "mistral-large-latest",    provider: "mistral", color: "#f97316" },
-                    { id: "nvidia-glm5",   name: "Z.ai GLM 5 (NVIDIA)",    apiModel: "z-ai/glm5",    provider: "nvidia", color: "#16f921" },
+                    { id: "nvidia-glm4.7",   name: "Z.ai GLM 4.7 (NVIDIA)",    apiModel: "z-ai/glm4.7",    provider: "nvidia", color: "#16f921" },
                     { id: "nvidia-kimi",   name: "(img) Kimi 2.5 (NVIDIA)",    apiModel: "moonshotai/kimi-k2.5",    provider: "nvidia", color: "#16f921" , supportsVision: true },
                     { id: "qwen3.5-397b", name: "(img) Qwen 3.5 397B (NVIDIA)", apiModel: "qwen/qwen3.5-397b-a17b", provider: "nvidia", color: "#46f536", supportsVision: true },
                     { id: "qwen3-coder-480b", name: "Qwen 3 Coder 480B (NVIDIA)", apiModel: "qwen/qwen3-coder-480b-a35b-instruct", provider: "nvidia", color: "#16f921" },
