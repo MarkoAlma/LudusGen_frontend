@@ -54,14 +54,14 @@ export default function ThreeViewer({
       
       renderer.outputEncoding = THREE.sRGBEncoding;        // ← ADD HOZZÁ
       renderer.toneMapping = THREE.ACESFilmicToneMapping;  // ← ADD HOZZÁ
-      renderer.toneMappingExposure = 1.0;                  // ← ADD HOZZÁ
+      renderer.toneMappingExposure = 1.4;                  // ← ADD HOZZÁ
       renderer.setSize(W, H);
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.4;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       el.appendChild(renderer.domElement);
