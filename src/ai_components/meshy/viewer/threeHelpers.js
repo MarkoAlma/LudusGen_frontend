@@ -217,15 +217,16 @@ export function applyLights(
   const toRemove = lightGroup.children.filter((c) => !c.userData.isBackLight);
   toRemove.forEach((c) => lightGroup.remove(c));
 
+// applyLights — clay/uv ág
 if (viewMode === 'clay' || viewMode === 'uv') {
-  lightGroup.add(new THREE.AmbientLight(0xffffff, 0.0));  // ← volt: 0x111111 = majdnem fekete!
-  const key = new THREE.DirectionalLight(0xffffff, 1.0);
+  lightGroup.add(new THREE.AmbientLight(0xffffff, 0.35));  // volt: 0.85 — túl erős!
+  const key = new THREE.DirectionalLight(0xffffff, 0.9);   // volt: 1.4
   key.position.set(3, 6, 4);
   lightGroup.add(key);
-  const fill = new THREE.DirectionalLight(0xffffff, 0.2);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.25); // volt: 0.6
   fill.position.set(-4, 2, -3);
   lightGroup.add(fill);
-  const back = new THREE.DirectionalLight(0xccccff, 0.2);
+  const back = new THREE.DirectionalLight(0xddeeff, 0.15); // volt: 0.4
   back.position.set(0, -1, -6);
   lightGroup.add(back);
   lightGroup.rotation.y = 0;
@@ -284,17 +285,22 @@ export function applyViewMode(s, mode) {
     const orig = origMaterials.get(node.uuid);
     node.castShadow = true;
 
-    if (mode === 'clay') {
-      // Clay: egyszerű szürke, semmi textúra
-      node.material = Array.isArray(orig)
-        ? orig.map(() => new THREE.MeshStandardMaterial({
-            color: 0xc2bdb8, metalness: 0, roughness: 0.92, envMapIntensity: 0,
-          }))
-        : new THREE.MeshStandardMaterial({
-            color: 0xc2bdb8, metalness: 0, roughness: 0.92, envMapIntensity: 0,
-          });
-
-    } else if (mode === 'normal') {
+// applyViewMode — clay material
+if (mode === 'clay') {
+  if (node.geometry && node.geometry.attributes.position) {
+    node.geometry.computeVertexNormals();
+  }
+  const buildClay = () => new THREE.MeshStandardMaterial({
+    color: '#544c40',      // volt: 0xc2bdb8 — melegebb, sötétebb agyagszín
+    metalness: 0,
+    roughness: 0.92,      // volt: 0.85 — erősebb diffúz, kevesebb spekulár
+    envMapIntensity: 0,
+    side: THREE.DoubleSide,
+  });
+  node.material = Array.isArray(orig)
+    ? orig.map(() => buildClay())
+    : buildClay();
+}else if (mode === 'normal') {
       // ← KULCS FIX: az eredeti GLTFLoader material-t adjuk vissza
       // Ez tartalmazza a helyes metalness/envMap beállításokat
       node.material = orig;
@@ -392,7 +398,16 @@ export function loadGLB(
 
 model.traverse((n) => {
   if (n.isMesh) {
-    s.origMaterials.set(n.uuid, n.material); // ← ez hiányzik!
+    // FIX: Trellis models often lack or have broken vertex normals
+    if (n.geometry) {
+      if (!n.geometry.attributes.normal) {
+        n.geometry.computeVertexNormals();
+      } else {
+        // Recompute anyway for Trellis — their normals can be inverted/corrupted
+        n.geometry.computeVertexNormals();
+      }
+    }
+    s.origMaterials.set(n.uuid, n.material);
   }
 });
 
