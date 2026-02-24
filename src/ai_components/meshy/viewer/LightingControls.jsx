@@ -1,6 +1,6 @@
 // viewer/LightingControls.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { Sun, Eye, Sparkles, RefreshCw, RotateCcw, Aperture, Grid } from 'lucide-react';
+import { Sun, Eye, Sparkles, RefreshCw, RotateCcw, Grid } from 'lucide-react';
 import { IconBtn, Tooltip } from '../ui/Primitives';
 
 function MiniSlider({ label, value, min, max, step, onChange, color, display }) {
@@ -87,7 +87,6 @@ function SectionHead({ icon, label, color }) {
 
 const Divider = () => <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '12px 0' }} />;
 
-// ── Inline color picker row ───────────────────────────────────────────────────
 function InlineColorRow({ label, value, onChange, accentColor }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -114,10 +113,6 @@ export default function LightingControls({
   lightAutoRotate, setLightAutoRotate,
   lightAutoRotateSpeed, setLightAutoRotateSpeed,
   dramaticColor, setDramaticColor,
-  bgLightOn, setBgLightOn,
-  bgLightColor, setBgLightColor,
-  bgLightSize, setBgLightSize,
-  bgLightIntensity, setBgLightIntensity,
   gridColor1, setGridColor1,
   gridColor2, setGridColor2,
   color,
@@ -145,14 +140,6 @@ export default function LightingControls({
     { hex: '#ff8800', label: 'Narancs' },
     { hex: '#00aaff', label: 'Kék' },
     { hex: '#00ff88', label: 'Zöld' },
-  ];
-
-  const BG_LIGHT_COLORS = [
-    { hex: '#ffffff', label: 'Fehér' },
-    { hex: '#ffe4b5', label: 'Meleg' },
-    { hex: '#b0c4ff', label: 'Hideg' },
-    { hex: '#d4b0ff', label: 'Lila' },
-    { hex: '#b0ffd4', label: 'Zöld' },
   ];
 
   return (
@@ -246,29 +233,6 @@ export default function LightingControls({
             </>
           )}
 
-          {/* ── Background Light ── */}
-          <SectionHead icon={<Aperture />} label="Background Light" color={color} />
-          <PopoverToggle
-            label="Háttér fény" sub="3D mélységű glow a modell mögött"
-            icon={<Aperture style={{ width: 11, height: 11 }} />}
-            value={bgLightOn} onChange={setBgLightOn} color={color}
-          />
-          {bgLightOn && (
-            <div style={{ marginTop: 10 }}>
-              <MiniSlider label="Erősség" min={0.01} max={1} step={0.01}
-                value={bgLightIntensity} onChange={setBgLightIntensity}
-                color={color} display={`${Math.round(bgLightIntensity * 100)}%`} />
-              <MiniSlider label="Méret" min={1} max={14} step={0.5}
-                value={bgLightSize} onChange={setBgLightSize}
-                color={color} display={`${bgLightSize.toFixed(0)}`} />
-              <span style={{ color: '#9ca3af', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Szín</span>
-              <ColorDots colors={BG_LIGHT_COLORS} value={bgLightColor}
-                onChange={setBgLightColor} accentColor={color} />
-            </div>
-          )}
-
-          <Divider />
-
           {/* ── Grid Colors ── */}
           <SectionHead icon={<Grid />} label="Grid Szín" color={color} />
           <InlineColorRow label="Fővonalak" value={gridColor1} onChange={setGridColor1} accentColor={color} />
@@ -301,8 +265,6 @@ export default function LightingControls({
             setLightStrength(1); setLightRotation(0);
             setLightAutoRotate(false); setLightAutoRotateSpeed(0.5);
             setDramaticColor('#4400ff');
-            setBgLightOn(true); setBgLightColor('#ffffff');
-            setBgLightSize(4); setBgLightIntensity(0.10);
             setGridColor1('#1e1e3a'); setGridColor2('#111128');
           }} style={{
             width: '100%', padding: '6px 0', borderRadius: 9,
