@@ -265,6 +265,17 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(2048);
   const [topP, setTopP] = useState(0.9);
+  const [thinking, setThinking] = useState(false);
+
+const THINKING_MODELS = [
+  "deepseek-ai/deepseek-v3.2",
+  "z-ai/glm4.7",
+  "moonshotai/kimi-k2.5",
+  "qwen/qwen3.5-397b-a17b",
+];
+
+const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
+
   const [frequencyPenalty, setFrequencyPenalty] = useState(0);
   const [presencePenalty, setPresencePenalty] = useState(0);
   const [activePresetId, setActivePresetId] = useState("default_balanced");
@@ -287,11 +298,37 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
   const prevMessageCount = useRef(0);
   const streamingMsgIdRef = useRef(null);
 
+  // ── Smart scroll: ha a user felgörgetett, ne ugráljunk vissza ──
+  const userScrolledUp = useRef(false);
+
+  // Figyeli, hogy a user manuálisan görgetett-e fel
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      // Ha több mint 80px-rel az aljától, a user felgörgetett
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      userScrolledUp.current = distanceFromBottom > 80;
+    };
+
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Mindig legörget (üzenetküldéskor / beszélgetés betöltésekor)
   const scrollToBottom = useCallback((smooth = true) => {
     const el = chatScrollRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "instant" });
   }, []);
+
+  // Csak akkor görget le, ha a user nem görgetett fel
+  const scrollToBottomIfNeeded = useCallback((smooth = true) => {
+    if (!userScrolledUp.current) {
+      scrollToBottom(smooth);
+    }
+  }, [scrollToBottom]);
 
   useEffect(() => {
     if (!userId) return;
@@ -410,6 +447,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     if (preset.topP !== undefined) setTopP(preset.topP);
     if (preset.frequencyPenalty !== undefined) setFrequencyPenalty(preset.frequencyPenalty);
     if (preset.presencePenalty !== undefined) setPresencePenalty(preset.presencePenalty);
+    if (preset.thinking !== undefined) setThinking(preset.thinking);
     setActivePresetId(preset.id);
   };
 
@@ -495,6 +533,14 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     setInput("");
     setAttachedImage(null);
     setIsTyping(true);
+
+    // ── Textarea magasság visszaállítása ──
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+
+    // ── Küldéskor mindig görgetünk le, és reseteljük a flag-et ──
+    userScrolledUp.current = false;
     setTimeout(() => scrollToBottom(), 50);
 
     const currentMessages = [...messages, userMsg];
@@ -504,14 +550,9 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
       const token = getIdToken ? await getIdToken() : null;
       if (!token) throw new Error("Nincs érvényes autentikációs token. Jelentkezz be újra.");
 
-      // ── FIX: "welcome" üzenetet kiszűrjük az API hívásból ──────────────
-      // clearConversation() után a messages[0] egy assistant welcome üzenet
-      // (id: "welcome"). Ha ezt elküldjük az API-nak, a lista assistant
-      // üzenettel kezdődik → az NVIDIA és más API-k 400-as hibával dobják vissza,
-      // mert az első üzenetnek user típusúnak kell lennie.
       const apiMessages = currentMessages
         .filter((m) => m.role !== "system")
-        .filter((m) => m.id !== "welcome")   // ← FIX: welcome üzenet kiszűrése
+        .filter((m) => m.id !== "welcome")
         .map((m) => ({ role: m.role, content: m.content }));
 
       const res = await fetch(`${API_BASE}/api/chat`, {
@@ -529,6 +570,9 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           ],
           temperature, max_tokens: maxTokens, top_p: topP,
           frequency_penalty: frequencyPenalty, presence_penalty: presencePenalty,
+          ...(supportsThinking && {
+            extra_body: { chat_template_kwargs: { thinking } },
+          }),
         }),
       });
 
@@ -568,7 +612,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
                 setMessages((prev) =>
                   prev.map((m) => m.id === aiMsgId ? { ...m, content: accumulated } : m)
                 );
-                scrollToBottom();
+                // ── Csak görgetünk, ha a user nem görgetett fel ──
+                scrollToBottomIfNeeded();
               }
             } catch { /* csonka JSON — kihagyjuk */ }
           }
@@ -594,7 +639,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
         setIsTyping(false);
         setMessages((prev) => prev.map((m) => m.id === aiMsgId ? finalMsg : m));
         await saveMessage(finalMsg);
-        setTimeout(() => scrollToBottom(), 50);
+        setTimeout(() => scrollToBottomIfNeeded(), 50);
       }
 
     } catch (err) {
@@ -628,6 +673,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
     }];
     prevMessageCount.current = welcome.length;
     setMessages(welcome);
+    userScrolledUp.current = false;
   };
 
   const color = selectedModel.color;
@@ -892,7 +938,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               placeholder="Az AI személyisége, szerepe, utasítások..."
-              rows={6}
+              rows={3}
               className="w-full px-4 py-3 rounded-xl text-white text-sm placeholder-gray-600 resize-none focus:outline-none transition-all"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
             />
@@ -920,6 +966,31 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
             </div>
           ))}
 
+          {/* ── Thinking (csak DeepSeek modelleknél) ── */}
+{supportsThinking && (
+  <div className="p-4 rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+    <div className="flex items-center justify-between">
+      <div>
+        <label className="text-white text-sm font-semibold">Reasoning (Thinking)</label>
+        <p className="text-gray-600 text-xs mt-0.5">Belső gondolkodási lánc engedélyezése</p>
+      </div>
+      <button
+        onClick={() => setThinking((v) => !v)}
+        className="cursor-pointer relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0"
+        style={{
+          background: thinking ? `linear-gradient(135deg, ${color}, ${color}bb)` : "rgba(255,255,255,0.1)",
+          boxShadow: thinking ? `0 0 12px ${color}50` : "none",
+        }}
+      >
+        <span
+          className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200"
+          style={{ left: thinking ? "calc(100% - 1.375rem)" : "0.125rem" }}
+        />
+      </button>
+    </div>
+  </div>
+)}
+
           <button
             onClick={() => setPresetModalOpen(true)}
             className="cursor-pointer w-full py-3 rounded-xl text-sm text-white font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.99]"
@@ -930,6 +1001,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
           </button>
         </div>
       )}
+
+
 
       {/* ── Tab: PRESETS ── */}
       {activeTab === "presets" && (
