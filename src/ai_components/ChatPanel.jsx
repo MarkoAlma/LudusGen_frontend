@@ -14,31 +14,51 @@ import { DEFAULT_PRESETS } from "./models";
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 // ─── Kódblokk copy gombbal ────────────────────────────
-const CodeBlock = ({ lang, code }) => {
+const CodeBlock = ({ lang, code, isStreaming }) => {
   const [copied, setCopied] = React.useState(false);
   const handleCopy = () => {
+    if (isStreaming) return;
     navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <div className="relative my-2 rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
+    <div className="relative my-2 rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.1)", overflow: "clip"  }}>
+      {/* ── Sticky fejléc: a chat scroll containerben ragad a tetejére ── */}
       <div
         className="flex items-center justify-between px-3 py-1.5"
-        style={{ background: "rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+        style={{
+          background: "rgba(18,18,40,0.97)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          position: "sticky",
+          top: "-0.75rem",   // kompenzálja a chat konténer py-3 (12px) padding-top-ját
+          marginTop: "-1px", // 1px overlap: megszünteti a border-radius okozta mikro-rést
+          zIndex: 10,
+          backdropFilter: "blur(8px)",
+        }}
       >
         <span className="text-gray-500 text-xs font-mono">{lang || "code"}</span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1 px-2 py-0.5 rounded-md text-xs transition-all hover:opacity-80 active:scale-95 cursor-pointer"
+          disabled={isStreaming}
+          className="flex items-center gap-1 px-2 py-0.5 rounded-md text-xs transition-all active:scale-95"
           style={{
-            background: copied ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.08)",
-            color: copied ? "#4ade80" : "#9ca3af",
-            border: `1px solid ${copied ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.1)"}`,
+            background: copied
+              ? "rgba(34,197,94,0.15)"
+              : isStreaming
+              ? "rgba(255,255,255,0.03)"
+              : "rgba(255,255,255,0.08)",
+            color: copied ? "#4ade80" : isStreaming ? "#4b5563" : "#9ca3af",
+            border: `1px solid ${copied ? "rgba(34,197,94,0.3)" : isStreaming ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.1)"}`,
+            cursor: isStreaming ? "not-allowed" : "pointer",
+            opacity: isStreaming ? 0.5 : 1,
           }}
+          title={isStreaming ? "Várd meg amíg a kód elkészül..." : "Másolás"}
         >
           {copied
             ? <><Check className="w-3 h-3" />&nbsp;Másolva</>
+            : isStreaming
+            ? <><Copy className="w-3 h-3" />&nbsp;Generálás...</>
             : <><Copy className="w-3 h-3" />&nbsp;Másolás</>}
         </button>
       </div>
@@ -50,7 +70,7 @@ const CodeBlock = ({ lang, code }) => {
 };
 
 // ─── Markdown-lite renderer (streaming-safe) ───────────────────────
-const renderContent = (text) => {
+const renderContent = (text, isStreaming = false) => {
   if (!text) return null;
 
   const parts = text.split(/(```[\s\S]*?```)/g);
@@ -68,7 +88,7 @@ const renderContent = (text) => {
     openBlock = incompleteCode;
   }
 
-  const renderCodeBlock = (raw, key) => {
+  const renderCodeBlock = (raw, key, streaming = isStreaming) => {
     let content = raw.startsWith("```") ? raw.slice(3) : raw;
     if (content.endsWith("```")) content = content.slice(0, -3);
 
@@ -86,7 +106,7 @@ const renderContent = (text) => {
     }
 
     code = code.replace(/```$/, "").replace(/"""$/, "");
-    return <CodeBlock key={key} lang={lang} code={code} />;
+    return <CodeBlock key={key} lang={lang} code={code} isStreaming={isStreaming} />;
   };
 
   const renderInline = (part, key) => {
@@ -123,18 +143,18 @@ const renderContent = (text) => {
         if (part.startsWith("```")) return renderCodeBlock(part, i);
         return renderInline(part, i);
       })}
-      {openBlock && renderCodeBlock(openBlock, "streaming-open")}
+      {openBlock && renderCodeBlock(openBlock, "streaming-open", isStreaming)}
     </>
   );
 };
 
 // ─── Üzenet tartalom renderer (kezeli az array content-et is) ────────
-const renderMessageContent = (content) => {
+const renderMessageContent = (content, isStreaming = false) => {
   if (Array.isArray(content)) {
     const textPart = content.find((p) => p.type === "text")?.text || "";
-    return renderContent(textPart);
+    return renderContent(textPart, isStreaming);
   }
-  return renderContent(content);
+  return renderContent(content, isStreaming);
 };
 
 // ─── Preset modal ──────────────────────────────────────
@@ -224,8 +244,8 @@ const PresetModal = ({ isOpen, onClose, onSave, editingPreset, modelColor }) => 
               <Sliders className="w-3.5 h-3.5" style={{ color: modelColor }} />
               <span className="text-xs font-semibold text-gray-300">Modell paraméterek</span>
             </div>
-            <Slider label="Temperature" field="temperature" min={0} max={2} step={0.05} hint="0 = determinisztikus · 1 = kiegyensúlyozott · 2 = kreatív" />
             <Slider label="Max tokens" field="maxTokens" min={128} max={32768*8} step={128} hint="Maximális válaszhossz tokenekben" />
+            <Slider label="Temperature" field="temperature" min={0} max={2} step={0.05} hint="0 = determinisztikus · 1 = kiegyensúlyozott · 2 = kreatív" />
             <Slider label="Top P" field="topP" min={0} max={1} step={0.05} hint="Nucleus sampling — általában ne módosítsd a temperature-rel együtt" />
             <Slider label="Frequency penalty" field="frequencyPenalty" min={-2} max={2} step={0.1} hint="Negatív: ismétlés ↑ · Pozitív: ismétlés ↓" />
             <Slider label="Presence penalty" field="presencePenalty" min={-2} max={2} step={0.1} hint="Pozitív: új témák bevezetése ↑" />
@@ -262,19 +282,18 @@ export default function ChatPanel({ selectedModel, userId, getIdToken }) {
   const [activeTab, setActiveTab] = useState("chat");
 
   const [systemPrompt, setSystemPrompt] = useState(selectedModel.defaultSystemPrompt || "");
-  const [temperature, setTemperature] = useState(0.7);
-  const [maxTokens, setMaxTokens] = useState(2048);
-  const [topP, setTopP] = useState(0.9);
+  const [temperature, setTemperature] = useState(selectedModel.defaultTemperature ?? 0.7);
+  const [maxTokens, setMaxTokens] = useState(selectedModel.defaultMaxTokens ?? 2048);
+  const [topP, setTopP] = useState(selectedModel.defaultTopP ?? 0.9);
   const [thinking, setThinking] = useState(false);
 
-const THINKING_MODELS = [
-  "deepseek-ai/deepseek-v3.2",
-  "z-ai/glm4.7",
-  "moonshotai/kimi-k2.5",
-  "qwen/qwen3.5-397b-a17b",
-];
-
-const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
+  const THINKING_MODELS = [
+    "deepseek-ai/deepseek-v3.2",
+    "z-ai/glm4.7",
+    "moonshotai/kimi-k2.5",
+    "qwen/qwen3.5-397b-a17b",
+  ];
+  const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
 
   const [frequencyPenalty, setFrequencyPenalty] = useState(0);
   const [presencePenalty, setPresencePenalty] = useState(0);
@@ -297,38 +316,101 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
   const isLoadingConversation = useRef(false);
   const prevMessageCount = useRef(0);
   const streamingMsgIdRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
-  // ── Smart scroll: ha a user felgörgetett, ne ugráljunk vissza ──
+  // ── Smart scroll logika ──
+  // true  = user felgörgetett, ne scrollozzunk automatikusan
+  // false = user az alján van, kövessük az AI-t
   const userScrolledUp = useRef(false);
+  // Megakadályozza, hogy a programmatikus scroll ne zavarja a detektálást
+  const isProgrammaticScroll = useRef(false);
 
-  // Figyeli, hogy a user manuálisan görgetett-e fel
+  // ── Scroll + Wheel esemény figyelők ──
+  // A wheel event csak valódi felhasználói inputra tüzel — layout shift, code block
+  // renderelés, DOM átrendeződés NEM váltja ki. Ezért sokkal megbízhatóbb mint
+  // a scroll irány alapú detektálás, ami code block streameléskor hamis pozitívokat ad.
   useEffect(() => {
     const el = chatScrollRef.current;
     if (!el) return;
 
-    const handleScroll = () => {
-      // Ha több mint 80px-rel az aljától, a user felgörgetett
-      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      userScrolledUp.current = distanceFromBottom > 80;
+    // ── Wheel event: egyetlen felfelé mozdulattal azonnal lekapcsol az auto-scroll ──
+    // Lefelé görgetésnél: ha elértük az alját, visszakapcsol
+    // (programmatikus scroll NEM váltja ki ezt az eventet → nincs race condition)
+    const handleWheel = (e) => {
+      if (e.deltaY < 0) {
+        // Bármilyen kis felfelé görgetés → auto-scroll ki
+        userScrolledUp.current = true;
+      } else if (e.deltaY > 0) {
+        // Lefelé görgetés → ha majdnem az alján van, auto-scroll vissza
+        const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        if (distanceFromBottom < 60) {
+          userScrolledUp.current = false;
+        }
+      }
     };
 
-    el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
+    // ── Touch scroll (mobil) ──
+    let touchStartY = 0;
+    const handleTouchStart = (e) => {
+      touchStartY = e.touches[0].clientY;
+    };
+    const handleTouchMove = (e) => {
+      const deltaY = touchStartY - e.touches[0].clientY;
+      if (deltaY < 0) {
+        // Ujj lefelé mozog = tartalom felfelé görget → auto-scroll ki
+        userScrolledUp.current = true;
+      } else if (deltaY > 0) {
+        // Ujj felfelé mozog = tartalom lefelé görget → ha az alján van, vissza
+        const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        if (distanceFromBottom < 60) {
+          userScrolledUp.current = false;
+        }
+      }
+    };
+
+    el.addEventListener("wheel", handleWheel, { passive: true });
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+    el.addEventListener("touchmove", handleTouchMove, { passive: true });
+    return () => {
+      el.removeEventListener("wheel", handleWheel);
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", handleTouchMove);
+    };
   }, []);
 
-  // Mindig legörget (üzenetküldéskor / beszélgetés betöltésekor)
-  const scrollToBottom = useCallback((smooth = true) => {
+  // ── Azonnali görgetés (instant = nincs animáció, nem zavarja a streamet) ──
+  const scrollToBottomInstant = useCallback(() => {
     const el = chatScrollRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "instant" });
+    isProgrammaticScroll.current = true;
+    el.scrollTop = el.scrollHeight;
+    // Kis delay után engedjük újra a user scroll detektálást
+    setTimeout(() => { isProgrammaticScroll.current = false; }, 50);
   }, []);
 
-  // Csak akkor görget le, ha a user nem görgetett fel
-  const scrollToBottomIfNeeded = useCallback((smooth = true) => {
+  // ── Sima görgetés (üzenetküldéskor, betöltéskor) ──
+  const scrollToBottomSmooth = useCallback(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    isProgrammaticScroll.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    setTimeout(() => { isProgrammaticScroll.current = false; }, 500);
+  }, []);
+
+  // ── Streaming közben: csak akkor görget, ha a user nincs felgörgetett állapotban ──
+  const scrollToBottomIfNeeded = useCallback(() => {
     if (!userScrolledUp.current) {
-      scrollToBottom(smooth);
+      scrollToBottomInstant();
     }
-  }, [scrollToBottom]);
+  }, [scrollToBottomInstant]);
+
+  // ── Modellváltáskor alapértékek visszaállítása ──
+  useEffect(() => {
+    setTemperature(selectedModel.defaultTemperature ?? 0.7);
+    setMaxTokens(selectedModel.defaultMaxTokens ?? 2048);
+    setTopP(selectedModel.defaultTopP ?? 0.9);
+    setSystemPrompt(selectedModel.defaultSystemPrompt || "");
+  }, [selectedModel.id]);
 
   useEffect(() => {
     if (!userId) return;
@@ -370,7 +452,7 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
       if (msgs.length > 0) {
         prevMessageCount.current = msgs.length;
         setMessages(msgs);
-        setTimeout(() => scrollToBottom(false), 50);
+        setTimeout(() => scrollToBottomInstant(), 50);
       } else {
         const welcome = [{
           role: "assistant",
@@ -534,14 +616,13 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
     setAttachedImage(null);
     setIsTyping(true);
 
-    // ── Textarea magasság visszaállítása ──
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
 
-    // ── Küldéskor mindig görgetünk le, és reseteljük a flag-et ──
+    // ── Üzenetküldéskor mindig legörgetünk és reseteljük a flag-et ──
     userScrolledUp.current = false;
-    setTimeout(() => scrollToBottom(), 50);
+    setTimeout(() => scrollToBottomSmooth(), 30);
 
     const currentMessages = [...messages, userMsg];
     await saveMessage(userMsg);
@@ -555,8 +636,16 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
         .filter((m) => m.id !== "welcome")
         .map((m) => ({ role: m.role, content: m.content }));
 
+      // ── AbortController a leállításhoz ──
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      // ── Félbemaradt tartalom nyilvántartása (abort esetén menthetjük) ──
+      let streamAccumulated = "";
+
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -609,23 +698,25 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
               const delta = parsed.delta || "";
               if (delta) {
                 accumulated += delta;
+                streamAccumulated = accumulated; // ── abort esetén elérhető a catch-ből ──
                 setMessages((prev) =>
                   prev.map((m) => m.id === aiMsgId ? { ...m, content: accumulated } : m)
                 );
-                // ── Csak görgetünk, ha a user nem görgetett fel ──
+                // ── Instant görgetés csak ha user nincs felgörgetett állapotban ──
                 scrollToBottomIfNeeded();
               }
             } catch { /* csonka JSON — kihagyjuk */ }
           }
         }
 
+        // Mentjük az eddig legenerált tartalmat (abort esetén is)
         const finalMsg = {
           role: "assistant", content: accumulated,
           model: selectedModel.id, id: aiMsgId,
         };
         setIsTyping(false);
-        setMessages((prev) => prev.map((m) => m.id === aiMsgId ? finalMsg : m));
-        await saveMessage(finalMsg);
+        setMessages((prev) => prev.map((m) => m.id === aiMsgId ? { ...finalMsg, isStreaming: false } : m));
+        if (accumulated) await saveMessage(finalMsg);
 
       // ── Normál JSON válasz ─────────────────────────────────
       } else {
@@ -643,15 +734,34 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
       }
 
     } catch (err) {
-      console.error("Chat hiba:", err.message);
-      setMessages((prev) =>
-        prev.map((m) => m.id === aiMsgId
-          ? { role: "assistant", content: `❌ Hiba: ${err.message}`, model: selectedModel.id, id: aiMsgId, isError: true }
-          : m)
-      );
+      if (err.name === "AbortError") {
+        // Felhasználó leállította — félbemaradt szöveget mentjük, hogy folytatható legyen
+        console.log("Generálás leállítva.");
+        setMessages((prev) =>
+          prev.map((m) => m.id === aiMsgId ? { ...m, isStreaming: false } : m)
+        );
+        // ── Partial tartalom mentése Firestore-ba, hogy a context megmaradjon ──
+        if (streamAccumulated) {
+          const partialMsg = {
+            role: "assistant",
+            content: streamAccumulated,
+            model: selectedModel.id,
+            id: aiMsgId,
+          };
+          await saveMessage(partialMsg);
+        }
+      } else {
+        console.error("Chat hiba:", err.message);
+        setMessages((prev) =>
+          prev.map((m) => m.id === aiMsgId
+            ? { role: "assistant", content: `❌ Hiba: ${err.message}`, model: selectedModel.id, id: aiMsgId, isError: true }
+            : m)
+        );
+      }
     } finally {
       setIsTyping(false);
       streamingMsgIdRef.current = null;
+      abortControllerRef.current = null;
     }
   };
 
@@ -674,6 +784,13 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
     prevMessageCount.current = welcome.length;
     setMessages(welcome);
     userScrolledUp.current = false;
+  };
+
+  // ── Generálás leállítása ──
+  const handleAbort = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
   };
 
   const color = selectedModel.color;
@@ -754,7 +871,6 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
                             }
                       }
                     >
-                      {/* ── Csatolt kép megjelenítése user üzenetnél ── */}
                       {msg.attachedImagePreview && (
                         <img
                           src={msg.attachedImagePreview}
@@ -773,7 +889,7 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
                         </div>
                       ) : (
                         <>
-                          {renderMessageContent(msg.content)}
+                          {renderMessageContent(msg.content, msg.isStreaming)}
                           {msg.isStreaming && (
                             <span
                               className="inline-block w-[2px] h-[1em] ml-0.5 align-middle rounded-sm animate-pulse"
@@ -838,7 +954,6 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
               </div>
             )}
 
-            {/* ── Kép preview ── */}
             {attachedImage && (
               <div className="relative inline-block mb-2 ml-1">
                 <img
@@ -905,18 +1020,35 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
                   minHeight: "48px", maxHeight: "160px", overflowY: "auto",
                 }}
               />
-              <button
-                onClick={handleSend}
-                disabled={(!input.trim() && !attachedImage) || isTyping}
-                className="cursor-pointer p-3 rounded-2xl transition-all duration-200 flex-shrink-0 hover:opacity-90 active:scale-95 disabled:cursor-not-allowed"
-                style={{
-                  background: (input.trim() || attachedImage) && !isTyping ? `linear-gradient(135deg, ${color}, ${color}bb)` : "rgba(255,255,255,0.05)",
-                  opacity: (input.trim() || attachedImage) && !isTyping ? 1 : 0.4,
-                  boxShadow: (input.trim() || attachedImage) && !isTyping ? `0 0 20px ${color}30` : "none",
-                }}
-              >
-                <Send className="w-4 h-4 text-white" />
-              </button>
+              {isTyping ? (
+                <button
+                  onClick={handleAbort}
+                  className="cursor-pointer p-3 rounded-2xl transition-all duration-200 flex-shrink-0 hover:opacity-90 active:scale-95"
+                  title="Generálás leállítása"
+                  style={{
+                    background: "rgba(239,68,68,0.85)",
+                    boxShadow: "0 0 20px rgba(239,68,68,0.3)",
+                    border: "1px solid rgba(239,68,68,0.5)",
+                  }}
+                >
+                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim() && !attachedImage}
+                  className="cursor-pointer p-3 rounded-2xl transition-all duration-200 flex-shrink-0 hover:opacity-90 active:scale-95 disabled:cursor-not-allowed"
+                  style={{
+                    background: (input.trim() || attachedImage) ? `linear-gradient(135deg, ${color}, ${color}bb)` : "rgba(255,255,255,0.05)",
+                    opacity: (input.trim() || attachedImage) ? 1 : 0.4,
+                    boxShadow: (input.trim() || attachedImage) ? `0 0 20px ${color}30` : "none",
+                  }}
+                >
+                  <Send className="w-4 h-4 text-white" />
+                </button>
+              )}
             </div>
             <p className="text-xs text-gray-700 mt-1.5 px-1 flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
@@ -946,8 +1078,8 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
           </div>
 
           {[
-            { label: "Temperature", key: "temperature", min: 0, max: 2, step: 0.05, val: temperature, set: setTemperature, hint: "0 = determinisztikus · 0.7 = kiegyensúlyozott · 2 = random" },
             { label: "Max Tokens", key: "maxTokens", min: 128, max: 32768*8, step: 128, val: maxTokens, set: setMaxTokens, hint: "Maximális válaszhossz tokenekben (~1 token ≈ ¾ szó)" },
+            { label: "Temperature", key: "temperature", min: 0, max: 2, step: 0.05, val: temperature, set: setTemperature, hint: "0 = determinisztikus · 0.7 = kiegyensúlyozott · 2 = random" },
             { label: "Top P", key: "topP", min: 0, max: 1, step: 0.05, val: topP, set: setTopP, hint: "Nucleus sampling — ne módosítsd temperature-rel együtt" },
             { label: "Frequency Penalty", key: "freq", min: -2, max: 2, step: 0.1, val: frequencyPenalty, set: setFrequencyPenalty, hint: "Pozitív: ismétlések csökkentése" },
             { label: "Presence Penalty", key: "pres", min: -2, max: 2, step: 0.1, val: presencePenalty, set: setPresencePenalty, hint: "Pozitív: új témák bevezetése" },
@@ -966,30 +1098,29 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
             </div>
           ))}
 
-          {/* ── Thinking (csak DeepSeek modelleknél) ── */}
-{supportsThinking && (
-  <div className="p-4 rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
-    <div className="flex items-center justify-between">
-      <div>
-        <label className="text-white text-sm font-semibold">Reasoning (Thinking)</label>
-        <p className="text-gray-600 text-xs mt-0.5">Belső gondolkodási lánc engedélyezése</p>
-      </div>
-      <button
-        onClick={() => setThinking((v) => !v)}
-        className="cursor-pointer relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0"
-        style={{
-          background: thinking ? `linear-gradient(135deg, ${color}, ${color}bb)` : "rgba(255,255,255,0.1)",
-          boxShadow: thinking ? `0 0 12px ${color}50` : "none",
-        }}
-      >
-        <span
-          className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200"
-          style={{ left: thinking ? "calc(100% - 1.375rem)" : "0.125rem" }}
-        />
-      </button>
-    </div>
-  </div>
-)}
+          {supportsThinking && (
+            <div className="p-4 rounded-xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-white text-sm font-semibold">Reasoning (Thinking)</label>
+                  <p className="text-gray-600 text-xs mt-0.5">Belső gondolkodási lánc engedélyezése</p>
+                </div>
+                <button
+                  onClick={() => setThinking((v) => !v)}
+                  className="cursor-pointer relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0"
+                  style={{
+                    background: thinking ? `linear-gradient(135deg, ${color}, ${color}bb)` : "rgba(255,255,255,0.1)",
+                    boxShadow: thinking ? `0 0 12px ${color}50` : "none",
+                  }}
+                >
+                  <span
+                    className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200"
+                    style={{ left: thinking ? "calc(100% - 1.375rem)" : "0.125rem" }}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
 
           <button
             onClick={() => setPresetModalOpen(true)}
@@ -1001,8 +1132,6 @@ const supportsThinking = THINKING_MODELS.includes(selectedModel.apiModel);
           </button>
         </div>
       )}
-
-
 
       {/* ── Tab: PRESETS ── */}
       {activeTab === "presets" && (
