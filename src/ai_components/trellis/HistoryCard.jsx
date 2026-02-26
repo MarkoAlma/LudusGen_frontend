@@ -98,13 +98,13 @@ const HistoryCard = React.memo(function HistoryCard({
   }, [item?.model_url, getIdToken]);
 
   const handleSelect = useCallback(() => onSelect?.(item), [onSelect, item]);
-  const handleReuse = useCallback(
-    (e) => {
-      e.stopPropagation();
-      onReuse?.(item?.prompt ?? "");
-    },
-    [onReuse, item],
-  );
+const handleReuse = useCallback(
+  (e) => {
+    e.stopPropagation();
+    onReuse?.(item);          // ← teljes item, nem csak prompt
+  },
+  [onReuse, item],
+);
   const handleDownload = useCallback(
     (e) => {
       e.stopPropagation();
@@ -452,14 +452,14 @@ const HistoryCard = React.memo(function HistoryCard({
           >
             <RotateCcw style={{ width: 10, height: 10 }} />
           </ActionBtn>
-          <ActionBtn
-            onClick={handleDownload}
-            title="GLB letöltése"
-            accent={accent}
-            label={isNarrow ? null : "GLB"}
-          >
-            <Download style={{ width: 10, height: 10 }} />
-          </ActionBtn>
+<ActionBtn
+  onClick={handleDownload}
+  title="Letöltés formátumválasztóval"
+  accent={accent}
+  label={isNarrow ? null : "DL"}    // ← vagy akár null is lehet
+>
+  <Download style={{ width: 10, height: 10 }} />
+</ActionBtn>
           <ActionBtn
             onClick={handleDelete}
             title="Törlés"
