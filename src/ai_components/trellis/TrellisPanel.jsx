@@ -6,6 +6,7 @@ import {
   Download, Loader2, AlertCircle, Trash2, RotateCcw,
   Camera, Move3d, Layers, Play, Square, Sparkles,
   Clock, ChevronRight, ChevronLeft, Sliders, Box, Type, Zap,
+  ChevronDown,
 } from "lucide-react";
 
 import ThreeViewer from "../meshy/viewer/ThreeViewer";
@@ -17,24 +18,27 @@ import {
   T, VIEW_MODES, EXAMPLE_PROMPTS, STYLE_OPTIONS, TRELLIS_PRESETS,
   ENHANCE_SYSTEM, DECHANTER_SYSTEM,
   fetchGlbAsBlob, stripStylePrefix, applyStylePrefix, defaultParams,
-  loadHistoryFromFirestore, saveHistoryToFirestore,
   Card, MiniSlider, NumInput, Pill, SectionLabel, ToggleRow,
   WireframeControl, BgColorPicker, HistoryCard,
 } from ".";
 import ConfirmModal from "./ConfirmModal";
 import StylePicker from "./StylePicker";
 import PromptInput from "./PromptInput";
+import DownloadModal from "./DownloadModal";
+import { loadHistoryPageFromFirestore,saveHistoryToFirestore } from "./utils";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 10;
+
 const PRESET_TIME = {
   Ultra: "~10–15 mp", Gyors: "~18–22 mp", Normál: "~28–35 mp",
   Minőség: "~45–55 mp", Max: "~60–70 mp",
 };
 const LEFT_DEFAULT  = 264;
-const LEFT_MIN      = 248;   // Simplify + Enhance gombok + padding minimuma
+const LEFT_MIN      = 248;
 const LEFT_MAX      = 360;
 const RIGHT_DEFAULT = 212;
-const RIGHT_MIN     = 178;   // HistoryCard akciógombok + padding minimuma
+const RIGHT_MIN     = 178;
 const RIGHT_MAX     = 320;
 
 const PULSE_DOTS = [0,1,2,3,4].map((i) => (
@@ -81,7 +85,9 @@ const GLOBAL_CSS = `
   @keyframes spin   { to { transform: rotate(360deg); } }
   @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.4} }
   @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
   .animate-spin { animation: spin 1s linear infinite; }
+  .hist-item-enter { animation: fadeIn 0.2s ease forwards; }
 
   .trellis-scroll {
     scrollbar-width: thin;
@@ -92,10 +98,8 @@ const GLOBAL_CSS = `
   .trellis-scroll::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.08); border-radius: 99px; }
   .trellis-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
 
-  /* Hide topbar scrollbar */
   .trellis-topbar::-webkit-scrollbar { display: none; }
 
-  /* Drag handle */
   .trellis-handle {
     width: 5px; flex-shrink: 0; cursor: col-resize;
     background: transparent; position: relative; z-index: 10;
@@ -110,7 +114,6 @@ const GLOBAL_CSS = `
   .trellis-handle:hover::after,
   .trellis-handle.dragging::after { background: rgba(255,255,255,0.2); width: 2px; }
 
-  /* Collapse toggle — appears on hover */
   .handle-toggle {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     width: 18px; height: 30px; border-radius: 99px;
@@ -128,6 +131,12 @@ const GLOBAL_CSS = `
   .hist-clear:hover { color: #f87171 !important; border-color: rgba(248,113,113,0.18) !important; background: rgba(248,113,113,0.05) !important; }
   .dl-ghost:hover   { color: #9ca3af !important; border-color: rgba(255,255,255,0.12) !important; background: rgba(255,255,255,0.04) !important; }
   .view-btn:hover   { background: rgba(255,255,255,0.05) !important; }
+
+  .load-more-btn:hover:not(:disabled) {
+    background: rgba(255,255,255,0.05) !important;
+    border-color: rgba(255,255,255,0.12) !important;
+    color: #6b7280 !important;
+  }
 `;
 
 // ── Layout styles ─────────────────────────────────────────────────────────────
@@ -160,7 +169,6 @@ const S = {
     padding: "0 12px", height: 38, flexShrink: 0,
     borderBottom: "1px solid rgba(255,255,255,0.04)",
     background: "rgba(6,6,18,0.98)",
-    overflowX: "auto", overflowY: "hidden",
     scrollbarWidth: "none",
     gap: 12,
   },
@@ -233,7 +241,6 @@ function ResizablePanel({ side, width, open, children }) {
       borderRight: side === "left"  ? "1px solid rgba(255,255,255,0.055)" : "none",
       background: "rgba(8,8,20,0.98)",
     }}>
-      {/* Fixed-width inner so content doesn't squish during animation */}
       <div style={{
         width: width,
         flex: 1, display: "flex", flexDirection: "column", overflow: "hidden",
@@ -288,16 +295,29 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
   const [dramaticColor, setDramaticColor] = useState("#4400ff");
   const [gridColor1, setGridColor1] = useState("#1e1e3a");
   const [gridColor2, setGridColor2] = useState("#111128");
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [downloadItem, setDownloadItem] = useState(null);
 
   // Panel state
   const [leftOpen,   setLeftOpen]   = useState(true);
-  const [rightOpen,  setRightOpen]  = useState(true);
+  const [rightOpen,  setRightOpen]  = useState(false);
   const [leftWidth,  setLeftWidth]  = useState(LEFT_DEFAULT);
   const [rightWidth, setRightWidth] = useState(RIGHT_DEFAULT);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [history, setHistory] = useState([]);
+
+  // ── Pagination state ────────────────────────────────────────────────────
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [loadingMore,    setLoadingMore]    = useState(false);
+  const [hasMore,        setHasMore]        = useState(false);
+  const historyInitialized = useRef(false);
+  const lastDocRef         = useRef(null);
+
+  // ── Loading item tracking (for rapid-switch prevention) ─────────────────
+  const [loadingItemId, setLoadingItemId] = useState(null);
+  const histSelectAbortRef = useRef(null);
+
   const [activeItem, setActiveItem] = useState(null);
   const [histSearch, setHistSearch] = useState("");
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -353,39 +373,70 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
     document.addEventListener("mouseup",   onUp);
   }, [leftWidth, rightWidth]);
 
-  // ── Load history ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    setHistoryLoading(true);
-    (async () => {
-      try {
-        const items = await loadHistoryFromFirestore(userId);
-        if (cancelled) return;
-        setHistory(items);
-        if (items.length > 0) {
-          const latest = items[0];
-          setActiveItem(latest); setGenStatus("succeeded");
-          if (latest.model_url) {
-            try {
-              const blobUrl = await fetchGlbAsBlob(latest.model_url, getIdToken);
-              if (!cancelled) { setModelUrl(blobUrl); prevUrlRef.current = blobUrl; }
-            } catch {
-              if (!cancelled) { setModelUrl(latest.model_url); prevUrlRef.current = latest.model_url; }
-            }
-          }
-        }
-      } catch (err) { console.error("History betöltési hiba:", err); }
-      finally { if (!cancelled) setHistoryLoading(false); }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line
-  }, [userId]);
-
   const authHeaders = useCallback(async () => {
     const token = getIdToken ? await getIdToken() : "";
     return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
   }, [getIdToken]);
+
+  // ── Load first page of history ────────────────────────────────────────────
+  const loadFirstPage = useCallback(async () => {
+    if (!userId || historyInitialized.current) return;
+    historyInitialized.current = true;
+    setHistoryLoading(true);
+    try {
+      const { items, lastDoc } = await loadHistoryPageFromFirestore(userId, {
+        limit: PAGE_SIZE,
+        startAfter: null,
+      });
+      lastDocRef.current = lastDoc;
+      setHasMore(items.length === PAGE_SIZE);
+      setHistory(items);
+
+      if (items.length > 0) {
+        const latest = items[0];
+        setActiveItem(latest);
+        setGenStatus("succeeded");
+        if (latest.model_url) {
+          try {
+            const blobUrl = await fetchGlbAsBlob(latest.model_url, getIdToken);
+            setModelUrl(blobUrl); prevUrlRef.current = blobUrl;
+          } catch {
+            setModelUrl(latest.model_url); prevUrlRef.current = latest.model_url;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("History betöltési hiba:", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [userId, getIdToken]);
+
+  // ── Trigger lazy load when panel first opens ──────────────────────────────
+  useEffect(() => {
+    if (rightOpen && !historyInitialized.current && userId) {
+      loadFirstPage();
+    }
+  }, [rightOpen, userId, loadFirstPage]);
+
+  // ── Load next page (pagination) ───────────────────────────────────────────
+  const loadMoreHistory = useCallback(async () => {
+    if (!userId || loadingMore || !hasMore || !lastDocRef.current) return;
+    setLoadingMore(true);
+    try {
+      const { items, lastDoc } = await loadHistoryPageFromFirestore(userId, {
+        limit: PAGE_SIZE,
+        startAfter: lastDocRef.current,
+      });
+      lastDocRef.current = lastDoc;
+      setHasMore(items.length === PAGE_SIZE);
+      setHistory((prev) => [...prev, ...items]);
+    } catch (err) {
+      console.error("Oldal betöltési hiba:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [userId, loadingMore, hasMore]);
 
   // ── AI name ───────────────────────────────────────────────────────────────
   const generateName = useCallback(async (promptText) => {
@@ -410,7 +461,24 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
   const handleSpinStop     = useCallback(() => setAutoSpin(false), []);
   const handleSceneReady   = useCallback((s) => { sceneRef.current = s; }, []);
   const handleExampleClick = useCallback((ex) => { setPrompt(ex); setErrorMsg(""); }, []);
-  const handleReusePrompt  = useCallback((p) => { setPrompt(p); setErrorMsg(""); }, []);
+
+  const handleReusePrompt = useCallback((item) => {
+    setPrompt(item?.prompt ?? "");
+    setErrorMsg("");
+    if (item?.style) setSelectedStyle(item.style);
+    if (item?.params) {
+      setParams((prev) => ({
+        ...prev,
+        ...(item.params.slat_cfg_scale      != null && { slat_cfg_scale:      item.params.slat_cfg_scale      }),
+        ...(item.params.ss_cfg_scale        != null && { ss_cfg_scale:        item.params.ss_cfg_scale        }),
+        ...(item.params.slat_sampling_steps != null && { slat_sampling_steps: item.params.slat_sampling_steps }),
+        ...(item.params.ss_sampling_steps   != null && { ss_sampling_steps:   item.params.ss_sampling_steps   }),
+        ...(item.params.seed                != null && { seed:                item.params.seed                }),
+        ...(item.params.randomSeed          != null && { randomSeed:          item.params.randomSeed          }),
+      }));
+    }
+  }, []);
+
   const handleDeleteItem   = useCallback((item) => { setItemToDelete(item); setDeleteModalOpen(true); }, []);
   const handleClearHistory = useCallback(() => setClearAllModalOpen(true), []);
 
@@ -488,7 +556,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       setModelUrl(blobUrl); prevUrlRef.current = blobUrl;
       setGenStatus("succeeded");
 
-      // Generate AI name in background
       const aiName = await generateName(prompt.trim());
 
       const itemData = {
@@ -503,10 +570,12 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
         style: selectedStyle, ts: Date.now(),
       };
 
-      const docId   = await saveHistoryToFirestore(userId, itemData);
+      const { docId } = await saveHistoryToFirestore(userId, itemData);
       const newItem = { id: docId ?? `local_${Date.now()}`, ...itemData, createdAt: { toDate: () => new Date() } };
+
       setHistory((h) => [newItem, ...h]);
       setActiveItem(newItem);
+      historyInitialized.current = true;
     } catch (err) {
       if (err.name === "AbortError") {
         setModelUrl(prevUrlRef.current);
@@ -525,17 +594,37 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
 
   const handleStop = useCallback(() => { setTimedOut(false); abortRef.current?.abort(); }, []);
 
+  // ── Select history item — with cancel token against rapid switching ────────
   const handleSelectHistory = useCallback(async (item) => {
-    setActiveItem(item); setGenStatus(item.status);
+    // Cancel any in-flight load
+    if (histSelectAbortRef.current) {
+      histSelectAbortRef.current.cancelled = true;
+    }
+    const token = { cancelled: false };
+    histSelectAbortRef.current = token;
+
+    setLoadingItemId(item.id);
+    setActiveItem(item);
+    setGenStatus(item.status);
     if (item.style) setSelectedStyle(item.style);
+
     if (item.model_url) {
       try {
         const blobUrl = await fetchGlbAsBlob(item.model_url, getIdToken);
-        setModelUrl(blobUrl); prevUrlRef.current = blobUrl;
-      } catch { setModelUrl(item.model_url); prevUrlRef.current = item.model_url; }
+        if (token.cancelled) return; // stale — discard
+        setModelUrl(blobUrl);
+        prevUrlRef.current = blobUrl;
+      } catch {
+        if (token.cancelled) return;
+        setModelUrl(item.model_url);
+        prevUrlRef.current = item.model_url;
+      }
     }
+
+    if (!token.cancelled) setLoadingItemId(null);
   }, [getIdToken]);
 
+  // ── Delete single item — load neighbour or clear viewer ───────────────────
   const confirmDeleteItem = useCallback(async () => {
     if (!itemToDelete) return;
     setIsDeleting(true);
@@ -544,38 +633,99 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       const res  = await fetch(`http://localhost:3001/api/trellis/history/${itemToDelete.id}`, { method: "DELETE", headers });
       const data = await res.json();
       if (data.success) {
-        setHistory((h) => h.filter((i) => i.id !== itemToDelete.id));
-        if (activeItem?.id === itemToDelete.id) { setActiveItem(null); setModelUrl(null); setGenStatus("idle"); }
-      } else { alert("Törlés sikertelen: " + data.message); }
-    } catch (err) { alert("Hálózati hiba: " + err.message); }
-    finally { setIsDeleting(false); setDeleteModalOpen(false); setItemToDelete(null); }
-  }, [itemToDelete, authHeaders, activeItem]);
+        // Compute neighbour before mutating state
+        const deletedId = itemToDelete.id;
+        const wasActive = activeItem?.id === deletedId;
 
+        setHistory((prev) => {
+          const next = prev.filter((i) => i.id !== deletedId);
+
+          if (wasActive) {
+            // Cancel any pending load
+            if (histSelectAbortRef.current) {
+              histSelectAbortRef.current.cancelled = true;
+              histSelectAbortRef.current = null;
+            }
+            setLoadingItemId(null);
+
+            if (next.length === 0) {
+              // No models left → clear viewer completely
+              setActiveItem(null);
+              setModelUrl(null);
+              prevUrlRef.current = null;
+              setGenStatus("idle");
+            } else {
+              // Find the deleted item's index in the old list
+              const oldIdx = prev.findIndex((i) => i.id === deletedId);
+              // Prefer the item before it (higher index = older), fall back to first
+              const neighbour = prev[oldIdx - 1] ?? prev[oldIdx + 1] ?? next[0];
+              // Load the neighbour asynchronously
+              setTimeout(() => handleSelectHistory(neighbour), 0);
+            }
+          }
+
+          return next;
+        });
+      } else {
+        alert("Törlés sikertelen: " + data.message);
+      }
+    } catch (err) {
+      alert("Hálózati hiba: " + err.message);
+    } finally {
+      setIsDeleting(false);
+      setDeleteModalOpen(false);
+      setItemToDelete(null);
+    }
+  }, [itemToDelete, authHeaders, activeItem, handleSelectHistory]);
+
+  // ── Clear all history ─────────────────────────────────────────────────────
   const confirmClearAll = useCallback(async () => {
     setIsDeleting(true);
     try {
       const headers = await authHeaders();
       const res  = await fetch("http://localhost:3001/api/trellis/history", { method: "DELETE", headers });
       const data = await res.json();
-      if (data.success) { setHistory([]); setActiveItem(null); setModelUrl(null); setGenStatus("idle"); }
-      else { alert("Törlés sikertelen: " + data.message); }
-    } catch (err) { alert("Hálózati hiba: " + err.message); }
-    finally { setIsDeleting(false); setClearAllModalOpen(false); }
+      if (data.success) {
+        // Cancel any pending load
+        if (histSelectAbortRef.current) {
+          histSelectAbortRef.current.cancelled = true;
+          histSelectAbortRef.current = null;
+        }
+        setLoadingItemId(null);
+        setHistory([]);
+        setActiveItem(null);
+        setModelUrl(null);
+        prevUrlRef.current = null;
+        setGenStatus("idle");
+        historyInitialized.current = false;
+        lastDocRef.current = null;
+        setHasMore(false);
+      } else {
+        alert("Törlés sikertelen: " + data.message);
+      }
+    } catch (err) {
+      alert("Hálózati hiba: " + err.message);
+    } finally {
+      setIsDeleting(false);
+      setClearAllModalOpen(false);
+    }
   }, [authHeaders]);
 
+  // ── Download ──────────────────────────────────────────────────────────────
   const handleDownload = useCallback(() => {
     if (!modelUrl) return;
-    const a = document.createElement("a"); a.href = modelUrl;
-    a.download = `trellis_${Date.now()}.glb`; a.click();
+    setDownloadItem(null);
+    setDownloadModalOpen(true);
   }, [modelUrl]);
 
   const handleDownloadItem = useCallback(async (item) => {
     try {
       const blobUrl = await fetchGlbAsBlob(item.model_url, getIdToken);
-      const a = document.createElement("a"); a.href = blobUrl;
-      a.download = `trellis_${item.id ?? Date.now()}.glb`; a.click();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
-    } catch (err) { alert("GLB letöltés sikertelen: " + err.message); }
+      setDownloadItem({ blobUrl, item });
+      setDownloadModalOpen(true);
+    } catch (err) {
+      alert("GLB betöltés sikertelen: " + err.message);
+    }
   }, [getIdToken]);
 
   const camPreset = useCallback((preset) => {
@@ -584,6 +734,10 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       const spin = preset === "reset";
       setAutoSpin(spin); sceneRef.current.autoSpin = spin;
     }
+  }, []);
+
+  const openRightPanel = useCallback(() => {
+    setRightOpen(true);
   }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -660,7 +814,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
           </div>
 
           <div style={S.generateArea}>
-            {/* Preset idő + model sor — overflow hidden, ne törjön ki */}
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
               marginBottom: 9, minWidth: 0, overflow: "hidden", gap: 6,
@@ -701,7 +854,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
                 cursor: "pointer", border: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)", transition: "all 0.15s",
                 whiteSpace: "nowrap",
               }}>
-                <Download style={{ width: 10, height: 10, flexShrink: 0 }} /> GLB letöltése
+                <Download style={{ width: 10, height: 10, flexShrink: 0 }} /> Letöltés…
               </button>
             )}
           </div>
@@ -753,7 +906,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
                 />
               )}
             </div>
-            {/* space-between a két csoportot szétválasztja, nincs szükség spacerre */}
             <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
               <BgColorPicker value={bgColor} onChange={setBgColor} />
               <div style={S.separator} />
@@ -777,7 +929,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
               />
               {!rightOpen && (
                 <Tooltip text="Előzmények megnyitása" side="bottom">
-                  <button onClick={() => setRightOpen(true)} style={{
+                  <button onClick={openRightPanel} style={{
                     width: 24, height: 24, borderRadius: 6, border: "none", cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     background: "rgba(255,255,255,0.04)", color: "#3d3d5a", transition: "all 0.14s",
@@ -809,6 +961,13 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
                 <p style={{ color: "#2d3748", fontSize: 10, margin: 0, fontFamily: "'SF Mono', monospace" }}>Előzmények betöltése…</p>
               </div>
             )}
+            {/* Model loading overlay — shown while switching history items */}
+            {loadingItemId && !isRunning && (
+              <div style={S.loadingOverlay}>
+                <Loader2 style={{ width: 20, height: 20, color, marginBottom: 10 }} className="animate-spin" />
+                <p style={{ color: "#2d3748", fontSize: 10, margin: 0, fontFamily: "'SF Mono', monospace" }}>Modell betöltése…</p>
+              </div>
+            )}
             {isRunning && (
               <div style={S.overlay}>
                 <div style={{ width: 64, height: 64, borderRadius: 18, marginBottom: 20, background: `${color}10`, border: `1px solid ${color}28`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 40px ${color}20, inset 0 1px 0 ${color}20` }}>
@@ -821,7 +980,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
                 <div style={{ display: "flex", gap: 5, alignItems: "center", color }}>{PULSE_DOTS}</div>
               </div>
             )}
-            {!isRunning && !modelUrl && !historyLoading && (
+            {!isRunning && !modelUrl && !historyLoading && !loadingItemId && (
               <div style={S.emptyState}>
                 <div style={{ width: 68, height: 68, borderRadius: 20, marginBottom: 16, background: `${color}05`, border: `1px solid ${color}12`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Box style={{ width: 28, height: 28, color: `${color}28` }} />
@@ -865,7 +1024,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
                   border: "none", cursor: "pointer", boxShadow: `0 2px 12px ${color}38`, transition: "all 0.15s",
                   whiteSpace: "nowrap", flexShrink: 0,
                 }}>
-                  <Download style={{ width: 10, height: 10 }} /> GLB letöltése
+                  <Download style={{ width: 10, height: 10 }} /> Letöltés
                 </button>
               )}
             </div>
@@ -875,7 +1034,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
         {/* Right handle */}
         <DragHandle
           onMouseDown={startDrag("right")}
-          onToggle={() => setRightOpen((v) => !v)}
+          onToggle={() => rightOpen ? setRightOpen(false) : openRightPanel()}
           icon={rightOpen
             ? <ChevronRight style={{ width: 10, height: 10, color: "rgba(255,255,255,0.45)" }} />
             : <ChevronLeft  style={{ width: 10, height: 10, color: "rgba(255,255,255,0.45)" }} />
@@ -889,7 +1048,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
               <Clock style={{ width: 10, height: 10, color: `${color}70`, flexShrink: 0 }} />
               <span style={{ color: "#5a5a78", fontSize: 11, fontWeight: 700, letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Előzmények</span>
               <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700, padding: "1px 7px", borderRadius: 99, background: `${color}10`, color: `${color}90`, border: `1px solid ${color}1c`, fontFamily: "'SF Mono', monospace", flexShrink: 0 }}>
-                {history.length}
+                {history.length}{hasMore ? "+" : ""}
               </span>
             </div>
             <input
@@ -912,20 +1071,64 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
                 <Loader2 style={{ width: 14, height: 14, color: "#22223a" }} className="animate-spin" />
               </div>
             )}
+
             {!historyLoading && filteredHistory.length === 0 && (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 140, textAlign: "center", gap: 8 }}>
                 <Box style={{ width: 20, height: 20, color: "#14142a" }} />
                 <p style={{ color: "#1c1c34", fontSize: 10, margin: 0 }}>{histSearch ? "Nincs találat" : "Még nincs mentett modell"}</p>
               </div>
             )}
-            {filteredHistory.map((item) => (
-              <HistoryCard
-                key={item.id} item={item} isActive={activeItem?.id === item.id}
-                onSelect={handleSelectHistory} onReuse={handleReusePrompt}
-                onDownload={handleDownloadItem} onDelete={handleDeleteItem}
-                color={color} getIdToken={getIdToken}
-              />
+
+            {filteredHistory.map((item, idx) => (
+              <div key={item.id} className="hist-item-enter" style={{ animationDelay: `${Math.min(idx, 4) * 0.04}s` }}>
+                <HistoryCard
+                  item={item}
+                  isActive={activeItem?.id === item.id}
+                  isLoading={loadingItemId === item.id}
+                  disabled={loadingItemId !== null}
+                  onSelect={handleSelectHistory}
+                  onReuse={handleReusePrompt}
+                  onDownload={handleDownloadItem}
+                  onDelete={handleDeleteItem}
+                  color={color}
+                  getIdToken={getIdToken}
+                />
+              </div>
             ))}
+
+            {!histSearch && hasMore && (
+              <button
+                className="load-more-btn"
+                onClick={loadMoreHistory}
+                disabled={loadingMore || loadingItemId !== null}
+                style={{
+                  width: "100%", padding: "8px 0", borderRadius: 8,
+                  fontSize: 9, fontWeight: 700, letterSpacing: "0.04em",
+                  color: (loadingMore || loadingItemId) ? "#22223a" : "#3d3d5a",
+                  background: "rgba(255,255,255,0.018)",
+                  border: "1px solid rgba(255,255,255,0.055)",
+                  cursor: (loadingMore || loadingItemId) ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  transition: "all 0.15s", fontFamily: "'SF Mono', monospace",
+                  marginTop: 2,
+                }}
+              >
+                {loadingMore ? (
+                  <><Loader2 style={{ width: 9, height: 9 }} className="animate-spin" /> Betöltés…</>
+                ) : (
+                  <><ChevronDown style={{ width: 9, height: 9 }} /> Több betöltése (10)</>
+                )}
+              </button>
+            )}
+
+            {!histSearch && !hasMore && history.length > 0 && (
+              <p style={{
+                textAlign: "center", fontSize: 8, color: "#161625",
+                fontFamily: "'SF Mono', monospace", padding: "6px 0 2px",
+              }}>
+                — {history.length} modell összesen —
+              </p>
+            )}
           </div>
 
           {history.length > 0 && (
@@ -957,6 +1160,18 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
         onConfirm={confirmClearAll} title="Összes előzmény törlése"
         message={`Biztosan törölni szeretnéd mind a ${history.length} mentett modellt? Ez a művelet nem vonható vissza.`}
         confirmText="Összes törlése" confirmColor="#dc2626" isDeleting={isDeleting}
+      />
+      <DownloadModal
+        isOpen={downloadModalOpen}
+        onClose={() => { setDownloadModalOpen(false); setDownloadItem(null); }}
+        glbBlobUrl={downloadItem ? downloadItem.blobUrl : modelUrl}
+        scene={sceneRef.current?.scene ?? sceneRef.current}
+        filename={
+          downloadItem
+            ? (downloadItem.item?.name ?? `trellis_${downloadItem.item?.id ?? Date.now()}`)
+            : (activeItem?.name ?? `trellis_${Date.now()}`)
+        }
+        color={color}
       />
     </>
   );
