@@ -66,7 +66,7 @@ export function createSunLight(THREE, scene) {
 
   sun.matrixAutoUpdate = false;
   sun.matrixWorldNeedsUpdate = false;
-  if ("matrixWorldAutoUpdate" in sun) sun.matrixWorldAutoUpdate = false;
+  if ("matrixAutoUpdate" in sun) sun.matrixWorldAutoUpdate = false;
 
   sun.target.matrixAutoUpdate = false;
   sun.target.matrixWorldNeedsUpdate = false;
@@ -134,18 +134,22 @@ export function applyLights(
     return;
   }
 
-  // ── Clay: soft even studio lighting — form reads from the matte material, not harsh shadows
+  // ── Clay: controlled contrast — shape reads clearly, not washed out
   if (viewMode === 'clay') {
-    lightGroup.add(new THREE.HemisphereLight(0xe8dccf, 0x1a1310, 0.04)); // warm sky / cool ground
-    const key = new THREE.DirectionalLight(0xfff8f0, 1.1);               // soft front-top key
-    key.position.set(3, 6, 5);
+    // Low ambient so shadows have weight
+    lightGroup.add(new THREE.HemisphereLight(0xc8c0b8, 0x302820, 0.18));
+    // Strong directional key from top-front-right
+    const key = new THREE.DirectionalLight(0xb8b8b8, 0.9);
+    key.position.set(5, 9, 6);
     key.castShadow = true;
     lightGroup.add(key);
-    const fill = new THREE.DirectionalLight(0xddeeff, 0.45);             // cool left fill
-    fill.position.set(-5, 3, 0);
+    // Moderate fill — lifts shadows without killing them
+    const fill = new THREE.DirectionalLight(0xa0a8b0, 0.2);
+    fill.position.set(-6, 3, 2);
     lightGroup.add(fill);
-    const back = new THREE.DirectionalLight(0xffeedd, 0.3);              // warm back rim
-    back.position.set(0, 2, -6);
+    // Subtle back rim for silhouette separation
+    const back = new THREE.DirectionalLight(0x909090, 0.1);
+    back.position.set(0, 2, -7);
     lightGroup.add(back);
     lightGroup.rotation.y = 0;
     return;
@@ -208,9 +212,10 @@ export function applyViewMode(s, mode) {
         node.geometry.computeVertexNormals();
       }
       const buildClay = () => new THREE.MeshStandardMaterial({
-        color: 0xd4b896,      // klasszikus meleg clay szín
+        // Mid-tone warm gray — enough contrast for shadows to read
+        color: 0x7a7a7a,
         metalness: 0,
-        roughness: 0.85,
+        roughness: 0.82,
         envMapIntensity: 0,
         side: THREE.DoubleSide,
       });

@@ -1,18 +1,13 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
-import { STYLE_OPTIONS } from './Styleutils';
-const T = {
-  radius: { sm: 6, md: 10 },
-};
+import { T } from './tokens';
+import { STYLE_OPTIONS } from './Constants';
 
-/**
- * Tooltip komponens - egyszerű tooltip megjelenítéshez
- */
 function Tooltip({ text, children, side = 'top' }) {
-  const [show, setShow] = React.useState(false);
-
+  const [show, setShow] = useState(false);
   return (
-    <div style={{ position: 'relative', display: 'inline-flex' }}
+    <div
+      style={{ position: 'relative', display: 'inline-flex', width: '100%' }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
     >
@@ -21,34 +16,27 @@ function Tooltip({ text, children, side = 'top' }) {
         <div style={{
           position: 'absolute',
           [side === 'top' ? 'bottom' : 'top']: '100%',
-          left: '50%',
-          transform: 'translateX(-50%)',
+          left: '50%', transform: 'translateX(-50%)',
           marginBottom: side === 'top' ? 8 : 0,
           marginTop: side === 'bottom' ? 8 : 0,
-          padding: '6px 10px',
-          background: 'rgba(0, 0, 0, 0.95)',
-          color: '#fff',
-          fontSize: 11,
-          fontWeight: 500,
-          borderRadius: 6,
-          whiteSpace: 'nowrap',
-          zIndex: 1000,
-          pointerEvents: 'none',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: '5px 10px',
+          background: '#0a0a14',
+          color: '#e2e8f0',
+          fontSize: 10, fontWeight: 500, borderRadius: 7,
+          whiteSpace: 'nowrap', zIndex: 1000, pointerEvents: 'none',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          letterSpacing: '0.01em',
         }}>
           {text}
           <div style={{
             position: 'absolute',
             [side === 'top' ? 'bottom' : 'top']: -4,
-            left: '50%',
-            transform: 'translateX(-50%) rotate(45deg)',
-            width: 8,
-            height: 8,
-            background: 'rgba(0, 0, 0, 0.95)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRight: 'none',
-            borderBottom: 'none',
+            left: '50%', transform: 'translateX(-50%) rotate(45deg)',
+            width: 7, height: 7,
+            background: '#0a0a14',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRight: 'none', borderBottom: 'none',
           }} />
         </div>
       )}
@@ -56,94 +44,64 @@ function Tooltip({ text, children, side = 'top' }) {
   );
 }
 
-/**
- * Pill komponens - kis badge megjelenítéshez
- */
-function Pill({ children, color, active }) {
-  return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 3,
-      padding: '2px 7px',
-      borderRadius: 999,
-      fontSize: 9,
-      fontWeight: 700,
-      background: active ? `${color}18` : 'rgba(255,255,255,0.04)',
-      color: active ? color : '#4b5563',
-      border: `1px solid ${active ? color + '30' : 'rgba(255,255,255,0.08)'}`,
-      letterSpacing: '0.01em',
-    }}>
-      {children}
-    </span>
+function StylePicker({ selected, onSelect, color, disabled }) {
+  const activeStyle = useMemo(
+    () => STYLE_OPTIONS.find(s => s.id === selected),
+    [selected]
   );
-}
 
-/**
- * SectionLabel komponens - szekció címsor ikonnal
- */
-function SectionLabel({ icon, children, color }) {
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      marginBottom: 8,
-    }}>
+    <div style={{ marginBottom: 12 }}>
+
+      {/* Section header */}
       <div style={{
-        width: 18,
-        height: 18,
-        borderRadius: 5,
-        background: `${color}12`,
-        border: `1px solid ${color}25`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 9,
       }}>
-        {React.cloneElement(icon, { 
-          style: { width: 10, height: 10, color } 
-        })}
-      </div>
-      <span style={{
-        color: '#9ca3af',
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: '-0.01em',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-      }}>
-        {children}
-      </span>
-    </div>
-  );
-}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          {/* Icon badge */}
+          <div style={{
+            width: 20, height: 20, borderRadius: 6,
+            background: `linear-gradient(135deg, ${color}20, ${color}08)`,
+            border: `1px solid ${color}25`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: `0 2px 8px ${color}10`,
+          }}>
+            <Sparkles style={{ width: 10, height: 10, color }} />
+          </div>
+          <span style={{
+            color: '#9ca3af',
+            fontSize: 10, fontWeight: 700,
+            letterSpacing: '0.07em',
+            textTransform: 'uppercase',
+          }}>
+            Stílus
+          </span>
+        </div>
 
-/**
- * StylePicker komponens - Trellis stílus kiválasztó
- * @param {string} selected - A kiválasztott stílus ID-ja
- * @param {Function} onSelect - Callback amikor új stílust választanak (styleId) => void
- * @param {string} color - Accent szín (pl. '#a78bfa')
- * @param {boolean} disabled - Le van-e tiltva a picker
- */
-export default function StylePicker({ selected, onSelect, color, disabled }) {
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <SectionLabel icon={<Sparkles />} color={color}>
-        Stílus
+        {/* Active style pill */}
         {selected !== 'nostyle' && (
-          <Pill color={color} active>
-            {STYLE_OPTIONS.find(s => s.id === selected)?.emoji}{' '}
-            {STYLE_OPTIONS.find(s => s.id === selected)?.label}
-          </Pill>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '3px 8px', borderRadius: 99,
+            fontSize: 9, fontWeight: 700,
+            letterSpacing: '0.03em',
+            background: `${color}14`,
+            color,
+            border: `1px solid ${color}28`,
+            boxShadow: `0 0 10px ${color}10`,
+          }}>
+            {activeStyle?.emoji}
+            <span>{activeStyle?.label}</span>
+          </span>
         )}
-      </SectionLabel>
-      
-      {/* Stílus grid */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(3, 1fr)', 
-        gap: 4 
+      </div>
+
+      {/* Style grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 4,
       }}>
         {STYLE_OPTIONS.map(style => {
           const isActive = selected === style.id;
@@ -153,40 +111,65 @@ export default function StylePicker({ selected, onSelect, color, disabled }) {
                 onClick={() => !disabled && onSelect(style.id)}
                 disabled={disabled}
                 style={{
-                  padding: '7px 4px', 
-                  borderRadius: T.radius.md,
-                  fontSize: 9, 
-                  fontWeight: 700,
-                  border: 'none', 
+                  padding: '9px 4px 8px',
+                  borderRadius: 10,
+                  fontSize: 9, fontWeight: 700,
+                  width: '100%',
+                  border: 'none',
                   cursor: disabled ? 'not-allowed' : 'pointer',
-                  background: isActive ? `${color}1e` : 'rgba(255,255,255,0.025)',
+                  background: isActive
+                    ? `linear-gradient(160deg, ${color}20, ${color}0c)`
+                    : 'rgba(255,255,255,0.025)',
                   color: isActive ? color : '#4b5563',
-                  outline: isActive 
-                    ? `1px solid ${color}50` 
-                    : '1px solid rgba(255,255,255,0.06)',
-                  transition: 'all 0.15s',
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  gap: 3,
-                  opacity: disabled ? 0.4 : 1,
-                  boxShadow: isActive 
-                    ? `inset 0 1px 0 ${color}20, 0 0 12px ${color}15` 
-                    : 'none',
+                  outline: isActive
+                    ? `1px solid ${color}45`
+                    : '1px solid rgba(255,255,255,0.055)',
+                  transition: 'all 0.16s cubic-bezier(0.4,0,0.2,1)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  opacity: disabled ? 0.35 : 1,
+                  boxShadow: isActive
+                    ? `inset 0 1px 0 ${color}18, 0 4px 12px ${color}12`
+                    : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+                onMouseEnter={e => {
+                  if (!disabled && !isActive) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                    e.currentTarget.style.color = '#9ca3af';
+                    e.currentTarget.style.outline = '1px solid rgba(255,255,255,0.1)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!disabled && !isActive) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.025)';
+                    e.currentTarget.style.color = '#4b5563';
+                    e.currentTarget.style.outline = '1px solid rgba(255,255,255,0.055)';
+                  }
                 }}
               >
-                <span style={{ 
-                  fontSize: 15, 
-                  lineHeight: 1, 
-                  filter: disabled ? 'grayscale(1)' : 'none' 
+                {/* Active indicator dot */}
+                {isActive && (
+                  <div style={{
+                    position: 'absolute', top: 5, right: 5,
+                    width: 4, height: 4, borderRadius: '50%',
+                    background: color,
+                    boxShadow: `0 0 6px ${color}`,
+                  }} />
+                )}
+
+                <span style={{
+                  fontSize: 16, lineHeight: 1,
+                  filter: disabled ? 'grayscale(1) opacity(0.4)' : 'none',
+                  transition: 'transform 0.15s',
                 }}>
                   {style.emoji}
                 </span>
-                <span style={{ 
-                  fontSize: 9, 
-                  lineHeight: 1.2, 
-                  textAlign: 'center', 
-                  letterSpacing: '0.01em' 
+                <span style={{
+                  fontSize: 9, lineHeight: 1.3,
+                  textAlign: 'center',
+                  letterSpacing: '0.02em',
+                  fontWeight: isActive ? 800 : 600,
                 }}>
                   {style.label}
                 </span>
@@ -195,41 +178,49 @@ export default function StylePicker({ selected, onSelect, color, disabled }) {
           );
         })}
       </div>
-      
-      {/* Prefix előnézet */}
-      {selected !== 'nostyle' && (
+
+      {/* Active style prefix tag */}
+      {selected !== 'nostyle' && activeStyle?.prefix && (
         <div style={{
-          marginTop: 6, 
-          padding: '5px 9px', 
-          borderRadius: T.radius.sm,
-          background: 'rgba(255,255,255,0.025)', 
-          border: '1px solid rgba(255,255,255,0.06)',
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 5, 
+          marginTop: 8,
+          padding: '7px 11px',
+          borderRadius: 9,
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.055)',
+          display: 'flex', alignItems: 'flex-start', gap: 7,
           overflow: 'hidden',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
         }}>
-          <span style={{ 
-            color: '#2d3748', 
-            fontSize: 9, 
-            flexShrink: 0, 
-            fontFamily: "'SF Mono', monospace" 
-          }}>
-            prefix:
-          </span>
           <span style={{
-            color: `${color}cc`, 
-            fontSize: 9, 
-            fontWeight: 600, 
+            color: 'rgba(255,255,255,0.2)',
+            fontSize: 8, fontWeight: 700,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
             fontFamily: "'SF Mono', monospace",
-            overflow: 'hidden', 
-            textOverflow: 'ellipsis', 
-            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            paddingTop: 1,
           }}>
-            {STYLE_OPTIONS.find(s => s.id === selected)?.prefix}
+            prefix
+          </span>
+          {/* Divider */}
+          <div style={{
+            width: 1, height: '100%', minHeight: 12,
+            background: 'rgba(255,255,255,0.07)',
+            flexShrink: 0,
+          }} />
+          <span style={{
+            color: `${color}b0`,
+            fontSize: 9, fontWeight: 600,
+            fontFamily: "'SF Mono', monospace",
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            lineHeight: 1.4,
+          }}>
+            {activeStyle.prefix}
           </span>
         </div>
       )}
     </div>
   );
 }
+
+export default React.memo(StylePicker);

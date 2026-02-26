@@ -1,16 +1,9 @@
+import { STYLE_OPTIONS } from './Constants';
 
 // ────────────────────────────────────────────────────────────────────────────
-// Helper Functions
+// Style helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-import { STYLE_OPTIONS } from "./Constants";
-
-/**
- * Strip style prefix from a prompt
- * @param {string} prompt - The prompt to strip
- * @param {string} styleId - The style ID
- * @returns {string} - Prompt without prefix
- */
 export function stripStylePrefix(prompt, styleId) {
   const style = STYLE_OPTIONS.find(s => s.id === styleId);
   if (!style?.prefix) return prompt;
@@ -18,23 +11,16 @@ export function stripStylePrefix(prompt, styleId) {
   return prompt;
 }
 
-/**
- * Apply style prefix to a raw prompt
- * @param {string} rawPrompt - The raw prompt
- * @param {string} styleId - The style ID
- * @returns {string} - Prompt with prefix
- */
 export function applyStylePrefix(rawPrompt, styleId) {
   const style = STYLE_OPTIONS.find(s => s.id === styleId);
   if (!style?.prefix) return rawPrompt;
   return style.prefix + rawPrompt;
 }
 
-/**
- * Format date to Hungarian locale
- * @param {Date|Timestamp} d - Date to format
- * @returns {string} - Formatted date string
- */
+// ────────────────────────────────────────────────────────────────────────────
+// Date formatter
+// ────────────────────────────────────────────────────────────────────────────
+
 export function fmtDate(d) {
   if (!d) return '';
   const date = d?.toDate ? d.toDate() : new Date(d);
@@ -43,10 +29,10 @@ export function fmtDate(d) {
   });
 }
 
-/**
- * Get default Trellis parameters
- * @returns {Object} - Default parameter object
- */
+// ────────────────────────────────────────────────────────────────────────────
+// Default params
+// ────────────────────────────────────────────────────────────────────────────
+
 export function defaultParams() {
   return {
     slat_cfg_scale: 3.0,
@@ -58,18 +44,15 @@ export function defaultParams() {
   };
 }
 
-/**
- * Fetch GLB file as blob URL
- * @param {string} modelUrl - URL of the model
- * @param {Function} getIdToken - Function to get authentication token
- * @returns {Promise<string|null>} - Blob URL or null
- */
+// ────────────────────────────────────────────────────────────────────────────
+// GLB fetcher
+// ────────────────────────────────────────────────────────────────────────────
+
 export async function fetchGlbAsBlob(modelUrl, getIdToken) {
   if (!modelUrl) return null;
   if (modelUrl.startsWith('data:')) return modelUrl;
 
   let fetchUrl = modelUrl;
-
   if (modelUrl.startsWith('/api/')) {
     fetchUrl = `http://localhost:3001${modelUrl}`;
   } else if (modelUrl.startsWith('https://s3.') || modelUrl.includes('backblazeb2.com')) {
@@ -80,11 +63,55 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken) {
   const r = await fetch(fetchUrl, {
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
     },
   });
 
   if (!r.ok) throw new Error(`GLB letöltés sikertelen (${r.status})`);
   const blob = await r.blob();
   return URL.createObjectURL(blob);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// SSE stream reader — shared by Enhance and Dechanter
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Sends a chat request to the local API and collects the full streamed response.
+ *
+ * @param {string}   url       - API endpoint
+ * @param {Object}   headers   - Auth + content-type headers
+ * @param {Object}   body      - Request body (model, messages, temperature, max_tokens)
+ * @returns {Promise<string>}  - Accumulated response text
+ */
+export async function streamChat(url, headers, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let accumulated = '';
+  let buf = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop(); // keep incomplete line in buffer
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data: ')) continue;
+      const raw = trimmed.slice(6);
+      if (raw === '[DONE]') continue;
+      try { accumulated += JSON.parse(raw).delta || ''; } catch { /* skip malformed */ }
+    }
+  }
+
+  return accumulated;
 }

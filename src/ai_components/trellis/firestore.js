@@ -1,29 +1,28 @@
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  getDocs, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
-  serverTimestamp 
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
 } from 'firebase/firestore';
-import { TRELLIS_COLLECTION } from './constants';
+import { db } from '../../firebase/firebaseApp';
+import { TRELLIS_COLLECTION } from './Constants';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Firestore History Operations
 // ────────────────────────────────────────────────────────────────────────────
-// Note: Requires 'db' (Firestore instance) to be passed or imported
 
 /**
  * Load user's Trellis generation history from Firestore
- * @param {string} userId - User ID
- * @param {Object} db - Firestore database instance
- * @returns {Promise<Array>} - Array of history items
+ * @param {string} userId
+ * @returns {Promise<Array>}
  */
-export async function loadHistoryFromFirestore(userId, db) {
+export async function loadHistoryFromFirestore(userId) {
   if (!userId) return [];
   try {
     const q = query(
@@ -44,12 +43,11 @@ export async function loadHistoryFromFirestore(userId, db) {
 
 /**
  * Save a new generation to Firestore history
- * @param {string} userId - User ID
- * @param {Object} item - Generation item to save
- * @param {Object} db - Firestore database instance
- * @returns {Promise<string|null>} - Document ID or null on failure
+ * @param {string} userId
+ * @param {Object} item
+ * @returns {Promise<string|null>} Document ID or null
  */
-export async function saveHistoryToFirestore(userId, item, db) {
+export async function saveHistoryToFirestore(userId, item) {
   if (!userId) return null;
   try {
     const docRef = await addDoc(collection(db, TRELLIS_COLLECTION), {
@@ -65,12 +63,11 @@ export async function saveHistoryToFirestore(userId, item, db) {
 }
 
 /**
- * Delete all user's history from Firestore
- * @param {string} userId - User ID
- * @param {Object} db - Firestore database instance
+ * Delete all of a user's history from Firestore
+ * @param {string} userId
  * @returns {Promise<void>}
  */
-export async function deleteHistoryFromFirestore(userId, db) {
+export async function deleteHistoryFromFirestore(userId) {
   if (!userId) return;
   try {
     const q = query(
@@ -78,8 +75,7 @@ export async function deleteHistoryFromFirestore(userId, db) {
       where('userId', '==', userId)
     );
     const snap = await getDocs(q);
-    const deletePromises = snap.docs.map(d => deleteDoc(doc(db, TRELLIS_COLLECTION, d.id)));
-    await Promise.all(deletePromises);
+    await Promise.all(snap.docs.map(d => deleteDoc(doc(db, TRELLIS_COLLECTION, d.id))));
   } catch (e) {
     console.warn('Firestore history delete failed:', e.message);
   }

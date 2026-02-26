@@ -1,5 +1,6 @@
 import React from 'react';
 import { T } from './tokens';
+import { Tooltip } from '../meshy/ui/Primitives';
 
 // ────────────────────────────────────────────────────────────────────────────
 // WireframeControl Component
