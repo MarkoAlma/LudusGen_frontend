@@ -55,10 +55,19 @@ Examples: "Mossy Stone Tower", "Crystal Wyvern", "Rusted Cargo Bay", "Frosted Pi
 Return ONLY the name, nothing else.`;
 
 // ── Shared streaming helper ───────────────────────────────────────────────────
+// ── Shared streaming helper ─────────────────────────────────────────
 async function streamChat(headers, body) {
-  const res = await fetch("http://localhost:3001/api/chat", {
+  const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+  const res = await fetch(`${BASE}/api/chat`, {
     method: "POST", headers, body: JSON.stringify(body),
   });
+
+  // ✅ HTTP hiba esetén early return
+  if (!res.ok) {
+    console.error("streamChat HTTP error:", res.status);
+    return "";
+  }
+
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let accumulated = "";
@@ -278,7 +287,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
   const [selectedStyle, setSelectedStyle] = useState("nostyle");
   const [enhancing, setEnhancing] = useState(false);
   const [dechantig, setDechantig] = useState(false);
-  const [timedOut, setTimedOut] = useState(false);
 
   const [viewMode, setViewMode] = useState("clay");
   const [lightMode, setLightMode] = useState("studio");
@@ -327,7 +335,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
 
   const sceneRef    = useRef(null);
   const abortRef    = useRef(null);
-  const timeoutRef  = useRef(null);
   const prevUrlRef  = useRef(null);
   const dragRef     = useRef(null);
 
@@ -447,7 +454,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
           { role: "system", content: NAME_SYSTEM },
           { role: "user",   content: promptText.slice(0, 300) },
         ],
-        temperature: 0.8, max_tokens: 20,
+        temperature: 0.8, max_tokens: 40,
       });
       return name || null;
     } catch { return null; }
@@ -482,23 +489,40 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
   const handleDeleteItem   = useCallback((item) => { setItemToDelete(item); setDeleteModalOpen(true); }, []);
   const handleClearHistory = useCallback(() => setClearAllModalOpen(true), []);
 
-  const handleEnhance = useCallback(async () => {
-    if (!prompt.trim() || enhancing) return;
-    setEnhancing(true);
-    try {
-      const result = await streamChat(await authHeaders(), {
-        model: "gpt-oss-120b", provider: "cerebras",
-        messages: [
-          { role: "system", content: ENHANCE_SYSTEM },
-          { role: "user",   content: stripStylePrefix(prompt.trim(), selectedStyle) },
-        ],
-        temperature: 0.7, max_tokens: 500,
-      });
-      if (result) setPrompt(result);
-    } catch (err) { console.error("Enhance hiba:", err); }
-    finally { setEnhancing(false); }
-  }, [prompt, enhancing, authHeaders, selectedStyle]);
+const handleEnhance = useCallback(async () => {
+  if (!prompt.trim() || enhancing) return;
+  setEnhancing(true);
+  
+  const originalPrompt = prompt.trim(); // ✅ elmentjük az eredetit
+  
+  try {
+    const result = await streamChat(await authHeaders(), {
+      model: "gpt-oss-120b",
+      provider: "cerebras",
+      messages: [
+        { role: "system", content: ENHANCE_SYSTEM },
+        { role: "user", content: stripStylePrefix(originalPrompt, selectedStyle) },
+      ],
+      temperature: 0.36,
+      top_p: 0.9,
+      max_tokens: 8192, // ⚠️ ez túl sok Cerebras-nak, max 8192 körül van
+    });
 
+    console.log("Enhance result:", result?.slice(0, 100)); // debug
+
+    if (result && result.trim().length > 20) {
+      setPrompt(result.trim());
+    } else {
+      console.warn("Enhance: üres/rövid eredmény, eredeti prompt megmarad");
+      // ✅ setErrorMsg helyett csak console — prompt megmarad
+    }
+  } catch (err) {
+    console.error("Enhance hiba:", err);
+    // ✅ prompt megmarad, nem töröljük
+  } finally {
+    setEnhancing(false);
+  }
+}, [prompt, enhancing, authHeaders, selectedStyle]);
   const handleDechance = useCallback(async () => {
     if (!prompt.trim() || dechantig) return;
     setDechantig(true);
@@ -511,7 +535,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
         ],
         temperature: 0.4, max_tokens: 300,
       });
-      if (result) { setPrompt(result); setTimedOut(false); }
+      if (result) setPrompt(result);
     } catch (err) { console.error("Dechance hiba:", err); }
     finally { setDechantig(false); }
   }, [prompt, dechantig, authHeaders, selectedStyle]);
@@ -521,11 +545,10 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
     if (genStatus === "pending" || !prompt.trim() || prompt.length > 1000) return;
     setErrorMsg("");
     prevUrlRef.current = modelUrl;
-    setModelUrl(null); setGenStatus("pending"); setTimedOut(false);
+    setModelUrl(null); setGenStatus("pending");
 
     const controller = new AbortController();
     abortRef.current = controller;
-    timeoutRef.current = setTimeout(() => { controller.abort(); setTimedOut(true); }, 70_000);
 
     try {
       const headers = await authHeaders();
@@ -588,15 +611,14 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       }
     } finally {
       abortRef.current = null;
-      clearTimeout(timeoutRef.current); timeoutRef.current = null;
     }
   }, [genStatus, prompt, params, authHeaders, userId, getIdToken, modelUrl, selectedStyle, generateName]);
 
-  const handleStop = useCallback(() => { setTimedOut(false); abortRef.current?.abort(); }, []);
+  // ── Stop — csak manuális abort, nincs timeout ─────────────────────────────
+  const handleStop = useCallback(() => { abortRef.current?.abort(); }, []);
 
   // ── Select history item — with cancel token against rapid switching ────────
   const handleSelectHistory = useCallback(async (item) => {
-    // Cancel any in-flight load
     if (histSelectAbortRef.current) {
       histSelectAbortRef.current.cancelled = true;
     }
@@ -611,7 +633,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
     if (item.model_url) {
       try {
         const blobUrl = await fetchGlbAsBlob(item.model_url, getIdToken);
-        if (token.cancelled) return; // stale — discard
+        if (token.cancelled) return;
         setModelUrl(blobUrl);
         prevUrlRef.current = blobUrl;
       } catch {
@@ -624,7 +646,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
     if (!token.cancelled) setLoadingItemId(null);
   }, [getIdToken]);
 
-  // ── Delete single item — load neighbour or clear viewer ───────────────────
+  // ── Delete single item ────────────────────────────────────────────────────
   const confirmDeleteItem = useCallback(async () => {
     if (!itemToDelete) return;
     setIsDeleting(true);
@@ -633,7 +655,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       const res  = await fetch(`http://localhost:3001/api/trellis/history/${itemToDelete.id}`, { method: "DELETE", headers });
       const data = await res.json();
       if (data.success) {
-        // Compute neighbour before mutating state
         const deletedId = itemToDelete.id;
         const wasActive = activeItem?.id === deletedId;
 
@@ -641,7 +662,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
           const next = prev.filter((i) => i.id !== deletedId);
 
           if (wasActive) {
-            // Cancel any pending load
             if (histSelectAbortRef.current) {
               histSelectAbortRef.current.cancelled = true;
               histSelectAbortRef.current = null;
@@ -649,17 +669,13 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
             setLoadingItemId(null);
 
             if (next.length === 0) {
-              // No models left → clear viewer completely
               setActiveItem(null);
               setModelUrl(null);
               prevUrlRef.current = null;
               setGenStatus("idle");
             } else {
-              // Find the deleted item's index in the old list
               const oldIdx = prev.findIndex((i) => i.id === deletedId);
-              // Prefer the item before it (higher index = older), fall back to first
               const neighbour = prev[oldIdx - 1] ?? prev[oldIdx + 1] ?? next[0];
-              // Load the neighbour asynchronously
               setTimeout(() => handleSelectHistory(neighbour), 0);
             }
           }
@@ -686,7 +702,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
       const res  = await fetch("http://localhost:3001/api/trellis/history", { method: "DELETE", headers });
       const data = await res.json();
       if (data.success) {
-        // Cancel any pending load
         if (histSelectAbortRef.current) {
           histSelectAbortRef.current.cancelled = true;
           histSelectAbortRef.current = null;
@@ -781,28 +796,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
             />
             <ExamplePrompts prompts={EXAMPLE_PROMPTS} color={color} disabled={isRunning} onClick={handleExampleClick} />
 
-            {timedOut && (
-              <div style={{ marginBottom: 12, borderRadius: 10, background: "rgba(251,146,60,0.06)", border: "1px solid rgba(251,146,60,0.18)", overflow: "hidden" }}>
-                <div style={{ padding: "10px 12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-                    <Clock style={{ width: 10, height: 10, color: "#fb923c", flexShrink: 0 }} />
-                    <p style={{ color: "#fdba74", fontSize: 10, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>Időtúllépés (1:10)</p>
-                  </div>
-                  <p style={{ color: "#6b3a1a", fontSize: 9, margin: "0 0 9px", lineHeight: 1.6 }}>Csökkentsd a Steps értékét, vagy egyszerűsítsd a promptot.</p>
-                  <button onClick={handleDechance} disabled={dechantig} style={{
-                    width: "100%", padding: "6px 0", borderRadius: 8,
-                    fontSize: 10, fontWeight: 700, cursor: dechantig ? "not-allowed" : "pointer",
-                    border: "none", background: "rgba(251,146,60,0.12)", color: "#fb923c",
-                    outline: "1px solid rgba(251,146,60,0.25)",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5, transition: "all 0.15s",
-                  }}>
-                    {dechantig ? <><Loader2 style={{ width: 10, height: 10 }} className="animate-spin" /> Egyszerűsítés…</> : <><Zap style={{ width: 10, height: 10 }} /> Prompt egyszerűsítése</>}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!timedOut && errorMsg && (
+            {errorMsg && (
               <div style={{ display: "flex", alignItems: "flex-start", gap: 7, padding: "9px 11px", borderRadius: 9, background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.18)", marginBottom: 12 }}>
                 <AlertCircle style={{ width: 11, height: 11, color: "#f87171", flexShrink: 0, marginTop: 1 }} />
                 <p style={{ color: "#fca5a5", fontSize: 10, margin: 0, lineHeight: 1.55 }}>{errorMsg}</p>
@@ -961,7 +955,6 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
                 <p style={{ color: "#2d3748", fontSize: 10, margin: 0, fontFamily: "'SF Mono', monospace" }}>Előzmények betöltése…</p>
               </div>
             )}
-            {/* Model loading overlay — shown while switching history items */}
             {loadingItemId && !isRunning && (
               <div style={S.loadingOverlay}>
                 <Loader2 style={{ width: 20, height: 20, color, marginBottom: 10 }} className="animate-spin" />
