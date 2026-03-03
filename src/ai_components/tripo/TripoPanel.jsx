@@ -7,8 +7,8 @@ import {
   Camera, Move3d, Layers, Play, Square, Clock,
   ChevronRight, ChevronLeft, Box, Zap, ChevronDown,
   ChevronUp, Check, X, Upload, Info, Sparkles,
-  Grid3x3, Scissors, Cpu, PaintBucket, ZoomIn, Boxes,
-  PersonStanding, Search, Music2, Plus, Pause, Globe,
+  Grid3x3, Scissors, Cpu, PaintBucket, Boxes,
+  PersonStanding, Search, Globe,
   Lock, HelpCircle, Image, Pencil, Wand2, Circle,
   ArrowUpCircle,
 } from "lucide-react";
@@ -18,7 +18,7 @@ import { setCameraPreset } from "../meshy/viewer/threeHelpers";
 import { IconBtn, Tooltip } from "../meshy/ui/Primitives";
 import LightingControls    from "../meshy/viewer/LightingControls";
 import {
-  VIEW_MODES, SectionLabel, WireframeControl, BgColorPicker, HistoryCard,
+  VIEW_MODES, WireframeControl, BgColorPicker, HistoryCard,
 } from "../trellis/.";
 import ConfirmModal  from "../trellis/ConfirmModal";
 import DownloadModal from "../trellis/DownloadModal";
@@ -31,23 +31,16 @@ const POLL_MS   = 2500;
 const POLL_MAX  = 120;
 
 const MODEL_VERSIONS = [
-  { id: "v2.5-20250123",  label: "v3.1 – Best Quality", badge: "new", warn: "Expect longer wait times" },
-  { id: "v2.0-20240919",  label: "v2.5 – Balanced",     badge: null,  warn: null },
-  { id: "turbo-v1.0",     label: "Turbo – Fast",         badge: null,  warn: null },
+  { id: "v2.5-20250123", label: "v3.1 – Best Quality", badge: "new", warn: "Expect longer wait times" },
+  { id: "v2.0-20240919", label: "v2.5 – Balanced",     badge: null,  warn: null },
+  { id: "turbo-v1.0",    label: "Turbo – Fast",         badge: null,  warn: null },
 ];
 
 const ANIM_MODEL_VERSIONS = [
-  { id: "v2.5-animals",  label: "v2.5 – Good for Animals", icon: "🐾" },
-  { id: "v2.0-human",    label: "v2.0 – Humanoid",         icon: "🚶" },
+  { id: "v2.5-animals", label: "v2.5 – Good for Animals", icon: "🐾" },
+  { id: "v2.0-human",   label: "v2.0 – Humanoid",         icon: "🚶" },
 ];
 
-const TEXTURE_QUALITY = [
-  { id: "standard", label: "Standard" },
-  { id: "detailed", label: "Detailed" },
-  { id: "hd",       label: "HD" },
-];
-
-// Nav items — Edit/Upscale/PBR are now top-level nav modes
 const NAV = [
   { id: "generate",        label: "Model",   icon: Sparkles,       sub: false },
   { id: "segment",         label: "Segment", icon: Scissors,       sub: true  },
@@ -59,23 +52,23 @@ const NAV = [
   { id: "animate",         label: "Animate", icon: PersonStanding, sub: false },
 ];
 
-const SEGMENT_SUBS  = [
+const SEGMENT_SUBS = [
   { id: "segment",    label: "Segment"    },
   { id: "fill_parts", label: "Fill Parts" },
 ];
 
-// Texture input tabs (inside the bordered box)
 const TEX_INPUT_TABS = [
-  { id: "image",  icon: Image,   tip: "Image"      },
-  { id: "multi",  icon: Cpu,     tip: "Multi-view" },
-  { id: "text",   icon: Pencil,  tip: "Text"       },
+  { id: "image", icon: Image,  tip: "Image"      },
+  { id: "multi", icon: Cpu,    tip: "Multi-view" },
+  { id: "text",  icon: Pencil, tip: "Text"       },
 ];
 
+// FIXED: correct tab order matching reference screenshots
 const GEN_TABS = [
-  { id: "image", icon: Image,   tip: "Image to 3D" },
-  { id: "multi", icon: Boxes,   tip: "Multi-view"  },
-  { id: "sketch",icon: Grid3x3, tip: "Sketch"      },
-  { id: "text",  icon: Pencil,  tip: "Text to 3D"  },
+  { id: "image",  icon: Image,   tip: "Image to 3D" },
+  { id: "multi",  icon: Boxes,   tip: "Multi-view"  },
+  { id: "sketch", icon: Grid3x3, tip: "Sketch"      },
+  { id: "text",   icon: Pencil,  tip: "Text to 3D"  },
 ];
 
 const MODE_COST = {
@@ -84,11 +77,10 @@ const MODE_COST = {
   animate: 20,
 };
 
-// ── CSS ───────────────────────────────────────────────────────────────────────
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
-  @keyframes spin    { to { transform: rotate(360deg); } }
-  @keyframes fadeUp  { from { opacity:0;transform:translateY(6px) } to { opacity:1;transform:none } }
+  @keyframes spin   { to { transform: rotate(360deg); } }
+  @keyframes fadeUp { from { opacity:0;transform:translateY(6px) } to { opacity:1;transform:none } }
   .anim-spin { animation: spin 1s linear infinite; }
   .fade-up   { animation: fadeUp 0.18s ease forwards; }
   .tp-scroll { scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.06) transparent; }
@@ -122,7 +114,9 @@ const CSS = `
   .tp-sub-tab:not(.on) { background:transparent;color:#2d2d48; }
   .tp-sub-tab:not(.on):hover { color:#5a5a7a;background:rgba(255,255,255,0.04); }
 
-  .tp-inp-tab { flex:1;padding:7px 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:all 0.13s;font-family:inherit; }
+  /* FIXED: white pill for active generate tab */
+  .tp-inp-tab { flex:1;padding:7px 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:all 0.15s;font-family:inherit;background:transparent; }
+  .tp-inp-tab.active { background:#ffffff;box-shadow:0 1px 6px rgba(0,0,0,0.35); }
 
   .tp-qual-btn { flex:1;padding:9px 4px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.14s;display:flex;align-items:center;justify-content:center;gap:5px;font-family:inherit; }
 
@@ -145,7 +139,6 @@ const CSS = `
 
   .anim-card { border-radius:10px;overflow:hidden;cursor:pointer;transition:all 0.13s; }
   .anim-card:hover { border-color:rgba(255,255,255,0.22) !important; transform:scale(1.02); }
-  .anim-card:hover .anim-ov { opacity:1 !important; }
 
   .sec-row { display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 0;user-select:none; }
   .sec-row span { transition:color 0.13s; }
@@ -161,8 +154,9 @@ const CSS = `
   .tex-tab { flex:1;padding:7px 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:all 0.14s;font-family:inherit; }
   .tex-tab.on { background:rgba(255,255,255,0.14);box-shadow:0 1px 4px rgba(0,0,0,0.3); }
 
+  /* FIXED: mv-cell needs position:relative for coin icon */
   .mv-grid { display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px; }
-  .mv-cell { border-radius:8px;aspect-ratio:1/1;border:1.5px dashed rgba(255,255,255,0.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:border-color 0.13s; }
+  .mv-cell { border-radius:8px;aspect-ratio:1/1;border:1.5px dashed rgba(255,255,255,0.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:border-color 0.13s;position:relative; }
   .mv-cell:hover { border-color:rgba(108,99,255,0.4); }
 
   .magic-mode-tab { flex:1;padding:8px 0;border:none;cursor:pointer;font-size:12px;font-weight:600;border-radius:8px;transition:all 0.14s;font-family:inherit; }
@@ -178,7 +172,6 @@ const CSS = `
   .auto-rig-btn.disabled { background:rgba(255,255,255,0.04);color:#1e1e38;cursor:not-allowed; }
 `;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function CoinIcon({ size = 15 }) {
   return (
     <div style={{ width:size,height:size,borderRadius:"50%",background:"linear-gradient(135deg,#f5c518,#e09900)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
@@ -195,30 +188,29 @@ function Toggle({ label, value, onChange, hint=false, premium=false }) {
         <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>{label}</span>
         {hint && <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }} />}
       </div>
-      <div className={`tp-switch${value?" on":""}`} style={{ background:value?"#4c8ef7":"rgba(255,255,255,0.12)" }} />
+      <div className={"tp-switch"+(value?" on":"")} style={{ background:value?"#4c8ef7":"rgba(255,255,255,0.12)" }} />
     </div>
   );
 }
 
-function Collapsible({ label, children, open: controlledOpen, border=true, extra }) {
+function Collapsible({ label, children, border=true, extra }) {
   const [open, setOpen] = useState(false);
-  const isOpen = controlledOpen !== undefined ? controlledOpen : open;
   return (
     <div>
       <div className="sec-row" onClick={()=>setOpen(v=>!v)}
-        style={{ borderTop:"1px solid rgba(255,255,255,0.05)", borderBottom: border&&isOpen ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+        style={{ borderTop:"1px solid rgba(255,255,255,0.05)", borderBottom:border&&open?"1px solid rgba(255,255,255,0.05)":"none" }}>
         <span style={{ color:"#4a4a68",fontSize:13,fontWeight:500 }}>{label}</span>
         <div style={{ display:"flex",alignItems:"center",gap:8 }}>
           {extra}
-          {isOpen ? <ChevronUp style={{ width:14,height:14,color:"#2d2d48" }}/> : <ChevronDown style={{ width:14,height:14,color:"#2d2d48" }}/>}
+          {open ? <ChevronUp style={{ width:14,height:14,color:"#2d2d48" }}/> : <ChevronDown style={{ width:14,height:14,color:"#2d2d48" }}/>}
         </div>
       </div>
-      {isOpen && <div style={{ padding:"10px 0 2px",animation:"fadeUp 0.15s ease" }}>{children}</div>}
+      {open && <div style={{ padding:"10px 0 2px",animation:"fadeUp 0.15s ease" }}>{children}</div>}
     </div>
   );
 }
 
-function TID({ value, onChange, placeholder, history, color }) {
+function TID({ value, onChange, placeholder, history }) {
   const [open, setOpen] = useState(false);
   const f = history?.filter(i=>i.taskId||i.id)??[];
   return (
@@ -247,27 +239,23 @@ function TID({ value, onChange, placeholder, history, color }) {
 function PBar({ value }) {
   return (
     <div style={{ width:"100%",height:3,borderRadius:99,background:"rgba(255,255,255,0.07)" }}>
-      <div style={{ width:`${value}%`,height:"100%",background:"linear-gradient(90deg,#6c63ff99,#6c63ff)",borderRadius:99,transition:"width 0.4s ease" }}/>
+      <div style={{ width:(value)+"%",height:"100%",background:"linear-gradient(90deg,#6c63ff99,#6c63ff)",borderRadius:99,transition:"width 0.4s ease" }}/>
     </div>
   );
 }
 
-// Texture input box — image/multi/text tabs in bordered box
-function TexInputBox({ tab, setTab, texPrompt, setTexPrompt, imgFile, imgPrev, imgToken, imgUploading, handleImg, fileRef, multiImages, setMultiImages }) {
+function TexInputBox({ tab, setTab, texPrompt, setTexPrompt, imgPrev, imgToken, imgUploading, handleImg, fileRef, multiImages, setMultiImages }) {
   const VIEW_SLOTS = ["Front","Left","Right","Back"];
   return (
     <div className="tex-input-box">
-      {/* Tab bar */}
       <div className="tex-tab-bar">
         {TEX_INPUT_TABS.map(t=>(
-          <button key={t.id} className={`tex-tab${tab===t.id?" on":""}`} onClick={()=>setTab(t.id)}
+          <button key={t.id} className={"tex-tab"+(tab===t.id?" on":"")} onClick={()=>setTab(t.id)}
             style={{ color:tab===t.id?"#e8e8f4":"#2d2d48" }}>
             <t.icon style={{ width:15,height:15 }}/>
           </button>
         ))}
       </div>
-
-      {/* Single image upload */}
       {tab==="image" && (
         <div className="tp-drop checker" onClick={()=>!imgUploading&&fileRef.current?.click()}
           onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)handleImg(f);}}
@@ -277,7 +265,6 @@ function TexInputBox({ tab, setTab, texPrompt, setTexPrompt, imgFile, imgPrev, i
               <img src={imgPrev} alt="preview" style={{ width:"100%",height:"100%",objectFit:"cover" }}/>
               {imgUploading && <div style={{ position:"absolute",inset:0,background:"rgba(9,9,18,0.75)",display:"flex",alignItems:"center",justifyContent:"center" }}><Loader2 style={{ width:24,height:24,color:"#6c63ff" }} className="anim-spin"/></div>}
               {imgToken && <div style={{ position:"absolute",bottom:8,right:8,width:22,height:22,borderRadius:"50%",background:"#22c55e",display:"flex",alignItems:"center",justifyContent:"center" }}><Check style={{ width:12,height:12,color:"#fff" }}/></div>}
-              <button onClick={e=>{e.stopPropagation();/* clear */}} style={{ position:"absolute",top:8,right:8,width:24,height:24,borderRadius:"50%",background:"rgba(0,0,0,0.65)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff" }}><X style={{ width:11,height:11 }}/></button>
             </>
           ) : (
             <div style={{ textAlign:"center",pointerEvents:"none",padding:20 }}>
@@ -290,8 +277,6 @@ function TexInputBox({ tab, setTab, texPrompt, setTexPrompt, imgFile, imgPrev, i
           )}
         </div>
       )}
-
-      {/* Multi-view 2x2 */}
       {tab==="multi" && (
         <div className="mv-grid">
           {VIEW_SLOTS.map((slot,i)=>{
@@ -299,6 +284,7 @@ function TexInputBox({ tab, setTab, texPrompt, setTexPrompt, imgFile, imgPrev, i
             return (
               <div key={slot} className="mv-cell checker"
                 onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=e=>{const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>{const next=[...(multiImages||[])];next[i]={file:f,preview:ev.target.result};setMultiImages(next);};r.readAsDataURL(f);}};inp.click();}}>
+                <div style={{ position:"absolute",top:5,left:5,zIndex:2 }}><CoinIcon size={13}/></div>
                 {prev ? (
                   <img src={prev} alt={slot} style={{ width:"100%",height:"100%",objectFit:"cover",borderRadius:6 }}/>
                 ) : (
@@ -313,8 +299,6 @@ function TexInputBox({ tab, setTab, texPrompt, setTexPrompt, imgFile, imgPrev, i
           })}
         </div>
       )}
-
-      {/* Text prompt */}
       {tab==="text" && (
         <div style={{ position:"relative",padding:"4px 0 0" }}>
           <textarea className="tp-ta" value={texPrompt} onChange={e=>setTexPrompt(e.target.value.slice(0,1000))}
@@ -332,7 +316,6 @@ function TexInputBox({ tab, setTab, texPrompt, setTexPrompt, imgFile, imgPrev, i
   );
 }
 
-// Texture Style selector row
 function TextureStyleSelector() {
   return (
     <div style={{ marginBottom:10 }}>
@@ -353,7 +336,6 @@ function TextureStyleSelector() {
   );
 }
 
-// Magic Brush panel (texture_edit)
 function MagicBrushPanel({ brushPrompt, setBrushPrompt, creativity, setCreativity, brushMode, setBrushMode, brushColor, setBrushColor }) {
   const handleHex = (e) => {
     const hex = e.target.value.replace(/[^0-9a-fA-F]/g,"").slice(0,6);
@@ -361,15 +343,11 @@ function MagicBrushPanel({ brushPrompt, setBrushPrompt, creativity, setCreativit
   };
   return (
     <div>
-      {/* Mode tabs */}
       <div style={{ display:"flex",gap:3,padding:"3px",background:"rgba(255,255,255,0.06)",borderRadius:11,marginBottom:16 }}>
         {["Gen Mode","Paint Mode"].map(m=>(
-          <button key={m} className={`magic-mode-tab${brushMode===m?" on":""}`} onClick={()=>setBrushMode(m)}>
-            {m}
-          </button>
+          <button key={m} className={"magic-mode-tab"+(brushMode===m?" on":"")} onClick={()=>setBrushMode(m)}>{m}</button>
         ))}
       </div>
-
       {brushMode==="Gen Mode" && (
         <>
           <div style={{ borderRadius:12,border:"1px solid rgba(255,255,255,0.09)",background:"rgba(255,255,255,0.03)",marginBottom:16,overflow:"hidden" }}>
@@ -395,19 +373,15 @@ function MagicBrushPanel({ brushPrompt, setBrushPrompt, creativity, setCreativit
           </div>
         </>
       )}
-
       {brushMode==="Paint Mode" && (
         <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
-          {/* Color gradient picker */}
-          <div style={{ borderRadius:12,overflow:"hidden",background:`linear-gradient(to bottom, transparent, #000), linear-gradient(to right, #fff, ${brushColor})`,height:180,cursor:"crosshair",position:"relative" }}>
-            <div style={{ position:"absolute",inset:0,background:`linear-gradient(to right, #fff, ${brushColor})` }}/>
+          <div style={{ borderRadius:12,overflow:"hidden",height:180,cursor:"crosshair",position:"relative" }}>
+            <div style={{ position:"absolute",inset:0,background:"linear-gradient(to right, #fff, "+brushColor+")" }}/>
             <div style={{ position:"absolute",inset:0,background:"linear-gradient(to bottom, transparent, #000)" }}/>
           </div>
-          {/* Hue slider */}
           <div style={{ height:14,borderRadius:7,background:"linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)",cursor:"pointer",position:"relative" }}>
-            <div style={{ position:"absolute",top:-2,left:`${(parseInt(brushColor.slice(1),16)%360/360*100)||0}%`,width:18,height:18,borderRadius:"50%",background:"#fff",border:"2px solid rgba(0,0,0,0.3)",transform:"translateX(-50%)",boxShadow:"0 1px 4px rgba(0,0,0,0.4)" }}/>
+            <div style={{ position:"absolute",top:-2,left:"50%",width:18,height:18,borderRadius:"50%",background:"#fff",border:"2px solid rgba(0,0,0,0.3)",transform:"translateX(-50%)",boxShadow:"0 1px 4px rgba(0,0,0,0.4)" }}/>
           </div>
-          {/* Opacity row */}
           <div style={{ display:"flex",alignItems:"center",gap:10 }}>
             <div style={{ width:32,height:32,borderRadius:"50%",background:brushColor,border:"2px solid rgba(255,255,255,0.15)",flexShrink:0 }}/>
             <input value={brushColor.replace("#","").toUpperCase()} onChange={handleHex}
@@ -419,19 +393,16 @@ function MagicBrushPanel({ brushPrompt, setBrushPrompt, creativity, setCreativit
   );
 }
 
-// Topology + Polycount shared control
 function TopoControls({ quad, setQuad, smartLowPoly, setSmartLowPoly, polycount, setPolycount }) {
   return (
     <div style={{ display:"flex",flexDirection:"column",gap:2 }}>
-      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6 }}>
-        <div style={{ display:"flex",alignItems:"center",gap:6 }}>
-          <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>Topology</span>
-          <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }}/>
-        </div>
+      <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:6 }}>
+        <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>Topology</span>
+        <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }}/>
       </div>
       <div style={{ display:"flex",gap:6,marginBottom:10 }}>
-        <button className={`tp-topo-btn${quad?" sel":""}`} onClick={()=>setQuad(true)}>Quad</button>
-        <button className={`tp-topo-btn${!quad?" sel":""}`} onClick={()=>setQuad(false)}>Triangle</button>
+        <button className={"tp-topo-btn"+(quad?" sel":"")} onClick={()=>setQuad(true)}>Quad</button>
+        <button className={"tp-topo-btn"+(!quad?" sel":"")} onClick={()=>setQuad(false)}>Triangle</button>
       </div>
       <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",cursor:"pointer" }} onClick={()=>setSmartLowPoly(v=>!v)}>
         <div style={{ display:"flex",alignItems:"center",gap:7 }}>
@@ -440,7 +411,7 @@ function TopoControls({ quad, setQuad, smartLowPoly, setSmartLowPoly, polycount,
           <span style={{ background:"linear-gradient(135deg,#c026d3,#a21caf)",color:"#fff",fontSize:9,fontWeight:800,padding:"1px 5px",borderRadius:4 }}>v2</span>
           <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }}/>
         </div>
-        <div className={`tp-switch${smartLowPoly?" on":""}`} style={{ background:smartLowPoly?"#4c8ef7":"rgba(255,255,255,0.12)" }}/>
+        <div className={"tp-switch"+(smartLowPoly?" on":"")} style={{ background:smartLowPoly?"#4c8ef7":"rgba(255,255,255,0.12)" }}/>
       </div>
       <div style={{ marginTop:4 }}>
         <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>Polygon Count</span>
@@ -462,7 +433,7 @@ function AnimCard({ anim, isSelected, onSelect }) {
   const [err, setErr] = useState(false);
   return (
     <div className="anim-card" onClick={onSelect}
-      style={{ border:`1px solid ${isSelected?"rgba(108,99,255,0.5)":"rgba(255,255,255,0.07)"}`, background:isSelected?"rgba(108,99,255,0.08)":"#111122" }}>
+      style={{ border:"1px solid "+(isSelected?"rgba(108,99,255,0.5)":"rgba(255,255,255,0.07)"), background:isSelected?"rgba(108,99,255,0.08)":"#111122" }}>
       <div style={{ aspectRatio:"1/1",display:"flex",alignItems:"center",justifyContent:"center",background:"#111122",position:"relative",overflow:"hidden" }}>
         {!err
           ? <img src={anim.gif} alt={anim.label} onError={()=>setErr(true)} style={{ width:"100%",height:"100%",objectFit:"contain" }}/>
@@ -478,120 +449,94 @@ function AnimCard({ anim, isSelected, onSelect }) {
 
 const LBL9 = { color:"#3a3a58",fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",margin:"0 0 6px",fontFamily:"monospace",display:"block" };
 
-// ════════════════════════════════════════════════════════════════════════════
 export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   const color = selectedModel?.color || "#6c63ff";
 
-  const [mode,       setMode]       = useState("generate");
-  const [segSub,     setSegSub]     = useState("segment");
-  const [genTab,     setGenTab]     = useState("image");
-  const [texInputTab,setTexInputTab]= useState("image");
-  const [modelExp,   setModelExp]   = useState(false);
-  const [modelVer,   setModelVer]   = useState("v2.5-20250123");
-
-  // Generate
-  const [prompt,     setPrompt]     = useState("");
-  const [negPrompt,  setNegPrompt]  = useState("");
-  const [texOn,      setTexOn]      = useState(true);
-  const [pbrOn,      setPbrOn]      = useState(false);
-  const [tex4K,      setTex4K]      = useState(true);
-  const [texQ,       setTexQ]       = useState("detailed");
-  const [faceLimit,  setFaceLimit]  = useState(0);
-  const [inParts,    setInParts]    = useState(false);
-  const [privacy,    setPrivacy]    = useState("public");
-  const [meshQ,      setMeshQ]      = useState("standard");
-  const [makeBetter, setMakeBetter] = useState(true);
-  const [imgFile,    setImgFile]    = useState(null);
-  const [imgPrev,    setImgPrev]    = useState(null);
-  const [imgToken,   setImgToken]   = useState(null);
-  const [imgUploading,setImgUploading]=useState(false);
-
-  // Shared topology
-  const [quadMesh,     setQuadMesh]     = useState(true);
-  const [smartLowPoly, setSmartLowPoly] = useState(false);
-  const [polycount,    setPolycount]    = useState(0);
-
-  // Segment/fill
-  const [segId,      setSegId]      = useState("");
-  const [fillId,     setFillId]     = useState("");
-
-  // Retopo
-  const [retopoId,   setRetopoId]   = useState("");
-
-  // Texture
-  const [texPrompt,  setTexPrompt]  = useState("");
-  const [texNeg,     setTexNeg]     = useState("");
-  const [texQ2,      setTexQ2]      = useState("detailed");
-  const [texId,      setTexId]      = useState("");
-  const [multiImages,setMultiImages]= useState([]);
-
-  // Texture Edit — Magic Brush
-  const [brushMode,    setBrushMode]    = useState("Gen Mode");
-  const [brushPrompt,  setBrushPrompt]  = useState("");
-  const [creativity,   setCreativity]   = useState(0.6);
-  const [brushColor,   setBrushColor]   = useState("#ffffff");
-  const [editId,       setEditId]       = useState("");
-
-  // Upscale
-  const [upId,       setUpId]       = useState("");
-
-  // PBR
-  const [pbrId,      setPbrId]      = useState("");
-
-  // Animate
-  const [animId,      setAnimId]      = useState("");
-  const [animModelVer,setAnimModelVer]= useState("v2.5-animals");
-  const [animModelDD, setAnimModelDD] = useState(false);
-  const [animSearch,  setAnimSearch]  = useState("");
-  const [animCat,     setAnimCat]     = useState("all");
-  const [selAnim,     setSelAnim]     = useState(null);
-  const [rigStep,     setRigStep]     = useState("idle"); // idle | rigging | rigged
-  const [riggedId,    setRiggedId]    = useState(null);
-
-  // Gen state
-  const [genStatus, setGenStatus] = useState("idle");
-  const [progress,  setProgress]  = useState(0);
-  const [errorMsg,  setErrorMsg]  = useState("");
-  const [modelUrl,  setModelUrl]  = useState(null);
-  const [statusMsg, setStatusMsg] = useState("");
-
-  // Viewer
-  const [viewMode,   setViewMode]  = useState("clay");
-  const [lightMode,  setLightMode] = useState("studio");
-  const [showGrid,   setShowGrid]  = useState(true);
-  const [autoSpin,   setAutoSpin]  = useState(true);
-  const [bgColor,    setBgColor]   = useState("default");
-  const [wireOv,     setWireOv]    = useState(false);
-  const [wireOp,     setWireOp]    = useState(0.22);
-  const [wireC,      setWireC]     = useState("#ffffff");
-  const [lStr,       setLStr]      = useState(1.0);
-  const [lRot,       setLRot]      = useState(0);
-  const [lAutoR,     setLAutoR]    = useState(false);
-  const [lAutoS,     setLAutoS]    = useState(0.5);
-  const [dramC,      setDramC]     = useState("#4400ff");
-  const [gc1,        setGc1]       = useState("#1e1e3a");
-  const [gc2,        setGc2]       = useState("#111128");
-  const [dlOpen,     setDlOpen]    = useState(false);
-  const [dlItem,     setDlItem]    = useState(null);
-
-  // Layout
-  const [leftOpen,  setLeftOpen]  = useState(true);
-  const [rightOpen, setRightOpen] = useState(false);
-  const [leftW,     setLeftW]     = useState(302);
-  const [rightW,    setRightW]    = useState(220);
-
-  // History
-  const [history,   setHistory]   = useState([]);
-  const [histLoad,  setHistLoad]  = useState(false);
-  const [moreLoad,  setMoreLoad]  = useState(false);
-  const [hasMore,   setHasMore]   = useState(false);
-  const [histQ,     setHistQ]     = useState("");
-  const [activeH,   setActiveH]   = useState(null);
-  const [loadingId, setLoadingId] = useState(null);
-  const [delModal,  setDelModal]  = useState(false);
-  const [clrModal,  setClrModal]  = useState(false);
-  const [toDel,     setToDel]     = useState(null);
-  const [deleting,  setDeleting]  = useState(false);
+  const [mode,          setMode]          = useState("generate");
+  const [segSub,        setSegSub]        = useState("segment");
+  // FIXED: default to "image" tab
+  const [genTab,        setGenTab]        = useState("image");
+  const [texInputTab,   setTexInputTab]   = useState("image");
+  const [modelExp,      setModelExp]      = useState(false);
+  const [modelVer,      setModelVer]      = useState("v2.5-20250123");
+  const [prompt,        setPrompt]        = useState("");
+  const [negPrompt,     setNegPrompt]     = useState("");
+  const [texOn,         setTexOn]         = useState(true);
+  const [pbrOn,         setPbrOn]         = useState(false);
+  const [tex4K,         setTex4K]         = useState(true);
+  const [texQ,          setTexQ]          = useState("detailed");
+  const [faceLimit,     setFaceLimit]     = useState(0);
+  const [inParts,       setInParts]       = useState(false);
+  const [privacy,       setPrivacy]       = useState("public");
+  const [meshQ,         setMeshQ]         = useState("standard");
+  const [makeBetter,    setMakeBetter]    = useState(true);
+  const [imgFile,       setImgFile]       = useState(null);
+  const [imgPrev,       setImgPrev]       = useState(null);
+  const [imgToken,      setImgToken]      = useState(null);
+  const [imgUploading,  setImgUploading]  = useState(false);
+  const [quadMesh,      setQuadMesh]      = useState(true);
+  const [smartLowPoly,  setSmartLowPoly]  = useState(false);
+  const [polycount,     setPolycount]     = useState(0);
+  const [segId,         setSegId]         = useState("");
+  const [fillId,        setFillId]        = useState("");
+  const [retopoId,      setRetopoId]      = useState("");
+  const [texPrompt,     setTexPrompt]     = useState("");
+  const [texNeg,        setTexNeg]        = useState("");
+  const [texQ2,         setTexQ2]         = useState("detailed");
+  const [texId,         setTexId]         = useState("");
+  const [multiImages,   setMultiImages]   = useState([]);
+  const [brushMode,     setBrushMode]     = useState("Gen Mode");
+  const [brushPrompt,   setBrushPrompt]   = useState("");
+  const [creativity,    setCreativity]    = useState(0.6);
+  const [brushColor,    setBrushColor]    = useState("#ffffff");
+  const [editId,        setEditId]        = useState("");
+  const [upId,          setUpId]          = useState("");
+  const [pbrId,         setPbrId]         = useState("");
+  const [animId,        setAnimId]        = useState("");
+  const [animModelVer,  setAnimModelVer]  = useState("v2.5-animals");
+  const [animModelDD,   setAnimModelDD]   = useState(false);
+  const [animSearch,    setAnimSearch]    = useState("");
+  const [animCat,       setAnimCat]       = useState("all");
+  const [selAnim,       setSelAnim]       = useState(null);
+  const [rigStep,       setRigStep]       = useState("idle");
+  const [riggedId,      setRiggedId]      = useState(null);
+  const [genStatus,     setGenStatus]     = useState("idle");
+  const [progress,      setProgress]      = useState(0);
+  const [errorMsg,      setErrorMsg]      = useState("");
+  const [modelUrl,      setModelUrl]      = useState(null);
+  const [statusMsg,     setStatusMsg]     = useState("");
+  const [viewMode,      setViewMode]      = useState("clay");
+  const [lightMode,     setLightMode]     = useState("studio");
+  const [showGrid,      setShowGrid]      = useState(true);
+  const [autoSpin,      setAutoSpin]      = useState(true);
+  const [bgColor,       setBgColor]       = useState("default");
+  const [wireOv,        setWireOv]        = useState(false);
+  const [wireOp,        setWireOp]        = useState(0.22);
+  const [wireC,         setWireC]         = useState("#ffffff");
+  const [lStr,          setLStr]          = useState(1.0);
+  const [lRot,          setLRot]          = useState(0);
+  const [lAutoR,        setLAutoR]        = useState(false);
+  const [lAutoS,        setLAutoS]        = useState(0.5);
+  const [dramC,         setDramC]         = useState("#4400ff");
+  const [gc1,           setGc1]           = useState("#1e1e3a");
+  const [gc2,           setGc2]           = useState("#111128");
+  const [dlOpen,        setDlOpen]        = useState(false);
+  const [dlItem,        setDlItem]        = useState(null);
+  const [leftOpen,      setLeftOpen]      = useState(true);
+  const [rightOpen,     setRightOpen]     = useState(false);
+  const [leftW,         setLeftW]         = useState(302);
+  const [rightW,        setRightW]        = useState(220);
+  const [history,       setHistory]       = useState([]);
+  const [histLoad,      setHistLoad]      = useState(false);
+  const [moreLoad,      setMoreLoad]      = useState(false);
+  const [hasMore,       setHasMore]       = useState(false);
+  const [histQ,         setHistQ]         = useState("");
+  const [activeH,       setActiveH]       = useState(null);
+  const [loadingId,     setLoadingId]     = useState(null);
+  const [delModal,      setDelModal]      = useState(false);
+  const [clrModal,      setClrModal]      = useState(false);
+  const [toDel,         setToDel]         = useState(null);
+  const [deleting,      setDeleting]      = useState(false);
 
   const histInit  = useRef(false);
   const lastDocR  = useRef(null);
@@ -602,8 +547,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   const dragRef   = useRef(null);
   const fileRef   = useRef(null);
 
-  const wireHex   = useMemo(()=>parseInt(wireC.replace("#",""),16),[wireC]);
-  const isRunning = genStatus==="pending";
+  const wireHex      = useMemo(()=>parseInt(wireC.replace("#",""),16),[wireC]);
+  const isRunning    = genStatus==="pending";
   const activeTaskId = activeH?.taskId ?? activeH?.id ?? "";
 
   const filtAnims = useMemo(()=>ANIMATION_LIBRARY.filter(a=>{
@@ -628,8 +573,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     }
   },[isRunning,mode,genTab,prompt,imgToken,segId,fillId,retopoId,activeTaskId,texInputTab,texPrompt,multiImages,editId,upId,pbrId,selAnim,rigStep]);
 
-  const effMode = mode; // modes are now flat
-
   const filtHist = useMemo(()=>{
     const q=histQ.toLowerCase();
     return q?history.filter(i=>(i.prompt||"").toLowerCase().includes(q)):history;
@@ -637,7 +580,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
 
   const authH = useCallback(async()=>{
     const t=getIdToken?await getIdToken():"";
-    return {"Content-Type":"application/json",Authorization:`Bearer ${t}`};
+    return {"Content-Type":"application/json",Authorization:"Bearer "+t};
   },[getIdToken]);
 
   const startDrag = useCallback((side)=>(e)=>{
@@ -655,7 +598,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     setImgUploading(true);
     try {
       const t=getIdToken?await getIdToken():"",form=new FormData();form.append("file",file);
-      const res=await fetch(`${BASE_URL}/api/tripo/upload`,{method:"POST",headers:{Authorization:`Bearer ${t}`},body:form});
+      const res=await fetch(BASE_URL+"/api/tripo/upload",{method:"POST",headers:{Authorization:"Bearer "+t},body:form});
       const d=await res.json();if(!d.success)throw new Error(d.message);setImgToken(d.imageToken);
     } catch(e){setErrorMsg("Upload failed: "+e.message);setImgFile(null);setImgPrev(null);}
     finally{setImgUploading(false);}
@@ -667,28 +610,28 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
       if(pt.cancelled)return;
       await new Promise(r=>setTimeout(r,POLL_MS));
       if(pt.cancelled)return;n++;
-      const res=await fetch(`${BASE_URL}/api/tripo/task/${taskId}`,{headers});
+      const res=await fetch(BASE_URL+"/api/tripo/task/"+taskId,{headers});
       const d=await res.json();if(!d.success)throw new Error(d.message??"Poll error");
       setProgress(d.progress??0);
       if(d.status==="success"){await onSuccess(d);return;}
-      if(d.status==="failed"||d.status==="cancelled")throw new Error(`Task ${d.status}`);
+      if(d.status==="failed"||d.status==="cancelled")throw new Error("Task "+d.status);
     }
     throw new Error("Timeout");
   },[]);
 
   const fetchProxy = useCallback(async(rawUrl)=>{
     const t=await getIdToken();
-    const res=await fetch(`${BASE_URL}/api/tripo/model-proxy?url=${encodeURIComponent(rawUrl)}`,{headers:{Authorization:`Bearer ${t}`}});
-    if(!res.ok)throw new Error(`Model load: ${res.status}`);
+    const res=await fetch(BASE_URL+"/api/tripo/model-proxy?url="+encodeURIComponent(rawUrl),{headers:{Authorization:"Bearer "+t}});
+    if(!res.ok)throw new Error("Model load: "+res.status);
     return URL.createObjectURL(await res.blob());
   },[getIdToken]);
 
   const saveHist = useCallback(async(taskId,rawUrl,extra={})=>{
-    const item={prompt:prompt.trim()||extra.label||effMode,status:"succeeded",model_url:rawUrl,source:"tripo",mode:effMode,taskId,params:{model_version:modelVer,mode:effMode,...extra},ts:Date.now()};
+    const item={prompt:prompt.trim()||extra.label||mode,status:"succeeded",model_url:rawUrl,source:"tripo",mode,taskId,params:{model_version:modelVer,mode,...extra},ts:Date.now()};
     const {docId}=await saveHistoryToFirestore(userId,item);
-    const ni={id:docId??`tripo_${Date.now()}`,...item,createdAt:{toDate:()=>new Date()}};
+    const ni={id:docId??("tripo_"+Date.now()),...item,createdAt:{toDate:()=>new Date()}};
     setHistory(h=>[ni,...h]);setActiveH(ni);histInit.current=true;return ni;
-  },[userId,prompt,effMode,modelVer]);
+  },[userId,prompt,mode,modelVer]);
 
   const handleGen = useCallback(async()=>{
     if(!canGen)return;
@@ -714,7 +657,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
         default:return;
       }
       setStatusMsg("Starting…");
-      const tr=await fetch(`${BASE_URL}/api/tripo/task`,{method:"POST",headers,body:JSON.stringify(body)});
+      const tr=await fetch(BASE_URL+"/api/tripo/task",{method:"POST",headers,body:JSON.stringify(body)});
       const td=await tr.json();if(!td.success)throw new Error(td.message??"Task failed");
       setStatusMsg("Generating…");
       await pollTask(td.taskId,pt,headers,async d=>{
@@ -740,14 +683,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     try{
       const headers=await authH();
       setStatusMsg("Checking animatability…");
-      const cr=await fetch(`${BASE_URL}/api/tripo/task`,{method:"POST",headers,body:JSON.stringify({type:"animate_prerigcheck",original_model_task_id:srcId})});
+      const cr=await fetch(BASE_URL+"/api/tripo/task",{method:"POST",headers,body:JSON.stringify({type:"animate_prerigcheck",original_model_task_id:srcId})});
       const cd=await cr.json();if(!cd.success)throw new Error(cd.message);
       let animatable=false;
       await pollTask(cd.taskId,pt,headers,async d=>{animatable=d.rigCheckResult??d.rawOutput?.is_animatable??false;});
       if(pt.cancelled)return;
       if(!animatable){setRigStep("idle");setErrorMsg("Model is not animatable (not humanoid)");setStatusMsg("");return;}
       setStatusMsg("Rigging…");
-      const rr=await fetch(`${BASE_URL}/api/tripo/task`,{method:"POST",headers,body:JSON.stringify({type:"animate_rig",original_model_task_id:srcId,out_format:"glb"})});
+      const rr=await fetch(BASE_URL+"/api/tripo/task",{method:"POST",headers,body:JSON.stringify({type:"animate_rig",original_model_task_id:srcId,out_format:"glb"})});
       const rd=await rr.json();if(!rd.success)throw new Error(rd.message);
       await pollTask(rd.taskId,pt,headers,async d=>{
         if(pt.cancelled)return;
@@ -763,7 +706,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     if(pollAb.current)pollAb.current.cancelled=true;
     setModelUrl(prevUrl.current);setGenStatus(prevUrl.current?"succeeded":"idle");
     setErrorMsg("");setStatusMsg("");
-  },[prevUrl]);
+  },[]);
 
   const loadFirst = useCallback(async()=>{
     if(!userId||histInit.current)return;
@@ -812,7 +755,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     if(!toDel)return;setDeleting(true);
     try{
       const headers=await authH();
-      const res=await fetch(`${BASE_URL}/api/trellis/history/${toDel.id}`,{method:"DELETE",headers});
+      const res=await fetch(BASE_URL+"/api/trellis/history/"+toDel.id,{method:"DELETE",headers});
       const d=await res.json();
       if(d.success){const dId=toDel.id,wasA=activeH?.id===dId;setHistory(prev=>{const next=prev.filter(i=>i.id!==dId);if(wasA){if(next.length===0){setActiveH(null);setModelUrl(null);prevUrl.current=null;setGenStatus("idle");}else{const idx=prev.findIndex(i=>i.id===dId);setTimeout(()=>selHist(next[Math.max(0,idx-1)]),0);}}return next;});}
     }catch(e){alert(e.message);}finally{setDeleting(false);setDelModal(false);setToDel(null);}
@@ -822,7 +765,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     setDeleting(true);
     try{
       const headers=await authH();
-      const res=await fetch(`${BASE_URL}/api/trellis/history`,{method:"DELETE",headers});
+      const res=await fetch(BASE_URL+"/api/trellis/history",{method:"DELETE",headers});
       const d=await res.json();
       if(d.success){setHistory([]);setActiveH(null);setModelUrl(null);prevUrl.current=null;setGenStatus("idle");histInit.current=false;lastDocR.current=null;setHasMore(false);}
     }catch(e){alert(e.message);}finally{setDeleting(false);setClrModal(false);}
@@ -845,16 +788,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   const genCost = MODE_COST[mode] ?? 35;
   const animModelInfo = ANIM_MODEL_VERSIONS.find(v=>v.id===animModelVer);
 
-  // ════════════════════════════════════════════════════════════════════════
   return (
     <>
       <style>{CSS}</style>
       <div style={{ display:"flex",height:"100%",overflow:"hidden",fontFamily:"'DM Sans',-apple-system,sans-serif",background:"#09090f" }}>
 
-        {/* ═══ ICON NAV ═══ */}
+        {/* NAV */}
         <div style={{ width:58,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",background:"#0b0b17",borderRight:"1px solid rgba(255,255,255,0.06)",paddingTop:8,overflowY:"auto" }} className="tp-scroll">
           {NAV.map(n=>(
-            <button key={n.id} className={`tp-nav-btn${mode===n.id?" active":""}`} onClick={()=>{setMode(n.id);setErrorMsg("");}}>
+            <button key={n.id} className={"tp-nav-btn"+(mode===n.id?" active":"")} onClick={()=>{setMode(n.id);setErrorMsg("");}}>
               <div className="ico"><n.icon style={{ width:17,height:17,color:mode===n.id?"#a5a0ff":"#2d2d48" }}/></div>
               <span className="lbl">{n.label}</span>
               {n.sub && <ChevronDown style={{ width:8,height:8,color:mode===n.id?"#4a4a68":"#1a1a30",marginTop:-2 }}/>}
@@ -862,48 +804,83 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
           ))}
         </div>
 
-        {/* ═══ LEFT PANEL ═══ */}
+        {/* LEFT PANEL */}
         <div style={{ width:leftOpen?leftW:0,minWidth:0,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",display:"flex",flexDirection:"column",background:"#0c0c18",borderRight:"1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ width:leftW,display:"flex",flexDirection:"column",height:"100%",overflow:"hidden" }}>
 
             {/* Header */}
             <div style={{ padding:"14px 16px 10px",borderBottom:"1px solid rgba(255,255,255,0.055)",flexShrink:0 }}>
               <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:mode==="segment"?10:0 }}>
-                {mode==="generate"     && <Sparkles      style={{ width:14,height:14,color:"#6c63ff" }}/>}
-                {mode==="segment"      && <Scissors      style={{ width:14,height:14,color:"#6c63ff" }}/>}
-                {mode==="fill_parts"   && <Boxes         style={{ width:14,height:14,color:"#6c63ff" }}/>}
-                {mode==="retopo"       && <Grid3x3       style={{ width:14,height:14,color:"#6c63ff" }}/>}
-                {mode==="texture"      && <Grid3x3       style={{ width:14,height:14,color:"#6c63ff" }}/>}
-                {mode==="texture_edit" && <Wand2         style={{ width:14,height:14,color:"#6c63ff" }}/>}
-                {mode==="texture_upscale"&&<ArrowUpCircle style={{ width:14,height:14,color:"#6c63ff" }}/>}
-                {mode==="texture_pbr"  && <Circle        style={{ width:14,height:14,color:"#6c63ff" }}/>}
-                {mode==="animate"      && <PersonStanding style={{ width:14,height:14,color:"#6c63ff" }}/>}
+                {mode==="generate"      && <Sparkles       style={{ width:14,height:14,color:"#6c63ff" }}/>}
+                {mode==="segment"       && <Scissors       style={{ width:14,height:14,color:"#6c63ff" }}/>}
+                {mode==="fill_parts"    && <Boxes          style={{ width:14,height:14,color:"#6c63ff" }}/>}
+                {mode==="retopo"        && <Grid3x3        style={{ width:14,height:14,color:"#6c63ff" }}/>}
+                {mode==="texture"       && <Grid3x3        style={{ width:14,height:14,color:"#6c63ff" }}/>}
+                {mode==="texture_edit"  && <Wand2          style={{ width:14,height:14,color:"#6c63ff" }}/>}
+                {mode==="texture_upscale"&&<ArrowUpCircle  style={{ width:14,height:14,color:"#6c63ff" }}/>}
+                {mode==="texture_pbr"   && <Circle         style={{ width:14,height:14,color:"#6c63ff" }}/>}
+                {mode==="animate"       && <PersonStanding style={{ width:14,height:14,color:"#6c63ff" }}/>}
                 <span style={{ color:"#e8e8f4",fontSize:14,fontWeight:700 }}>{modeTitle}</span>
               </div>
               {mode==="segment" && (
                 <div style={{ display:"flex",gap:3 }}>
                   {SEGMENT_SUBS.map(t=>(
-                    <button key={t.id} className={`tp-sub-tab${segSub===t.id?" on":""}`} onClick={()=>setSegSub(t.id)}>{t.label}</button>
+                    <button key={t.id} className={"tp-sub-tab"+(segSub===t.id?" on":"")} onClick={()=>setSegSub(t.id)}>{t.label}</button>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Content */}
+            {/* Content scroll */}
             <div style={{ flex:1,overflowY:"auto",minHeight:0 }} className="tp-scroll">
               <div style={{ padding:"14px 16px" }}>
 
-                {/* ── GENERATE ── */}
+                {/* GENERATE */}
                 {mode==="generate" && <>
-                  <div style={{ display:"flex",gap:3,padding:"3px",background:"rgba(255,255,255,0.04)",borderRadius:11,marginBottom:14 }}>
+                  {/* FIXED tab bar — white active pill */}
+                  <div style={{ display:"flex",gap:3,padding:"3px",background:"rgba(255,255,255,0.06)",borderRadius:11,marginBottom:14 }}>
                     {GEN_TABS.map(t=>(
-                      <button key={t.id} className="tp-inp-tab" onClick={()=>setGenTab(t.id)}
-                        style={{ background:genTab===t.id?"rgba(255,255,255,0.1)":"transparent",color:genTab===t.id?"#e8e8f4":"#2d2d48" }}>
+                      <button
+                        key={t.id}
+                        className={"tp-inp-tab"+(genTab===t.id?" active":"")}
+                        onClick={()=>setGenTab(t.id)}
+                        style={{ color:genTab===t.id?"#0a0a1a":"#4a4a68" }}
+                      >
                         <t.icon style={{ width:15,height:15 }}/>
                       </button>
                     ))}
                   </div>
-                  {genTab!=="text" ? (
+
+                  {/* Tab content */}
+                  {genTab==="text" ? (
+                    <textarea className="tp-ta" value={prompt} onChange={e=>{setPrompt(e.target.value);setErrorMsg("");}}
+                      onKeyDown={e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)&&canGen)handleGen();}}
+                      placeholder="Describe a 3D object… (Ctrl+Enter)" disabled={isRunning} rows={5}
+                      style={{ marginBottom:14,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:10,padding:"10px 12px" }}/>
+                  ) : genTab==="multi" ? (
+                    <div style={{ border:"1.5px solid rgba(108,99,255,0.35)",borderRadius:12,overflow:"hidden",background:"rgba(108,99,255,0.04)",marginBottom:14 }}>
+                      <div className="mv-grid">
+                        {["Front","Left","Right","Back"].map((slot,i)=>{
+                          const prev=multiImages?.[i]?.preview;
+                          return (
+                            <div key={slot} className="mv-cell checker"
+                              onClick={()=>{const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.onchange=e=>{const f=e.target.files[0];if(f){const r=new FileReader();r.onload=ev=>{const next=[...(multiImages||[])];next[i]={file:f,preview:ev.target.result};setMultiImages(next);};r.readAsDataURL(f);}};inp.click();}}>
+                              <div style={{ position:"absolute",top:5,left:5,zIndex:2 }}><CoinIcon size={13}/></div>
+                              {prev ? (
+                                <img src={prev} alt={slot} style={{ width:"100%",height:"100%",objectFit:"cover",borderRadius:6 }}/>
+                              ) : (
+                                <>
+                                  <PersonStanding style={{ width:20,height:20,color:"#2d2d48" }}/>
+                                  <span style={{ color:"#2d2d48",fontSize:10,fontWeight:500 }}>{slot}</span>
+                                  <span style={{ color:"#1a1a30",fontSize:9 }}>JPG,PNG,WEBP, Size≤20MB</span>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
                     <div className="tp-drop checker" onClick={()=>!imgUploading&&fileRef.current?.click()}
                       onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)handleImg(f);}}
                       style={{ width:"100%",aspectRatio:"1/1",borderRadius:12,border:"1.5px dashed rgba(255,255,255,0.1)",cursor:imgUploading?"wait":"pointer",overflow:"hidden",marginBottom:14,position:"relative",display:"flex",alignItems:"center",justifyContent:"center" }}>
@@ -920,14 +897,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                         </div>
                       )}
                     </div>
-                  ) : (
-                    <textarea className="tp-ta" value={prompt} onChange={e=>{setPrompt(e.target.value);setErrorMsg("");}}
-                      onKeyDown={e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)&&canGen)handleGen();}}
-                      placeholder="Describe a 3D object… (Ctrl+Enter)" disabled={isRunning} rows={5}
-                      style={{ marginBottom:14,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:10,padding:"10px 12px" }}/>
                   )}
+
                   <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display:"none" }} onChange={e=>{const f=e.target.files?.[0];if(f)handleImg(f);}}/>
                   {genTab!=="text" && <Toggle label="Make Image Better" value={makeBetter} onChange={setMakeBetter} hint/>}
+
                   <div style={{ margin:"14px 0 8px",display:"flex",alignItems:"center",justifyContent:"space-between" }}>
                     <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>Mesh Quality</span>
                     <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }}/>
@@ -961,14 +935,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                           <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>4K Texture</span>
                           <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }}/>
                         </div>
-                        <div className={`tp-switch${tex4K&&texOn?" on":""}`} style={{ background:tex4K&&texOn?"#4c8ef7":"rgba(255,255,255,0.12)" }}/>
+                        <div className={"tp-switch"+(tex4K&&texOn?" on":"")} style={{ background:tex4K&&texOn?"#4c8ef7":"rgba(255,255,255,0.12)" }}/>
                       </div>
                       <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",cursor:"pointer",opacity:texOn?1:0.4 }} onClick={()=>texOn&&setPbrOn(v=>!v)}>
                         <div style={{ display:"flex",alignItems:"center",gap:7 }}>
                           <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>PBR</span>
                           <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }}/>
                         </div>
-                        <div className={`tp-switch${pbrOn&&texOn?" on":""}`} style={{ background:pbrOn&&texOn?"#4c8ef7":"rgba(255,255,255,0.12)" }}/>
+                        <div className={"tp-switch"+(pbrOn&&texOn?" on":"")} style={{ background:pbrOn&&texOn?"#4c8ef7":"rgba(255,255,255,0.12)" }}/>
                       </div>
                     </div>
                   </Collapsible>
@@ -979,7 +953,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                   <div style={{ marginTop:14 }}>
                     <span style={{ color:"#4a4a68",fontSize:12,fontWeight:600,display:"block",marginBottom:8 }}>AI Model</span>
                     {MODEL_VERSIONS.map((v,i)=>((!modelExp&&i>0)?null:(
-                      <div key={v.id} className={`tp-model-card${modelVer===v.id?" sel":""}`}
+                      <div key={v.id} className={"tp-model-card"+(modelVer===v.id?" sel":"")}
                         onClick={()=>{setModelVer(v.id);setModelExp(false);}}
                         style={{ display:"flex",alignItems:"center",justifyContent:"space-between" }}>
                         <div>
@@ -997,30 +971,16 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                   </div>
                 </>}
 
-                {/* ── SEGMENT ── */}
+                {/* SEGMENT */}
                 {mode==="segment" && segSub==="segment" && (
                   <div style={{ display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center",padding:"8px 0" }}>
                     <p style={{ color:"#c8c8e0",fontSize:13,fontWeight:500,lineHeight:1.6,margin:"0 0 20px" }}>
-                      Select a model<br/>
-                      from the <span style={{ color:"#f5a623" }}>Assets</span> Panel on the<br/>
-                      right for <span style={{ color:"#a5a0ff" }}>Segmentation</span>
+                      Select a model<br/>from the <span style={{ color:"#f5a623" }}>Assets</span> Panel on the<br/>right for <span style={{ color:"#a5a0ff" }}>Segmentation</span>
                     </p>
                     <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:24,opacity:0.7 }}>
                       <div style={{ width:90,height:90,borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center" }}><Scissors style={{ width:28,height:28,color:"#3a3a58" }}/></div>
                       <div style={{ width:20,height:20,borderRadius:"50%",background:"rgba(108,99,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}><ChevronRight style={{ width:11,height:11,color:"#6c63ff" }}/></div>
                       <div style={{ width:90,height:90,borderRadius:10,background:"rgba(108,99,255,0.06)",border:"1px solid rgba(108,99,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center" }}><Grid3x3 style={{ width:28,height:28,color:"#6c63ff",opacity:0.5 }}/></div>
-                    </div>
-                    <div style={{ width:"100%",marginBottom:10 }}>
-                      <p style={{ color:"#3a3a58",fontSize:10,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 10px",fontFamily:"monospace" }}>Unavailable for</p>
-                      <div style={{ display:"flex",gap:8 }}>
-                        {[{label:"Quad models",icon:Grid3x3},{label:"Rigged models",icon:PersonStanding}].map(item=>(
-                          <div key={item.label} style={{ flex:1,borderRadius:10,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",padding:"10px 6px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,position:"relative" }}>
-                            <div style={{ width:28,height:28,borderRadius:"50%",background:"rgba(239,68,68,0.15)",border:"1.5px solid rgba(239,68,68,0.4)",display:"flex",alignItems:"center",justifyContent:"center",position:"absolute",top:-10,right:6 }}><X style={{ width:11,height:11,color:"#ef4444" }}/></div>
-                            <item.icon style={{ width:30,height:30,color:"#2d2d48",marginTop:8 }}/>
-                            <span style={{ color:"#3a3a58",fontSize:10,fontWeight:500 }}>{item.label}</span>
-                          </div>
-                        ))}
-                      </div>
                     </div>
                     {activeTaskId && (
                       <div style={{ width:"100%",padding:"8px 10px",borderRadius:9,background:"rgba(108,99,255,0.08)",border:"1px solid rgba(108,99,255,0.25)",marginTop:8,textAlign:"left" }}>
@@ -1031,13 +991,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                   </div>
                 )}
 
-                {/* ── FILL PARTS ── */}
+                {/* FILL PARTS */}
                 {mode==="segment" && segSub==="fill_parts" && (
                   <div style={{ display:"flex",flexDirection:"column",alignItems:"center",textAlign:"center",padding:"8px 0" }}>
                     <p style={{ color:"#c8c8e0",fontSize:13,fontWeight:500,lineHeight:1.6,margin:"0 0 20px" }}>
-                      Select a model<br/>
-                      from the <span style={{ color:"#f5a623" }}>Assets</span> Panel on<br/>
-                      the right for <span style={{ color:"#a5a0ff" }}>Part Completion</span>
+                      Select a model<br/>from the <span style={{ color:"#f5a623" }}>Assets</span> Panel on<br/>the right for <span style={{ color:"#a5a0ff" }}>Part Completion</span>
                     </p>
                     <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:24,opacity:0.7 }}>
                       <div style={{ width:90,height:90,borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center" }}><Boxes style={{ width:28,height:28,color:"#3a3a58" }}/></div>
@@ -1058,7 +1016,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                   </div>
                 )}
 
-                {/* ── RETOPO ── */}
+                {/* RETOPO */}
                 {mode==="retopo" && (
                   <>
                     {activeTaskId && (
@@ -1071,32 +1029,26 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                   </>
                 )}
 
-                {/* ── TEXTURE ── */}
+                {/* TEXTURE */}
                 {mode==="texture" && (
                   <>
-                    <TexInputBox
-                      tab={texInputTab} setTab={setTexInputTab}
-                      texPrompt={texPrompt} setTexPrompt={setTexPrompt}
-                      imgFile={imgFile} imgPrev={imgPrev} imgToken={imgToken}
-                      imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef}
-                      multiImages={multiImages} setMultiImages={setMultiImages}
-                    />
+                    <TexInputBox tab={texInputTab} setTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt}
+                      imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef}
+                      multiImages={multiImages} setMultiImages={setMultiImages}/>
                     {(texInputTab==="image"||texInputTab==="text") && <TextureStyleSelector/>}
                     <Toggle label="4K Texture" value={tex4K} onChange={setTex4K} hint/>
                   </>
                 )}
 
-                {/* ── TEXTURE EDIT — Magic Brush ── */}
+                {/* TEXTURE EDIT */}
                 {mode==="texture_edit" && (
-                  <MagicBrushPanel
-                    brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt}
+                  <MagicBrushPanel brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt}
                     creativity={creativity} setCreativity={setCreativity}
                     brushMode={brushMode} setBrushMode={setBrushMode}
-                    brushColor={brushColor} setBrushColor={setBrushColor}
-                  />
+                    brushColor={brushColor} setBrushColor={setBrushColor}/>
                 )}
 
-                {/* ── TEXTURE UPSCALE ── */}
+                {/* TEXTURE UPSCALE */}
                 {mode==="texture_upscale" && (
                   <>
                     <div style={{ padding:"8px 10px",borderRadius:9,background:"rgba(245,197,24,0.06)",border:"1px solid rgba(245,197,24,0.14)",display:"flex",gap:7,marginBottom:14 }}>
@@ -1104,11 +1056,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                       <p style={{ color:"#fcd34d",fontSize:11,margin:0,lineHeight:1.6 }}>Increases texture resolution using AI super-resolution.</p>
                     </div>
                     <span style={LBL9}>Source Task ID</span>
-                    <TID value={upId} onChange={setUpId} placeholder="Tripo task_id…" history={history} color={color}/>
+                    <TID value={upId} onChange={setUpId} placeholder="Tripo task_id…" history={history}/>
                   </>
                 )}
 
-                {/* ── TEXTURE PBR ── */}
+                {/* TEXTURE PBR */}
                 {mode==="texture_pbr" && (
                   <>
                     <div style={{ padding:"8px 10px",borderRadius:9,background:"rgba(245,197,24,0.06)",border:"1px solid rgba(245,197,24,0.14)",display:"flex",gap:7,marginBottom:14 }}>
@@ -1116,14 +1068,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                       <p style={{ color:"#fcd34d",fontSize:11,margin:0,lineHeight:1.6 }}>Generates PBR maps: albedo, normal, roughness, metallic.</p>
                     </div>
                     <span style={LBL9}>Source Task ID</span>
-                    <TID value={pbrId} onChange={setPbrId} placeholder="Tripo task_id…" history={history} color={color}/>
+                    <TID value={pbrId} onChange={setPbrId} placeholder="Tripo task_id…" history={history}/>
                   </>
                 )}
 
-                {/* ── ANIMATE ── */}
+                {/* ANIMATE */}
                 {mode==="animate" && (
                   <>
-                    {/* AI Model selector */}
                     <div style={{ marginBottom:12 }}>
                       <span style={{ color:"#8a8aaa",fontSize:12,fontWeight:600,display:"block",marginBottom:7 }}>AI Model</span>
                       <div style={{ position:"relative" }}>
@@ -1150,31 +1101,24 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                         )}
                       </div>
                     </div>
-
-                    {/* Auto Rig button */}
-                    <button className={`auto-rig-btn${(activeTaskId||animId)&&rigStep!=="rigging"?" ready":" disabled"}`}
+                    <button className={"auto-rig-btn"+((activeTaskId||animId)&&rigStep!=="rigging"?" ready":" disabled")}
                       onClick={handleAutoRig} disabled={(!activeTaskId&&!animId)||rigStep==="rigging"}
                       style={{ marginBottom:16 }}>
                       {rigStep==="rigging"
                         ? <><Loader2 style={{ width:14,height:14 }} className="anim-spin"/>Rigging…</>
                         : <><CoinIcon size={16}/>Auto Rig<span style={{ color:"rgba(255,255,255,0.5)",fontSize:12,fontWeight:400,marginLeft:2 }}>20</span></>}
                     </button>
-
                     {rigStep==="rigged" && (
                       <div style={{ display:"flex",alignItems:"center",gap:6,padding:"7px 10px",borderRadius:9,background:"rgba(34,197,94,0.07)",border:"1px solid rgba(34,197,94,0.2)",marginBottom:12 }}>
                         <Check style={{ width:11,height:11,color:"#22c55e",flexShrink:0 }}/>
                         <span style={{ fontSize:11,color:"#86efac" }}>Rigged — select an animation below</span>
                       </div>
                     )}
-
-                    {/* Search */}
                     <div style={{ position:"relative",marginBottom:8 }}>
                       <Search style={{ position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",width:12,height:12,color:"#2d2d48" }}/>
                       <input value={animSearch} onChange={e=>setAnimSearch(e.target.value)} placeholder="Search"
                         className="tp-input" style={{ paddingLeft:28,fontSize:11 }}/>
                     </div>
-
-                    {/* Category tabs */}
                     <div style={{ display:"flex",flexWrap:"wrap",gap:4,marginBottom:10 }}>
                       {["all","basic","interactive",...ANIM_CATEGORIES.filter(c=>!["all","basic","interactive"].includes(c))].slice(0,5).map(c=>(
                         <button key={c} onClick={()=>setAnimCat(c)}
@@ -1183,8 +1127,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                         </button>
                       ))}
                     </div>
-
-                    {/* Animation grid */}
                     <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:6 }}>
                       {filtAnims.map(a=>(
                         <AnimCard key={a.id} anim={a} isSelected={selAnim===a.id} onSelect={()=>setSelAnim(selAnim===a.id?null:a.id)}/>
@@ -1204,7 +1146,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
               </div>
             </div>
 
-            {/* Gen button */}
+            {/* Gen button footer */}
             <div style={{ padding:"12px 16px 16px",borderTop:"1px solid rgba(255,255,255,0.055)",flexShrink:0 }}>
               {isRunning ? (
                 <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
@@ -1216,7 +1158,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                 </div>
               ) : (
                 <>
-                  <button className={`tp-gen-btn${canGen?" go":" no"}`} onClick={handleGen} disabled={!canGen}>
+                  <button className={"tp-gen-btn"+(canGen?" go":" no")} onClick={handleGen} disabled={!canGen}>
                     {genLabel}
                     {canGen && <div style={{ display:"flex",alignItems:"center",gap:5,marginLeft:4,paddingLeft:8,borderLeft:"1px solid rgba(0,0,0,0.2)" }}>
                       <CoinIcon size={16}/><span style={{ fontSize:14,fontWeight:800 }}>{genCost}</span>
@@ -1243,7 +1185,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
           </div>
         </div>
 
-        {/* ═══ CENTER ═══ */}
+        {/* CENTER */}
         <main style={{ flex:1,minWidth:0,display:"flex",flexDirection:"column",background:"#09090f",position:"relative" }}>
           <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",height:40,flexShrink:0,borderBottom:"1px solid rgba(255,255,255,0.055)",background:"rgba(9,9,18,0.98)",gap:12,overflowX:"auto" }}>
             <div style={{ display:"flex",alignItems:"center",gap:4,flexShrink:0 }}>
@@ -1299,10 +1241,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
           <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",height:40,flexShrink:0,borderTop:"1px solid rgba(255,255,255,0.055)",background:"rgba(9,9,18,0.98)",overflowX:"auto",gap:10 }}>
             <div style={{ display:"flex",alignItems:"center",gap:4,flexShrink:0 }}>
               <span style={{ color:"#1a1a30",fontSize:9,fontWeight:700,letterSpacing:"0.09em",textTransform:"uppercase",fontFamily:"monospace",marginRight:2 }}>Camera</span>
-              <IconBtn icon={<RotateCcw/>} tip="Reset"  onClick={()=>camP("reset")}/>
-              <IconBtn icon={<Camera/>}   tip="Front"  onClick={()=>camP("front")}/>
-              <IconBtn icon={<Move3d/>}   tip="Side"   onClick={()=>camP("side")} />
-              <IconBtn icon={<Layers/>}   tip="Top"    onClick={()=>camP("top")}  />
+              <IconBtn icon={<RotateCcw/>} tip="Reset" onClick={()=>camP("reset")}/>
+              <IconBtn icon={<Camera/>}    tip="Front" onClick={()=>camP("front")}/>
+              <IconBtn icon={<Move3d/>}    tip="Side"  onClick={()=>camP("side")} />
+              <IconBtn icon={<Layers/>}    tip="Top"   onClick={()=>camP("top")}  />
               <div style={{ width:1,height:14,background:"rgba(255,255,255,0.06)",margin:"0 4px" }}/>
               <button onClick={()=>setAutoSpin(v=>!v)}
                 style={{ display:"flex",alignItems:"center",gap:4,padding:"3px 9px",borderRadius:6,fontSize:10,fontWeight:600,cursor:"pointer",border:"none",background:autoSpin?"rgba(108,99,255,0.18)":"rgba(255,255,255,0.03)",color:autoSpin?"#a5a0ff":"#2d2d48",outline:autoSpin?"1px solid rgba(108,99,255,0.38)":"1px solid rgba(255,255,255,0.06)",fontFamily:"inherit" }}>
@@ -1327,7 +1269,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
           </div>
         </div>
 
-        {/* ═══ RIGHT — History ═══ */}
+        {/* RIGHT — History */}
         <div style={{ width:rightOpen?rightW:0,minWidth:0,flexShrink:0,overflow:"hidden",transition:"width 0.22s cubic-bezier(0.4,0,0.2,1)",display:"flex",flexDirection:"column",background:"#0c0c18",borderLeft:"1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ width:rightW,display:"flex",flexDirection:"column",height:"100%",overflow:"hidden" }}>
             <div style={{ padding:"12px 12px 10px",borderBottom:"1px solid rgba(255,255,255,0.055)",flexShrink:0 }}>
@@ -1349,7 +1291,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                 </div>
               )}
               {filtHist.map((item,idx)=>(
-                <div key={item.id} style={{ animationDelay:`${Math.min(idx,4)*0.04}s` }} className="fade-up">
+                <div key={item.id} style={{ animationDelay:(Math.min(idx,4)*0.04)+"s" }} className="fade-up">
                   <HistoryCard item={item} isActive={activeH?.id===item.id} isLoading={loadingId===item.id} disabled={loadingId!==null} onSelect={selHist} onReuse={reuse} onDownload={async(i)=>{try{const b=await fetchProxy(i.model_url);setDlItem({blobUrl:b,item:i});setDlOpen(true);}catch(e){alert(e.message);}}} onDelete={i=>{setToDel(i);setDelModal(true);}} color={color} getIdToken={getIdToken}/>
                 </div>
               ))}
@@ -1359,7 +1301,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                   {moreLoad?<><Loader2 style={{ width:9,height:9 }} className="anim-spin"/>Loading…</>:<><ChevronDown style={{ width:9,height:9 }}/>Load more</>}
                 </button>
               )}
-              {!histQ&&!hasMore&&history.length>0&&<p style={{ textAlign:"center",fontSize:8,color:"#0e0e22",fontFamily:"monospace",padding:"6px 0" }}>— {history.length} models —</p>}
+              {!histQ&&!hasMore&&history.length>0&&<p style={{ textAlign:"center",fontSize:8,color:"#0e0e22",fontFamily:"monospace",padding:"6px 0" }}>{"— "+history.length+" models —"}</p>}
             </div>
             {history.length>0&&(
               <div style={{ padding:"6px 8px",borderTop:"1px solid rgba(255,255,255,0.04)",flexShrink:0 }}>
@@ -1375,9 +1317,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
         </div>
       </div>
 
-      <ConfirmModal isOpen={delModal} onClose={()=>{if(!deleting){setDelModal(false);setToDel(null);}}} onConfirm={confirmDel} title="Delete model" message={`Delete "${toDel?.prompt?.slice(0,60)}…"?`} confirmText="Delete" confirmColor="#ef4444" isDeleting={deleting}/>
-      <ConfirmModal isOpen={clrModal} onClose={()=>{if(!deleting)setClrModal(false);}} onConfirm={confirmClr} title="Clear history" message={`Delete all ${history.length} Tripo models?`} confirmText="Clear all" confirmColor="#dc2626" isDeleting={deleting}/>
-      <DownloadModal isOpen={dlOpen} onClose={()=>{setDlOpen(false);setDlItem(null);}} glbBlobUrl={dlItem?dlItem.blobUrl:modelUrl} scene={sceneRef.current?.scene??sceneRef.current} filename={dlItem?(dlItem.item?.prompt?.slice(0,30)??`tripo_${Date.now()}`):(activeH?.prompt?.slice(0,30)??`tripo_${Date.now()}`)} color={color}/>
+      <ConfirmModal isOpen={delModal} onClose={()=>{if(!deleting){setDelModal(false);setToDel(null);}}} onConfirm={confirmDel} title="Delete model" message={"Delete \""+((toDel?.prompt?.slice(0,60))||"")+"…\"?"} confirmText="Delete" confirmColor="#ef4444" isDeleting={deleting}/>
+      <ConfirmModal isOpen={clrModal} onClose={()=>{if(!deleting)setClrModal(false);}} onConfirm={confirmClr} title="Clear history" message={"Delete all "+history.length+" Tripo models?"} confirmText="Clear all" confirmColor="#dc2626" isDeleting={deleting}/>
+      <DownloadModal isOpen={dlOpen} onClose={()=>{setDlOpen(false);setDlItem(null);}} glbBlobUrl={dlItem?dlItem.blobUrl:modelUrl} scene={sceneRef.current?.scene??sceneRef.current} filename={dlItem?(dlItem.item?.prompt?.slice(0,30)??("tripo_"+Date.now())):(activeH?.prompt?.slice(0,30)??("tripo_"+Date.now()))} color={color}/>
     </>
   );
 }
