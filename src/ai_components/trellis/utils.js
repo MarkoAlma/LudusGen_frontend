@@ -159,14 +159,15 @@ import {
  * @param {{ limit: number, startAfter: import("firebase/firestore").DocumentSnapshot|null }} opts
  * @returns {Promise<{ items: object[], lastDoc: import("firebase/firestore").DocumentSnapshot|null }>}
  */
+// UTÁNA
 export async function loadHistoryPageFromFirestore(userId, { limit = 10, startAfter: cursor = null } = {}) {
   const constraints = [
     where("userId", "==", userId),
+    orderBy("ts", "desc"),       // ← EZ HIÁNYZOTT
     firestoreLimit(limit),
   ];
 
   if (cursor) constraints.push(startAfter(cursor));
-
   const q    = query(collection(db, "trellis_history"), ...constraints);
   const snap = await getDocs(q);
 

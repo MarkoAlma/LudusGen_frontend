@@ -424,7 +424,7 @@ export const MODEL_GROUPS = [
                         gradient: "from-violet-400 to-purple-400",
                         inputType: "text",
                         outputNote: "GLB / FBX",
-                        panelType: "threed",
+                        panelType: "tripo",
                     },
                     {
                         id: "meshy6",

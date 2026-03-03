@@ -28,6 +28,7 @@ import { MyUserContext } from "../context/MyUserProvider";
 import { useContext } from "react";
 import Trellis2Panel from "./meshy/Meshy";
 import TrellisPanel from "./trellis/TrellisPanel";
+import TripoPanel from "./tripo/TripoPanel";
 
 // ─── Group icon map ────────────────────────────────────
 const GroupIcon = ({ group, className = "w-4 h-4" }) => {
@@ -182,6 +183,9 @@ export default function AIChat({ user, getIdToken }) {
 
       case "trellis":
         return <TrellisPanel {...props} />;
+      case "tripo":
+
+        return <TripoPanel {...props} />
       default:
         return <ChatPanel {...props} />;
     }
