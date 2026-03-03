@@ -114,8 +114,8 @@ const Lightbox = ({ src, onClose }) => (
 
 export default function ImagePanel({ selectedModel, userId, getIdToken }) {
 
-  // ── Qwen Image Edit repromter (JSON output) ──────────────────────────────
-const enhancing_prompt_edit = `
+  // ── Qwen Image Edit enhancer prompt (JSON output) ────────────────────────
+  const enhancing_prompt_edit = `
 You are a prompt rewriter specialized for Qwen-Image-Edit running on ModelScope / DashScope.
 
 Qwen-Image-Edit is an IMAGE EDITING model — not a generation model.
@@ -292,6 +292,18 @@ negative_prompt field:
   Complex / multi-image:    55–90 words
 
 ────────────────────────────
+IMPORTANT: USING VISUAL CONTEXT FROM VISION AI
+────────────────────────────
+When the user message contains a "VISUAL CONTEXT" section (provided by Gemma 3 27B IT vision analysis),
+use this information to:
+1. Reference specific visual details from the images (exact clothing items, colors, background elements)
+2. Build more precise preservation anchors based on what is actually in the images
+3. Correctly identify which image is the canvas (Image 1) and which is the donor (Image 2+)
+4. Use the lighting description to write accurate integration instructions
+
+Do NOT reference or quote the visual context section in the output JSON. Only use it to write better prompts.
+
+────────────────────────────
 WORKED EXAMPLE
 ────────────────────────────
 
@@ -342,7 +354,7 @@ No commentary. No markdown. No text outside the JSON.
 `;
 
   // ── Z-Image-Turbo generálás mód ──────────────────────────────────────────
-const enhancing_prompt_image = `
+  const enhancing_prompt_image = `
 You are a prompt rewriter optimized specifically for Z-Image-Turbo.
 
 Your task:
@@ -477,6 +489,30 @@ Rules:
 7) Keep it positive and clear.
 8) Output ONLY the simplified prompt. No commentary.
 `;
+
+  // ── Gemma Vision prompt (képek leírásához, Enhancer-nek átadva) ──────────
+  // Ez az Enhancer komponensnek átadott prompt, amit a /api/vision-describe
+  // endpointon keresztül a google/gemma-3-27b-it modell kap meg.
+  const gemmaVisionPrompt = `You are a precise visual analyst for an AI image editing pipeline.
+Analyze the uploaded image(s) and provide a detailed, structured description of each one.
+
+For EACH image, describe:
+1. SUBJECTS: Who or what is in the image — species/type, physical traits (hair color/style, skin tone, eyes, build), every visible clothing item listed individually (jacket, shirt, trousers, shoes, accessories, etc.), pose, expression, position in frame
+2. BACKGROUND: Environment, setting, colors, textures, depth, any objects in the background
+3. LIGHTING: Direction (left/right/top/front/back), quality (soft/hard/diffuse/natural), color temperature (warm/cool/neutral)
+4. NOTABLE ELEMENTS: Specific objects, accessories, props, spatial relationships between elements
+5. VISUAL STYLE: Photograph/illustration/3D render/painting, color grading, artistic style if applicable
+
+Format your response EXACTLY as:
+IMAGE 1:
+[detailed structured description]
+
+IMAGE 2:
+[detailed structured description]
+
+(continue for each uploaded image)
+
+Be specific, visual, and objective. No interpretation or creative additions. Describe only what is visually present. This description will be used by another AI model to write precise image editing instructions.`;
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [isEnhancerBusy, setIsEnhancerBusy] = useState(false);
@@ -762,6 +798,13 @@ Rules:
             )}
 
             {/* ── Enhancer ── */}
+            {/*
+              inputImages és gemmaVisionPrompt csak edit módban kerül átadásra.
+              Ha képek vannak feltöltve, az Enhancer Enhance gombja:
+                1. Elküldi a képeket a /api/vision-describe-nek (Gemma 3 27B IT, NVIDIA)
+                2. A Gemma leírást + felhasználói szöveget elküldi a Cerebras edit enhancernek
+                3. Az eredmény (JSON) visszaírja a prompt + negative_prompt mezőket
+            */}
             <Enhancer
               value={prompt}
               onChange={setPrompt}
@@ -772,6 +815,8 @@ Rules:
               enhancing_prompt={isModelScopeEdit ? enhancing_prompt_edit : enhancing_prompt_image}
               dechanting_prompt={isModelScopeEdit ? dehancing_prompt_edit : dehancing_prompt_image}
               onBusyChange={handleEnhancerBusy}
+              inputImages={isModelScopeEdit ? inputImages : []}
+              gemmaVisionPrompt={isModelScopeEdit ? gemmaVisionPrompt : ""}
             />
 
             {/* ── Negatív prompt — edit módban az Enhancer tölti, de manuálisan is szerkeszthető ── */}
