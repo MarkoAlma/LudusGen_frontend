@@ -190,7 +190,6 @@ const handleReuse = useCallback(
               width: "100%",
               height: "100%",
               objectFit: "contain",
-              background: "#ffffff", // ← EZ A LÉNYEG
               display: "block",
               background: "#1A1528",
               transition: "transform 0.4s ease",
