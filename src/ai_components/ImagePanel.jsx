@@ -992,7 +992,7 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
                   </div>
                 )}
 
-                {(isFal || isNvidia) && !isModelScopeEdit && (
+                {(isFal || isNvidia)  && (
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                       <label style={{ color: "#6b7280", fontSize: 12 }}>Steps</label>
@@ -1005,7 +1005,7 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
                   </div>
                 )}
 
-                {(isFal || isNvidia) && !isModelScopeEdit && (
+                {(isFal || isNvidia)  && (
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                       <label style={{ color: "#6b7280", fontSize: 12 }}>CFG Scale</label>
