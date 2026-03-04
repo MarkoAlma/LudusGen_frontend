@@ -370,6 +370,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   }, []);
 
   const fetchProxy = useCallback(async (rawUrl) => {
+      console.log("[fetchProxy] rawUrl:", rawUrl); // ← ADD IDE IDEIGLENESEN
+
     const t = await getIdToken();
     const res = await fetch(BASE_URL + "/api/tripo/model-proxy?url=" + encodeURIComponent(rawUrl), { headers: { Authorization: "Bearer " + t } });
     if (!res.ok) throw new Error("Model load: " + res.status);
