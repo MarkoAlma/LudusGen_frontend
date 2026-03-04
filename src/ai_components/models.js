@@ -9,7 +9,7 @@ export const MODEL_GROUPS = [
         label: "Chat",
         emoji: "💬",
         color: "#8b5cf6",
-        defaultOpen: true,
+        defaultOpen: true,    
         categories: [
             {
                 id: "chat_anthropic",
@@ -138,7 +138,7 @@ export const MODEL_GROUPS = [
                     { id: "mistralai-devstral-2-123b-instruct-2512", name: "DevStral 2 123B (coding) (NVIDIA)", apiModel: "mistralai/devstral-2-123b-instruct-2512", provider: "nvidia", color: "#16f921", defaultTemperature: 0.15, defaultMaxTokens: 2048, defaultTopP: 0.9 },
                     { id: "deepseek-v3.2", name: "DeepSeek v3.2 (NVIDIA)", apiModel: "deepseek-ai/deepseek-v3.2", provider: "nvidia", color: "#16f921", defaultTemperature: 0.3, defaultMaxTokens: 2048, defaultTopP: 0.95 },
                     { id: "google-gemma-3-27b-it", name: "(img) Gemma 3 27B IT (NVIDIA)", apiModel: "google/gemma-3-27b-it", provider: "nvidia", color: "#16f921", supportsVision: true, defaultTemperature: 0.8, defaultMaxTokens: 2048, defaultTopP: 0.95 },
-
+                    
                     
 //                     {
 //                         id: "deepseek_coder",
@@ -256,6 +256,30 @@ export const MODEL_GROUPS = [
                         badge: "ModelScope",
                         badgeDetail: "Alibaba Qwen – gyors képgenerátor",
                         description: "Qwen képgenerálás (ingyenes)",
+                        tier: "free", tierLabel: "Free",
+                        panelType: "image",
+                    },
+                    {
+                        id: "flux2-klein-base-9B",
+                        name: "Flux 2 (ModelScope)",
+                        apiModel: "flux-community/FLUX.2-klein-base-9B",
+                        provider: "modelscope",
+                        color: "#9333ea",
+                        badge: "ModelScope",
+                        badgeDetail: "Alibaba Flux 2 – gyors képgenerátor",
+                        description: "Flux 2 képgenerálás (ingyenes)",
+                        tier: "free", tierLabel: "Free",
+                        panelType: "image",
+                    },
+                    {
+                        id: "sd3-medium",
+                        name: "Stable Diffusion 3 (ModelScope)",
+                        apiModel: "MusePublic/stable-diffusion-3-medium",
+                        provider: "modelscope",
+                        color: "#9333ea",
+                        badge: "ModelScope",
+                        badgeDetail: "Alibaba SD 3 – gyors képgenerátor",
+                        description: "SD 3 képgenerálás (ingyenes)",
                         tier: "free", tierLabel: "Free",
                         panelType: "image",
                     },

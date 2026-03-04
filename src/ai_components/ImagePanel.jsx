@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Sparkles, Download, RefreshCw, Settings2,
   ChevronDown, ChevronUp, Loader2, AlertCircle,
@@ -490,9 +490,7 @@ Rules:
 8) Output ONLY the simplified prompt. No commentary.
 `;
 
-  // ── Gemma Vision prompt (képek leírásához, Enhancer-nek átadva) ──────────
-  // Ez az Enhancer komponensnek átadott prompt, amit a /api/vision-describe
-  // endpointon keresztül a google/gemma-3-27b-it modell kap meg.
+  // ── Gemma Vision prompt ──────────────────────────────────────────────────
   const gemmaVisionPrompt = `You are a precise visual analyst for an AI image editing pipeline.
 Analyze the uploaded image(s) and provide a detailed, structured description of each one.
 
@@ -529,8 +527,8 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
   const [quality, setQuality]         = useState("balanced");
   const [numImages, setNumImages]     = useState(1);
   const [seed, setSeed]               = useState("");
-  const [steps, setSteps]             = useState(8);
-  const [guidance, setGuidance]       = useState(7.5);
+  const [steps, setSteps]             = useState(35);
+  const [guidance, setGuidance]       = useState(3);
   const [fluxSizeIdx, setFluxSizeIdx] = useState(0);
 
   const [inputImages, setInputImages] = useState([]);
@@ -559,6 +557,54 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
   const selectedAR = isFlux
     ? FLUX_SIZES[fluxSizeIdx]
     : { value: aspectRatio, label: aspectRatio, ...QUALITY_PRESETS[quality].sizes[aspectRatio] };
+
+  // ── Edit-mód állapot mentése/visszaállítása modellváltáskor ──────────────
+  // Ha edit → normal: elmenti a negative prompt + promptExtend értékét, majd reseteli
+  // Ha normal → edit: visszaállítja a mentett értékeket
+  const savedEditState  = useRef({ negativePrompt: "", promptExtend: true });
+  const prevIsEditRef   = useRef(isModelScopeEdit);
+  const isFirstRender   = useRef(true);
+
+  // Ref-ek a legfrissebb state értékekhez (stale closure elkerüléséhez)
+  const negativePromptRef = useRef(negativePrompt);
+  const promptExtendRef   = useRef(promptExtend);
+  useEffect(() => { negativePromptRef.current = negativePrompt; }, [negativePrompt]);
+  useEffect(() => { promptExtendRef.current   = promptExtend;   }, [promptExtend]);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const wasEdit = prevIsEditRef.current;
+
+    if (wasEdit && !isModelScopeEdit) {
+      // edit → sima generálás: mentés, majd törlés
+      savedEditState.current = {
+        negativePrompt: negativePromptRef.current,
+        promptExtend:   promptExtendRef.current,
+      };
+      setNegativePrompt("");
+      setPromptExtend(false);
+    } else if (!wasEdit && isModelScopeEdit) {
+      // sima generálás → edit: visszaállítás
+      setNegativePrompt(savedEditState.current.negativePrompt);
+      setPromptExtend(savedEditState.current.promptExtend);
+    }
+
+    prevIsEditRef.current = isModelScopeEdit;
+  }, [isModelScopeEdit]);
+
+  // const resetValues = () => {
+  //   setPrompt("");
+  //   setNegativePrompt("");
+  //   setNumImages(1);
+  //   setSeed("");
+  //   setSteps(8);
+  //   setPromptExtend(isModelScopeEdit ? true : false);
+  //   setGuidance(7.5);
+  //   setInputImages([]);
+  // };
 
   // ── Kép upload ────────────────────────────────────────────────────────────
   const handleImageUpload = (e) => {
@@ -606,6 +652,7 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
           ...(isModelScopeEdit && inputImages.length > 0 ? { input_images: inputImages.map((img) => img.dataUrl) } : {}),
         }),
       });
+      // resetValues();
       const data = await res.json();
       if (!data.success) throw new Error(data.message || "Képgenerálási hiba");
       setGeneratedImages(data.images || []);
@@ -798,13 +845,6 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
             )}
 
             {/* ── Enhancer ── */}
-            {/*
-              inputImages és gemmaVisionPrompt csak edit módban kerül átadásra.
-              Ha képek vannak feltöltve, az Enhancer Enhance gombja:
-                1. Elküldi a képeket a /api/vision-describe-nek (Gemma 3 27B IT, NVIDIA)
-                2. A Gemma leírást + felhasználói szöveget elküldi a Cerebras edit enhancernek
-                3. Az eredmény (JSON) visszaírja a prompt + negative_prompt mezőket
-            */}
             <Enhancer
               value={prompt}
               onChange={setPrompt}
@@ -819,7 +859,7 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
               gemmaVisionPrompt={isModelScopeEdit ? gemmaVisionPrompt : ""}
             />
 
-            {/* ── Negatív prompt — edit módban az Enhancer tölti, de manuálisan is szerkeszthető ── */}
+            {/* ── Negatív prompt — csak edit módban ── */}
             {isModelScopeEdit && !isGoogleImage && !isFlux && (
               <div>
                 <label style={{
@@ -934,6 +974,7 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
                     }} />
                 </div>
 
+                {/* Prompt Extend — csak edit módban jelenik meg */}
                 {isModelScopeEdit && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <span style={{ color: "#6b7280", fontSize: 12 }}>Prompt Extend</span>
@@ -970,7 +1011,7 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
                       <label style={{ color: "#6b7280", fontSize: 12 }}>CFG Scale</label>
                       <span style={{ fontSize: 11, fontWeight: 700, color }}>{guidance}</span>
                     </div>
-                    <input type="range" min={1} max={isFlux ? 30 : 20} step={0.5} value={guidance}
+                    <input type="range" min={1.5} max={isFlux ? 30 : 20} step={0.5} value={guidance}
                       onChange={(e) => setGuidance(parseFloat(e.target.value))}
                       style={{ width: "100%", cursor: "pointer", accentColor: color }} />
                     <p style={{ color: "#4b5563", fontSize: 11, marginTop: 2 }}>Alacsony = kreatív · Magas = prompt-hű</p>
