@@ -267,7 +267,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   const fileRef = useRef(null);
 
   // FIX: store panel widths in refs so startDrag doesn't recreate on every resize
-  const leftWRef  = useRef(302);
+  const leftWRef = useRef(302);
   const rightWRef = useRef(220);
 
   const wireHex = useMemo(() => parseInt(wireC.replace("#", ""), 16), [wireC]);
@@ -673,24 +673,24 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     animate: "3D Rigging & Animation",
   })[mode] ?? mode, [mode]);
 
-const genCost = useMemo(() => {
-  if (mode !== "generate") return MODE_COST[mode] ?? 35;
-  const type = genTab === "text" ? "text_to_model"
-             : genTab === "multi" ? "multiview_to_model"
-             : "image_to_model";
-  const base   = type === "text_to_model" ? 10 : 20;
-  const hasTex = texOn || pbrOn;
+  const genCost = useMemo(() => {
+    if (mode !== "generate") return MODE_COST[mode] ?? 35;
+    const type = genTab === "text" ? "text_to_model"
+      : genTab === "multi" ? "multiview_to_model"
+        : "image_to_model";
+    const base = type === "text_to_model" ? 10 : 20;
+    const hasTex = texOn || pbrOn;
 
-  return (
-    base
-    + (hasTex ? (tex4K ? 20 : 10) : 0)   // standard=10, HD=20
-    + (pbrOn && texOn ? 5 : 0)            // pbr = +5 külön (nem ingyenes!)
-    + (meshQ === "ultra" ? 10 : 0)        // geometry_detailed = 10 (nem 20)
-    + (inParts ? 20 : 0)
-    + (quadMesh ? 5 : 0)
-    + (smartLowPoly ? 10 : 0)
-  );
-}, [mode, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh, smartLowPoly]);
+    return (
+      base
+      + (hasTex ? (tex4K ? 20 : 10) : 0)   // standard=10, HD=20
+      + (pbrOn && texOn ? 5 : 0)            // pbr = +5 külön (nem ingyenes!)
+      + (meshQ === "ultra" ? 10 : 0)        // geometry_detailed = 10 (nem 20)
+      + (inParts ? 20 : 0)
+      + (quadMesh ? 5 : 0)
+      + (smartLowPoly ? 10 : 0)
+    );
+  }, [mode, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh, smartLowPoly]);
   // FIX: download modal blob cleanup — the onDownload handler creates a new
   // fetchProxy blob for the download modal. When the modal is closed we revoke it.
   const handleDlClose = useCallback(() => {
@@ -764,7 +764,8 @@ const genCost = useMemo(() => {
                     handleGen={handleGen} setErrorMsg={setErrorMsg}
                     handleMultiImg={uploadImageFile}
                     handleBatchImg={uploadImageFile}
-                  />
+                    getIdToken={getIdToken}
+                      />
                 )}
                 {(mode === "segment" || mode === "fill_parts") && (
                   <Segment segSub={mode === "fill_parts" ? "fill_parts" : segSub} activeTaskId={activeTaskId} isRiggedInput={isRiggedInput} />
