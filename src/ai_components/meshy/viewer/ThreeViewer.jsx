@@ -1,8 +1,8 @@
-// viewer/ThreeViewer.jsx — Three.js 3D viewport
+// viewer/ThreeViewer.jsx — Three.js 3D viewport (fully optimized)
 import React, { useRef, useEffect, useCallback } from 'react';
 import {
   loadScript, syncCamera, buildPlaceholder,
-  createSunLight, setSunLightProps,
+  createSunLight,
   applyLights, applyViewMode, applyWireframeOverlay,
   setSceneBg, setGridColor, loadGLB,
 } from './threeHelpers';
@@ -35,6 +35,7 @@ export default function ThreeViewer({
   useEffect(() => {
     const el = mountRef.current;
     if (!el) return;
+    let resizeTimer = null;
     let resizeObs;
 
     (async () => {
@@ -45,15 +46,20 @@ export default function ThreeViewer({
 
       const scene    = new THREE.Scene();
       const camera   = new THREE.PerspectiveCamera(45, W / H, 0.01, 10000);
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: 'high-performance',
+        stencil: false,
+      });
       renderer.outputEncoding = THREE.sRGBEncoding;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.4;
       renderer.setSize(W, H);
-      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.sortObjects = false;
       el.appendChild(renderer.domElement);
 
       const grid = new THREE.GridHelper(20, 40,
@@ -78,19 +84,35 @@ export default function ThreeViewer({
 
       const lightGroup = new THREE.Group();
       scene.add(lightGroup);
-
       const sunLight = createSunLight(THREE, scene);
 
       const cam = { theta: 0.4, phi: Math.PI / 3, radius: 6, panX: 0, panY: 0 };
       syncCamera(camera, cam);
 
+      // ── DEMAND-BASED RENDERING ──────────────────────────────────────────────
+      // Previously the render loop ran unconditionally at 60fps — even when the
+      // model was just sitting still with no interaction. On a 300MB model that's
+      // wasted fill-rate and battery every single frame.
+      //
+      // Now we only call renderer.render() when something actually changed:
+      //   - model loaded / settings changed → markDirty()
+      //   - user drags / scrolls → markDirty() in event handlers
+      //   - auto-spin active → renders every frame (still needed for smooth rotation)
+      //   - light auto-rotate → renders every frame
+      //
+      // When idle (model loaded, nothing moving), GPU load drops to ~0%.
+      let _dirty = true; // start dirty so first frame renders
+      const markDirty = () => { _dirty = true; };
+
       S.current = {
         THREE, scene, camera, renderer, grid, lightGroup, placeholder,
         model: null, origMaterials: new Map(), cam,
         sunLight, _camDir: null,
+        _wireCache: new Map(), _clayMats: new Map(), _uvMats: new Map(),
         autoSpin, lightAutoRotate, lightAutoRotateSpeed,
         drag: { active: false, mode: 'orbit', x: 0, y: 0 },
         frame: null,
+        markDirty,
       };
 
       applyLights(S.current, lightMode, color, lightStrength, lightRotation, dramaticColor, viewMode);
@@ -101,23 +123,42 @@ export default function ThreeViewer({
       const loop = () => {
         S.current.frame = requestAnimationFrame(loop);
         const dt = clock.getDelta();
+        const spinning = S.current.autoSpin && !S.current.drag.active;
+        const lightMoving = S.current.lightAutoRotate;
 
-        if (S.current.autoSpin && !S.current.drag.active) {
+        if (spinning) {
           S.current.cam.theta += 0.004;
+          // FIX: normalize theta to prevent floating-point drift during long sessions
+          if (S.current.cam.theta > Math.PI * 2) S.current.cam.theta -= Math.PI * 2;
           syncCamera(camera, S.current.cam);
+          _dirty = true;
         }
-        if (S.current.lightAutoRotate) {
+        if (lightMoving) {
           S.current.lightGroup.rotation.y += S.current.lightAutoRotateSpeed * dt;
+          _dirty = true;
         }
 
-        renderer.render(scene, camera);
+        // Only render when something changed
+        if (_dirty) {
+          renderer.render(scene, camera);
+          _dirty = false;
+        }
       };
       loop();
 
+      // Throttled resize — was firing on every pixel of drag, hammering the GPU
       resizeObs = new ResizeObserver(() => {
-        const w = el.clientWidth, h = el.clientHeight;
-        camera.aspect = w / h; camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
+        if (resizeTimer) return;
+        resizeTimer = setTimeout(() => {
+          resizeTimer = null;
+          if (!S.current) return;
+          const w = el.clientWidth, h = el.clientHeight;
+          if (w === 0 || h === 0) return;
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+          markDirty();
+        }, 100);
       });
       resizeObs.observe(el);
 
@@ -125,6 +166,7 @@ export default function ThreeViewer({
     })().catch(console.error);
 
     return () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
       resizeObs?.disconnect();
       if (S.current?.frame) cancelAnimationFrame(S.current.frame);
       if (S.current?.renderer) {
@@ -134,7 +176,7 @@ export default function ThreeViewer({
     };
   }, []); // eslint-disable-line
 
-  useEffect(() => { if (S.current) S.current.autoSpin = autoSpin; }, [autoSpin]);
+  useEffect(() => { if (S.current) { S.current.autoSpin = autoSpin; S.current.markDirty?.(); } }, [autoSpin]);
   useEffect(() => { if (S.current?.scene) setSceneBg(S.current, bgColor); }, [bgColor]);
 
   useEffect(() => {
@@ -169,9 +211,12 @@ export default function ThreeViewer({
     S.current.lightAutoRotate = lightAutoRotate;
     S.current.lightAutoRotateSpeed = lightAutoRotateSpeed;
     if (!lightAutoRotate) S.current.lightGroup.rotation.y = (lightRotation * Math.PI) / 180;
+    S.current.markDirty?.();
   }, [lightAutoRotate, lightAutoRotateSpeed, lightRotation]);
 
-  useEffect(() => { if (S.current?.grid) S.current.grid.visible = showGrid; }, [showGrid]);
+  useEffect(() => {
+    if (S.current?.grid) { S.current.grid.visible = showGrid; S.current.markDirty?.(); }
+  }, [showGrid]);
 
   useEffect(() => {
     if (!modelUrl || !S.current?.scene) return;
@@ -187,6 +232,7 @@ export default function ThreeViewer({
       const delta = e.deltaY > 0 ? 0.5 : -0.5;
       S.current.cam.radius = Math.max(0.5, Math.min(30, S.current.cam.radius + delta));
       syncCamera(S.current.camera, S.current.cam);
+      S.current.markDirty?.();
       if (S.current.autoSpin) { S.current.autoSpin = false; if (onSpinStop) onSpinStop(); }
     };
     el.addEventListener('wheel', handler, { passive: false });
@@ -198,7 +244,7 @@ export default function ThreeViewer({
     if (!S.current) return;
     let dragMode = 'orbit';
     if (e.button === 0 && e.shiftKey) dragMode = 'model';
-    else if (e.button !== 0)          dragMode = 'pan';
+    else if (e.button !== 0) dragMode = 'pan';
     S.current.drag = { active: true, mode: dragMode, x: e.clientX, y: e.clientY };
     if (S.current.autoSpin) { S.current.autoSpin = false; if (onSpinStop) onSpinStop(); }
   }, [onSpinStop]);
@@ -210,7 +256,6 @@ export default function ThreeViewer({
     S.current.drag.x = e.clientX;
     S.current.drag.y = e.clientY;
     const { mode } = S.current.drag;
-
     if (mode === 'model') {
       const target = S.current.model || S.current.placeholder;
       if (target) target.rotation.y += dx * 0.012;
@@ -224,6 +269,7 @@ export default function ThreeViewer({
       S.current.cam.phi = Math.max(0.05, Math.min(Math.PI - 0.05, S.current.cam.phi - dy * 0.007));
       syncCamera(S.current.camera, S.current.cam);
     }
+    S.current.markDirty?.();
   }, []);
 
   const onPointerUp = useCallback(() => {
