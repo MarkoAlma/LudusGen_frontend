@@ -7,10 +7,10 @@ import {
 
 /* ─── Tab definitions ─────────────────────────────────────────────────── */
 export const GEN_TABS = [
-  { id: "image",  icon: Image,   tip: "Image to 3D"        },
-  { id: "multi",  icon: Boxes,   tip: "Multi-view to 3D"   },
-  { id: "batch",  icon: Images,  tip: "Batch Images to 3D" },
-  { id: "text",   icon: Pencil,  tip: "Text to 3D"         },
+  { id: "image", icon: Image, tip: "Image to 3D" },
+  { id: "multi", icon: Boxes, tip: "Multi-view to 3D" },
+  { id: "batch", icon: Images, tip: "Batch Images to 3D" },
+  { id: "text", icon: Pencil, tip: "Text to 3D" },
 ];
 
 /* "Make Image Better" (enable_image_autofix) only on image-based tabs */
@@ -26,9 +26,10 @@ const TABS_WITH_MAKE_BETTER = new Set(["image", "batch"]);
  *  Deprecated (do not use): v1.3-20240522, v1.4-20240522 multiview
  * ─────────────────────────────────────────────────────────────────────── */
 export const MODEL_VERSIONS = [
-  { id: "v3.0-20250812",       label: "v3.0 – Best Quality (default)" },
-  { id: "v2.5-20250123",       label: "v2.5 – Fast & Balanced"        },
-  { id: "turbo-v1.0-20250506", label: "Turbo – Fastest"               },
+  { id: "v3.0-20250812", label: "v3.0 – Best Quality (default)" },
+  { id: "v2.5-20250123", label: "v2.5 – Fast & Balanced" },
+  { id: "Turbo-v1.0-20250506", label: "Turbo – Fastest" },
+
 ];
 
 /* ─── API face_limit constraints (official Tripo docs) ───────────────────
@@ -44,11 +45,11 @@ export const MODEL_VERSIONS = [
  *  For Retopo panel (smart_low_poly task type) the same ranges apply.
  * ─────────────────────────────────────────────────────────────────────── */
 export function getFaceLimitConfig(smartLowPoly, quad) {
-  if (smartLowPoly && quad)  return { min: 500,   max: 10_000,  step: 500,   defaultVal: 5_000,  allowAuto: false };
-  if (smartLowPoly && !quad) return { min: 1_000,  max: 20_000,  step: 1_000, defaultVal: 8_000,  allowAuto: false };
-  if (!smartLowPoly && quad) return { min: 0,      max: 100_000, step: 1_000, defaultVal: 10_000, allowAuto: true  };
+  if (smartLowPoly && quad) return { min: 500, max: 10_000, step: 500, defaultVal: 5_000, allowAuto: false };
+  if (smartLowPoly && !quad) return { min: 1_000, max: 20_000, step: 1_000, defaultVal: 8_000, allowAuto: false };
+  if (!smartLowPoly && quad) return { min: 0, max: 100_000, step: 1_000, defaultVal: 10_000, allowAuto: true };
   /* triangle, no smart_low_poly */
-  return                      { min: 0,      max: 500_000, step: 5_000, defaultVal: 0,      allowAuto: true  };
+  return { min: 0, max: 500_000, step: 5_000, defaultVal: 0, allowAuto: true };
 }
 
 /* ─── helpers ─────────────────────────────────────────────────────────── */
@@ -215,7 +216,7 @@ function TopoControls({ quad, setQuad, smartLowPoly, setSmartLowPoly, polycount,
         {/* Contextual hint */}
         <p style={{ color: "#4a4a68", fontSize: 10, margin: "5px 0 0", lineHeight: 1.5 }}>
           {showAuto && "Auto — model adaptively determines optimal face count"}
-          {!showAuto && smartLowPoly && quad  && "Quad smart-low-poly: 500 – 10 000 faces (required)"}
+          {!showAuto && smartLowPoly && quad && "Quad smart-low-poly: 500 – 10 000 faces (required)"}
           {!showAuto && smartLowPoly && !quad && "Smart-low-poly: 1 000 – 20 000 faces (required)"}
           {!showAuto && !smartLowPoly && quad && "Quad: default 10 000 when unset"}
           {!showAuto && !smartLowPoly && !quad && `${localVal.toLocaleString()} faces`}
@@ -329,20 +330,34 @@ export default function GeneratePanel({
   isRunning,
   canGen,
   handleGen,
+  // A GeneratePanel function paramétereibe INSERT (a handleImg után):
+  handleMultiImg,   // NEW: (file) => Promise<token>
+  handleBatchImg,   // NEW: (file) => Promise<token>
   setErrorMsg,
+tPose, setTPose,
 }) {
   const MV_SLOTS = ["Front", "Left", "Right", "Back"];
   const batchInputRef = useRef(null);
 
+  // A function signature-t módosítsd (a komponens propjaiba is kell handleBatchImg):
   function handleBatchFiles(files) {
     const arr = Array.from(files).slice(0, 10 - (batchImages?.length ?? 0));
     arr.forEach(f => {
       const r = new FileReader();
-      r.onload = ev => setBatchImages(prev => {
-        const next = [...(prev ?? [])];
-        if (next.length < 10) next.push({ file: f, preview: ev.target.result });
-        return next;
-      });
+      r.onload = ev => {
+        const tempItem = { file: f, preview: ev.target.result, token: null };
+        setBatchImages(prev => {
+          const next = [...(prev ?? [])];
+          if (next.length < 10) next.push(tempItem);
+          return next;
+        });
+        // Upload és token visszaírás
+        handleBatchImg && handleBatchImg(f).then(token => {
+          setBatchImages(prev => prev.map(i =>
+            i.file === f ? { ...i, token } : i
+          ));
+        }).catch(() => { });
+      };
       r.readAsDataURL(f);
     });
   }
@@ -398,9 +413,15 @@ export default function GeneratePanel({
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ color: "#2d2d48", fontSize: 10, fontFamily: "monospace" }}>{prompt.length}/1000</span>
-              <button style={{ padding: "4px 12px", borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: "pointer", border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.07)", color: "#c8c8e0", fontFamily: "inherit" }}>
-                T-Pose
-              </button>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+                onClick={() => setTPose(v => !v)}
+              >
+                <span style={{ color: tPose ? "#a5a0ff" : "#4a4a68", fontSize: 11, fontWeight: 600 }}>T-Pose</span>
+                <div className={"tp-switch" + (tPose ? " on" : "")}
+                  style={{ width: 28, height: 16, background: tPose ? "#6c63ff" : "rgba(255,255,255,0.12)" }}>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -417,9 +438,26 @@ export default function GeneratePanel({
                   onClick={() => {
                     const inp = document.createElement("input");
                     inp.type = "file"; inp.accept = "image/*";
+                    // REPLACE az inp.onchange-t:
                     inp.onchange = e => {
                       const f = e.target.files[0];
-                      if (f) { const r = new FileReader(); r.onload = ev => { const next = [...(multiImages ?? [])]; next[i] = { file: f, preview: ev.target.result }; setMultiImages(next); }; r.readAsDataURL(f); }
+                      if (f) {
+                        const r = new FileReader();
+                        r.onload = ev => {
+                          const next = [...(multiImages ?? [])];
+                          next[i] = { file: f, preview: ev.target.result, token: null };
+                          setMultiImages(next);
+                          // Upload
+                          handleMultiImg && handleMultiImg(f).then(token => {
+                            setMultiImages(prev => {
+                              const updated = [...prev];
+                              if (updated[i]) updated[i] = { ...updated[i], token };
+                              return updated;
+                            });
+                          }).catch(() => { });
+                        };
+                        r.readAsDataURL(f);
+                      }
                     };
                     inp.click();
                   }}>
@@ -568,7 +606,7 @@ export default function GeneratePanel({
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 2 }}>
         {[
-          { id: "ultra",    label: "Ultra",    prem: true,  hint: isV3 ? "geometry_quality: detailed" : "v3.0 only" },
+          { id: "ultra", label: "Ultra", prem: true, hint: isV3 ? "geometry_quality: detailed" : "v3.0 only" },
           { id: "standard", label: "Standard", prem: false, hint: "geometry_quality: standard" },
         ].map(q => (
           <button key={q.id} className="tp-qual-btn" onClick={() => setMeshQ(q.id)}
@@ -623,18 +661,21 @@ export default function GeneratePanel({
         <div style={{ display: "flex", flexDirection: "column" }}>
           {/* 4K Texture → texture_quality: "HD" */}
           <div
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", cursor: texOn ? "pointer" : "not-allowed", opacity: texOn ? 1 : 0.4 }}
-            onClick={() => texOn && setTex4K(v => !v)}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", cursor: texOn ? "pointer" : "not-allowed", opacity: (texOn || pbrOn) ? 1 : 0.4
+            }}
+            onClick={() => (texOn || pbrOn) && setTex4K(v => !v)}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
               <CoinIcon size={14} />
               <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>4K Texture</span>
               <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
             </div>
-            <div className={"tp-switch" + (tex4K && texOn ? " on" : "")}
+            <div className={"tp-switch" + (tex4K && (texOn || pbrOn) ? " on" : "")}
+
               style={{ background: tex4K && texOn ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
           </div>
-          {tex4K && texOn && (
+          {tex4K && (texOn || pbrOn) && (
             <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
               texture_quality: "HD" — higher resolution, slower generation.
             </p>
@@ -642,7 +683,9 @@ export default function GeneratePanel({
 
           {/* PBR */}
           <div
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", cursor: texOn ? "pointer" : "not-allowed", opacity: texOn ? 1 : 0.4 }}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", cursor: texOn ? "pointer" : "not-allowed", opacity: (texOn || pbrOn) ? 1 : 0.4
+            }}
             onClick={() => texOn && setPbrOn(v => !v)}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
