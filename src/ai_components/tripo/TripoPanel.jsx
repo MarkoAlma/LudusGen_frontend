@@ -427,6 +427,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
               ...(meshQ === "ultra" && { geometry_quality: "detailed" }),
               ...(faceLimit > 0 && { face_limit: faceLimit }),
               ...(inParts && { generate_parts: true }),
+                    ...(quadMesh && { quad: true }),        // ← EZ HIÁNYZIK
+      ...(smartLowPoly && { smart_low_poly: true }), // ← EZ IS HIÁNYZIK
             };
           } else if (genTab === "multi") {
             body = {
@@ -673,24 +675,31 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     animate: "3D Rigging & Animation",
   })[mode] ?? mode, [mode]);
 
-  const genCost = useMemo(() => {
-    if (mode !== "generate") return MODE_COST[mode] ?? 35;
-    const type = genTab === "text" ? "text_to_model"
-      : genTab === "multi" ? "multiview_to_model"
-        : "image_to_model";
-    const base = type === "text_to_model" ? 10 : 20;
-    const hasTex = texOn || pbrOn;
+const genCost = useMemo(() => {
+  if (mode !== "generate") return MODE_COST[mode] ?? 35;
 
-    return (
-      base
-      + (hasTex ? (tex4K ? 20 : 10) : 0)   // standard=10, HD=20
-      + (pbrOn && texOn ? 5 : 0)            // pbr = +5 külön (nem ingyenes!)
-      + (meshQ === "ultra" ? 10 : 0)        // geometry_detailed = 10 (nem 20)
-      + (inParts ? 20 : 0)
-      + (quadMesh ? 5 : 0)
-      + (smartLowPoly ? 10 : 0)
-    );
-  }, [mode, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh, smartLowPoly]);
+  const type  = genTab === "text"  ? "text_to_model"
+              : genTab === "multi" ? "multiview_to_model"
+              : "image_to_model";
+
+  const base  = type === "text_to_model" ? 10 : 20;
+  const isV3  = modelVer.startsWith("v3.0") || modelVer.startsWith("v3.1");
+  const hasTex = texOn || pbrOn;
+
+  // texture: v3 standard=20, v3 HD=30, v2 standard=10, v2 HD=20
+  const texCost = hasTex
+  ? (tex4K
+      ? (isV3 ? 30 : 20)   // "detailed" v3=30?, v2=20 — még tesztelni kell
+      : (isV3 ? 20 : 10))  // "standard" v3=20, v2=10 ← ez bizonyított
+  : 0;
+  const ultraCost  = meshQ === "ultra" ? 10 : 0;  // geometry_detailed
+  const partsCost  = inParts      ? 20 : 0;
+  const quadCost   = quadMesh     ? 5  : 0;
+  const slpCost    = smartLowPoly ? 10 : 0;
+  // pbr = 0 (ingyenes ha texture=true mellé)
+
+  return base + texCost + ultraCost + partsCost + quadCost + slpCost;
+}, [mode, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh, smartLowPoly, modelVer]);
   // FIX: download modal blob cleanup — the onDownload handler creates a new
   // fetchProxy blob for the download modal. When the modal is closed we revoke it.
   const handleDlClose = useCallback(() => {
