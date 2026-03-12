@@ -20,6 +20,7 @@ import Settings from './pages/Settings';
 import { ProtectedRoute } from './ProtectedRoute';
 import AIChat from './ai_components/AiChat';
 import { auth } from './firebase/firebaseApp';
+import Forum from './pages/Forum';
 
 function App() {
   const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled} = useContext(MyUserContext);
@@ -78,9 +79,10 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/chat" element={<ProtectedRoute>
-<AIChat user={user} getIdToken={() => auth.currentUser?.getIdToken(true)}   /></ProtectedRoute>} />
+          <AIChat user={user} getIdToken={() => auth.currentUser?.getIdToken(true)}   /></ProtectedRoute>} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forum" element={<Forum/>}/>
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         </Routes>
       </main>

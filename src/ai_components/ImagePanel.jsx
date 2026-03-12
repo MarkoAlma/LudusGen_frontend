@@ -559,13 +559,10 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
     : { value: aspectRatio, label: aspectRatio, ...QUALITY_PRESETS[quality].sizes[aspectRatio] };
 
   // ── Edit-mód állapot mentése/visszaállítása modellváltáskor ──────────────
-  // Ha edit → normal: elmenti a negative prompt + promptExtend értékét, majd reseteli
-  // Ha normal → edit: visszaállítja a mentett értékeket
   const savedEditState  = useRef({ negativePrompt: "", promptExtend: true });
   const prevIsEditRef   = useRef(isModelScopeEdit);
   const isFirstRender   = useRef(true);
 
-  // Ref-ek a legfrissebb state értékekhez (stale closure elkerüléséhez)
   const negativePromptRef = useRef(negativePrompt);
   const promptExtendRef   = useRef(promptExtend);
   useEffect(() => { negativePromptRef.current = negativePrompt; }, [negativePrompt]);
@@ -579,7 +576,6 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
     const wasEdit = prevIsEditRef.current;
 
     if (wasEdit && !isModelScopeEdit) {
-      // edit → sima generálás: mentés, majd törlés
       savedEditState.current = {
         negativePrompt: negativePromptRef.current,
         promptExtend:   promptExtendRef.current,
@@ -587,24 +583,12 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
       setNegativePrompt("");
       setPromptExtend(false);
     } else if (!wasEdit && isModelScopeEdit) {
-      // sima generálás → edit: visszaállítás
       setNegativePrompt(savedEditState.current.negativePrompt);
       setPromptExtend(savedEditState.current.promptExtend);
     }
 
     prevIsEditRef.current = isModelScopeEdit;
   }, [isModelScopeEdit]);
-
-  // const resetValues = () => {
-  //   setPrompt("");
-  //   setNegativePrompt("");
-  //   setNumImages(1);
-  //   setSeed("");
-  //   setSteps(8);
-  //   setPromptExtend(isModelScopeEdit ? true : false);
-  //   setGuidance(7.5);
-  //   setInputImages([]);
-  // };
 
   // ── Kép upload ────────────────────────────────────────────────────────────
   const handleImageUpload = (e) => {
@@ -652,7 +636,6 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
           ...(isModelScopeEdit && inputImages.length > 0 ? { input_images: inputImages.map((img) => img.dataUrl) } : {}),
         }),
       });
-      // resetValues();
       const data = await res.json();
       if (!data.success) throw new Error(data.message || "Képgenerálási hiba");
       setGeneratedImages(data.images || []);
@@ -992,7 +975,7 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
                   </div>
                 )}
 
-                {(isFal || isNvidia)  && (
+                {(isFal || isNvidia) && !isModelScopeEdit && (
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                       <label style={{ color: "#6b7280", fontSize: 12 }}>Steps</label>
@@ -1005,7 +988,7 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
                   </div>
                 )}
 
-                {(isFal || isNvidia)  && (
+                {(isFal || isNvidia) && !isModelScopeEdit && (
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                       <label style={{ color: "#6b7280", fontSize: 12 }}>CFG Scale</label>
@@ -1139,40 +1122,89 @@ Be specific, visual, and objective. No interpretation or creative additions. Des
 
             {!isGenerating && generatedImages.length > 0 && (
               <div style={{
-                position: "absolute", inset: 0, padding: 16,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 12, overflow: "hidden",
+                position: "absolute",
+                inset: 0,
+                padding: 16,
+                boxSizing: "border-box",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                overflow: "hidden",
               }}>
                 {generatedImages.map((img, i) => (
-                  <div key={i} style={{
-                    position: "relative", borderRadius: 16, flexShrink: 0, lineHeight: 0,
-                    border: `1px solid ${color}25`, overflow: "hidden",
-                    maxWidth: generatedImages.length > 1 ? "calc(50% - 6px)" : "100%",
-                  }}>
-                    <img src={img.url} alt={`Generated ${i + 1}`}
-                      style={{ display: "block", width: "100%", height: "auto", objectFit: "contain", borderRadius: 16 }} />
+                  <div
+                    key={i}
+                    style={{
+                      position: "relative",
+                      // KULCS: explicit magasság → az img maxHeight: 100%-nak lesz
+                      // egy konkrét referencia értéke (a konténer belső magassága)
+                      height: "100%",
+                      // Vízszintes korlát: több kép esetén fél szélesség
+                      maxWidth: generatedImages.length > 1 ? "calc(50% - 6px)" : "100%",
+                      flexShrink: 1,
+                      flexGrow: 0,
+                      minWidth: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: 16,
+                      border: `1px solid ${color}25`,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <img
+                      src={img.url}
+                      alt={`Generated ${i + 1}`}
+                      style={{
+                        display: "block",
+                        // Mindkét tengely korlátozott — az arány megmarad
+                        maxWidth: "100%",
+                        maxHeight: "100%",
+                        width: "auto",
+                        height: "auto",
+                        borderRadius: 16,
+                      }}
+                    />
                     <div
                       style={{
-                        position: "absolute", inset: 0, opacity: 0, transition: "opacity 0.2s",
+                        position: "absolute",
+                        inset: 0,
+                        opacity: 0,
+                        transition: "opacity 0.2s",
                         background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 55%)",
-                        display: "flex", alignItems: "flex-end", justifyContent: "space-between", padding: 12,
-                        borderRadius: isModelScopeEdit ? 16 : 0, overflow: "hidden",
+                        display: "flex",
+                        alignItems: "flex-end",
+                        justifyContent: "space-between",
+                        padding: 12,
+                        borderRadius: 16,
+                        overflow: "hidden",
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
                       onMouseLeave={(e) => (e.currentTarget.style.opacity = 0)}
                     >
-                      <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{img.width ? `${img.width}×${img.height}` : ""}</span>
+                      <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
+                        {img.width ? `${img.width}×${img.height}` : ""}
+                      </span>
                       <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={() => setLightboxSrc(img.url)} title="Teljes méret" style={{
-                          padding: 8, borderRadius: 10, color: "white", cursor: "pointer",
-                          background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", border: "none",
-                        }}>
+                        <button
+                          onClick={() => setLightboxSrc(img.url)}
+                          title="Teljes méret"
+                          style={{
+                            padding: 8, borderRadius: 10, color: "white", cursor: "pointer",
+                            background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", border: "none",
+                          }}
+                        >
                           <ZoomIn style={{ width: 14, height: 14 }} />
                         </button>
-                        <button onClick={() => downloadImage(img.url, i)} style={{
-                          display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10,
-                          color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                          background: `${color}cc`, backdropFilter: "blur(8px)", border: "none",
-                        }}>
+                        <button
+                          onClick={() => downloadImage(img.url, i)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10,
+                            color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                            background: `${color}cc`, backdropFilter: "blur(8px)", border: "none",
+                          }}
+                        >
                           <Download style={{ width: 14, height: 14 }} /> Letöltés
                         </button>
                       </div>
