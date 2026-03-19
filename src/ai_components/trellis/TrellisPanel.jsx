@@ -25,7 +25,7 @@ import ConfirmModal from "./ConfirmModal";
 import StylePicker from "./StylePicker";
 import PromptInput from "./PromptInput";
 import DownloadModal from "./DownloadModal";
-import { loadHistoryPageFromFirestore,saveHistoryToFirestore } from "./utils";
+// loadHistoryPageFromFirestore and saveHistoryToFirestore are re-exported from "."
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 10;
@@ -283,7 +283,7 @@ export default function TrellisPanel({ selectedModel, getIdToken, userId }) {
   const [genStatus, setGenStatus] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [modelUrl, setModelUrl] = useState(null);
-  const [params, setParams] = useState(defaultParams);
+  const [params, setParams] = useState(() => ({ ...defaultParams }));
   const [selectedStyle, setSelectedStyle] = useState("nostyle");
   const [enhancing, setEnhancing] = useState(false);
   const [dechantig, setDechantig] = useState(false);
@@ -556,7 +556,8 @@ const handleEnhance = useCallback(async () => {
         ? Math.floor(Math.random() * 2_147_483_647)
         : Math.max(0, Math.floor(Number(params.seed) || 0));
 
-      const res = await fetch("http://localhost:3001/api/trellis", {
+      const BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const res = await fetch(`${BASE}/api/trellis`, {
         method: "POST", headers, signal: controller.signal,
         body: JSON.stringify({
           prompt: applyStylePrefix(prompt.trim(), selectedStyle),
@@ -593,7 +594,8 @@ const handleEnhance = useCallback(async () => {
         style: selectedStyle, ts: Date.now(),
       };
 
-      const { docId } = await saveHistoryToFirestore(userId, itemData);
+      const saveResult = await saveHistoryToFirestore(userId, itemData);
+      const docId = saveResult?.docId ?? null;
       const newItem = { id: docId ?? `local_${Date.now()}`, ...itemData, createdAt: { toDate: () => new Date() } };
 
       setHistory((h) => [newItem, ...h]);
@@ -652,7 +654,8 @@ const handleEnhance = useCallback(async () => {
     setIsDeleting(true);
     try {
       const headers = await authHeaders();
-      const res  = await fetch(`http://localhost:3001/api/trellis/history/${itemToDelete.id}`, { method: "DELETE", headers });
+      const BASE2 = import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const res  = await fetch(`${BASE2}/api/trellis/history/${itemToDelete.id}`, { method: "DELETE", headers });
       const data = await res.json();
       if (data.success) {
         const deletedId = itemToDelete.id;
@@ -699,7 +702,8 @@ const handleEnhance = useCallback(async () => {
     setIsDeleting(true);
     try {
       const headers = await authHeaders();
-      const res  = await fetch("http://localhost:3001/api/trellis/history", { method: "DELETE", headers });
+      const BASE3 = import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const res  = await fetch(`${BASE3}/api/trellis/history`, { method: "DELETE", headers });
       const data = await res.json();
       if (data.success) {
         if (histSelectAbortRef.current) {

@@ -62,66 +62,94 @@ function loadCleanScene(glbBlobUrl) {
   });
 }
 
+// ── Segédfüggvény: blob URL triggerelése ─────────────────────────────────────
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement("a");
+  a.href     = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 15_000);
+}
+
+// ── GLTF JSON validáció ───────────────────────────────────────────────────────
+function validateGltfJson(obj) {
+  if (!obj || typeof obj !== "object") throw new Error("GLTF: üres vagy érvénytelen JSON objektum");
+  if (obj.asset?.version == null) throw new Error("GLTF: hiányzó asset.version mező");
+  if (!Array.isArray(obj.scenes) && !Array.isArray(obj.nodes) && !Array.isArray(obj.meshes)) {
+    throw new Error("GLTF: nincs scenes/nodes/meshes tömb — valószínűleg üres scene");
+  }
+  return true;
+}
+
 // ── Exporter logic ────────────────────────────────────────────────────────────
 async function exportModel(format, glbBlobUrl, filename) {
-  const baseName = filename.replace(/\.[^.]+$/, "");
+  const baseName = (filename || `trellis_${Date.now()}`).replace(/\.[^.]+$/, "");
 
-  // GLB — natív blob újraletöltés, konvertálás nélkül
+  // GLB — natív blob újraletöltés, semmi konverzió
   if (format === "glb") {
-    const a = document.createElement("a");
-    a.href     = glbBlobUrl;
-    a.download = `${baseName}.glb`;
-    a.click();
+    const resp = await fetch(glbBlobUrl);
+    if (!resp.ok) throw new Error(`GLB fetch hiba: ${resp.status}`);
+    const blob = await resp.blob();
+    if (blob.size < 12) throw new Error("GLB: érvénytelen fájl (túl kis méret)");
+    triggerDownload(blob, `${baseName}.glb`);
     return;
   }
 
-  // Minden más formátumhoz: tiszta scene a GLB-ből
+  // Minden más formátumhoz: tiszta scene a GLB blob-ból
   const cleanScene = await loadCleanScene(glbBlobUrl);
 
   if (format === "gltf") {
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const exporter = new GLTFExporter();
-      try {
-        exporter.parse(
-          cleanScene,
-          (result) => {
-            try {
-              const str  = JSON.stringify(result, null, 2);
-              const blob = new Blob([str], { type: "model/gltf+json" });
-              const url  = URL.createObjectURL(blob);
-              const a    = document.createElement("a");
-              a.href = url; a.download = `${baseName}.gltf`; a.click();
-              setTimeout(() => URL.revokeObjectURL(url), 10_000);
-              resolve();
-            } catch (e) { reject(e); }
-          },
-          { binary: false },
-        );
-      } catch (e) { reject(e); }
+      exporter.parse(
+        cleanScene,
+        (result) => {
+          try {
+            // result lehet ArrayBuffer (binary:true) vagy plain object (binary:false)
+            if (result instanceof ArrayBuffer) {
+              reject(new Error("GLTF exporter bináris outputot adott text helyett"));
+              return;
+            }
+            validateGltfJson(result);
+            const str  = JSON.stringify(result, null, 2);
+            // Sanity check: parseable-e vissza?
+            JSON.parse(str);
+            const blob = new Blob([str], { type: "model/gltf+json" });
+            triggerDownload(blob, `${baseName}.gltf`);
+            resolve();
+          } catch (e) { reject(e); }
+        },
+        (error) => { reject(new Error(`GLTF export hiba: ${error?.message ?? error}`)); },
+        { binary: false, embedImages: true, forceIndices: true },
+      );
     });
+    return;
   }
 
   if (format === "obj") {
     const exporter = new OBJExporter();
     const result   = exporter.parse(cleanScene);
-    const blob     = new Blob([result], { type: "text/plain" });
-    const url      = URL.createObjectURL(blob);
-    const a        = document.createElement("a");
-    a.href = url; a.download = `${baseName}.obj`; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    if (!result || result.trim().length < 10) throw new Error("OBJ export üres eredményt adott");
+    const blob = new Blob([result], { type: "text/plain;charset=utf-8" });
+    triggerDownload(blob, `${baseName}.obj`);
     return;
   }
 
   if (format === "stl") {
     const exporter = new STLExporter();
     const result   = exporter.parse(cleanScene, { binary: true });
-    const blob     = new Blob([result], { type: "application/octet-stream" });
-    const url      = URL.createObjectURL(blob);
-    const a        = document.createElement("a");
-    a.href = url; a.download = `${baseName}.stl`; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    if (!result || (result instanceof ArrayBuffer && result.byteLength < 84)) {
+      throw new Error("STL export üres eredményt adott");
+    }
+    const blob = new Blob([result], { type: "application/octet-stream" });
+    triggerDownload(blob, `${baseName}.stl`);
     return;
   }
+
+  throw new Error(`Ismeretlen export formátum: ${format}`);
 }
 
 // ── Modal CSS ─────────────────────────────────────────────────────────────────

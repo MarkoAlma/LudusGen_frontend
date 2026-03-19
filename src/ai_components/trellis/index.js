@@ -22,17 +22,14 @@ export {
   stripStylePrefix,
   applyStylePrefix,
   fmtDate,
+  getItemTs,
   defaultParams,
   fetchGlbAsBlob,
   streamChat,
-} from './utils';
-
-// Firestore operations
-export {
-  loadHistoryFromFirestore,
+  loadHistoryPageFromFirestore,
   saveHistoryToFirestore,
   deleteHistoryFromFirestore,
-} from './firestore';
+} from './utils';
 
 // Common UI primitives
 export {
@@ -46,8 +43,8 @@ export {
 
 // Specialized components
 export { WireframeControl } from './WireframeControl';
-export { BgColorPicker } from './BgColorPicker';
-export { default as HistoryCard } from './HistoryCard';
-export { default as StylePicker } from './StylePicker';
-export { default as PromptInput } from './PromptInput';
+export { BgColorPicker }   from './BgColorPicker';
+export { default as HistoryCard }  from './HistoryCard';
+export { default as StylePicker }  from './StylePicker';
+export { default as PromptInput }  from './PromptInput';
 export { default as ConfirmModal } from './ConfirmModal';

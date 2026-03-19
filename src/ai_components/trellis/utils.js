@@ -1,5 +1,18 @@
 import { db } from '../../firebase/firebaseApp';
 import { STYLE_OPTIONS } from './Constants';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit as firestoreLimit,
+  startAfter,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+} from 'firebase/firestore';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Style helpers
@@ -36,16 +49,12 @@ export function fmtDate(d) {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function getItemTs(item) {
-  // Numerikus ts mező (Date.now()) — legmegbízhatóbb
   if (typeof item.ts === 'number' && item.ts > 0) return item.ts;
-  // Firestore Timestamp objektum
   if (item.createdAt?.toDate) return item.createdAt.toDate().getTime();
-  // ISO string vagy ms szám
   if (item.createdAt) {
     const t = new Date(item.createdAt).getTime();
     if (!isNaN(t)) return t;
   }
-  // ts lehet Firestore Timestamp is
   if (item.ts?.toDate) return item.ts.toDate().getTime();
   return 0;
 }
@@ -75,14 +84,16 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken) {
 
   // URL feloldás
   let fetchUrl = modelUrl;
+  const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
   if (modelUrl.startsWith('/api/')) {
-    fetchUrl = `http://localhost:3001${modelUrl}`;
+    fetchUrl = `${BASE}${modelUrl}`;
   } else if (
     modelUrl.startsWith('https://s3.') ||
     modelUrl.includes('backblazeb2.com') ||
     modelUrl.includes('b2cdn.com')
   ) {
-    fetchUrl = `http://localhost:3001/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
+    fetchUrl = `${BASE}/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
   }
 
   let token = '';
@@ -103,6 +114,20 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken) {
   }
 
   const blob = await r.blob();
+
+  // Validáció: nem üres és valóban bináris GLB (magic: 0x46546C67 = "glTF")
+  if (blob.size < 12) {
+    throw new Error(`GLB letöltés sikertelen: túl kis fájl (${blob.size} byte)`);
+  }
+  const header = await blob.slice(0, 4).arrayBuffer();
+  const magic  = new Uint8Array(header);
+  const isGlb  = magic[0] === 0x67 && magic[1] === 0x6C && magic[2] === 0x54 && magic[3] === 0x46;
+  if (!isGlb) {
+    // Nem GLB — valószínűleg JSON hibaüzenet érkezett a szerver ről
+    const text = await blob.text().catch(() => '');
+    throw new Error(`Érvénytelen GLB fájl (nem bináris GLTF): ${text.slice(0, 300)}`);
+  }
+
   return URL.createObjectURL(blob);
 }
 
@@ -117,7 +142,12 @@ export async function streamChat(url, headers, body) {
     body: JSON.stringify(body),
   });
 
-  const reader = res.body.getReader();
+  if (!res.ok) {
+    console.error('streamChat HTTP error:', res.status);
+    return '';
+  }
+
+  const reader  = res.body.getReader();
   const decoder = new TextDecoder();
   let accumulated = '';
   let buf = '';
@@ -143,62 +173,122 @@ export async function streamChat(url, headers, body) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Firestore history — paginated
+// Firestore history — paginated load
 // ────────────────────────────────────────────────────────────────────────────
 
-import {
-  collection, query, where, orderBy, limit as firestoreLimit,
-  startAfter, getDocs,
-} from "firebase/firestore";
+const TRELLIS_COLLECTION = 'trellis_history';
 
 /**
  * Fetches one page of Trellis history for a user, ordered newest-first.
- * Sorting is done client-side to avoid requiring a composite Firestore index.
+ * Uses `ts` field for ordering (set at save time as Date.now()).
+ * Falls back to client-side sort for robustness.
  *
  * @param {string} userId
  * @param {{ limit: number, startAfter: import("firebase/firestore").DocumentSnapshot|null }} opts
  * @returns {Promise<{ items: object[], lastDoc: import("firebase/firestore").DocumentSnapshot|null }>}
  */
-// UTÁNA
 export async function loadHistoryPageFromFirestore(userId, { limit = 10, startAfter: cursor = null } = {}) {
+  if (!userId) return { items: [], lastDoc: null };
+
   const constraints = [
-    where("userId", "==", userId),
-    orderBy("ts", "desc"),       // ← EZ HIÁNYZOTT
+    where('userId', '==', userId),
+    where('status', '==', 'succeeded'),   // csak sikeres generálások
+    orderBy('ts', 'desc'),
     firestoreLimit(limit),
   ];
 
   if (cursor) constraints.push(startAfter(cursor));
-  const q    = query(collection(db, "trellis_history"), ...constraints);
-  const snap = await getDocs(q);
 
-  const items = snap.docs
-    .map((doc) => ({ id: doc.id, ...doc.data() }))
-    // Robusztus rendezés: ts (number) > createdAt (Timestamp) > createdAt (string) > 0
-    .sort((a, b) => getItemTs(b) - getItemTs(a));
+  try {
+    const q    = query(collection(db, TRELLIS_COLLECTION), ...constraints);
+    const snap = await getDocs(q);
 
-  const lastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
-  return { items, lastDoc };
+    const items = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      // Kizárjuk azokat amiknek nincs model_url (mentési hiba edge case)
+      .filter((i) => !!i.model_url)
+      // Kliens oldali rendezés — robusztus, ha a ts mező hiányzik néhány régi dokuból
+      .sort((a, b) => getItemTs(b) - getItemTs(a));
+
+    const lastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
+    return { items, lastDoc };
+  } catch (e) {
+    console.error('loadHistoryPageFromFirestore hiba:', e.message, e.code);
+    // Ha a lekérdezés index-hiány miatt bukik (pl. composite index nincs),
+    // fallback: rendezés nélküli lekérdezés + kliens-oldali sort
+    if (e.code === 'failed-precondition' || e.message?.includes('index')) {
+      console.warn('Composite index hiányzik, fallback rendezés nélkül...');
+      const q2   = query(collection(db, TRELLIS_COLLECTION), where('userId', '==', userId), firestoreLimit(limit * 3));
+      const snap2 = await getDocs(q2);
+      const items2 = snap2.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((i) => i.status === 'succeeded' && !!i.model_url)
+        .sort((a, b) => getItemTs(b) - getItemTs(a))
+        .slice(0, limit);
+      return { items: items2, lastDoc: null };
+    }
+    return { items: [], lastDoc: null };
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Firestore history — save
 // ────────────────────────────────────────────────────────────────────────────
 
-import { collection as col, addDoc, serverTimestamp } from "firebase/firestore";
-
 /**
  * Saves a new Trellis history item to Firestore.
+ * Always sets both `ts` (numeric, for ordering) and `createdAt` (Firestore server timestamp).
  *
  * @param {string} userId
  * @param {object} itemData  — prompt, name, status, model_url, params, style, ts
- * @returns {Promise<{ docId: string }>}
+ * @returns {Promise<{ docId: string | null }>}
  */
 export async function saveHistoryToFirestore(userId, itemData) {
-  const docRef = await addDoc(col(db, "trellis_history"), {
-    userId,
-    ...itemData,
-    createdAt: serverTimestamp(),   // Firestore server timestamp (indexeléshez)
-    ts: itemData.ts ?? Date.now(),  // numerikus ts (kliens oldali rendezéshez)
-  });
-  return { docId: docRef.id };
+  if (!userId) return { docId: null };
+
+  // Validáció: csak succeeded + model_url-lel rendelkező itemeket mentünk
+  if (!itemData.model_url) {
+    console.warn('saveHistoryToFirestore: model_url hiányzik, mentés kihagyva');
+    return { docId: null };
+  }
+
+  try {
+    const docRef = await addDoc(collection(db, TRELLIS_COLLECTION), {
+      userId,
+      prompt:    itemData.prompt    ?? '',
+      name:      itemData.name      ?? null,
+      status:    itemData.status    ?? 'succeeded',
+      model_url: itemData.model_url,
+      params:    itemData.params    ?? {},
+      style:     itemData.style     ?? 'nostyle',
+      ts:        typeof itemData.ts === 'number' ? itemData.ts : Date.now(),
+      createdAt: serverTimestamp(),
+    });
+    return { docId: docRef.id };
+  } catch (e) {
+    console.warn('saveHistoryToFirestore hiba:', e.message);
+    return { docId: null };
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Firestore history — delete all
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Deletes all Trellis history documents for a user from Firestore.
+ * (Backend-side delete is preferred; this is a client-side fallback.)
+ *
+ * @param {string} userId
+ * @returns {Promise<void>}
+ */
+export async function deleteHistoryFromFirestore(userId) {
+  if (!userId) return;
+  try {
+    const q    = query(collection(db, TRELLIS_COLLECTION), where('userId', '==', userId));
+    const snap = await getDocs(q);
+    await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, TRELLIS_COLLECTION, d.id))));
+  } catch (e) {
+    console.warn('deleteHistoryFromFirestore hiba:', e.message);
+  }
 }
