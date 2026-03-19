@@ -66,6 +66,23 @@ const MODE_COST = {
 /* ─── CSS ────────────────────────────────────────────────────────────── */
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+  :root {
+    --bg-base: #0a0a12;
+    --bg-panel: #0f0f1e;
+    --bg-surface: #16162a;
+    --bg-raised: #1e1e36;
+    --accent: #7c6fff;
+    --accent-bright: #a08fff;
+    --accent-glow: rgba(124,111,255,0.35);
+    --text-primary: #f0f0ff;
+    --text-secondary: #a8a8cc;
+    --text-muted: #5a5a80;
+    --text-faint: #2e2e50;
+    --border: rgba(255,255,255,0.1);
+    --border-accent: rgba(124,111,255,0.4);
+    --error: #ff6b6b;
+    --success: #4fffb0;
+  }
   @keyframes spin   { to { transform: rotate(360deg); } }
   @keyframes fadeUp { from { opacity:0;transform:translateY(6px) } to { opacity:1;transform:none } }
   .anim-spin { animation: spin 1s linear infinite; }
@@ -76,35 +93,36 @@ const CSS = `
   .tp-nav-btn { display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;padding:10px 0;background:none;border:none;cursor:pointer;position:relative;transition:all 0.14s; }
   .tp-nav-btn .ico { width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;transition:all 0.14s; }
   .tp-nav-btn:hover .ico { background:rgba(255,255,255,0.06); }
-  .tp-nav-btn.active .ico { background:rgba(108,99,255,0.18); }
-  .tp-nav-btn .lbl { font-size:10px;font-weight:600;letter-spacing:0.01em;transition:color 0.14s; }
-  .tp-nav-btn.active .lbl { color:#a5a0ff; }
-  .tp-nav-btn:not(.active) .lbl { color:#2d2d48; }
-  .tp-nav-btn:not(.active):hover .lbl { color:#5a5a7a; }
-  .tp-nav-btn.active::before { content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:24px;background:linear-gradient(180deg,#8b5cf6,#6c63ff);border-radius:0 3px 3px 0; }
+  .tp-nav-btn.active .ico { background:rgba(124,111,255,0.22);box-shadow:0 0 12px rgba(124,111,255,0.2); }
+  .tp-nav-btn .lbl { font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;transition:color 0.14s; }
+  .tp-nav-btn.active .lbl { color:var(--accent-bright); }
+  .tp-nav-btn:not(.active) .lbl { color:var(--text-muted); }
+  .tp-nav-btn:not(.active):hover .lbl { color:var(--text-secondary); }
+  .tp-nav-btn.active::before { content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:26px;background:linear-gradient(180deg,var(--accent-bright),var(--accent));border-radius:0 4px 4px 0;box-shadow:0 0 8px var(--accent-glow); }
   .tp-switch { width:36px;height:20px;border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;cursor:pointer; }
   .tp-switch::after { content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.4); }
   .tp-switch.on::after { transform:translateX(16px); }
-  .tp-input { width:100%;padding:8px 11px;border-radius:9px;font-size:12px;color:#e4e4f0;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);outline:none;font-family:inherit;transition:border-color 0.14s;box-sizing:border-box; }
-  .tp-input:focus { border-color:rgba(108,99,255,0.5); }
-  .tp-input::placeholder { color:#22223a; }
-  .tp-ta { width:100%;padding:10px 12px;border-radius:10px;font-size:12px;color:#e4e4f0;background:transparent;border:none;outline:none;font-family:inherit;resize:none;line-height:1.6;box-sizing:border-box; }
-  .tp-ta::placeholder { color:#3a3a5a; }
+  .tp-input { width:100%;padding:8px 11px;border-radius:9px;font-size:12px;color:var(--text-primary);background:var(--bg-raised);border:1px solid var(--border);outline:none;font-family:inherit;transition:border-color 0.14s,background 0.14s;box-sizing:border-box; }
+  .tp-input:focus { border-color:var(--border-accent);background:rgba(30,30,54,0.9); }
+  .tp-input::placeholder { color:var(--text-muted); }
+  .tp-ta { width:100%;padding:10px 12px;border-radius:10px;font-size:12px;color:var(--text-primary);background:var(--bg-raised);border:1px solid var(--border);outline:none;font-family:inherit;resize:none;line-height:1.6;box-sizing:border-box;transition:border-color 0.14s; }
+  .tp-ta::placeholder { color:var(--text-muted); }
+  .tp-ta:focus { border-color:var(--border-accent);outline:none; }
   .tp-drop:hover { border-color:rgba(108,99,255,0.4) !important; }
   .tp-sub-tab { padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;border:none;transition:all 0.13s;font-family:inherit; }
-  .tp-sub-tab.on { background:rgba(108,99,255,0.2);color:#a5a0ff; }
-  .tp-sub-tab:not(.on) { background:transparent;color:#2d2d48; }
+  .tp-sub-tab.on { background:rgba(124,111,255,0.25);color:var(--accent-bright);outline:1px solid var(--border-accent); }
+  .tp-sub-tab:not(.on) { background:transparent;color:var(--text-muted); }
   .tp-sub-tab:not(.on):hover { color:#5a5a7a;background:rgba(255,255,255,0.04); }
   .tp-inp-tab { flex:1;padding:7px 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:all 0.15s;font-family:inherit;background:transparent; }
   .tp-inp-tab.active { background:#ffffff;box-shadow:0 1px 6px rgba(0,0,0,0.35); }
-  .tp-qual-btn { flex:1;padding:9px 4px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.14s;display:flex;align-items:center;justify-content:center;gap:5px;font-family:inherit; }
-  .tp-gen-btn { width:100%;padding:14px 0;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:0.01em;transition:all 0.2s;font-family:inherit; }
-  .tp-gen-btn.go { background:linear-gradient(135deg,#f5c518,#e6a400);color:#0a0800;box-shadow:0 4px 24px rgba(245,197,24,0.3); }
-  .tp-gen-btn.go:hover { box-shadow:0 6px 32px rgba(245,197,24,0.42);transform:translateY(-1px); }
-  .tp-gen-btn.no { background:rgba(255,255,255,0.05);color:#2d2d48;cursor:not-allowed; }
-  .tp-model-card { padding:11px 12px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);cursor:pointer;transition:all 0.13s;margin-bottom:5px; }
-  .tp-model-card.sel { background:rgba(108,99,255,0.08);border-color:rgba(108,99,255,0.3); }
-  .tp-model-card:hover:not(.sel) { background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.13); }
+  .tp-qual-btn { flex:1;padding:10px 4px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all 0.14s;display:flex;align-items:center;justify-content:center;gap:5px;font-family:inherit; }
+  .tp-gen-btn { width:100%;padding:16px 0;border-radius:13px;font-size:15px;font-weight:800;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:0.03em;transition:all 0.2s;font-family:inherit; }
+  .tp-gen-btn.go { background:linear-gradient(135deg,#ffe066,#f5a623);color:#0a0500;box-shadow:0 4px 28px rgba(245,166,35,0.45); }
+  .tp-gen-btn.go:hover { box-shadow:0 6px 36px rgba(245,166,35,0.6);transform:translateY(-2px); }
+  .tp-gen-btn.no { background:var(--bg-raised);color:var(--text-muted);cursor:not-allowed;border:1px solid var(--border); }
+  .tp-model-card { padding:11px 12px;border-radius:10px;background:var(--bg-raised);border:1px solid var(--border);cursor:pointer;transition:all 0.13s;margin-bottom:5px; }
+  .tp-model-card.sel { background:rgba(124,111,255,0.14);border-color:var(--border-accent);box-shadow:0 0 0 1px rgba(124,111,255,0.2); }
+  .tp-model-card:hover:not(.sel) { background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.2); }
   .tp-handle { width:4px;flex-shrink:0;cursor:col-resize;position:relative;z-index:10; }
   .tp-handle::after { content:'';position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);width:1px;background:rgba(255,255,255,0.04);transition:all 0.14s; }
   .tp-handle:hover::after { background:rgba(255,255,255,0.14);width:2px; }
@@ -117,8 +135,8 @@ const CSS = `
   .sec-row span { transition:color 0.13s; }
   .sec-row:hover span { color:#8a8aaa !important; }
   .tp-topo-btn { flex:1;padding:8px 4px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.14s;font-family:inherit; }
-  .tp-topo-btn.sel { background:rgba(108,99,255,0.2);color:#a5a0ff;outline:1.5px solid rgba(108,99,255,0.4); }
-  .tp-topo-btn:not(.sel) { background:rgba(255,255,255,0.04);color:#3d3d5a;outline:1.5px solid rgba(255,255,255,0.07); }
+  .tp-topo-btn.sel { background:rgba(124,111,255,0.22);color:var(--accent-bright);outline:1.5px solid var(--border-accent); }
+  .tp-topo-btn:not(.sel) { background:var(--bg-raised);color:var(--text-secondary);outline:1px solid var(--border); }
   .tp-topo-btn:not(.sel):hover { background:rgba(255,255,255,0.07);color:#6a6a8a; }
   .tex-input-box { border:1.5px solid rgba(108,99,255,0.35);border-radius:12px;overflow:hidden;background:rgba(108,99,255,0.04);margin-bottom:14px; }
   .tex-tab-bar { display:flex;background:rgba(255,255,255,0.04);padding:4px;gap:3px; }
@@ -149,7 +167,7 @@ function CoinIcon({ size = 15 }) {
 function PBar({ value }) {
   return (
     <div style={{ width: "100%", height: 3, borderRadius: 99, background: "rgba(255,255,255,0.07)" }}>
-      <div style={{ width: value + "%", height: "100%", background: "linear-gradient(90deg,#6c63ff99,#6c63ff)", borderRadius: 99, transition: "width 0.4s ease" }} />
+      <div style={{ width: value + "%", height: "100%", background: "linear-gradient(90deg,var(--accent),var(--accent-bright))", borderRadius: 99, transition: "width 0.4s ease" }} />
     </div>
   );
 }
@@ -444,13 +462,26 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     throw new Error("Timeout");
   }, []);
 
-  const fetchProxy = useCallback(async (rawUrl) => {
-    const t = await getIdToken();
-    const res = await fetch(BASE_URL + "/api/tripo/model-proxy?url=" + encodeURIComponent(rawUrl), {
-      headers: { Authorization: "Bearer " + t },
-    });
-    if (!res.ok) throw new Error("Model load: " + res.status);
-    return URL.createObjectURL(await res.blob());
+  const fetchProxy = useCallback(async (rawUrl, retries = 3) => {
+    let lastErr;
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 1200 * attempt));
+        const t = await getIdToken();
+        const res = await fetch(
+          BASE_URL + "/api/tripo/model-proxy?url=" + encodeURIComponent(rawUrl),
+          { headers: { Authorization: "Bearer " + t }, signal: AbortSignal.timeout(45_000) }
+        );
+        if (!res.ok) throw new Error("Model load HTTP " + res.status);
+        const blob = await res.blob();
+        if (!blob || blob.size === 0) throw new Error("Empty model response");
+        return URL.createObjectURL(blob);
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[fetchProxy] attempt ${attempt + 1}/${retries} failed:`, err.message);
+      }
+    }
+    throw lastErr ?? new Error("fetchProxy: all retries exhausted");
   }, [getIdToken]);
 
   // FIX: helper to safely revoke blob URLs — prevents RAM accumulation
@@ -852,14 +883,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
       try {
         const b = await fetchProxy(item.model_url);
         if (!t.cancelled) {
-          // FIX: free the previous model blob before showing the new one
           revokeBlobUrl(prevUrl.current);
           setModelUrl(b); prevUrl.current = b;
         } else {
-          // FIX: if selection was cancelled mid-fetch, free the new blob too
           revokeBlobUrl(b);
         }
-      } catch {
+      } catch (loadErr) {
+        console.warn("[selHist] fetchProxy failed, using direct URL:", loadErr.message);
+        // Fallback: use direct URL — viewer can still attempt to load it
         if (!t.cancelled) { setModelUrl(item.model_url); prevUrl.current = item.model_url; }
       }
     }
@@ -1002,10 +1033,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   return (
     <>
       <style>{CSS}</style>
-      <div style={{ display: "flex", height: "100%", overflow: "hidden", fontFamily: "'DM Sans',-apple-system,sans-serif", background: "#09090f" }}>
+      <div style={{ display: "flex", height: "100%", overflow: "hidden", fontFamily: "'DM Sans',-apple-system,sans-serif", background: "var(--bg-base)" }}>
 
-        {/* ── NAV ── */}
-        <div style={{ width: 58, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", background: "#0b0b17", borderRight: "1px solid rgba(255,255,255,0.06)", paddingTop: 8, overflowY: "auto" }} className="tp-scroll">
+        <div style={{ width: 58, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", background: "var(--bg-panel)", borderRight: "1px solid var(--border)", paddingTop: 8, overflowY: "auto" }} className="tp-scroll">
           {NAV.map(n => (
             <button key={n.id} className={"tp-nav-btn" + (mode === n.id ? " active" : "")} onClick={() => { setMode(n.id); setErrorMsg(""); }}>
               <div className="ico"><n.icon style={{ width: 17, height: 17, color: mode === n.id ? "#a5a0ff" : "#2d2d48" }} /></div>
@@ -1016,9 +1046,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
         </div>
 
         {/* ── LEFT PANEL ── */}
-        <div style={{ width: leftOpen ? leftW : 0, minWidth: 0, flexShrink: 0, overflow: "hidden", transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)", display: "flex", flexDirection: "column", background: "#0c0c18", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ width: leftOpen ? leftW : 0, minWidth: 0, flexShrink: 0, overflow: "hidden", transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)", display: "flex", flexDirection: "column", background: "var(--bg-panel)", borderRight: "1px solid var(--border)" }}>
           <div style={{ width: leftW, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-            <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid rgba(255,255,255,0.055)", flexShrink: 0 }}>
+            <div style={{ padding: "16px 18px 12px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: mode === "segment" ? 10 : 0 }}>
                 {mode === "generate" && <Sparkles style={{ width: 14, height: 14, color: "#6c63ff" }} />}
                 {mode === "segment" && <Scissors style={{ width: 14, height: 14, color: "#6c63ff" }} />}
@@ -1027,7 +1057,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                 {mode === "texture" && <PaintBucket style={{ width: 14, height: 14, color: "#6c63ff" }} />}
                 {mode === "texture_edit" && <Wand2 style={{ width: 14, height: 14, color: "#6c63ff" }} />}
                 {mode === "animate" && <PersonStanding style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                <span style={{ color: "#e8e8f4", fontSize: 14, fontWeight: 700 }}>{modeTitle}</span>
+                <span style={{ color: "var(--text-primary)", fontSize: 14, fontWeight: 700 }}>{modeTitle}</span>
               </div>
               {mode === "segment" && (
                 <div style={{ display: "flex", gap: 3 }}>
@@ -1039,7 +1069,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
             </div>
 
             <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }} className="tp-scroll">
-              <div style={{ padding: "14px 16px" }}>
+              <div style={{ padding: "16px 18px" }}>
                 {mode === "generate" && (
                   <GeneratePanel
                     genTab={genTab} setGenTab={setGenTab}
@@ -1086,20 +1116,20 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                   <Animate activeTaskId={activeTaskId} animId={animId} rigStep={rigStep} handleAutoRig={handleAutoRig} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} filtAnims={filtAnims} />
                 )}
                 {errorMsg && (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "9px 12px", borderRadius: 10, background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)", marginTop: 12 }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "9px 12px", borderRadius: 10, background: "rgba(255,80,80,0.12)", border: "1px solid rgba(255,80,80,0.35)", marginTop: 12 }}>
                     <AlertCircle style={{ width: 13, height: 13, color: "#f87171", flexShrink: 0, marginTop: 1 }} />
-                    <p style={{ color: "#fca5a5", fontSize: 11, margin: 0, lineHeight: 1.55 }}>{errorMsg}</p>
+                    <p style={{ color: "#ffb3b3", fontSize: 11, margin: 0, lineHeight: 1.55 }}>{errorMsg}</p>
                   </div>
                 )}
                 <div style={{ height: 12 }} />
               </div>
             </div>
 
-            <div style={{ padding: "12px 16px 16px", borderTop: "1px solid rgba(255,255,255,0.055)", flexShrink: 0 }}>
+            <div style={{ padding: "12px 16px 16px", borderTop: "1px solid var(--border)", flexShrink: 0 }}>
               {isRunning ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <PBar value={progress} />
-                  {statusMsg && <p style={{ color: "#8a8aaa", fontSize: 10, margin: 0, textAlign: "center", fontFamily: "monospace" }}>{statusMsg}</p>}
+                  {statusMsg && <p style={{ color: "var(--text-secondary)", fontSize: 11, margin: 0, textAlign: "center", fontFamily: "monospace", fontWeight: 500 }}>{statusMsg}</p>}
                   <button onClick={handleStop} style={{ width: "100%", padding: "12px 0", borderRadius: 11, fontSize: 13, fontWeight: 600, color: "#fca5a5", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", border: "none", background: "rgba(239,68,68,0.09)", outline: "1.5px solid rgba(239,68,68,0.2)", fontFamily: "inherit" }}>
                     <Square style={{ width: 12, height: 12 }} /> Stop
                   </button>
@@ -1136,8 +1166,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
         </div>
 
         {/* ── CENTER ── */}
-        <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "#09090f", position: "relative" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", height: 40, flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.055)", background: "rgba(9,9,18,0.98)", gap: 12, overflowX: "auto" }}>
+        <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "var(--bg-base)", position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", height: 40, flexShrink: 0, borderBottom: "1px solid var(--border)", background: "rgba(12,12,24,0.98)", gap: 12, overflowX: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
               {!leftOpen && <button onClick={() => setLeftOpen(true)} style={{ width: 24, height: 24, borderRadius: 6, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.05)", color: "#2d2d48", marginRight: 4 }}><ChevronRight style={{ width: 11, height: 11 }} /></button>}
               <span style={{ color: "#1a1a30", fontSize: 9, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "monospace", marginRight: 3 }}>View</span>
@@ -1167,7 +1197,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
               </div>
             )}
             {isRunning && (
-              <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(4,4,14,0.9)", backdropFilter: "blur(18px)", pointerEvents: "none" }}>
+              <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(3,3,12,0.94)", backdropFilter: "blur(20px)", pointerEvents: "none" }}>
                 <div style={{ width: 72, height: 72, borderRadius: 20, marginBottom: 22, background: "rgba(108,99,255,0.1)", border: "1.5px solid rgba(108,99,255,0.22)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 40px rgba(108,99,255,0.16)" }}>
                   <Sparkles style={{ width: 28, height: 28, color: "#8b7fff" }} />
                 </div>
@@ -1182,13 +1212,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                 <div style={{ width: 72, height: 72, borderRadius: 20, marginBottom: 18, background: "rgba(108,99,255,0.04)", border: "1px solid rgba(108,99,255,0.09)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Box style={{ width: 30, height: 30, color: "rgba(108,99,255,0.18)" }} />
                 </div>
-                <p style={{ color: "#14142a", fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>Tripo3D Studio</p>
+                <p style={{ color: "var(--text-muted)", fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>Tripo3D Studio</p>
                 <p style={{ color: "#0e0e22", fontSize: 10, fontFamily: "monospace" }}>{genLabel}</p>
               </div>
             )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", height: 40, flexShrink: 0, borderTop: "1px solid rgba(255,255,255,0.055)", background: "rgba(9,9,18,0.98)", overflowX: "auto", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", height: 40, flexShrink: 0, borderTop: "1px solid var(--border)", background: "rgba(12,12,24,0.98)", overflowX: "auto", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
               <span style={{ color: "#1a1a30", fontSize: 9, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "monospace", marginRight: 2 }}>Camera</span>
               <IconBtn icon={<RotateCcw />} tip="Reset" onClick={() => camP("reset")} />
@@ -1197,14 +1227,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
               <IconBtn icon={<Layers />} tip="Top" onClick={() => camP("top")} />
               <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.06)", margin: "0 4px" }} />
               <button onClick={() => setAutoSpin(v => !v)}
-                style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 9px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer", border: "none", background: autoSpin ? "rgba(108,99,255,0.18)" : "rgba(255,255,255,0.03)", color: autoSpin ? "#a5a0ff" : "#2d2d48", outline: autoSpin ? "1px solid rgba(108,99,255,0.38)" : "1px solid rgba(255,255,255,0.06)", fontFamily: "inherit" }}>
+                style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 9px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer", border: "none", background: autoSpin ? "rgba(108,99,255,0.18)" : "rgba(255,255,255,0.03)", color: autoSpin ? "var(--accent-bright)" : "var(--text-muted)", outline: autoSpin ? "1px solid var(--border-accent)" : "1px solid var(--border)", fontFamily: "inherit" }}>
                 {autoSpin ? <Square style={{ width: 9, height: 9 }} /> : <Play style={{ width: 9, height: 9 }} />} Auto-spin
               </button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
               {modelUrl && (
                 <button onClick={() => { setDlItem(null); setDlOpen(true); }}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: "#fff", background: "linear-gradient(135deg,#6c63ff,#8b7fff)", border: "none", cursor: "pointer", boxShadow: "0 2px 14px rgba(108,99,255,0.35)", fontFamily: "inherit" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: "#fff", background: "linear-gradient(135deg,var(--accent),var(--accent-bright))", border: "none", cursor: "pointer", boxShadow: "0 2px 18px var(--accent-glow)", fontFamily: "inherit" }}>
                   <Download style={{ width: 11, height: 11 }} /> Download
                 </button>
               )}
@@ -1220,13 +1250,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
         </div>
 
         {/* ── RIGHT: History ── */}
-        <div style={{ width: rightOpen ? rightW : 0, minWidth: 0, flexShrink: 0, overflow: "hidden", transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)", display: "flex", flexDirection: "column", background: "#0c0c18", borderLeft: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ width: rightOpen ? rightW : 0, minWidth: 0, flexShrink: 0, overflow: "hidden", transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)", display: "flex", flexDirection: "column", background: "var(--bg-panel)", borderLeft: "1px solid var(--border)" }}>
           <div style={{ width: rightW, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-            <div style={{ padding: "12px 12px 10px", borderBottom: "1px solid rgba(255,255,255,0.055)", flexShrink: 0 }}>
+            <div style={{ padding: "12px 12px 10px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 9 }}>
                 <Clock style={{ width: 11, height: 11, color: "#2d2d48" }} />
-                <span style={{ color: "#5a5a7a", fontSize: 12, fontWeight: 700 }}>History</span>
-                <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700, padding: "1px 7px", borderRadius: 99, background: "rgba(108,99,255,0.1)", color: "rgba(108,99,255,0.6)", border: "1px solid rgba(108,99,255,0.14)", fontFamily: "monospace" }}>{history.length}{hasMore ? "+ " : ""}</span>
+                <span style={{ color: "var(--text-secondary)", fontSize: 12, fontWeight: 700 }}>History</span>
+                <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700, padding: "1px 7px", borderRadius: 99, background: "rgba(124,111,255,0.15)", color: "var(--accent-bright)", border: "1px solid var(--border-accent)", fontFamily: "monospace" }}>{history.length}{hasMore ? "+ " : ""}</span>
               </div>
               <input placeholder="Search…" value={histQ} onChange={e => setHistQ(e.target.value)} className="tp-input" style={{ fontSize: 11 }}
                 onFocus={e => e.target.style.borderColor = "rgba(108,99,255,0.45)"}
