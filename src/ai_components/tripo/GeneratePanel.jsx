@@ -1,5 +1,5 @@
 // trellis/GeneratePanel.jsx
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Image, Boxes, Grid3x3, Pencil, HelpCircle, Upload, Check, X,
   Loader2, Globe, Lock, ChevronDown, PersonStanding, Zap, Images, Lightbulb,
@@ -19,18 +19,21 @@ const TABS_WITH_MAKE_BETTER = new Set(["image", "batch"]);
 
 /* ─── Model versions — real Tripo API strings ─────────────────────────────
  *
- *  v3.0-20250812      → default, best quality (~90s), geometry_quality support,
- *                        Ultra mode up to 2M polygons
- *  v2.5-20250123      → fast & balanced (~25-30s), good for iterations
- *  turbo-v1.0-20250506 → fastest prototyping (~5-10s)
- *
- *  Deprecated (do not use): v1.3-20240522, v1.4-20240522 multiview
+ *  P1-20260311              → Latest Model, prémium minőség
+ *  v3.1-20260211     → V3.1, kiváló minőség
+ *  v3.0-20250812     → V3.0, Ultra mód (geometry_quality), akár 2M polygon
+ *  v2.5-20250123     → gyors & kiegyensúlyozott (~25-30s)
+ *  Turbo-v1.0-20250506 → leggyorsabb prototipizálás (~5-10s)
+ *  v1.4-20240625     → Fastest (lapos árazás: text=20, image=30)
  * ─────────────────────────────────────────────────────────────────────── */
 export const MODEL_VERSIONS = [
-  { id: "v3.0-20250812", label: "v3.0 – Best Quality (default)" },
-  { id: "v2.5-20250123", label: "v2.5 – Fast & Balanced" },
-  { id: "Turbo-v1.0-20250506", label: "Turbo – Fastest" },
-
+  { id: "P1-20260311",                   label: "P1-20260311 (Latest Model)"    },
+  { id: "v3.1-20260211",          label: "V3.1"                   },
+  { id: "v3.0-20250812",          label: "V3.0"                   },
+  { id: "v2.5-20250123",          label: "V2.5"                   },
+  { id: "Turbo-v1.0-20250506",    label: "Turbo V1.0"             },
+  { id: "v2.0-20240919",          label: "V2.0"                   },
+  { id: "v1.4-20240625",          label: "V1.4 (Fastest Model)"   },
 ];
 
 /* ─── API face_limit constraints (official Tripo docs) ───────────────────
@@ -318,7 +321,7 @@ export default function GeneratePanel({
   imgPrev, imgToken, imgUploading, handleImg, fileRef,
   multiImages, setMultiImages,
   batchImages, setBatchImages,
-  meshQ, setMeshQ,                 // "ultra" → geometry_quality:"detailed" for v3.0
+  meshQ, setMeshQ,                 // "ultra" → geometry_quality:"detailed" for P1-20260311 / v3.x
   inParts, setInParts,             // generate_parts
   privacy, setPrivacy,
   texOn, setTexOn,                 // texture (bool)
@@ -338,9 +341,22 @@ export default function GeneratePanel({
   handleBatchImg,   // NEW: (file) => Promise<token>
   setErrorMsg,
 tPose, setTPose,
+  // Advanced params
+  modelSeed, setModelSeed,
+  textureSeed, setTextureSeed,
+  imageSeed, setImageSeed,
+  autoSize, setAutoSize,
+  exportUv, setExportUv,
 }) {
   const MV_SLOTS = ["Front", "Left", "Right", "Back"];
   const batchInputRef = useRef(null);
+
+  // V1.4: csak text/image elérhető — ha multi/batch volt aktív, válts image-re
+  useEffect(() => {
+    if (modelVer === "v1.4-20240625" && (genTab === "multi" || genTab === "batch")) {
+      setGenTab("image");
+    }
+  }, [modelVer, genTab, setGenTab]);
 
   // A function signature-t módosítsd (a komponens propjaiba is kell handleBatchImg):
   function handleBatchFiles(files) {
@@ -374,11 +390,13 @@ tPose, setTPose,
   const partsDisabled = texOn || pbrOn || quadMesh;
 
   /*
-   * Ultra mesh quality = geometry_quality:"detailed" (v3.0 only).
+   * Ultra mesh quality = geometry_quality:"detailed" (P1-20260311, v3.x).
    * For non-v3.0 models the button still exists but maps to standard quality.
-   * Show hint when ultra+non-v3.0.
+   * Show hint when ultra+non-modern model.
    */
-  const isV3 = modelVer.startsWith("v3.0");
+  // isModernModel: P1-20260311 és V3.x modellek támogatják a geometry_quality (Ultra) módot
+  const isModernModel = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
+  const isV3 = isModernModel; // backward compat alias
 const TRIPO_ENHANCE_PROMPT = `You are an elite 3D asset prompt engineer specializing in Tripo3D text-to-3D generation. Your job is to transform any user description — however short, vague, or explicit — into a maximally detailed, generation-optimized prompt.
 
 RULES:
@@ -413,21 +431,27 @@ Respond ONLY with a raw JSON object — no markdown fences, no explanation, no p
 const TRIPO_SIMPLIFY_PROMPT = `You are a 3D model prompt engineer.
 The user gives you a long or complex prompt. Simplify it to a clear, concise English description under 200 characters, keeping the essential object and style.
 Respond ONLY with plain text, no JSON, no explanation.`;
+  // V1.4: csak text és image tab elérhető (nincs multiview/batch)
+  const isV14 = modelVer === "v1.4-20240625";
+
   return (
     <>
       {/* ── Tab bar ── */}
       <div style={{ display: "flex", gap: 3, padding: "3px", background: "rgba(255,255,255,0.06)", borderRadius: 11, marginBottom: 14 }}>
-        {GEN_TABS.map(t => (
-          <button
-            key={t.id}
-            className={"tp-inp-tab" + (genTab === t.id ? " active" : "")}
-            onClick={() => setGenTab(t.id)}
-            title={t.tip}
-            style={{ color: genTab === t.id ? "#0a0a1a" : "#4a4a68" }}
-          >
-            <t.icon style={{ width: 15, height: 15 }} />
-          </button>
-        ))}
+        {GEN_TABS.map(t => {
+          const disabled = isV14 && (t.id === "multi" || t.id === "batch");
+          return (
+            <button
+              key={t.id}
+              className={"tp-inp-tab" + (genTab === t.id ? " active" : "")}
+              onClick={() => { if (!disabled) setGenTab(t.id); }}
+              title={disabled ? `Not available for V1.4` : t.tip}
+              style={{ color: genTab === t.id ? "#0a0a1a" : "#4a4a68", opacity: disabled ? 0.3 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+            >
+              <t.icon style={{ width: 15, height: 15 }} />
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Text tab ── */}
@@ -444,6 +468,22 @@ Respond ONLY with plain text, no JSON, no explanation.`;
       dechanting_prompt={TRIPO_SIMPLIFY_PROMPT}
       onBusyChange={() => {}}
     />
+    {/* Negative prompt */}
+    <div style={{ marginBottom: 10 }}>
+      <textarea
+        className="tp-ta"
+        placeholder="Negative prompt (optional)…"
+        value={negPrompt}
+        onChange={e => setNegPrompt(e.target.value)}
+        rows={2}
+        style={{
+          border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9,
+          background: "rgba(255,255,255,0.03)", fontSize: 11, resize: "none", width: "100%",
+          boxSizing: "border-box", padding: "8px 11px",
+        }}
+      />
+    </div>
+
     {/* T-Pose toggle */}
     <div
       style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, cursor: "pointer", marginTop: -8, marginBottom: 10 }}
@@ -635,7 +675,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 2 }}>
         {[
-          { id: "ultra", label: "Ultra", prem: true, hint: isV3 ? "geometry_quality: detailed" : "v3.0 only" },
+          { id: "ultra", label: "Ultra", prem: true, hint: isV3 ? "geometry_quality: detailed" : "P1-20260311 / v3.x only" },
           { id: "standard", label: "Standard", prem: false, hint: "geometry_quality: standard" },
         ].map(q => (
           <button key={q.id} className="tp-qual-btn" onClick={() => setMeshQ(q.id)}
@@ -652,7 +692,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
       </div>
       {meshQ === "ultra" && !isV3 && (
         <p style={{ color: "#f5c518", fontSize: 10, margin: "2px 0 4px", lineHeight: 1.5 }}>
-          Ultra quality requires v3.0 model.
+          Ultra quality requires P1-20260311 or v3.x model.
         </p>
       )}
 
@@ -739,6 +779,86 @@ Respond ONLY with plain text, no JSON, no explanation.`;
           smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly}
           polycount={polycount} setPolycount={setPolycount}
         />
+      </Collapsible>
+
+      {/* ── Advanced Settings ── */}
+      <Collapsible label="Advanced Settings" border={false}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+
+          {/* model_seed */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Model Seed</span>
+              <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+            </div>
+            <input
+              type="number" min="0" placeholder="Random"
+              value={modelSeed ?? ""}
+              onChange={e => setModelSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
+              className="tp-input"
+              style={{ width: 90, textAlign: "right", fontSize: 11, padding: "4px 8px" }}
+            />
+          </div>
+
+          {/* image_seed */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Image Seed</span>
+              <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+            </div>
+            <input
+              type="number" min="0" placeholder="Random"
+              value={imageSeed ?? ""}
+              onChange={e => setImageSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
+              className="tp-input"
+              style={{ width: 90, textAlign: "right", fontSize: 11, padding: "4px 8px" }}
+            />
+          </div>
+
+          {/* texture_seed — csak ha textúra be van kapcsolva */}
+          {(texOn || pbrOn) && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Texture Seed</span>
+                <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+              </div>
+              <input
+                type="number" min="0" placeholder="Random"
+                value={textureSeed ?? ""}
+                onChange={e => setTextureSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
+                className="tp-input"
+                style={{ width: 90, textAlign: "right", fontSize: 11, padding: "4px 8px" }}
+              />
+            </div>
+          )}
+
+          {/* auto_size */}
+          <Toggle
+            label="Auto Size"
+            value={autoSize}
+            onChange={setAutoSize}
+            hint
+          />
+          {autoSize && (
+            <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
+              Scales the model to real-world dimensions (meters).
+            </p>
+          )}
+
+          {/* export_uv */}
+          <Toggle
+            label="Export UV"
+            value={exportUv}
+            onChange={setExportUv}
+            hint
+          />
+          {!exportUv && (
+            <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
+              Skips UV unwrap during generation — faster & smaller file. UV added at texturing stage.
+            </p>
+          )}
+
+        </div>
       </Collapsible>
 
       {/* ── AI Model ── */}

@@ -21,6 +21,7 @@ import ConfirmModal from "../trellis/ConfirmModal";
 import DownloadModal from "../trellis/DownloadModal";
 import { saveHistoryToFirestore, loadHistoryPageFromFirestore } from "../trellis/utils";
 import { getAnimById, ANIMATION_LIBRARY, ANIM_CATEGORIES } from "./animationlibrary";
+import { persistGen, loadPersistedGen, updatePersistedProgress, clearPersistedGen } from "./useGenerationPersist";
 
 import GeneratePanel, { MODEL_VERSIONS } from "./GeneratePanel";
 import Segment from "./Segment";
@@ -33,6 +34,10 @@ const PAGE_SIZE = 10;
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const POLL_MS = 2500;
 const POLL_MAX = 120;
+
+// Auto-stop thresholds
+const PROGRESS_JUMP_LIMIT = 30;    // stop if progress jumps >30% in one poll
+const STUCK_THRESHOLD_MS  = 30_000; // stop if stuck at 99/100% for 30s
 
 const NAV = [
   { id: "generate", label: "Model", icon: Sparkles, sub: false },
@@ -49,9 +54,13 @@ const SEGMENT_SUBS = [
   { id: "fill_parts", label: "Fill Parts" },
 ];
 
+// Rögzített módköltségek — mode-specifikus taskokhoz.
+// A "generate" és "texture" és "retopo" módok dinamikusan számolnak (genCost).
 const MODE_COST = {
-  generate: 40, segment: 40, fill_parts: 40, retopo: 10,
-  texture: 35, texture_edit: 35, animate: 20,
+  segment:      40,  // mesh_segmentation: 40
+  fill_parts:   50,  // mesh_completion:   50
+  texture_edit: 10,  // texture_edit task
+  animate:      10,  // animate_retarget:  10 per animation
 };
 
 /* ─── CSS ────────────────────────────────────────────────────────────── */
@@ -184,6 +193,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   const [outFormat, setOutFormat] = useState("glb");
   const [pivotToBottom, setPivotToBottom] = useState(false);
   const [tPose, setTPose] = useState(false);
+  const [modelSeed, setModelSeed] = useState(null);
+  const [textureSeed, setTextureSeed] = useState(null);
+  const [imageSeed, setImageSeed] = useState(null);
+  const [autoSize, setAutoSize] = useState(false);
+  const [exportUv, setExportUv] = useState(true);
 
   // task id inputs
   const [segId, setSegId] = useState("");
@@ -266,7 +280,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   const prevUrl = useRef(null);
   const dragRef = useRef(null);
   const fileRef = useRef(null);
-  const currentTaskId = useRef(null); // ← ÚJ: cancel-hez kell
+  const currentTaskId      = useRef(null);
+  const currentRequestId   = useRef(null); // concurrency guard
+  const userStoppedRef     = useRef(false);  // true = user explicitly stopped
 
   // FIX: store panel widths in refs so startDrag doesn't recreate on every resize
   const leftWRef = useRef(302);
@@ -364,21 +380,51 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
 
   const pollTask = useCallback(async (taskId, pt, headers, onSuccess) => {
     let n = 0;
+    let prevProgress  = 0;
+    let stuckSince    = null;
+
     while (n < POLL_MAX) {
       if (pt.cancelled) return;
       await new Promise(r => setTimeout(r, POLL_MS));
-      if (pt.cancelled) return; n++;
+      if (pt.cancelled) return;
+      n++;
+
       const res = await fetch(BASE_URL + "/api/tripo/task/" + taskId, { headers });
-      const d = await res.json();
+      const d   = await res.json();
       if (!d.success) throw new Error(d.message ?? "Poll error");
 
-      // Progress: csak futás közben frissítjük, success/failed esetén NEM
+      const prog = d.progress ?? 0;
+
+      // AUTO-STOP A: suspicious progress jump
+      if (d.status !== "success" && prog - prevProgress > PROGRESS_JUMP_LIMIT) {
+        throw Object.assign(
+          new Error(`Auto-stopped: suspicious progress jump (${prevProgress}% → ${prog}%)`),
+          { type: "auto_stop", autoStop: true }
+        );
+      }
+
+      // AUTO-STOP B: stuck at 99/100% for 30s
+      if (d.status !== "success" && prog >= 99) {
+        if (!stuckSince) stuckSince = Date.now();
+        else if (Date.now() - stuckSince > STUCK_THRESHOLD_MS) {
+          throw Object.assign(
+            new Error("Auto-stopped: stuck at " + prog + "% for 30s"),
+            { type: "auto_stop", autoStop: true }
+          );
+        }
+      } else {
+        stuckSince = null;
+      }
+
+      // Update progress & persist snapshot
       if (d.status !== "success" && d.status !== "failed" && d.status !== "cancelled") {
-        setProgress(Math.min(d.progress ?? 0, 99)); // max 99 — 100 csak valódi sikernél
+        const dp = Math.min(prog, 99);
+        setProgress(dp);
+        updatePersistedProgress(dp);
+        prevProgress = prog;
       }
 
       if (d.status === "success") {
-        // Silent NSFW block: success + üres output
         if (!d.modelUrl) {
           throw Object.assign(
             new Error("Content blocked by Tripo. Credits were not charged."),
@@ -418,6 +464,53 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     return () => { revokeBlobUrl(prevUrl.current); };
   }, []); // eslint-disable-line
 
+  // Page-reload resume: reconnect to an in-progress generation
+  useEffect(() => {
+    const persisted = loadPersistedGen();
+    if (!persisted) return;
+    console.log("[TripoPanel] Resuming after reload:", persisted.taskId);
+    setIsRunning(true);
+    setProgress(persisted.lastProgress ?? 0);
+    setStatusMsg("Resuming generation…");
+    currentTaskId.current = persisted.taskId;
+    userStoppedRef.current = false;
+    const requestId = crypto.randomUUID();
+    currentRequestId.current = requestId;
+    const pt = { cancelled: false };
+    pollAb.current = pt;
+    (async () => {
+      try {
+        const t = getIdToken ? await getIdToken() : "";
+        const headers = { "Content-Type": "application/json", Authorization: "Bearer " + t };
+        await pollTask(persisted.taskId, pt, headers, async (d) => {
+          if (currentRequestId.current !== requestId) return;
+          const rawUrl = d.modelUrl;
+          if (!rawUrl) throw Object.assign(new Error("Content blocked."), { type: "nsfw" });
+          const blob = await fetchProxy(rawUrl);
+          if (pt.cancelled) { revokeBlobUrl(blob); return; }
+          revokeBlobUrl(prevUrl.current);
+          setModelUrl(blob); prevUrl.current = blob;
+          setGenStatus("succeeded"); setProgress(100); setStatusMsg("");
+          setIsRunning(false);
+          currentTaskId.current = null;
+          clearPersistedGen();
+          await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "" });
+        });
+      } catch (e) {
+        setIsRunning(false); setProgress(0); setStatusMsg("");
+        currentTaskId.current = null;
+        clearPersistedGen();
+        if (!pt.cancelled) {
+          setGenStatus(e.autoStop ? "idle" : "failed");
+          setErrorMsg(e.message ?? "Resumed generation failed");
+        } else {
+          setGenStatus(prevUrl.current ? "succeeded" : "idle");
+        }
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally runs once on mount
+
   const saveHist = useCallback(async (taskId, rawUrl, extra = {}) => {
     const item = { prompt: prompt.trim() || extra.label || mode, status: "succeeded", model_url: rawUrl, source: "tripo", mode, taskId, params: { model_version: modelVer, mode, ...extra }, ts: Date.now() };
     const { docId } = await saveHistoryToFirestore(userId, item);
@@ -433,62 +526,102 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     prevUrl.current = modelUrl; setModelUrl(null); setGenStatus("pending");
     if (pollAb.current) pollAb.current.cancelled = true;
     const pt = { cancelled: false }; pollAb.current = pt;
+
+    // Unique requestId for stale-response detection
+    const requestId = crypto.randomUUID();
+    currentRequestId.current = requestId;
+    userStoppedRef.current = false;
+
     const srcId = activeTaskId;
     const animSlug = selAnim ? getAnimById(selAnim)?.slug : null;
     try {
       const headers = await authH();
       let body;
+      // isModernModel: P1-20260311 és V3.x modellek támogatják a geometry_quality (Ultra) módot
+      const _isModern = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
       switch (mode) {
         case "generate":
           if (genTab === "text") {
-            const isUltra = meshQ === "ultra";
+            const isUltra = meshQ === "ultra" && _isModern;
             body = {
               type: "text_to_model", prompt: prompt.trim(), model_version: modelVer,
               ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
               ...(tPose && { t_pose: true }),
-              ...(texOn && !isUltra && { texture: true }),
-              ...(pbrOn && !isUltra && { pbr: true }),
-              ...(!isUltra && (texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
+              ...(texOn && { texture: true }),
+              ...(pbrOn && { pbr: true }),
+              ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
               ...(isUltra && { geometry_quality: "detailed" }),
               ...(polycount > 0 && { face_limit: polycount }),
               ...(inParts && { generate_parts: true }),
               ...(quadMesh && { quad: true }),
               ...(smartLowPoly && { smart_low_poly: true }),
+              ...(modelSeed != null && { model_seed: modelSeed }),
+              ...(imageSeed != null && { image_seed: imageSeed }),
+              ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
+              ...(autoSize && { auto_size: true }),
+              ...(!exportUv && { export_uv: false }),
             };
           } else if (genTab === "multi") {
-            const isUltra = meshQ === "ultra";
+            const isUltra = meshQ === "ultra" && _isModern;
             body = {
               type: "multiview_to_model",
               files: multiImages.map(i => ({ type: "png", file_token: i.token })),
               model_version: modelVer,
-              ...(texOn && !isUltra && { texture: true }),
-              ...(pbrOn && !isUltra && { pbr: true }),
-              ...(!isUltra && (texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
+              ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
+              ...(texOn && { texture: true }),
+              ...(pbrOn && { pbr: true }),
+              ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
               ...(isUltra && { geometry_quality: "detailed" }),
               ...(polycount > 0 && { face_limit: polycount }),
+              ...(quadMesh && { quad: true }),
+              ...(smartLowPoly && { smart_low_poly: true }),
+              ...(inParts && { generate_parts: true }),
+              ...(modelSeed != null && { model_seed: modelSeed }),
+              ...(imageSeed != null && { image_seed: imageSeed }),
+              ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
+              ...(autoSize && { auto_size: true }),
+              ...(!exportUv && { export_uv: false }),
             };
           } else if (genTab === "batch") {
             body = {
               type: "image_to_model",
               file: { type: "jpg", file_token: batchImages[0]?.token },
               model_version: modelVer,
+              ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
               ...(texOn && { texture: true }),
               ...(pbrOn && { pbr: true }),
               ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
               ...(makeBetter && { enable_image_autofix: true }),
+              ...(polycount > 0 && { face_limit: polycount }),
+              ...(quadMesh && { quad: true }),
+              ...(smartLowPoly && { smart_low_poly: true }),
+              ...(modelSeed != null && { model_seed: modelSeed }),
+              ...(imageSeed != null && { image_seed: imageSeed }),
+              ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
+              ...(autoSize && { auto_size: true }),
+              ...(!exportUv && { export_uv: false }),
             };
           } else {
-            const isUltra = meshQ === "ultra";
+            const isUltra = meshQ === "ultra" && _isModern;
             body = {
               type: "image_to_model",
               file: { type: "jpg", file_token: imgToken },
               model_version: modelVer,
-              ...(texOn && !isUltra && { texture: true }),
-              ...(pbrOn && !isUltra && { pbr: true }),
-              ...(!isUltra && (texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
+              ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
+              ...(texOn && { texture: true }),
+              ...(pbrOn && { pbr: true }),
+              ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
               ...(isUltra && { geometry_quality: "detailed" }),
               ...(makeBetter && { enable_image_autofix: true }),
               ...(polycount > 0 && { face_limit: polycount }),
+              ...(quadMesh && { quad: true }),
+              ...(smartLowPoly && { smart_low_poly: true }),
+              ...(inParts && { generate_parts: true }),
+              ...(modelSeed != null && { model_seed: modelSeed }),
+              ...(imageSeed != null && { image_seed: imageSeed }),
+              ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
+              ...(autoSize && { auto_size: true }),
+              ...(!exportUv && { export_uv: false }),
             };
           }
           break;
@@ -506,7 +639,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
         case "texture":
           body = {
             type: "texture_model", original_model_task_id: (texId.trim() || srcId),
-            texture_quality: tex4K ? "HD" : "detailed",
+            texture_quality: tex4K ? "detailed" : "standard",
             ...(texPbr && { pbr: true }),
             ...(texPrompt.trim() && { prompt: texPrompt.trim() }),
             ...(texNeg.trim() && { negative_prompt: texNeg.trim() }),
@@ -543,6 +676,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
 
       // ── Tároljuk a taskId-t, hogy Stop-kor le tudjuk cancelolni ───────
       currentTaskId.current = td.taskId;
+      persistGen({
+        taskId: td.taskId, requestId, mode, prompt: prompt.trim(), modelVer,
+        lastProgress: 0, lastProgressAt: Date.now(), startedAt: Date.now(),
+      });
       setStatusMsg("Generating…");
       await pollTask(td.taskId, pt, headers, async d => {
         if (pt.cancelled) return;
@@ -550,10 +687,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
         // ── Poll-szintű hibák felismerése (NSFW, credit, failed) ──────────
 
 
+        // Stale response guard
+        if (currentRequestId.current !== requestId) return;
+
         const rawUrl = d.modelUrl;
         if (!rawUrl) {
-          // Tripo silent block — success státusz de üres output
-          // Ilyenkor a kredit automatikusan visszajár a Tripo oldalán
           throw Object.assign(
             new Error("Generation blocked: content policy or empty output. Credits were not charged."),
             { type: "nsfw" }
@@ -564,24 +702,33 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
         revokeBlobUrl(prevUrl.current);
         setModelUrl(blob); prevUrl.current = blob;
         setGenStatus("succeeded"); setProgress(100); setStatusMsg("");
-        setIsRunning(false); // ← siker esetén is
-
+        setIsRunning(false);
         currentTaskId.current = null;
-        await saveHist(td.taskId, rawUrl, { prompt: prompt.trim() });
+        clearPersistedGen();
+        // History: only if user did NOT explicitly stop
+        if (!userStoppedRef.current) {
+          await saveHist(td.taskId, rawUrl, { prompt: prompt.trim() });
+        }
       });
     } catch (e) {
-      // ── State reset MINDIG lefut — cancelled-től függetlenül ──────────
-
-      setIsRunning(false); // ← ELSŐ SOR — garantáltan lefut
+      setIsRunning(false);
       setProgress(0);
       setStatusMsg("");
       currentTaskId.current = null;
-      // ... többi marad
+      clearPersistedGen();
 
-      // Cancelled esetén csak UI reset, semmi más
+      // User cancelled
       if (pt.cancelled) {
         setModelUrl(prevUrl.current);
         setGenStatus(prevUrl.current ? "succeeded" : "idle");
+        return;
+      }
+
+      // System auto-stop (progress jump / stuck)
+      if (e.autoStop) {
+        setModelUrl(prevUrl.current);
+        setGenStatus(prevUrl.current ? "succeeded" : "idle");
+        setErrorMsg(e.message);
         return;
       }
 
@@ -607,7 +754,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
       setGenStatus(prevUrl.current ? "succeeded" : (isHardError ? "idle" : "failed"));
       setErrorMsg(e.message ?? "Network error");
     }
-  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, authH, modelUrl, pollTask, fetchProxy, revokeBlobUrl, saveHist, activeTaskId]);
+  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, modelUrl, pollTask, fetchProxy, revokeBlobUrl, saveHist, activeTaskId]);
 
   const handleAutoRig = useCallback(async () => {
     if (!activeTaskId && !animId) return;
@@ -641,11 +788,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     } catch (e) { if (pt.cancelled) return; setRigStep("idle"); setErrorMsg(e.message); setStatusMsg(""); }
   }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl]);
   const handleStop = useCallback(async () => {
+    userStoppedRef.current = true; // user-initiated: suppress history save
     if (pollAb.current) pollAb.current.cancelled = true;
-    setIsRunning(false); // ← AZONNAL, await előtt
+    setIsRunning(false);
     setProgress(0);
     setStatusMsg("");
-    // ... cancel fetch marad, de a UI már visszaáll
+    clearPersistedGen();
     const taskId = currentTaskId.current;
     if (taskId) {
       currentTaskId.current = null;
@@ -784,44 +932,65 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   })[mode] ?? mode, [mode]);
 
   const genCost = useMemo(() => {
-    if (mode !== "generate") return MODE_COST[mode] ?? 35;
+    // Texture Generation (önálló retexture task): std=10, HD=20
+    if (mode === "texture") return tex4K ? 20 : 10;
+    // Post Processing: Retopology
+    if (mode === "retopo") return smartLowPoly ? 10 : 5;
+    // Egyéb rögzített módok (segment, fill_parts, texture_edit, animate)
+    if (mode !== "generate") return MODE_COST[mode] ?? 10;
 
-    const type = genTab === "text" ? "text_to_model"
-      : genTab === "multi" ? "multiview_to_model"
-        : "image_to_model";
+    // ── 3D Generálás ─────────────────────────────────────────────────
+    const type = genTab === "text"  ? "text_to_model"
+               : genTab === "multi" ? "multiview_to_model"
+                                    : "image_to_model";
 
-    const base = type === "text_to_model" ? 10 : 20;
-    const isV3 = modelVer.startsWith("v3.0") || modelVer.startsWith("v3.1");
-    const hasTex = texOn || pbrOn;
-    const isUltra = meshQ === "ultra" && isV3;
+    // V1.4: lapos árazás, nincs textúra addon
+    if (modelVer === "v1.4-20240625") {
+      return type === "text_to_model" ? 20 : 30;
+    }
 
     /*
-     * Ultra (geometry_quality:"detailed") = 40 kredit, ÉS magában foglalja
-     * a texture cost-ot — ha Ultra ON, texCost = 0.
+     * Alapár = WITHOUT TEXTURE ár (CREDIT_COSTS["type:mv"]):
+     *   P1-20260311  text: 30  |  P1-20260311  image/multi: 40
+     *   Többi text: 10  |  Többi image/multi: 20
      *
-     * Bizonyított tesztek:
-     *   text+v3+tex+pbr+detailed+quad        = 35  → 10+20+5       ✓
-     *   text+v3+Ultra+quad (tex OFF)         = 55  → 10+40+5       ✓
-     *   text+v3+Ultra+tex+pbr+detailed+quad  = 55  → 10+40+5 (+0)  ✓
+     * Textúra addonok (modelltől függetlenül egységes):
+     *   Standard Texture: +10
+     *   Detailed Texture: +20  (standard +10, HD/detailed upgrade +10)
+     *
+     * Összesített árak:
+     *   P1-20260311  text:  30 (no tex) | 40 (std) | 50 (HD)
+     *   P1-20260311  image: 40 (no tex) | 50 (std) | 60 (HD)
+     *   Többi text:  10 (no tex) | 20 (std) | 30 (detailed)
+     *   Többi image: 20 (no tex) | 30 (std) | 40 (detailed)
+     *
+     * Advanced Generation Setup addonok az alapárra adódnak:
+     *   Detailed Geometry Quality (Ultra): +20
+     *   Low Poly:                          +10
+     *   Generate in parts:                 +20
+     *   Quad Topology:                      +5
+     *   Style:                              +5
      */
-    const ultraCost = isUltra ? 40 : 0;
+    const isP1     = modelVer === "P1-20260311";
+    const isText   = type === "text_to_model";
+    const isModern = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
+    const isUltra  = meshQ === "ultra" && isModern;
 
-    const texCost = (!isUltra && hasTex)
-      ? (tex4K
-        ? (isV3 ? 20 : 20)
-        : (isV3 ? 20 : 10))
-      : 0;
+    // Without-texture alap (modell + típus függő)
+    const base = isP1 ? (isText ? 30 : 40) : (isText ? 10 : 20);
 
-    /*
-     * generate_parts: +20  (API docs)
-     * quad:           +5   ✓ bizonyított
-     * smart_low_poly: +10  (API docs)
-     */
-    const partsCost = inParts ? 20 : 0;
-    const quadCost = quadMesh ? 5 : 0;
-    const slpCost = smartLowPoly ? 10 : 0;
+    // Textúra addon: std=+10, HD=+20
+    const hasTex  = texOn || pbrOn;
+    const texAddon = !hasTex ? 0 : tex4K ? 20 : 10;
 
-    return base + texCost + ultraCost + partsCost + quadCost + slpCost;
+    // Advanced Generation Setup addonok
+    const ultraAddon = isUltra      ? 20 : 0;
+    const slpCost    = smartLowPoly ? 10 : 0;
+    const partsCost  = inParts      ? 20 : 0;
+    const quadCost   = quadMesh     ?  5 : 0;
+    // const styleCost = genStyle ? 5 : 0;
+
+    return base + texAddon + ultraAddon + slpCost + partsCost + quadCost;
   }, [mode, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh, smartLowPoly, modelVer]);
   // FIX: download modal blob cleanup — the onDownload handler creates a new
   // fetchProxy blob for the download modal. When the modal is closed we revoke it.
@@ -886,6 +1055,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                     texOn={texOn} setTexOn={setTexOn}
                     negPrompt={negPrompt} setNegPrompt={setNegPrompt}
                     tPose={tPose} setTPose={setTPose}
+                    modelSeed={modelSeed} setModelSeed={setModelSeed}
+                    textureSeed={textureSeed} setTextureSeed={setTextureSeed}
+                    imageSeed={imageSeed} setImageSeed={setImageSeed}
+                    autoSize={autoSize} setAutoSize={setAutoSize}
+                    exportUv={exportUv} setExportUv={setExportUv}
                     tex4K={tex4K} setTex4K={setTex4K}
                     pbrOn={pbrOn} setPbrOn={setPbrOn}
                     quadMesh={quadMesh} setQuadMesh={setQuadMesh}
