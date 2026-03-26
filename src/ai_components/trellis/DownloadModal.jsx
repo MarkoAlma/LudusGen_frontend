@@ -48,8 +48,18 @@ const FORMATS = [
   },
 ];
 
+// ── Helper: trigger a file download safely in all browsers ───────────────────
+function triggerDownload(href, filename) {
+  const a = document.createElement("a");
+  a.href     = href;
+  a.download = filename;
+  // BUG FIX: append to body so it works in Firefox and other strict browsers
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 // ── Tiszta scene betöltése a GLB blob-ból ─────────────────────────────────────
-// Teljesen friss scene, nincsenek benne grid/fény/camera helperek
 function loadCleanScene(glbBlobUrl) {
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader();
@@ -68,10 +78,7 @@ async function exportModel(format, glbBlobUrl, filename) {
 
   // GLB — natív blob újraletöltés, konvertálás nélkül
   if (format === "glb") {
-    const a = document.createElement("a");
-    a.href     = glbBlobUrl;
-    a.download = `${baseName}.glb`;
-    a.click();
+    triggerDownload(glbBlobUrl, `${baseName}.glb`);
     return;
   }
 
@@ -89,8 +96,7 @@ async function exportModel(format, glbBlobUrl, filename) {
               const str  = JSON.stringify(result, null, 2);
               const blob = new Blob([str], { type: "model/gltf+json" });
               const url  = URL.createObjectURL(blob);
-              const a    = document.createElement("a");
-              a.href = url; a.download = `${baseName}.gltf`; a.click();
+              triggerDownload(url, `${baseName}.gltf`);
               setTimeout(() => URL.revokeObjectURL(url), 10_000);
               resolve();
             } catch (e) { reject(e); }
@@ -106,8 +112,7 @@ async function exportModel(format, glbBlobUrl, filename) {
     const result   = exporter.parse(cleanScene);
     const blob     = new Blob([result], { type: "text/plain" });
     const url      = URL.createObjectURL(blob);
-    const a        = document.createElement("a");
-    a.href = url; a.download = `${baseName}.obj`; a.click();
+    triggerDownload(url, `${baseName}.obj`);
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
     return;
   }
@@ -117,8 +122,7 @@ async function exportModel(format, glbBlobUrl, filename) {
     const result   = exporter.parse(cleanScene, { binary: true });
     const blob     = new Blob([result], { type: "application/octet-stream" });
     const url      = URL.createObjectURL(blob);
-    const a        = document.createElement("a");
-    a.href = url; a.download = `${baseName}.stl`; a.click();
+    triggerDownload(url, `${baseName}.stl`);
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
     return;
   }
@@ -202,7 +206,6 @@ export default function DownloadModal({ isOpen, onClose, glbBlobUrl, scene, file
     if (downloading) return;
     setDownloading(fmt.id);
     try {
-      // scene argumentum már nem kell — a glbBlobUrl-ból töltünk be
       await exportModel(fmt.id, glbBlobUrl, filename ?? `trellis_${Date.now()}`);
       setDone(fmt.id);
       setTimeout(() => setDone(null), 2000);

@@ -5,23 +5,18 @@ import {
   orderBy,
   limit,
   getDocs,
-  addDoc,
   deleteDoc,
   doc,
-  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseApp';
 import { TRELLIS_COLLECTION } from './Constants';
 
 // ────────────────────────────────────────────────────────────────────────────
-// Firestore History Operations
+// DEPRECATED: loadHistoryFromFirestore
+// Csak visszafelé kompatibilitáshoz marad. Pagination nélkül tölti be az
+// összes rekordot. Helyette: loadHistoryPageFromFirestore() from ./utils
 // ────────────────────────────────────────────────────────────────────────────
 
-/**
- * Load user's Trellis generation history from Firestore
- * @param {string} userId
- * @returns {Promise<Array>}
- */
 export async function loadHistoryFromFirestore(userId) {
   if (!userId) return [];
   try {
@@ -41,32 +36,20 @@ export async function loadHistoryFromFirestore(userId) {
   }
 }
 
-/**
- * Save a new generation to Firestore history
- * @param {string} userId
- * @param {Object} item
- * @returns {Promise<string|null>} Document ID or null
- */
-export async function saveHistoryToFirestore(userId, item) {
-  if (!userId) return null;
-  try {
-    const docRef = await addDoc(collection(db, TRELLIS_COLLECTION), {
-      ...item,
-      userId,
-      createdAt: serverTimestamp(),
-    });
-    return docRef.id;
-  } catch (e) {
-    console.warn('Firestore history save failed:', e.message);
-    return null;
-  }
-}
+// ────────────────────────────────────────────────────────────────────────────
+// DEPRECATED: saveHistoryToFirestore
+// NEM menti a `ts` numerikus mezőt, ezért a client-side rendezés rossz.
+// Helyette: saveHistoryToFirestore() from ./utils  ← ez a helyes verzió
+// ────────────────────────────────────────────────────────────────────────────
 
-/**
- * Delete all of a user's history from Firestore
- * @param {string} userId
- * @returns {Promise<void>}
- */
+// export async function saveHistoryToFirestore(userId, item) { ... }
+// ↑ Szándékosan kommentezve ki — ne legyen kétféle verzió.
+//   Importáld a utils.js-ből!
+
+// ────────────────────────────────────────────────────────────────────────────
+// deleteHistoryFromFirestore — teljes törlés (minden rekord egyszerre)
+// ────────────────────────────────────────────────────────────────────────────
+
 export async function deleteHistoryFromFirestore(userId) {
   if (!userId) return;
   try {

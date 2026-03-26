@@ -33,11 +33,11 @@ import Animate from "./Animate";
 const PAGE_SIZE = 10;
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const POLL_MS = 2500;
-const POLL_MAX = 120;
+const POLL_MAX = 500;
 
 // Auto-stop thresholds
 const PROGRESS_JUMP_LIMIT = 30;    // stop if progress jumps >30% in one poll
-const STUCK_THRESHOLD_MS  = 30_000; // stop if stuck at 99/100% for 30s
+const STUCK_THRESHOLD_MS  = 300_000; // stop if stuck at 99/100% for 5 minutes
 
 const NAV = [
   { id: "generate", label: "Model", icon: Sparkles, sub: false },
@@ -329,6 +329,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
       case "retopo": return !!(retopoId.trim() || activeTaskId);
       case "texture": return !!(texId.trim() || activeTaskId) && (texInputTab === "text" ? !!texPrompt.trim() : texInputTab === "image" ? !!imgToken : multiImages.length > 0);
       case "texture_edit": return !!(editId.trim() || activeTaskId);
+      case "animate": return !!(riggedId && selAnim); // rigged model + selected animation required
       default: return false;
     }
   }, [isRunning, mode, genTab, prompt, imgToken, batchImages, segId, fillId, retopoId, activeTaskId, texInputTab, texPrompt, multiImages, editId, texId]);
@@ -907,7 +908,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     if (!toDel) return; setDeleting(true);
     try {
       const headers = await authH();
-      const res = await fetch(BASE_URL + "/api/trellis/history/" + toDel.id, { method: "DELETE", headers });
+      const res = await fetch(BASE_URL + "/api/tripo/history/" + toDel.id, { method: "DELETE", headers });
       const d = await res.json();
       if (d.success) {
         const dId = toDel.id, wasA = activeH?.id === dId;
@@ -934,7 +935,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     setDeleting(true);
     try {
       const headers = await authH();
-      const res = await fetch(BASE_URL + "/api/trellis/history", { method: "DELETE", headers });
+      const res = await fetch(BASE_URL + "/api/tripo/history", { method: "DELETE", headers });
       const d = await res.json();
       if (d.success) {
         setHistory([]); setActiveH(null);

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 let _activeCount = 0;
 const _MAX = 1;
@@ -86,12 +86,9 @@ export function generateGlbThumbnail(modelUrl, options = {}) {
       });
     }
 
-    const timeoutId = setTimeout(() => { cleanup(); reject(new Error('Thumbnail timeout')); }, 20_000);
-
     new GLTFLoader().load(
       modelUrl,
       (gltf) => {
-        clearTimeout(timeoutId);
 
         const model = gltf.scene;
         model.traverse(n => {
@@ -152,7 +149,7 @@ export function generateGlbThumbnail(modelUrl, options = {}) {
         }
       },
       undefined,
-      (err) => { clearTimeout(timeoutId); cleanup(); reject(err); }
+      (err) => { cleanup(); reject(err); }
     );
   });
 }

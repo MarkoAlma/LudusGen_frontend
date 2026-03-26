@@ -25,12 +25,15 @@ export {
   defaultParams,
   fetchGlbAsBlob,
   streamChat,
+  // BUG FIX: saveHistoryToFirestore a utils.js-ből jön (ts mezőt is menti),
+  // nem a firestore.js-ből (elavult, ts nélküli verzió)
+  saveHistoryToFirestore,
+  loadHistoryPageFromFirestore,
 } from './utils';
 
-// Firestore operations
+// Firestore operations (csak a deleteHistoryFromFirestore maradt itt, az nincs utils-ban)
 export {
   loadHistoryFromFirestore,
-  saveHistoryToFirestore,
   deleteHistoryFromFirestore,
 } from './firestore';
 

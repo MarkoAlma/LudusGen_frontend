@@ -1,5 +1,16 @@
 import { db } from '../../firebase/firebaseApp';
 import { STYLE_OPTIONS } from './Constants';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit as firestoreLimit,
+  startAfter,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Style helpers
@@ -36,16 +47,12 @@ export function fmtDate(d) {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function getItemTs(item) {
-  // Numerikus ts mező (Date.now()) — legmegbízhatóbb
   if (typeof item.ts === 'number' && item.ts > 0) return item.ts;
-  // Firestore Timestamp objektum
   if (item.createdAt?.toDate) return item.createdAt.toDate().getTime();
-  // ISO string vagy ms szám
   if (item.createdAt) {
     const t = new Date(item.createdAt).getTime();
     if (!isNaN(t)) return t;
   }
-  // ts lehet Firestore Timestamp is
   if (item.ts?.toDate) return item.ts.toDate().getTime();
   return 0;
 }
@@ -64,8 +71,10 @@ export const defaultParams = {
 };
 
 // ────────────────────────────────────────────────────────────────────────────
-// GLB fetcher
+// GLB fetcher — VITE_API_URL-t használ, production-ban is működik
 // ────────────────────────────────────────────────────────────────────────────
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export async function fetchGlbAsBlob(modelUrl, getIdToken) {
   if (!modelUrl) return null;
@@ -76,13 +85,17 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken) {
   // URL feloldás
   let fetchUrl = modelUrl;
   if (modelUrl.startsWith('/api/')) {
-    fetchUrl = `http://localhost:3001${modelUrl}`;
+    // BUG FIX: volt hardcoded http://localhost:3001 — production-ban törött
+    fetchUrl = `${API_BASE}${modelUrl}`;
+  } else if (modelUrl.includes('tripo3d.com')) {
+    // tripo CDN CORS-blokkolt, saját proxy endpointja van (nem a trellis proxy!)
+    fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}`;
   } else if (
     modelUrl.startsWith('https://s3.') ||
     modelUrl.includes('backblazeb2.com') ||
     modelUrl.includes('b2cdn.com')
   ) {
-    fetchUrl = `http://localhost:3001/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
+    fetchUrl = `${API_BASE}/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
   }
 
   let token = '';
@@ -143,37 +156,28 @@ export async function streamChat(url, headers, body) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Firestore history — paginated
+// Firestore history — paginated load
+//
+// BUG FIX: orderBy("ts") → orderBy("createdAt")
+// A régi itemeknek nincs ts mezőjük (csak createdAt serverTimestamp).
+// A Firestore kihagyta ezeket a dokumentumokat az orderBy("ts") querynél.
+// createdAt minden rekordban megvan. Client-side getItemTs() rendez pontosan.
 // ────────────────────────────────────────────────────────────────────────────
 
-import {
-  collection, query, where, orderBy, limit as firestoreLimit,
-  startAfter, getDocs,
-} from "firebase/firestore";
-
-/**
- * Fetches one page of Trellis history for a user, ordered newest-first.
- * Sorting is done client-side to avoid requiring a composite Firestore index.
- *
- * @param {string} userId
- * @param {{ limit: number, startAfter: import("firebase/firestore").DocumentSnapshot|null }} opts
- * @returns {Promise<{ items: object[], lastDoc: import("firebase/firestore").DocumentSnapshot|null }>}
- */
-// UTÁNA
 export async function loadHistoryPageFromFirestore(userId, { limit = 10, startAfter: cursor = null } = {}) {
   const constraints = [
-    where("userId", "==", userId),
-    orderBy("ts", "desc"),       // ← EZ HIÁNYZOTT
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc'),  // BUG FIX: volt orderBy('ts', 'desc')
     firestoreLimit(limit),
   ];
 
   if (cursor) constraints.push(startAfter(cursor));
-  const q    = query(collection(db, "trellis_history"), ...constraints);
+
+  const q = query(collection(db, 'trellis_history'), ...constraints);
   const snap = await getDocs(q);
 
   const items = snap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() }))
-    // Robusztus rendezés: ts (number) > createdAt (Timestamp) > createdAt (string) > 0
     .sort((a, b) => getItemTs(b) - getItemTs(a));
 
   const lastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
@@ -182,23 +186,17 @@ export async function loadHistoryPageFromFirestore(userId, { limit = 10, startAf
 
 // ────────────────────────────────────────────────────────────────────────────
 // Firestore history — save
+//
+// BUG FIX: a firestore.js-ben lévő saveHistoryToFirestore elavult duplikátum
+// volt, ami nem mentette a ts mezőt. Ez az egyetlen helyes verzió.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { collection as col, addDoc, serverTimestamp } from "firebase/firestore";
-
-/**
- * Saves a new Trellis history item to Firestore.
- *
- * @param {string} userId
- * @param {object} itemData  — prompt, name, status, model_url, params, style, ts
- * @returns {Promise<{ docId: string }>}
- */
 export async function saveHistoryToFirestore(userId, itemData) {
-  const docRef = await addDoc(col(db, "trellis_history"), {
+  const docRef = await addDoc(collection(db, 'trellis_history'), {
     userId,
     ...itemData,
-    createdAt: serverTimestamp(),   // Firestore server timestamp (indexeléshez)
-    ts: itemData.ts ?? Date.now(),  // numerikus ts (kliens oldali rendezéshez)
+    createdAt: serverTimestamp(),   // Firestore index + load
+    ts: itemData.ts ?? Date.now(),  // client-side rendezés
   });
   return { docId: docRef.id };
 }
