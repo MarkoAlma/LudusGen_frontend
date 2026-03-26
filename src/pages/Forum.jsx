@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   MessageSquare, ChevronRight, ChevronDown,
   ThumbsUp, Eye, Clock, Pin, Flame, Sparkles, Trophy,
@@ -9,6 +9,40 @@ import {
   BarChart2, PenSquare, HelpCircle, Megaphone, AtSign,
 } from "lucide-react";
 import ForumPost from "./ForumPost";
+import { db } from "../firebase/firebaseApp";
+import {
+  collection, addDoc, getDocs,
+  query, orderBy, serverTimestamp,
+} from "firebase/firestore";
+
+// ─── Slug generátor ───────────────────────────────────────────────
+export function generateSlug(title) {
+  return title
+    .toLowerCase()
+    .replace(/á/g, "a").replace(/é/g, "e").replace(/í/g, "i")
+    .replace(/ó/g, "o").replace(/ö/g, "o").replace(/ő/g, "o")
+    .replace(/ú/g, "u").replace(/ü/g, "u").replace(/ű/g, "u")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 80);
+}
+
+// ─── Firebase timestamp → olvasható szöveg ────────────────────────
+const formatFirebaseTime = (timestamp) => {
+  if (!timestamp?.toDate) return "Nemrég";
+  const date = timestamp.toDate();
+  const diff = Date.now() - date;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "Most";
+  if (m < 60) return `${m} perce`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} órája`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d} napja`;
+  return `${Math.floor(d / 7)} hete`;
+};
 
 // ─── Adatok ───────────────────────────────────────────────────────
 const CATEGORIES = [
@@ -229,6 +263,29 @@ Ez a sablon bármely modellnél működik.`,
   },
 ];
 
+// Előre generáljuk a slugokat az összes kezdeti poszthoz
+MOCK_POSTS.forEach(p => { if (!p.slug) p.slug = generateSlug(p.title); });
+
+// ─── Router segédfüggvények ───────────────────────────────────────
+const BASE_PATH = "/forum";
+
+// Visszaadja a { category, slug } párt, vagy null-t
+function getPostInfoFromURL() {
+  const path = window.location.pathname;
+  // /forum/category/slug-here
+  const match = path.match(/\/forum\/([^/]+)\/(.+)/);
+  return match ? { category: match[1], slug: match[2] } : null;
+}
+
+function pushPostURL(category, slug) {
+  const url = `${BASE_PATH}/${category}/${slug}`;
+  window.history.pushState({ category, slug }, "", url);
+}
+
+function pushForumURL() {
+  window.history.pushState({}, "", BASE_PATH);
+}
+
 // ─── Segéd UI ─────────────────────────────────────────────────────
 const GlassCard = ({ children, style = {}, className = "" }) => (
   <div className={className} style={{
@@ -408,6 +465,15 @@ const PostCard = ({ post, onClick, bookmarked, onBookmark, viewedIds }) => {
               <span className="font-semibold" style={{ color: post.avatarColor }}>{post.author}</span>
               <span>·</span>
               <span>{post.time}</span>
+              {/* ÚJ: kategória/slug permalink */}
+              {post.slug && post.category && (
+                <>
+                  <span>·</span>
+                  <span className="font-mono opacity-50 text-gray-700 truncate max-w-[140px]">
+                    /forum/{post.category}/{post.slug}
+                  </span>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button onClick={e => { e.stopPropagation(); onBookmark(post.id); }}
@@ -507,6 +573,14 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit }) => {
               <span className="text-gray-700 text-xs">Min. 10 karakter</span>
               <span className="text-xs" style={{ color: title.length > 10 ? "#4ade80" : "#6b7280" }}>{title.length}/200</span>
             </div>
+            {title.length > 5 && (
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="text-gray-700 text-xs">URL:</span>
+                <span className="text-gray-600 text-xs font-mono">
+                  /forum/{selectedCat}/{generateSlug(title) || "..."}
+                </span>
+              </div>
+            )}
           </div>
 
           <div>
@@ -635,9 +709,84 @@ export default function Forum() {
   const [unreadCount] = useState(2);
   const notifRef = useRef(null);
   const userMenuRef = useRef(null);
+  // Ref: hogy az URL-ből nyitott poszt keresését ne ismételje feleslegesen
+  const initialSlugRef = useRef(false);
 
   const accentColor = CATEGORIES.find(c => c.id === activeCategory)?.color || "#a78bfa";
 
+  // ── Poszt keresése kategória + slug alapján ─────────────────────
+  const findPost = useCallback((category, slug, postList) => {
+    return (
+      postList.find(p => p.slug === slug && p.category === category) ||
+      postList.find(p => p.slug === slug) || // fallback: csak slug
+      null
+    );
+  }, []);
+
+  // ── Firebase: mentett posztok betöltése mount-kor ───────────────
+  useEffect(() => {
+    const loadFirebasePosts = async () => {
+      try {
+        const q = query(collection(db, "forum_posts"), orderBy("createdAt", "desc"));
+        const snap = await getDocs(q);
+        const fbPosts = snap.docs.map(doc => {
+          const d = doc.data();
+          return {
+            ...d,
+            id: doc.id,
+            time: formatFirebaseTime(d.createdAt),
+            slug: d.slug || generateSlug(d.title || ""),
+          };
+        });
+        if (fbPosts.length > 0) {
+          // Firebase posztok elöl, MOCK_POSTS mögötte
+          setPosts([...fbPosts, ...MOCK_POSTS]);
+        }
+      } catch (e) {
+        console.error("Firebase betöltési hiba:", e);
+      }
+    };
+    loadFirebasePosts();
+  }, []);
+
+  // ── URL routing: ha posts megváltozik, próbáljuk meg nyitni az URL-ből ──
+  useEffect(() => {
+    if (initialSlugRef.current) return;
+    const info = getPostInfoFromURL();
+    if (!info) {
+      initialSlugRef.current = true;
+      return;
+    }
+    const found = findPost(info.category, info.slug, posts);
+    if (found) {
+      setOpenPost(found);
+      setViewedIds(prev => new Set([...prev, found.id]));
+      initialSlugRef.current = true;
+    }
+  }, [posts, findPost]);
+
+  // ── Böngésző vissza/előre gomb ──────────────────────────────────
+  useEffect(() => {
+    const handlePopState = () => {
+      const info = getPostInfoFromURL();
+      if (info) {
+        setPosts(currentPosts => {
+          const found = findPost(info.category, info.slug, currentPosts);
+          if (found) {
+            setOpenPost(found);
+            setViewedIds(prev => new Set([...prev, found.id]));
+          }
+          return currentPosts;
+        });
+      } else {
+        setOpenPost(null);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [findPost]);
+
+  // ── Dropdown bezárás kívülre kattintáskor ───────────────────────
   useEffect(() => {
     const handler = e => {
       if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false);
@@ -649,20 +798,54 @@ export default function Forum() {
 
   const toggleBookmark = id => setBookmarks(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const handleOpenPost = post => {
+  const handleOpenPost = (post) => {
     setViewedIds(p => new Set([...p, post.id]));
     setOpenPost(post);
+    pushPostURL(post.category, post.slug);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleNewPost = (data) => {
-    const newPost = {
-      id: Date.now(), ...data,
+  const handleBack = () => {
+    setOpenPost(null);
+    pushForumURL();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // ── Új poszt létrehozása + Firebase mentés ──────────────────────
+  const handleNewPost = async (data) => {
+    const slug = generateSlug(data.title);
+
+    // Slug ütközés csak azonos kategórián belül
+    let finalSlug = slug;
+    let counter = 1;
+    while (posts.some(p => p.slug === finalSlug && p.category === data.category)) {
+      finalSlug = `${slug}-${counter}`;
+      counter++;
+    }
+
+    const postData = {
+      slug: finalSlug,
+      ...data,
       pinned: false, hot: false, locked: false, solved: false,
       author: "te", avatar: "É", avatarColor: accentColor,
       time: "Most", views: 1, likes: 0, comments: 0, readTime: 1,
       preview: data.content?.slice(0, 120) || "",
     };
-    setPosts(p => [newPost, ...p]);
+
+    // Firebase mentés
+    let finalId = Date.now(); // fallback ID
+    try {
+      const docRef = await addDoc(collection(db, "forum_posts"), {
+        ...postData,
+        createdAt: serverTimestamp(),
+      });
+      finalId = docRef.id;
+      console.log("✅ Poszt elmentve Firebase-be:", docRef.id);
+    } catch (e) {
+      console.error("❌ Firebase mentési hiba:", e);
+    }
+
+    setPosts(p => [{ ...postData, id: finalId }, ...p]);
   };
 
   const filteredPosts = posts.filter(p => {
@@ -685,7 +868,14 @@ export default function Forum() {
   const totalThreads = CATEGORIES.slice(1).reduce((s, c) => s + c.threads, 0);
 
   if (openPost) {
-    return <ForumPost post={openPost} allPosts={posts} onBack={() => setOpenPost(null)} onOpenPost={handleOpenPost} />;
+    return (
+      <ForumPost
+        post={openPost}
+        allPosts={posts}
+        onBack={handleBack}
+        onOpenPost={handleOpenPost}
+      />
+    );
   }
 
   return (

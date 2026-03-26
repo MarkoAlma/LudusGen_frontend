@@ -7,7 +7,7 @@ import {
   AlertCircle, Award, Edit3, X, BarChart2, RefreshCw,
   ArrowUp, Zap, AtSign, Bold, Italic, Code,
   List, Quote, ChevronRight,
-  PenSquare, Shield, Search, Rss,
+  PenSquare, Shield, Search, Rss, Link,
 } from "lucide-react";
 
 // ─── Kategória map ────────────────────────────────────────────────
@@ -79,7 +79,7 @@ Ezzel Claude teljesítménye még jobban kiemelkedik.`,
       {
         id: 31, parentId: 3,
         author: "beatmaker99", avatar: "B", avatarColor: "#ea580c",
-        content: "Ez arany, köszönöm! Rögtön ki is próbálom.",
+        content: "Ez arany, köszönjük! Rögtön ki is próbálom.",
         time: "25 perce", likes: 8, liked: false,
         reactions: {}, replies: [],
       },
@@ -626,6 +626,39 @@ const HelpfulWidget = ({ color }) => {
   );
 };
 
+// ─── Permalink copy widget ─────────────────────────────────────────
+// ÚJ: category + slug alapú permalink
+const PermalinkWidget = ({ category, slug, color }) => {
+  const [copied, setCopied] = useState(false);
+  const permalink = `${window.location.origin}/forum/${category}/${slug}`;
+  const displayPath = `/forum/${category}/${slug}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(permalink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  return (
+    <GlassCard>
+      <div className="px-4 pt-4 pb-3">
+        <h4 className="text-white font-semibold text-xs uppercase tracking-wider flex items-center gap-2 mb-2">
+          <Link className="w-3.5 h-3.5" style={{ color }} /> Permalink
+        </h4>
+        <div className="flex items-center gap-2 p-2 rounded-xl"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <span className="text-gray-500 text-xs font-mono truncate flex-1">{displayPath}</span>
+          <button onClick={handleCopy}
+            className="cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all flex-shrink-0"
+            style={{ background: copied ? "rgba(74,222,128,0.15)" : `${color}20`, color: copied ? "#4ade80" : color, border: `1px solid ${copied ? "rgba(74,222,128,0.3)" : color + "40"}` }}>
+            {copied ? <><Check className="w-3 h-3" /> Másolva!</> : <><Copy className="w-3 h-3" /> Másolás</>}
+          </button>
+        </div>
+      </div>
+    </GlassCard>
+  );
+};
+
 // ─── FŐ KOMPONENS ─────────────────────────────────────────────────
 export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
   const [comments, setComments] = useState(INITIAL_COMMENTS);
@@ -646,8 +679,12 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
     : RELATED_MOCK
   ).slice(0, 3);
 
+  // ÚJ: kategória/slug alapú megosztás
   const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
+    const permalink = post?.slug && post?.category
+      ? `${window.location.origin}/forum/${post.category}/${post.slug}`
+      : window.location.href;
+    navigator.clipboard.writeText(permalink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -695,7 +732,8 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
       </div>
 
       <div className="relative z-10 max-w-4xl mx-auto px-3 md:px-5 py-5">
-        <div className="flex items-center gap-2 mb-4">
+        {/* ── Breadcrumb ── */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
           <button onClick={onBack} className="cursor-pointer flex items-center gap-1.5 text-gray-500 hover:text-white transition-colors group">
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
             <span className="text-sm">Fórum</span>
@@ -703,7 +741,16 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
           <ChevronRight className="w-3 h-3 text-gray-700" />
           <span className="text-xs" style={{ color }}>{cat.emoji} {cat.label}</span>
           <ChevronRight className="w-3 h-3 text-gray-700" />
-          <span className="text-gray-600 text-xs truncate max-w-[200px]">{post.title}</span>
+          <span className="text-gray-600 text-xs truncate max-w-[180px]">{post.title}</span>
+          {/* ÚJ: teljes elérési út */}
+          {post.slug && post.category && (
+            <>
+              <ChevronRight className="w-3 h-3 text-gray-700" />
+              <span className="text-gray-700 text-xs font-mono truncate max-w-[180px]">
+                /forum/{post.category}/{post.slug}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4">
@@ -732,6 +779,15 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
                       <Clock className="w-2.5 h-2.5" />{post.time}
                       <span>·</span>
                       <Eye className="w-2.5 h-2.5" />{post.views?.toLocaleString()} megtekintés
+                      {/* ÚJ: kategória/slug az URL-ben */}
+                      {post.slug && post.category && (
+                        <>
+                          <span>·</span>
+                          <span className="font-mono text-gray-700 hidden sm:inline">
+                            /forum/{post.category}/{post.slug}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -888,6 +944,15 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
                             <Heart className="w-2.5 h-2.5" />{p.likes}
                             <span>·</span>
                             <MessageSquare className="w-2.5 h-2.5" />{p.comments}
+                            {/* ÚJ: kategória/slug */}
+                            {p.slug && p.category && (
+                              <>
+                                <span>·</span>
+                                <span className="font-mono text-gray-700 truncate max-w-[100px]">
+                                  /{p.category}/{p.slug}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </button>
                       );
@@ -898,8 +963,14 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
             )}
           </div>
 
+          {/* ── SIDEBAR ── */}
           <div className="space-y-3">
             <TableOfContents content={post.content} color={color} />
+
+            {/* ÚJ: category + slug alapú Permalink widget */}
+            {post.slug && post.category && (
+              <PermalinkWidget category={post.category} slug={post.slug} color={color} />
+            )}
 
             <GlassCard>
               <div className="px-4 pt-4 pb-3">

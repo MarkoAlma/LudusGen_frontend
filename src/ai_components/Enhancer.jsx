@@ -113,8 +113,8 @@ function Enhancer({
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model:    'gpt-oss-120b',
-        provider: 'cerebras',
+        model:    'openai/gpt-oss-120b',
+        provider: 'groq',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user',   content: userContent  },
@@ -299,7 +299,7 @@ function Enhancer({
     : describingImages
       ? 'Képelemzés folyamatban…'
       : hasImages
-        ? `AI prompt fejlesztés (${inputImages.length} kép → Gemma vision + Cerebras)`
+        ? `AI prompt fejlesztés (${inputImages.length} kép → vision + reprompt)`
         : 'AI prompt fejlesztés';
 
   return (
