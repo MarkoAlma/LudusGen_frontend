@@ -7,13 +7,22 @@ import {
   Shield, Lock, CheckCircle, RefreshCw, SlidersHorizontal,
   ArrowUp, Rss, Award, Tag, Globe, Heart, Smile,
   BarChart2, PenSquare, HelpCircle, Megaphone, AtSign,
+  Trash2, Edit3, Unlock,
 } from "lucide-react";
 import ForumPost from "./ForumPost";
-import { db } from "../firebase/firebaseApp";
+import { auth, db } from "../firebase/firebaseApp";
+import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection, addDoc, getDocs,
-  query, orderBy, serverTimestamp,
+  collection, addDoc, getDocs, deleteDoc, doc, updateDoc,
+  query, orderBy, serverTimestamp, getDoc,
 } from "firebase/firestore";
+
+// ─── Admin UIDs ───────────────────────────────────────────────────
+const ADMIN_UIDS = [];
+
+// ─── DEBUG MODE ───────────────────────────────────────────────────
+const DEBUG = true;
+const dbg = (...args) => { if (DEBUG) console.log("[Forum DEBUG]", ...args); };
 
 // ─── Slug generátor ───────────────────────────────────────────────
 export function generateSlug(title) {
@@ -99,37 +108,9 @@ export const MOCK_POSTS = [
     id: 1, category: "chat", pinned: true, hot: true, locked: false, solved: false,
     title: "Claude vs GPT-4o — melyik a jobb kódoláshoz? [Összehasonlítás 2025]",
     preview: "Elvégeztem 50+ tesztet mindkét modellen. Az eredmények meglepőek: Claude jobban teljesít hosszú fájloknál, de GPT gyorsabb egyszerű snippeteknél...",
-    content: `Elvégeztem **50+ tesztet** mindkét modellen, különböző kódolási feladatokon. Az eredmények meglepőek.
-
-## Módszertan
-
-Minden tesztet ugyanolyan körülmények között futtattam: ugyanaz a prompt, ugyanaz a kontextus, 3x megismételve.
-
-- **Hosszú fájlok refaktorálása** (500+ sor)
-- **Bug keresés és javítás**
-- **API integráció írása nulláról**
-- **Unit tesztek generálása**
-
-## Eredmények
-
-\`\`\`
-Feladat                  Claude    GPT-4o
-─────────────────────────────────────────
-Hosszú fájl refaktor      ✅ 9/10   ⚠️ 6/10
-Bug keresés               ✅ 8/10   ✅ 8/10
-API integráció            ✅ 9/10   ✅ 8/10
-Unit teszt generálás      ⚠️ 7/10   ✅ 9/10
-Kód magyarázat            ✅ 9/10   ✅ 8/10
-\`\`\`
-
-## Következtetések
-
-**Claude erősségei:** Sokkal jobb hosszú, komplex fájloknál. Refaktorálásnál szinte mindig megőrzi az eredeti logikát.
-
-**GPT-4o erősségei:** Gyorsabb egyszerű snippeteknél. Unit teszt generálásban jobb.
-
-Mi a tapasztalatotok?`,
+    content: `Elvégeztem **50+ tesztet** mindkét modellen, különböző kódolási feladatokon.`,
     author: "devmaster_hu", avatar: "D", avatarColor: "#7c3aed",
+    authorId: null,
     time: "2 órája", views: 3241, likes: 187, comments: 64,
     tags: ["claude", "gpt-4o", "összehasonlítás", "kódolás"],
     readTime: 4, poll: null,
@@ -138,22 +119,9 @@ Mi a tapasztalatotok?`,
     id: 2, category: "image", pinned: false, hot: true, locked: false, solved: false,
     title: "Midjourney v7 vs FLUX — részletes prompt guide kezdőknek",
     preview: "Az új MJ v7 teljesen megváltoztatta a prompt struktúrát. Összeállítottam egy 20 pontos checklist-et...",
-    content: `Az új **Midjourney v7** teljesen megváltoztatta a prompt struktúrát. Összeállítottam egy checklistet.
-
-## Prompt struktúra
-
-\`\`\`
-[STÍLUS] [ALANY] [KÖRNYEZET], [MEGVILÁGÍTÁS], [HANGULAT] --ar 16:9 --v 7
-\`\`\`
-
-## Top 5 különbség MJ v7 vs FLUX
-
-- **Fotórealizmus:** FLUX jobb
-- **Artistic stílusok:** MJ v7 jobb  
-- **Szöveg kezelés:** FLUX sokkal jobb
-- **Sebesség:** FLUX gyorsabb
-- **Ár:** FLUX olcsóbb`,
+    content: `Az új **Midjourney v7** teljesen megváltoztatta a prompt struktúrát.`,
     author: "pixel_witch", avatar: "P", avatarColor: "#db2777",
+    authorId: null,
     time: "5 órája", views: 5892, likes: 412, comments: 103,
     tags: ["midjourney", "flux", "prompt", "összehasonlítás"],
     readTime: 6, poll: {
@@ -169,26 +137,10 @@ Mi a tapasztalatotok?`,
   {
     id: 3, category: "code", pinned: false, hot: false, locked: false, solved: true,
     title: "Cursor AI beállítása React projekthez — teljes konfig + .cursorrules",
-    preview: "Megosztom a .cursorrules fájlomat amit 3 hónap alatt finomítottam. Typescript + TailwindCSS + Next.js projektekhez ideális...",
-    content: `Megosztom a **.cursorrules** fájlomat amit 3 hónap alatt finomítottam.
-
-## A .cursorrules fájl
-
-\`\`\`
-You are an expert TypeScript/React/Next.js developer.
-- Always use TypeScript with strict mode
-- Prefer functional components with hooks
-- Use Tailwind for styling, avoid inline styles
-- Write self-documenting code with JSDoc
-- Always handle loading and error states
-\`\`\`
-
-## Beállítások
-
-- **Model:** claude-3.5-sonnet (legjobb kódhoz)
-- **Context:** 200k token ablak
-- **Auto-complete:** be`,
+    preview: "Megosztom a .cursorrules fájlomat amit 3 hónap alatt finomítottam...",
+    content: `Megosztom a **.cursorrules** fájlomat amit 3 hónap alatt finomítottam.`,
     author: "typescript_king", avatar: "T", avatarColor: "#34d399",
+    authorId: null,
     time: "1 napja", views: 1876, likes: 234, comments: 47,
     tags: ["cursor", "react", "typescript", "tipp"],
     readTime: 3, poll: null,
@@ -197,20 +149,9 @@ You are an expert TypeScript/React/Next.js developer.
     id: 4, category: "audio", pinned: false, hot: false, locked: false, solved: false,
     title: "Suno v4 — prompting technikák amikkel profin szól a zene",
     preview: "A legtöbb ember rosszul használja a Suno-t. A kulcs nem a stílusban van, hanem a struktúra...",
-    content: `A legtöbb ember rosszul használja a Suno-t.
-
-## A helyes struktúra
-
-\`\`\`
-[Genre: Lo-fi hip hop]
-[Mood: melancholic, nostalgic]  
-[Tempo: 75 BPM]
-[Instruments: piano, vinyl crackle, soft drums]
-[Structure: intro 8 bars, verse, chorus, bridge, outro]
-\`\`\`
-
-A kulcs a **struktúra és az érzelem** helyes megadásában van, nem csak a stílusban.`,
+    content: `A legtöbb ember rosszul használja a Suno-t.`,
     author: "beatmaker99", avatar: "B", avatarColor: "#ea580c",
+    authorId: null,
     time: "3 napja", views: 987, likes: 89, comments: 31,
     tags: ["suno", "prompt", "zene", "tipp"],
     readTime: 5, poll: null,
@@ -218,18 +159,10 @@ A kulcs a **struktúra és az érzelem** helyes megadásában van, nem csak a st
   {
     id: 5, category: "threed", pinned: false, hot: true, locked: false, solved: false,
     title: "Meshy vs TripoSG — melyik generál jobb 3D modellt képből? [2025 teszt]",
-    preview: "Teszteltem mindkét platformot ugyanazokkal a képekkel. A Meshy konzisztensebb, de a TripoSG részletgazdagabb...",
-    content: `Teszteltem mindkét platformot ugyanazokkal a referencia képekkel.
-
-## Eredmények
-
-- **Meshy:** konzisztensebb, jobb topológia, game-ready meshek
-- **TripoSG:** részletgazdagabb geometria, jobb textúrák
-
-## Melyiket válaszd?
-
-Ha **game dev**-be mész → Meshy. Ha **rendereléshez** kell → TripoSG.`,
+    preview: "Teszteltem mindkét platformot ugyanazokkal a képekkel...",
+    content: `Teszteltem mindkét platformot ugyanazokkal a referencia képekkel.`,
     author: "3d_builder", avatar: "3", avatarColor: "#0284c7",
+    authorId: null,
     time: "1 hete", views: 2134, likes: 156, comments: 58,
     tags: ["meshy", "triposg", "3d", "összehasonlítás"],
     readTime: 4, poll: null,
@@ -238,48 +171,28 @@ Ha **game dev**-be mész → Meshy. Ha **rendereléshez** kell → TripoSG.`,
     id: 6, category: "chat", pinned: false, hot: false, locked: true, solved: false,
     title: "Hogyan írjak tökéletes system promptot? Bevált módszerek gyűjteménye",
     preview: "3 éve dolgozom prompt engineeringgel. Megosztom azokat a mintákat amik mindig működnek...",
-    content: `3 éve dolgozom prompt engineeringgel. Ezek a minták mindig működnek.
-
-## Az alap sablon
-
-\`\`\`
-# Szerepkör
-Te egy [SZAKMA] vagy, aki [CÉL].
-
-# Viselkedési szabályok  
-- Mindig [ELVÁRÁS 1]
-- Soha ne [TILTÁS]
-- Ha nem tudod, mondd el
-
-# Kimeneti formátum
-[STRUKTÚRA LEÍRÁSA]
-\`\`\`
-
-Ez a sablon bármely modellnél működik.`,
+    content: `3 éve dolgozom prompt engineeringgel. Ezek a minták mindig működnek.`,
     author: "prompt_guru", avatar: "G", avatarColor: "#a78bfa",
+    authorId: null,
     time: "2 hete", views: 8754, likes: 921, comments: 203,
     tags: ["prompt-engineering", "tipp", "claude", "gpt-4o"],
     readTime: 8, poll: null,
   },
 ];
 
-// Előre generáljuk a slugokat az összes kezdeti poszthoz
 MOCK_POSTS.forEach(p => { if (!p.slug) p.slug = generateSlug(p.title); });
 
 // ─── Router segédfüggvények ───────────────────────────────────────
 const BASE_PATH = "/forum";
 
-// Visszaadja a { category, slug } párt, vagy null-t
 function getPostInfoFromURL() {
   const path = window.location.pathname;
-  // /forum/category/slug-here
   const match = path.match(/\/forum\/([^/]+)\/(.+)/);
   return match ? { category: match[1], slug: match[2] } : null;
 }
 
 function pushPostURL(category, slug) {
-  const url = `${BASE_PATH}/${category}/${slug}`;
-  window.history.pushState({ category, slug }, "", url);
+  window.history.pushState({ category, slug }, "", `${BASE_PATH}/${category}/${slug}`);
 }
 
 function pushForumURL() {
@@ -376,18 +289,43 @@ const NotifDropdown = ({ onClose }) => {
 };
 
 // ─── Poszt kártya ─────────────────────────────────────────────────
-const PostCard = ({ post, onClick, bookmarked, onBookmark, viewedIds }) => {
+const PostCard = ({
+  post, onClick, bookmarked, onBookmark, viewedIds,
+  currentUserId, isAdmin, onDelete, onEdit, onToggle,
+}) => {
   const cat = CATEGORIES.find(c => c.id === post.category) || CATEGORIES[1];
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post.likes);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef(null);
   const isRead = viewedIds?.has(post.id);
 
+  const isOwn = !post.authorId || (!!currentUserId && currentUserId === post.authorId);
+  const canManage = isOwn || isAdmin;
+
+  useEffect(() => {
+    dbg(`PostCard render | post.id=${post.id} | post.authorId=${post.authorId} | currentUserId=${currentUserId} | isAdmin=${isAdmin} | isOwn=${isOwn} | canManage=${canManage}`);
+  }, [post.id, post.authorId, currentUserId, isAdmin, isOwn, canManage]);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener("pointerdown", handler);
+    return () => document.removeEventListener("pointerdown", handler);
+  }, [showMenu]);
+
   return (
-    <div className="group cursor-pointer transition-all duration-200 relative"
+    <div
+      className="group cursor-pointer transition-all duration-200 relative"
       style={{
         background: isRead ? "rgba(255,255,255,0.015)" : "rgba(255,255,255,0.03)",
         border: `1px solid ${isRead ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.08)"}`,
         borderRadius: "1rem", padding: "1.125rem 1.25rem",
+        overflow: "visible",
       }}
       onMouseEnter={e => {
         e.currentTarget.style.background = "rgba(255,255,255,0.05)";
@@ -401,8 +339,10 @@ const PostCard = ({ post, onClick, bookmarked, onBookmark, viewedIds }) => {
       }}
       onClick={onClick}
     >
-      {isRead && <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-full" style={{ background: "rgba(255,255,255,0.08)" }} />}
-      {!isRead && <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-full" style={{ background: `linear-gradient(180deg, ${cat.color}, ${cat.color}40)` }} />}
+      {isRead
+        ? <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-full" style={{ background: "rgba(255,255,255,0.08)" }} />
+        : <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-full" style={{ background: `linear-gradient(180deg, ${cat.color}, ${cat.color}40)` }} />
+      }
 
       <div className="flex items-start gap-3 pl-1">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0 mt-0.5"
@@ -463,37 +403,185 @@ const PostCard = ({ post, onClick, bookmarked, onBookmark, viewedIds }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs text-gray-600">
               <span className="font-semibold" style={{ color: post.avatarColor }}>{post.author}</span>
+              {isOwn && (
+                <span className="text-xs px-1 py-0.5 rounded font-semibold"
+                  style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa", fontSize: "0.6rem" }}>
+                  TE
+                </span>
+              )}
               <span>·</span>
               <span>{post.time}</span>
-              {/* ÚJ: kategória/slug permalink */}
-              {post.slug && post.category && (
-                <>
-                  <span>·</span>
-                  <span className="font-mono opacity-50 text-gray-700 truncate max-w-[140px]">
-                    /forum/{post.category}/{post.slug}
-                  </span>
-                </>
-              )}
             </div>
+
             <div className="flex items-center gap-2">
-              <button onClick={e => { e.stopPropagation(); onBookmark(post.id); }}
+              <button
+                onClick={e => { e.stopPropagation(); onBookmark(post.id); }}
                 className="cursor-pointer p-1 rounded-lg transition-all opacity-0 group-hover:opacity-100 hover:bg-white/10"
                 style={{ color: bookmarked ? "#fbbf24" : "#6b7280" }}
-                title="Mentés">
+                title="Mentés"
+              >
                 <Bookmark className={`w-3.5 h-3.5 ${bookmarked ? "fill-current" : ""}`} />
               </button>
-              <button onClick={e => { e.stopPropagation(); setLiked(v => !v); setLikeCount(c => liked ? c - 1 : c + 1); }}
+
+              <button
+                onClick={e => { e.stopPropagation(); setLiked(v => !v); setLikeCount(c => liked ? c - 1 : c + 1); }}
                 className="cursor-pointer flex items-center gap-1 text-xs transition-all active:scale-90 px-2 py-1 rounded-lg hover:bg-white/8"
-                style={{ color: liked ? "#f472b6" : "#6b7280" }}>
+                style={{ color: liked ? "#f472b6" : "#6b7280" }}
+              >
                 <Heart className={`w-3 h-3 ${liked ? "fill-current" : ""}`} />
                 <span>{likeCount}</span>
               </button>
+
               <span className="flex items-center gap-1 text-xs text-gray-600">
                 <MessageSquare className="w-3 h-3" />{post.comments}
               </span>
               <span className="flex items-center gap-1 text-xs text-gray-600">
                 <Eye className="w-3 h-3" />{post.views.toLocaleString()}
               </span>
+
+              {canManage && (
+                <div
+                  className="relative"
+                  ref={menuRef}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      setShowMenu(v => !v);
+                    }}
+                    className="cursor-pointer p-1 rounded-lg transition-all hover:bg-white/10"
+                    style={{
+                      color: showMenu ? "#a78bfa" : "#6b7280",
+                      background: showMenu ? "rgba(167,139,250,0.15)" : "transparent",
+                      border: `1px solid ${showMenu ? "rgba(167,139,250,0.3)" : "transparent"}`,
+                    }}
+                  >
+                    <MoreHorizontal className="w-3.5 h-3.5" />
+                  </button>
+
+                  {showMenu && (
+                    <div
+                      className="absolute right-0 bottom-full mb-1 w-48 rounded-xl overflow-hidden"
+                      style={{
+                        zIndex: 9999,
+                        background: "rgba(10,10,28,0.98)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        boxShadow: "0 10px 40px rgba(0,0,0,0.8)",
+                      }}
+                    >
+                      {DEBUG && (
+                        <div className="px-3 py-1.5 border-b border-white/10" style={{ background: "rgba(239,68,68,0.1)" }}>
+                          <p style={{ color: "#f87171", fontSize: "0.55rem", fontFamily: "monospace" }}>
+                            DEBUG | isOwn={String(isOwn)} | isAdmin={String(isAdmin)}<br/>
+                            authorId={String(post.authorId)} | uid={String(currentUserId)}
+                          </p>
+                        </div>
+                      )}
+
+                      {isOwn && (
+                        <>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setShowMenu(false);
+                              onEdit(post);
+                            }}
+                            className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-blue-400" /> Szerkesztés
+                          </button>
+
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setShowMenu(false);
+                              onToggle(post.id, "solved", !post.solved);
+                            }}
+                            className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                            {post.solved ? "Megoldás visszavon" : "Megoldva jelöl"}
+                          </button>
+
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setShowMenu(false);
+                              onToggle(post.id, "locked", !post.locked);
+                            }}
+                            className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
+                          >
+                            {post.locked
+                              ? <><Unlock className="w-3.5 h-3.5 text-blue-400" /> Zárolás feloldása</>
+                              : <><Lock className="w-3.5 h-3.5 text-orange-400" /> Téma zárolása</>
+                            }
+                          </button>
+                        </>
+                      )}
+
+                      {isAdmin && (
+                        <>
+                          <div className="border-t border-white/8 my-0.5" />
+                          <p className="px-3 pt-1.5 pb-0.5 text-gray-600" style={{ fontSize: "0.6rem", letterSpacing: "0.08em", textTransform: "uppercase" }}>Admin</p>
+
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setShowMenu(false);
+                              onToggle(post.id, "pinned", !post.pinned);
+                            }}
+                            className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
+                          >
+                            <Pin className="w-3.5 h-3.5 text-yellow-400" />
+                            {post.pinned ? "Kitűzés eltávolítása" : "Kitűzés"}
+                          </button>
+
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setShowMenu(false);
+                              onToggle(post.id, "hot", !post.hot);
+                            }}
+                            className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
+                          >
+                            <Flame className="w-3.5 h-3.5 text-orange-400" />
+                            {post.hot ? "Trending eltávolítása" : "Trending jelölés"}
+                          </button>
+
+                          {!isOwn && (
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                setShowMenu(false);
+                                onToggle(post.id, "locked", !post.locked);
+                              }}
+                              className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
+                            >
+                              {post.locked
+                                ? <><Unlock className="w-3.5 h-3.5 text-blue-400" /> Zárolás feloldása</>
+                                : <><Lock className="w-3.5 h-3.5 text-red-400" /> Téma zárolása</>
+                              }
+                            </button>
+                          )}
+                        </>
+                      )}
+
+                      <div className="border-t border-white/8 my-0.5" />
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          setShowMenu(false);
+                          onDelete(post.id, post.authorId);
+                        }}
+                        className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-400/10 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Téma törlése
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -502,8 +590,9 @@ const PostCard = ({ post, onClick, bookmarked, onBookmark, viewedIds }) => {
   );
 };
 
-// ─── New Post Modal ───────────────────────────────────────────────
-const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit }) => {
+// ─── New / Edit Post Modal ────────────────────────────────────────
+const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = null }) => {
+  const isEditMode = !!editPost;
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [selectedCat, setSelectedCat] = useState(defaultCategory || "chat");
@@ -513,31 +602,69 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit }) => {
   const [pollOpts, setPollOpts] = useState(["", ""]);
   const [preview, setPreview] = useState(false);
 
-  useEffect(() => { if (isOpen) setSelectedCat(defaultCategory || "chat"); }, [isOpen, defaultCategory]);
+  useEffect(() => {
+    if (isOpen) {
+      if (isEditMode && editPost) {
+        setTitle(editPost.title || "");
+        setContent(editPost.content || "");
+        setSelectedCat(editPost.category || "chat");
+        setTags((editPost.tags || []).join(", "));
+        if (editPost.poll) {
+          setAddPoll(true);
+          setPollQ(editPost.poll.question || "");
+          setPollOpts(editPost.poll.options?.map(o => o.label) || ["", ""]);
+        } else {
+          setAddPoll(false);
+          setPollQ("");
+          setPollOpts(["", ""]);
+        }
+      } else {
+        setTitle("");
+        setContent("");
+        setSelectedCat(defaultCategory || "chat");
+        setTags("");
+        setAddPoll(false);
+        setPollQ("");
+        setPollOpts(["", ""]);
+      }
+      setPreview(false);
+    }
+  }, [isOpen, isEditMode, editPost, defaultCategory]);
+
   if (!isOpen) return null;
   const cat = CATEGORIES.find(c => c.id === selectedCat);
 
   const addPollOpt = () => { if (pollOpts.length < 6) setPollOpts(p => [...p, ""]); };
 
   const handleSubmit = () => {
-    if (!title.trim()) return;
-    onSubmit?.({
-      title: title.trim(), content: content.trim(),
-      category: selectedCat, tags: tags.split(",").map(t => t.trim()).filter(Boolean),
-      poll: addPoll && pollQ ? { question: pollQ, options: pollOpts.filter(Boolean).map((o, i) => ({ id: String.fromCharCode(97 + i), label: o, votes: 0 })) } : null,
-    });
-    setTitle(""); setContent(""); setTags(""); setAddPoll(false); setPollQ(""); setPollOpts(["", ""]);
+    if (!title.trim() || title.trim().length < 10) return;
+    const data = {
+      title: title.trim(),
+      content: content.trim(),
+      category: selectedCat,
+      tags: tags.split(",").map(t => t.trim()).filter(Boolean),
+      poll: addPoll && pollQ
+        ? { question: pollQ, options: pollOpts.filter(Boolean).map((o, i) => ({ id: String.fromCharCode(97 + i), label: o, votes: 0 })) }
+        : null,
+    };
+    if (!isEditMode) {
+      data.authorId = auth.currentUser?.uid || null;
+    }
+    onSubmit?.(data, isEditMode ? editPost.id : null);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col"
         style={{ background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.1)", maxHeight: "92vh", boxShadow: `0 30px 80px rgba(0,0,0,0.8), 0 0 60px ${cat?.color || "#7c3aed"}12` }}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/8 flex-shrink-0">
           <h3 className="text-white font-bold flex items-center gap-2 text-sm">
-            <PenSquare className="w-4 h-4" style={{ color: cat?.color }} /> Új téma indítása
+            {isEditMode
+              ? <><Edit3 className="w-4 h-4" style={{ color: cat?.color }} /> Téma szerkesztése</>
+              : <><PenSquare className="w-4 h-4" style={{ color: cat?.color }} /> Új téma indítása</>
+            }
           </h3>
           <div className="flex items-center gap-2">
             <button onClick={() => setPreview(v => !v)}
@@ -568,12 +695,14 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit }) => {
             <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider block mb-1.5">Cím *</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Fogalmazd meg egyértelműen a témát..."
               className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
-              style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${title ? (cat?.color || "#7c3aed") + "50" : "rgba(255,255,255,0.1)"}` }} />
+              style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${title.length >= 10 ? (cat?.color || "#7c3aed") + "50" : "rgba(255,255,255,0.1)"}` }} />
             <div className="flex justify-between mt-1">
-              <span className="text-gray-700 text-xs">Min. 10 karakter</span>
-              <span className="text-xs" style={{ color: title.length > 10 ? "#4ade80" : "#6b7280" }}>{title.length}/200</span>
+              <span className="text-xs" style={{ color: title.length > 0 && title.length < 10 ? "#f87171" : "#6b7280" }}>
+                {title.length > 0 && title.length < 10 ? `Még ${10 - title.length} karakter kell` : "Min. 10 karakter"}
+              </span>
+              <span className="text-xs" style={{ color: title.length >= 10 ? "#4ade80" : "#6b7280" }}>{title.length}/200</span>
             </div>
-            {title.length > 5 && (
+            {title.length >= 5 && (
               <div className="mt-1 flex items-center gap-1.5">
                 <span className="text-gray-700 text-xs">URL:</span>
                 <span className="text-gray-600 text-xs font-mono">
@@ -655,10 +784,13 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit }) => {
         <div className="px-5 py-4 border-t border-white/8 flex gap-2 flex-shrink-0">
           <button onClick={onClose} className="cursor-pointer flex-1 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white transition-all"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>Mégse</button>
-          <button onClick={handleSubmit} disabled={!title.trim()}
+          <button onClick={handleSubmit} disabled={title.trim().length < 10}
             className="cursor-pointer flex-1 py-2.5 rounded-xl text-sm text-white font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-30 flex items-center justify-center gap-2"
-            style={{ background: cat ? `linear-gradient(135deg, ${cat.color}, ${cat.color}99)` : "rgba(255,255,255,0.1)", boxShadow: cat && title ? `0 4px 20px ${cat.color}30` : "none" }}>
-            <Send className="w-3.5 h-3.5" /> Közzétesz
+            style={{ background: cat ? `linear-gradient(135deg, ${cat.color}, ${cat.color}99)` : "rgba(255,255,255,0.1)", boxShadow: cat && title.length >= 10 ? `0 4px 20px ${cat.color}30` : "none" }}>
+            {isEditMode
+              ? <><CheckCircle className="w-3.5 h-3.5" /> Mentés</>
+              : <><Send className="w-3.5 h-3.5" /> Közzétesz</>
+            }
           </button>
         </div>
       </div>
@@ -666,7 +798,40 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit }) => {
   );
 };
 
-// ─── Kategória sidebar card ────────────────────────────────────────
+// ─── Törlés megerősítő dialog ─────────────────────────────────────
+const ConfirmDialog = ({ isOpen, onConfirm, onCancel, message }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10001 }}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative rounded-2xl p-6 max-w-sm w-full"
+        style={{ background: "rgba(10,10,28,0.99)", border: "1px solid rgba(239,68,68,0.3)", boxShadow: "0 20px 60px rgba(0,0,0,0.8)" }}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            <Trash2 className="w-4 h-4 text-red-400" />
+          </div>
+          <h3 className="text-white font-semibold text-sm">Biztosan törlöd?</h3>
+        </div>
+        <p className="text-gray-400 text-xs mb-5 leading-relaxed">{message || "Ez a művelet nem vonható vissza."}</p>
+        <div className="flex gap-2">
+          <button onClick={onCancel}
+            className="cursor-pointer flex-1 py-2 rounded-xl text-xs text-gray-400 hover:text-white transition-all"
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            Mégse
+          </button>
+          <button onClick={onConfirm}
+            className="cursor-pointer flex-1 py-2 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}>
+            Törlés
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Kategória sidebar card ───────────────────────────────────────
 const CatSidebarCard = ({ cat, isActive, onClick }) => (
   <button onClick={() => onClick(cat.id)} className="cursor-pointer w-full text-left transition-all duration-150 active:scale-[0.98]"
     style={{ background: isActive ? `${cat.color}12` : "rgba(255,255,255,0.02)", border: `1.5px solid ${isActive ? cat.color + "45" : "rgba(255,255,255,0.06)"}`, borderRadius: "0.875rem", padding: "0.75rem 0.875rem" }}
@@ -696,6 +861,7 @@ export default function Forum() {
   const [sortBy, setSortBy] = useState("hot");
   const [search, setSearch] = useState("");
   const [newPostOpen, setNewPostOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
   const [openPost, setOpenPost] = useState(null);
   const [bookmarks, setBookmarks] = useState(new Set());
   const [viewedIds, setViewedIds] = useState(new Set());
@@ -707,39 +873,61 @@ export default function Forum() {
   const [filterLocked, setFilterLocked] = useState(false);
   const [filterSolved, setFilterSolved] = useState(false);
   const [unreadCount] = useState(2);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const notifRef = useRef(null);
   const userMenuRef = useRef(null);
-  // Ref: hogy az URL-ből nyitott poszt keresését ne ismételje feleslegesen
   const initialSlugRef = useRef(false);
 
   const accentColor = CATEGORIES.find(c => c.id === activeCategory)?.color || "#a78bfa";
 
-  // ── Poszt keresése kategória + slug alapján ─────────────────────
+  // ── Auth figyelés ────────────────────────────────────────────────
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      dbg("Auth state changed:", user ? `uid=${user.uid}` : "null");
+      setCurrentUser(user || null);
+      setCurrentUserId(user?.uid || null);
+      if (user) {
+        const adminStatus = ADMIN_UIDS.includes(user.uid);
+        setIsAdmin(adminStatus);
+      } else {
+        setIsAdmin(false);
+      }
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => { dbg("confirmDelete state:", confirmDelete); }, [confirmDelete]);
+  useEffect(() => { dbg("editingPost state:", editingPost ? `id=${editingPost.id}` : "null"); }, [editingPost]);
+
+  // ── Poszt keresése ───────────────────────────────────────────────
   const findPost = useCallback((category, slug, postList) => {
     return (
       postList.find(p => p.slug === slug && p.category === category) ||
-      postList.find(p => p.slug === slug) || // fallback: csak slug
+      postList.find(p => p.slug === slug) ||
       null
     );
   }, []);
 
-  // ── Firebase: mentett posztok betöltése mount-kor ───────────────
+  // ── Firebase betöltés ────────────────────────────────────────────
   useEffect(() => {
     const loadFirebasePosts = async () => {
       try {
         const q = query(collection(db, "forum_posts"), orderBy("createdAt", "desc"));
         const snap = await getDocs(q);
-        const fbPosts = snap.docs.map(doc => {
-          const d = doc.data();
+        const fbPosts = snap.docs.map(d => {
+          const data = d.data();
           return {
-            ...d,
-            id: doc.id,
-            time: formatFirebaseTime(d.createdAt),
-            slug: d.slug || generateSlug(d.title || ""),
+            ...data,
+            id: d.id,
+            time: formatFirebaseTime(data.createdAt),
+            slug: data.slug || generateSlug(data.title || ""),
           };
         });
+        dbg(`Firebase: ${fbPosts.length} poszt betöltve`);
         if (fbPosts.length > 0) {
-          // Firebase posztok elöl, MOCK_POSTS mögötte
           setPosts([...fbPosts, ...MOCK_POSTS]);
         }
       } catch (e) {
@@ -749,14 +937,11 @@ export default function Forum() {
     loadFirebasePosts();
   }, []);
 
-  // ── URL routing: ha posts megváltozik, próbáljuk meg nyitni az URL-ből ──
+  // ── URL routing ──────────────────────────────────────────────────
   useEffect(() => {
     if (initialSlugRef.current) return;
     const info = getPostInfoFromURL();
-    if (!info) {
-      initialSlugRef.current = true;
-      return;
-    }
+    if (!info) { initialSlugRef.current = true; return; }
     const found = findPost(info.category, info.slug, posts);
     if (found) {
       setOpenPost(found);
@@ -765,7 +950,6 @@ export default function Forum() {
     }
   }, [posts, findPost]);
 
-  // ── Böngésző vissza/előre gomb ──────────────────────────────────
   useEffect(() => {
     const handlePopState = () => {
       const info = getPostInfoFromURL();
@@ -786,7 +970,6 @@ export default function Forum() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, [findPost]);
 
-  // ── Dropdown bezárás kívülre kattintáskor ───────────────────────
   useEffect(() => {
     const handler = e => {
       if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false);
@@ -796,7 +979,11 @@ export default function Forum() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const toggleBookmark = id => setBookmarks(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleBookmark = id => setBookmarks(p => {
+    const n = new Set(p);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
 
   const handleOpenPost = (post) => {
     setViewedIds(p => new Set([...p, post.id]));
@@ -811,43 +998,134 @@ export default function Forum() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // ── Új poszt létrehozása + Firebase mentés ──────────────────────
-  const handleNewPost = async (data) => {
-    const slug = generateSlug(data.title);
+  // ── Új / szerkesztett poszt mentése ─────────────────────────────
+  const handleNewPost = async (data, editId = null) => {
+    dbg("handleNewPost:", { editId, title: data.title });
 
-    // Slug ütközés csak azonos kategórián belül
+    if (editId !== null) {
+      const updates = {
+        title: data.title,
+        content: data.content,
+        category: data.category,
+        tags: data.tags,
+        poll: data.poll,
+        preview: data.content?.slice(0, 120) || "",
+        slug: generateSlug(data.title),
+      };
+
+      const postIdStr = String(editId);
+      const isFbPost = !postIdStr.startsWith("local_") && isNaN(Number(postIdStr));
+
+      if (isFbPost) {
+        try {
+          await updateDoc(doc(db, "forum_posts", postIdStr), updates);
+          dbg("Firebase frissítés OK:", postIdStr);
+        } catch (e) {
+          console.error("Firebase frissítési hiba:", e);
+        }
+      }
+
+      setPosts(p => p.map(post =>
+        String(post.id) === postIdStr ? { ...post, ...updates } : post
+      ));
+
+      if (openPost && String(openPost.id) === postIdStr) {
+        setOpenPost(prev => ({ ...prev, ...updates }));
+      }
+      return;
+    }
+
+    // Új poszt
+    const slug = generateSlug(data.title);
     let finalSlug = slug;
     let counter = 1;
     while (posts.some(p => p.slug === finalSlug && p.category === data.category)) {
-      finalSlug = `${slug}-${counter}`;
-      counter++;
+      finalSlug = `${slug}-${counter++}`;
     }
 
     const postData = {
       slug: finalSlug,
       ...data,
       pinned: false, hot: false, locked: false, solved: false,
-      author: "te", avatar: "É", avatarColor: accentColor,
+      author: currentUser?.displayName || currentUser?.email?.split("@")[0] || "Névtelen",
+      avatar: (currentUser?.displayName?.[0] || currentUser?.email?.[0] || "?").toUpperCase(),
+      avatarColor: accentColor,
+      authorId: currentUser?.uid || null,
       time: "Most", views: 1, likes: 0, comments: 0, readTime: 1,
       preview: data.content?.slice(0, 120) || "",
     };
 
-    // Firebase mentés
-    let finalId = Date.now(); // fallback ID
+    let finalId = `local_${Date.now()}`;
     try {
       const docRef = await addDoc(collection(db, "forum_posts"), {
         ...postData,
         createdAt: serverTimestamp(),
       });
       finalId = docRef.id;
-      console.log("✅ Poszt elmentve Firebase-be:", docRef.id);
+      dbg("Firebase mentés OK:", docRef.id);
     } catch (e) {
-      console.error("❌ Firebase mentési hiba:", e);
+      console.error("Firebase mentési hiba:", e);
     }
 
     setPosts(p => [{ ...postData, id: finalId }, ...p]);
   };
 
+  // ── Poszt törlése ────────────────────────────────────────────────
+  const handleDeletePost = async (postId, authorId) => {
+    dbg("handleDeletePost:", { postId, authorId, currentUserId, isAdmin });
+
+    if (authorId && !currentUserId) { dbg("MEGTAGADVA: nincs bejelentkezés"); return; }
+    if (authorId && currentUserId !== authorId && !isAdmin) { dbg("MEGTAGADVA: nem saját poszt"); return; }
+
+    const postIdStr = String(postId);
+    const isFbPost = !postIdStr.startsWith("local_") && isNaN(Number(postIdStr));
+
+    if (isFbPost) {
+      try {
+        await deleteDoc(doc(db, "forum_posts", postIdStr));
+        dbg("Firebase törlés OK:", postIdStr);
+      } catch (e) {
+        console.error("Firebase törlési hiba:", e);
+      }
+    }
+
+    setPosts(p => {
+      const filtered = p.filter(post => String(post.id) !== postIdStr);
+      dbg(`Törlés után: ${p.length} → ${filtered.length} poszt`);
+      return filtered;
+    });
+    setConfirmDelete(null);
+
+    if (openPost && String(openPost.id) === postIdStr) {
+      handleBack();
+    }
+  };
+
+  // ── Toggle mező ──────────────────────────────────────────────────
+  const handleToggleField = async (postId, field, value) => {
+    dbg("handleToggleField:", { postId, field, value });
+    const postIdStr = String(postId);
+    const isFbPost = !postIdStr.startsWith("local_") && isNaN(Number(postIdStr));
+
+    if (isFbPost) {
+      try {
+        await updateDoc(doc(db, "forum_posts", postIdStr), { [field]: value });
+        dbg(`Firebase toggle OK: ${field}=${value}`);
+      } catch (e) {
+        console.error(`Firebase ${field} toggle hiba:`, e);
+      }
+    }
+
+    setPosts(p => p.map(post =>
+      String(post.id) === postIdStr ? { ...post, [field]: value } : post
+    ));
+
+    if (openPost && String(openPost.id) === postIdStr) {
+      setOpenPost(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  // ── Szűrés + rendezés ────────────────────────────────────────────
   const filteredPosts = posts.filter(p => {
     if (showOnlyBookmarks && !bookmarks.has(p.id)) return false;
     if (activeCategory !== "all" && p.category !== activeCategory) return false;
@@ -858,7 +1136,7 @@ export default function Forum() {
     return true;
   }).sort((a, b) => {
     if (sortBy === "hot") return (b.likes * 3 + b.views / 10 + b.comments * 2) - (a.likes * 3 + a.views / 10 + a.comments * 2);
-    if (sortBy === "new") return b.id - a.id;
+    if (sortBy === "new") return String(b.id) > String(a.id) ? 1 : -1;
     if (sortBy === "top") return b.likes - a.likes;
     if (sortBy === "views") return b.views - a.views;
     return 0;
@@ -867,17 +1145,63 @@ export default function Forum() {
   const totalOnline = CATEGORIES.slice(1).reduce((s, c) => s + c.online, 0);
   const totalThreads = CATEGORIES.slice(1).reduce((s, c) => s + c.threads, 0);
 
+  // ── Közös modálok (mindkét nézetben renderelve) ──────────────────
+  // FIX: ezek korábban az early-return UTÁN voltak, így poszt-nézetben
+  // soha nem kerültek a DOM-ba → szerkesztés és törlés nem működött.
+  const sharedModals = (
+    <>
+      {/* Szerkesztő modal */}
+      <NewPostModal
+        isOpen={!!editingPost}
+        onClose={() => setEditingPost(null)}
+        defaultCategory={editingPost?.category || "chat"}
+        onSubmit={handleNewPost}
+        editPost={editingPost}
+      />
+
+      {/* Törlés megerősítő */}
+      <ConfirmDialog
+        isOpen={!!confirmDelete}
+        message="A poszt véglegesen törlődik. Ez a művelet nem vonható vissza."
+        onConfirm={() => {
+          dbg("ConfirmDialog onConfirm → handleDeletePost", confirmDelete);
+          handleDeletePost(confirmDelete.id, confirmDelete.authorId);
+        }}
+        onCancel={() => {
+          dbg("ConfirmDialog onCancel");
+          setConfirmDelete(null);
+        }}
+      />
+    </>
+  );
+
+  // ── Poszt nézet (early return — de a modálok most itt is benne vannak!) ──
   if (openPost) {
     return (
-      <ForumPost
-        post={openPost}
-        allPosts={posts}
-        onBack={handleBack}
-        onOpenPost={handleOpenPost}
-      />
+      <>
+        <ForumPost
+          post={openPost}
+          allPosts={posts}
+          onBack={handleBack}
+          onOpenPost={handleOpenPost}
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          onDelete={(id, authorId) => {
+            dbg("ForumPost onDelete:", { id, authorId });
+            setConfirmDelete({ id, authorId });
+          }}
+          onEdit={(post) => {
+            dbg("ForumPost onEdit:", post.id);
+            setEditingPost(post);
+          }}
+          onToggle={handleToggleField}
+        />
+        {sharedModals}
+      </>
     );
   }
 
+  // ── Fórum lista nézet ────────────────────────────────────────────
   return (
     <div className="min-h-screen relative overflow-x-hidden"
       style={{ background: "radial-gradient(ellipse at top, #1a0b2e 0%, #0a0118 50%, #000000 100%)", fontFamily: "'SF Pro Display', -apple-system, system-ui, sans-serif" }}>
@@ -901,8 +1225,21 @@ export default function Forum() {
                 <h1 className="text-white font-bold text-base leading-tight flex items-center gap-2">
                   AI Fórum
                   <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(74,222,128,0.15)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)" }}>BETA</span>
+                  {isAdmin && (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}>
+                      👑 Admin
+                    </span>
+                  )}
+                  {DEBUG && (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(239,68,68,0.15)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>
+                      🐛 DEBUG
+                    </span>
+                  )}
                 </h1>
-                <p className="text-gray-500 text-xs">{totalThreads.toLocaleString()} téma · <span className="text-green-400">{totalOnline} online</span></p>
+                <p className="text-gray-500 text-xs">
+                  {totalThreads.toLocaleString()} téma · <span className="text-green-400">{totalOnline} online</span>
+                  {DEBUG && <span className="text-red-400 ml-2">· uid: {currentUserId || "null"}</span>}
+                </p>
               </div>
             </div>
 
@@ -932,20 +1269,20 @@ export default function Forum() {
                 <button onClick={() => setShowUserMenu(v => !v)}
                   className="cursor-pointer w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm text-white transition-all"
                   style={{ background: "linear-gradient(135deg,#7c3aed,#db2777)", boxShadow: showUserMenu ? "0 0 20px rgba(124,58,237,0.5)" : "none" }}>
-                  É
+                  {currentUser?.displayName?.[0]?.toUpperCase() || currentUser?.email?.[0]?.toUpperCase() || "?"}
                 </button>
                 {showUserMenu && (
                   <div className="absolute right-0 top-full mt-2 w-52 z-50 rounded-2xl overflow-hidden"
                     style={{ background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
                     <div className="px-4 py-3 border-b border-white/8">
-                      <p className="text-white font-semibold text-sm">én</p>
-                      <p className="text-gray-500 text-xs">342 pont · 12 bejegyzés</p>
+                      <p className="text-white font-semibold text-sm">{currentUser?.displayName || currentUser?.email || "Felhasználó"}</p>
+                      <p className="text-gray-500 text-xs">{isAdmin ? "👑 Admin" : "Tag"}</p>
                     </div>
                     {[
                       { icon: <User className="w-3.5 h-3.5" />, label: "Profilom", action: null },
                       { icon: <Bookmark className="w-3.5 h-3.5" />, label: "Mentett témák", action: () => { setShowOnlyBookmarks(v => !v); setShowUserMenu(false); } },
                       { icon: <Settings className="w-3.5 h-3.5" />, label: "Beállítások", action: null },
-                      { icon: <Shield className="w-3.5 h-3.5" />, label: "Admin panel", action: null },
+                      ...(isAdmin ? [{ icon: <Shield className="w-3.5 h-3.5" />, label: "Admin panel", action: null }] : []),
                     ].map(item => (
                       <button key={item.label} onClick={item.action || undefined}
                         className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-gray-400 hover:text-white hover:bg-white/8 transition-colors text-xs">
@@ -1072,13 +1409,38 @@ export default function Forum() {
               </div>
             )}
 
+            {!currentUser && (
+              <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl"
+                style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.15)" }}>
+                <User className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                <p className="text-gray-400 text-xs">
+                  <span className="text-white font-medium">Jelentkezz be</span> a saját témáid szerkesztéséhez és törléséhez.
+                  {DEBUG && <span className="text-red-400 ml-1">(DEBUG: mock postok mindenképp kezelhetők)</span>}
+                </p>
+              </div>
+            )}
+
             {filteredPosts.length > 0
               ? filteredPosts.map(post => (
-                <PostCard key={post.id} post={post}
+                <PostCard
+                  key={post.id}
+                  post={post}
                   onClick={() => handleOpenPost(post)}
                   bookmarked={bookmarks.has(post.id)}
                   onBookmark={toggleBookmark}
-                  viewedIds={viewedIds} />
+                  viewedIds={viewedIds}
+                  currentUserId={currentUserId}
+                  isAdmin={isAdmin}
+                  onDelete={(id, authorId) => {
+                    dbg("PostCard onDelete prop hívva:", { id, authorId });
+                    setConfirmDelete({ id, authorId });
+                  }}
+                  onEdit={(p) => {
+                    dbg("PostCard onEdit prop hívva:", p.id);
+                    setEditingPost(p);
+                  }}
+                  onToggle={handleToggleField}
+                />
               ))
               : (
                 <div className="flex flex-col items-center justify-center py-16 gap-3 rounded-2xl"
@@ -1134,7 +1496,6 @@ export default function Forum() {
                         <div className="text-xs font-semibold truncate" style={{ color: user.color }}>{user.name}</div>
                         <div className="text-gray-600 text-xs">{user.points.toLocaleString()} pont · {user.posts} bejegyzés</div>
                       </div>
-                      <div className="w-1 h-8 rounded-full flex-shrink-0" style={{ background: `linear-gradient(180deg, ${user.color}, ${user.color}30)`, opacity: 1 - i * 0.12 }} />
                     </div>
                   ))}
                 </div>
@@ -1208,9 +1569,16 @@ export default function Forum() {
         </div>
       </div>
 
-      <NewPostModal isOpen={newPostOpen} onClose={() => setNewPostOpen(false)}
+      {/* Új poszt modal */}
+      <NewPostModal
+        isOpen={newPostOpen}
+        onClose={() => setNewPostOpen(false)}
         defaultCategory={activeCategory !== "all" ? activeCategory : "chat"}
-        onSubmit={handleNewPost} />
+        onSubmit={handleNewPost}
+      />
+
+      {/* Közös modálok (szerkesztés + törlés) — lista nézetben */}
+      {sharedModals}
 
       <style>{`
         @keyframes floatA { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(20px,-20px) scale(1.05)} 66%{transform:translate(-15px,15px) scale(0.95)} }

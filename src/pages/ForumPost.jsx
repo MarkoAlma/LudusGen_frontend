@@ -7,7 +7,7 @@ import {
   AlertCircle, Award, Edit3, X, BarChart2, RefreshCw,
   ArrowUp, Zap, AtSign, Bold, Italic, Code,
   List, Quote, ChevronRight,
-  PenSquare, Shield, Search, Rss, Link,
+  PenSquare, Shield, Search, Rss, Link, Unlock,
 } from "lucide-react";
 
 // ─── Kategória map ────────────────────────────────────────────────
@@ -626,8 +626,7 @@ const HelpfulWidget = ({ color }) => {
   );
 };
 
-// ─── Permalink copy widget ─────────────────────────────────────────
-// ÚJ: category + slug alapú permalink
+// ─── Permalink widget ─────────────────────────────────────────────
 const PermalinkWidget = ({ category, slug, color }) => {
   const [copied, setCopied] = useState(false);
   const permalink = `${window.location.origin}/forum/${category}/${slug}`;
@@ -659,8 +658,52 @@ const PermalinkWidget = ({ category, slug, color }) => {
   );
 };
 
+// ─── Törlés megerősítő dialog (lokális, poszt nézetben) ───────────
+const ConfirmDeleteModal = ({ isOpen, onConfirm, onCancel }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10001 }}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative rounded-2xl p-6 max-w-sm w-full"
+        style={{ background: "rgba(10,10,28,0.99)", border: "1px solid rgba(239,68,68,0.3)", boxShadow: "0 20px 60px rgba(0,0,0,0.8)" }}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            <Trash2 className="w-4 h-4 text-red-400" />
+          </div>
+          <h3 className="text-white font-semibold text-sm">Biztosan törlöd?</h3>
+        </div>
+        <p className="text-gray-400 text-xs mb-5 leading-relaxed">A poszt véglegesen törlődik. Ez a művelet nem vonható vissza.</p>
+        <div className="flex gap-2">
+          <button onClick={onCancel}
+            className="cursor-pointer flex-1 py-2 rounded-xl text-xs text-gray-400 hover:text-white transition-all"
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            Mégse
+          </button>
+          <button onClick={onConfirm}
+            className="cursor-pointer flex-1 py-2 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}>
+            Törlés
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── FŐ KOMPONENS ─────────────────────────────────────────────────
-export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
+// JAVÍTÁS: currentUserId, isAdmin, onDelete, onEdit, onToggle propok hozzáadva
+export default function ForumPost({
+  post,
+  allPosts = [],
+  onBack,
+  onOpenPost,
+  currentUserId,
+  isAdmin,
+  onDelete,
+  onEdit,
+  onToggle,
+}) {
   const [comments, setComments] = useState(INITIAL_COMMENTS);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post?.likes || 0);
@@ -670,16 +713,21 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
   const [sortComments, setSortComments] = useState("top");
   const [commentSearch, setCommentSearch] = useState("");
   const [showCommentSearch, setShowCommentSearch] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const cat = CATEGORIES[post?.category] || CATEGORIES.chat;
   const color = cat.color;
+
+  // JAVÍTÁS: jogosultság-számítás
+  // Ha nincs authorId (mock poszt) → mindenki kezelheti; ha van → csak a saját uid
+  const isOwn = !post?.authorId || (!!currentUserId && currentUserId === post?.authorId);
+  const canManage = isOwn || isAdmin;
 
   const relatedPosts = (allPosts.length > 1
     ? allPosts.filter(p => p.id !== post?.id && p.category === post?.category)
     : RELATED_MOCK
   ).slice(0, 3);
 
-  // ÚJ: kategória/slug alapú megosztás
   const handleShare = () => {
     const permalink = post?.slug && post?.category
       ? `${window.location.origin}/forum/${post.category}/${post.slug}`
@@ -726,6 +774,16 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
       <ReadingProgress color={color} />
       <ScrollToTop />
 
+      {/* Törlés megerősítő (lokális) */}
+      <ConfirmDeleteModal
+        isOpen={showDeleteConfirm}
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          onDelete?.(post.id, post.authorId);
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl" style={{ background: `${color}08`, animation: "floatB 22s ease-in-out infinite" }} />
         <div className="absolute bottom-1/3 right-1/4 w-72 h-72 bg-blue-500/8 rounded-full blur-3xl" style={{ animation: "floatB 30s ease-in-out infinite reverse" }} />
@@ -742,7 +800,6 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
           <span className="text-xs" style={{ color }}>{cat.emoji} {cat.label}</span>
           <ChevronRight className="w-3 h-3 text-gray-700" />
           <span className="text-gray-600 text-xs truncate max-w-[180px]">{post.title}</span>
-          {/* ÚJ: teljes elérési út */}
           {post.slug && post.category && (
             <>
               <ChevronRight className="w-3 h-3 text-gray-700" />
@@ -779,7 +836,6 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
                       <Clock className="w-2.5 h-2.5" />{post.time}
                       <span>·</span>
                       <Eye className="w-2.5 h-2.5" />{post.views?.toLocaleString()} megtekintés
-                      {/* ÚJ: kategória/slug az URL-ben */}
                       {post.slug && post.category && (
                         <>
                           <span>·</span>
@@ -944,15 +1000,6 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
                             <Heart className="w-2.5 h-2.5" />{p.likes}
                             <span>·</span>
                             <MessageSquare className="w-2.5 h-2.5" />{p.comments}
-                            {/* ÚJ: kategória/slug */}
-                            {p.slug && p.category && (
-                              <>
-                                <span>·</span>
-                                <span className="font-mono text-gray-700 truncate max-w-[100px]">
-                                  /{p.category}/{p.slug}
-                                </span>
-                              </>
-                            )}
                           </div>
                         </button>
                       );
@@ -967,7 +1014,6 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
           <div className="space-y-3">
             <TableOfContents content={post.content} color={color} />
 
-            {/* ÚJ: category + slug alapú Permalink widget */}
             {post.slug && post.category && (
               <PermalinkWidget category={post.category} slug={post.slug} color={color} />
             )}
@@ -1031,26 +1077,85 @@ export default function ForumPost({ post, allPosts = [], onBack, onOpenPost }) {
               </GlassCard>
             )}
 
-            <GlassCard>
-              <div className="px-4 pt-4 pb-3">
-                <h4 className="text-gray-500 text-xs uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                  <Shield className="w-3 h-3" /> Moderáció
-                </h4>
-                <div className="space-y-1">
-                  {[
-                    { icon: <Pin className="w-3.5 h-3.5" />, label: "Kitűzés" },
-                    { icon: <Lock className="w-3.5 h-3.5" />, label: post.locked ? "Zárolás feloldása" : "Zárolás" },
-                    { icon: <CheckCircle className="w-3.5 h-3.5" />, label: "Megoldottnak jelöl" },
-                    { icon: <Trash2 className="w-3.5 h-3.5" />, label: "Törlés", red: true },
-                  ].map(a => (
-                    <button key={a.label} className="cursor-pointer w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all hover:bg-white/8"
-                      style={{ color: a.red ? "#f87171" : "#6b7280" }}>
-                      {a.icon}{a.label}
-                    </button>
-                  ))}
+            {/* ── MODERÁCIÓ PANEL — JAVÍTVA ── */}
+            {/* Csak akkor jelenik meg, ha a felhasználónak van jogosultsága */}
+            {canManage && (
+              <GlassCard>
+                <div className="px-4 pt-4 pb-3">
+                  <h4 className="text-gray-500 text-xs uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                    <Shield className="w-3 h-3" /> {isAdmin && !isOwn ? "Admin műveletek" : "Saját téma"}
+                  </h4>
+                  <div className="space-y-0.5">
+
+                    {/* Szerkesztés — csak saját poszthoz */}
+                    {isOwn && (
+                      <button
+                        onClick={() => onEdit?.(post)}
+                        className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
+                        style={{ color: "#60a5fa" }}>
+                        <Edit3 className="w-3.5 h-3.5" /> Szerkesztés
+                      </button>
+                    )}
+
+                    {/* Megoldottnak jelöl — csak saját poszthoz */}
+                    {isOwn && (
+                      <button
+                        onClick={() => onToggle?.(post.id, "solved", !post.solved)}
+                        className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
+                        style={{ color: post.solved ? "#6b7280" : "#4ade80" }}>
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        {post.solved ? "Megoldás visszavon" : "Megoldottnak jelöl"}
+                      </button>
+                    )}
+
+                    {/* Zárolás — saját vagy admin */}
+                    {canManage && (
+                      <button
+                        onClick={() => onToggle?.(post.id, "locked", !post.locked)}
+                        className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
+                        style={{ color: post.locked ? "#60a5fa" : "#fb923c" }}>
+                        {post.locked
+                          ? <><Unlock className="w-3.5 h-3.5" /> Zárolás feloldása</>
+                          : <><Lock className="w-3.5 h-3.5" /> Téma zárolása</>
+                        }
+                      </button>
+                    )}
+
+                    {/* Kitűzés — csak admin */}
+                    {isAdmin && (
+                      <button
+                        onClick={() => onToggle?.(post.id, "pinned", !post.pinned)}
+                        className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
+                        style={{ color: "#fbbf24" }}>
+                        <Pin className="w-3.5 h-3.5" />
+                        {post.pinned ? "Kitűzés eltávolítása" : "Kitűzés"}
+                      </button>
+                    )}
+
+                    {/* Trending — csak admin */}
+                    {isAdmin && (
+                      <button
+                        onClick={() => onToggle?.(post.id, "hot", !post.hot)}
+                        className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
+                        style={{ color: "#fb923c" }}>
+                        <Flame className="w-3.5 h-3.5" />
+                        {post.hot ? "Trending eltávolítása" : "Trending jelölés"}
+                      </button>
+                    )}
+
+                    {/* Törlés — saját vagy admin */}
+                    <div className="border-t border-white/8 mt-1 pt-1">
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-red-400/10"
+                        style={{ color: "#f87171" }}>
+                        <Trash2 className="w-3.5 h-3.5" /> Téma törlése
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </GlassCard>
+              </GlassCard>
+            )}
           </div>
         </div>
       </div>
