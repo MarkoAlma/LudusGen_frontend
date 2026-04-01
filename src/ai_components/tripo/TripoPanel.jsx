@@ -35,32 +35,28 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const POLL_MS = 2500;
 const POLL_MAX = 500;
 
-// Auto-stop thresholds
-const PROGRESS_JUMP_LIMIT = 30;    // stop if progress jumps >30% in one poll
-const STUCK_THRESHOLD_MS  = 300_000; // stop if stuck at 99/100% for 5 minutes
+const PROGRESS_JUMP_LIMIT = 30;
+const STUCK_THRESHOLD_MS  = 300_000;
 
 const NAV = [
-  { id: "generate", label: "Model", icon: Sparkles, sub: false },
-  { id: "segment", label: "Segment", icon: Scissors, sub: true },
-  { id: "retopo", label: "Retopo", icon: Grid3x3, sub: false },
-  { id: "texture", label: "Texture", icon: PaintBucket, sub: true },
-  { id: "texture_edit", label: "Edit", icon: Wand2, sub: false },
-  { id: "animate", label: "Animate", icon: PersonStanding, sub: false },
+  { id: "generate",     label: "Model",   icon: Sparkles,       sub: false },
+  { id: "segment",      label: "Segment", icon: Scissors,       sub: true  },
+  { id: "retopo",       label: "Retopo",  icon: Grid3x3,        sub: false },
+  { id: "texture",      label: "Texture", icon: PaintBucket,    sub: true  },
+  { id: "texture_edit", label: "Edit",    icon: Wand2,          sub: false },
+  { id: "animate",      label: "Animate", icon: PersonStanding, sub: false },
 ];
 
-
 const SEGMENT_SUBS = [
-  { id: "segment", label: "Segment" },
+  { id: "segment",    label: "Segment"    },
   { id: "fill_parts", label: "Fill Parts" },
 ];
 
-// Rögzített módköltségek — mode-specifikus taskokhoz.
-// A "generate" és "texture" és "retopo" módok dinamikusan számolnak (genCost).
 const MODE_COST = {
-  segment:      40,  // mesh_segmentation: 40
-  fill_parts:   50,  // mesh_completion:   50
-  texture_edit: 10,  // texture_edit task
-  animate:      10,  // animate_retarget:  10 per animation
+  segment:      40,
+  fill_parts:   50,
+  texture_edit: 10,
+  animate:      10,
 };
 
 /* ─── CSS ────────────────────────────────────────────────────────────── */
@@ -154,6 +150,29 @@ const CSS = `
   .auto-rig-btn.ready { background:rgba(255,255,255,0.08);color:#c8c8e0; }
   .auto-rig-btn.ready:hover { background:rgba(255,255,255,0.12); }
   .auto-rig-btn.disabled { background:rgba(255,255,255,0.04);color:#1e1e38;cursor:not-allowed; }
+
+  /* ── Model-NA: feature not available with selected model ─────────────
+   * Wrapper dims the child UI and blocks all pointer interaction.
+   * Title tooltip on the wrapper still describes why it's disabled.
+   * ─────────────────────────────────────────────────────────────────── */
+  .model-na {
+    opacity: 0.28;
+    filter: grayscale(0.45);
+    cursor: not-allowed !important;
+    transition: opacity 0.15s, filter 0.15s;
+    position: relative;
+  }
+  .model-na * {
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+  }
+  /* Tab buttons get model-na directly (no wrapper), so pointer-events is
+     overridden individually via JS onClick guard + cursor style. */
+  .tp-inp-tab.model-na {
+    pointer-events: none !important;
+    opacity: 0.25 !important;
+    filter: grayscale(0.5);
+  }
 `;
 
 function CoinIcon({ size = 15 }) {
@@ -197,8 +216,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   const [tex4K, setTex4K] = useState(true);
   const [pbrOn, setPbrOn] = useState(false);
   const [genStatus, setGenStatus] = useState("idle");
-  const [isRunning, setIsRunning] = useState(false); // ← explicit, nem derived
-  // FIX: removed unused `texQ` state (was declared but never read or passed anywhere)
+  const [isRunning, setIsRunning] = useState(false);
   const [multiImages, setMultiImages] = useState([]);
   const [batchImages, setBatchImages] = useState([]);
 
@@ -299,11 +317,62 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   const dragRef = useRef(null);
   const fileRef = useRef(null);
   const currentTaskId      = useRef(null);
-  const currentRequestId   = useRef(null); // concurrency guard
-  const userStoppedRef     = useRef(false);  // true = user explicitly stopped
+  const currentRequestId   = useRef(null);
+  const userStoppedRef     = useRef(false);
 
-  // FIX: store panel widths in refs so startDrag doesn't recreate on every resize
-  const leftWRef = useRef(302);
+  // ── Backend-driven model capabilities ───────────────────────────────────
+  // Fetched once on mount; falls back to null so GeneratePanel uses its own
+  // static MODEL_CAPS map until the response arrives.
+  const [backendCaps, setBackendCaps] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const t = getIdToken ? await getIdToken() : "";
+        const res = await fetch(BASE_URL + "/api/tripo/model-capabilities", {
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + t },
+        });
+        if (!res.ok) return;
+        const d = await res.json();
+        if (!cancelled && d.success && d.capabilities) {
+          setBackendCaps(d.capabilities);
+        }
+      } catch (e) {
+        console.warn("[TripoPanel] Failed to fetch model capabilities from backend:", e.message);
+        // Graceful fallback — GeneratePanel uses its own static MODEL_CAPS
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Weekly history cleanup ───────────────────────────────────────────────
+  // Runs once per session (not per component mount) to prune expired items.
+  useEffect(() => {
+    if (!userId) return;
+    const CLEANUP_KEY = "tripo_history_cleanup_ts";
+    const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const last = parseInt(localStorage.getItem(CLEANUP_KEY) || "0", 10);
+    if (Date.now() - last < WEEK_MS) return; // already ran this week
+    (async () => {
+      try {
+        const t = getIdToken ? await getIdToken() : "";
+        const res = await fetch(BASE_URL + "/api/tripo/history/expired", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + t },
+        });
+        if (res.ok) {
+          localStorage.setItem(CLEANUP_KEY, String(Date.now()));
+          const d = await res.json();
+          if (d.deleted > 0) console.log(`[TripoPanel] Cleaned up ${d.deleted} expired history items`);
+        }
+      } catch (e) {
+        console.warn("[TripoPanel] History cleanup failed:", e.message);
+      }
+    })();
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const leftWRef  = useRef(302);
   const rightWRef = useRef(220);
 
   const wireHex = useMemo(() => parseInt(wireC.replace("#", ""), 16), [wireC]);
@@ -323,14 +392,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   const canGen = useMemo(() => {
     if (isRunning) return false;
     switch (mode) {
-      case "generate": return genTab === "text" ? !!prompt.trim() : genTab === "batch" ? (batchImages?.length > 0) : !!imgToken;
-      case "segment": return !!(segId.trim() || activeTaskId);
-      case "fill_parts": return !!(fillId.trim() || activeTaskId);
-      case "retopo": return !!(retopoId.trim() || activeTaskId);
-      case "texture": return !!(texId.trim() || activeTaskId) && (texInputTab === "text" ? !!texPrompt.trim() : texInputTab === "image" ? !!imgToken : multiImages.length > 0);
+      case "generate":     return genTab === "text" ? !!prompt.trim() : genTab === "batch" ? (batchImages?.length > 0) : !!imgToken;
+      case "segment":      return !!(segId.trim() || activeTaskId);
+      case "fill_parts":   return !!(fillId.trim() || activeTaskId);
+      case "retopo":       return !!(retopoId.trim() || activeTaskId);
+      case "texture":      return !!(texId.trim() || activeTaskId) && (texInputTab === "text" ? !!texPrompt.trim() : texInputTab === "image" ? !!imgToken : multiImages.length > 0);
       case "texture_edit": return !!(editId.trim() || activeTaskId);
-      case "animate": return !!(riggedId && selAnim); // rigged model + selected animation required
-      default: return false;
+      case "animate":      return !!(riggedId && selAnim);
+      default:             return false;
     }
   }, [isRunning, mode, genTab, prompt, imgToken, batchImages, segId, fillId, retopoId, activeTaskId, texInputTab, texPrompt, multiImages, editId, texId]);
 
@@ -344,9 +413,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     return { "Content-Type": "application/json", Authorization: "Bearer " + t };
   }, [getIdToken]);
 
-  // FIX: startDrag no longer has leftW/rightW in its dep array.
-  // It reads current values from refs, so it's created only once.
-  // The refs are kept in sync via the setLeftW/setRightW calls below.
   const startDrag = useCallback((side) => (e) => {
     e.preventDefault();
     const startW = side === "left" ? leftWRef.current : rightWRef.current;
@@ -357,17 +423,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
       const dx = ev.clientX - startX;
       if (s === "left") {
         const nw = Math.max(260, Math.min(400, sw + dx));
-        leftWRef.current = nw;
-        setLeftW(nw);
+        leftWRef.current = nw; setLeftW(nw);
       } else {
         const nw = Math.max(180, Math.min(320, sw - dx));
-        rightWRef.current = nw;
-        setRightW(nw);
+        rightWRef.current = nw; setRightW(nw);
       }
     };
     const up = () => { dragRef.current = null; document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); };
     document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
-  }, []); // no deps — reads widths from refs
+  }, []);
 
   const handleImg = useCallback(async (file) => {
     if (!file) return;
@@ -382,82 +446,44 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     finally { setImgUploading(false); }
   }, [getIdToken]);
 
-  // FIX: handleMultiImg and handleBatchImg were identical — merged into one uploadImageFile
   const uploadImageFile = useCallback(async (file) => {
     const t = getIdToken ? await getIdToken() : "";
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch(BASE_URL + "/api/tripo/upload", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + t },
-      body: form,
-    });
+    const form = new FormData(); form.append("file", file);
+    const res = await fetch(BASE_URL + "/api/tripo/upload", { method: "POST", headers: { Authorization: "Bearer " + t }, body: form });
     const d = await res.json();
     if (!d.success) throw new Error(d.message);
     return d.imageToken;
   }, [getIdToken]);
 
   const pollTask = useCallback(async (taskId, pt, headers, onSuccess) => {
-    let n = 0;
-    let prevProgress  = 0;
-    let stuckSince    = null;
-
+    let n = 0, prevProgress = 0, stuckSince = null;
     while (n < POLL_MAX) {
       if (pt.cancelled) return;
       await new Promise(r => setTimeout(r, POLL_MS));
       if (pt.cancelled) return;
       n++;
-
       const res = await fetch(BASE_URL + "/api/tripo/task/" + taskId, { headers });
       const d   = await res.json();
       if (!d.success) throw new Error(d.message ?? "Poll error");
-
       const prog = d.progress ?? 0;
-
-      // AUTO-STOP A: suspicious progress jump
       if (d.status !== "success" && prog - prevProgress > PROGRESS_JUMP_LIMIT) {
-        throw Object.assign(
-          new Error(`Auto-stopped: suspicious progress jump (${prevProgress}% → ${prog}%)`),
-          { type: "auto_stop", autoStop: true }
-        );
+        throw Object.assign(new Error(`Auto-stopped: suspicious progress jump (${prevProgress}% → ${prog}%)`), { type: "auto_stop", autoStop: true });
       }
-
-      // AUTO-STOP B: stuck at 99/100% for 30s
       if (d.status !== "success" && prog >= 99) {
         if (!stuckSince) stuckSince = Date.now();
         else if (Date.now() - stuckSince > STUCK_THRESHOLD_MS) {
-          throw Object.assign(
-            new Error("Auto-stopped: stuck at " + prog + "% for 30s"),
-            { type: "auto_stop", autoStop: true }
-          );
+          throw Object.assign(new Error("Auto-stopped: stuck at " + prog + "% for 5min"), { type: "auto_stop", autoStop: true });
         }
-      } else {
-        stuckSince = null;
-      }
-
-      // Update progress & persist snapshot
+      } else { stuckSince = null; }
       if (d.status !== "success" && d.status !== "failed" && d.status !== "cancelled") {
-        const dp = Math.min(prog, 99);
-        setProgress(dp);
-        updatePersistedProgress(dp);
-        prevProgress = prog;
+        const dp = Math.min(prog, 99); setProgress(dp); updatePersistedProgress(dp); prevProgress = prog;
       }
-
       if (d.status === "success") {
-        if (!d.modelUrl) {
-          throw Object.assign(
-            new Error("Content blocked by Tripo. Credits were not charged."),
-            { type: "nsfw" }
-          );
-        }
-        await onSuccess(d);
-        return;
+        if (!d.modelUrl) throw Object.assign(new Error("Content blocked by Tripo. Credits were not charged."), { type: "nsfw" });
+        await onSuccess(d); return;
       }
       if (d.status === "failed" || d.status === "cancelled") {
-        throw Object.assign(
-          new Error("Task " + d.status),
-          { tripoStatus: d.status, rawOutput: d }
-        );
+        throw Object.assign(new Error("Task " + d.status), { tripoStatus: d.status, rawOutput: d });
       }
     }
     throw new Error("Timeout");
@@ -469,47 +495,31 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
       try {
         if (attempt > 0) await new Promise(r => setTimeout(r, 1200 * attempt));
         const t = await getIdToken();
-        const res = await fetch(
-          BASE_URL + "/api/tripo/model-proxy?url=" + encodeURIComponent(rawUrl),
-          { headers: { Authorization: "Bearer " + t }, signal: AbortSignal.timeout(45_000) }
-        );
+        const res = await fetch(BASE_URL + "/api/tripo/model-proxy?url=" + encodeURIComponent(rawUrl), { headers: { Authorization: "Bearer " + t }, signal: AbortSignal.timeout(45_000) });
         if (!res.ok) throw new Error("Model load HTTP " + res.status);
         const blob = await res.blob();
         if (!blob || blob.size === 0) throw new Error("Empty model response");
         return URL.createObjectURL(blob);
-      } catch (err) {
-        lastErr = err;
-        console.warn(`[fetchProxy] attempt ${attempt + 1}/${retries} failed:`, err.message);
-      }
+      } catch (err) { lastErr = err; console.warn(`[fetchProxy] attempt ${attempt + 1}/${retries} failed:`, err.message); }
     }
     throw lastErr ?? new Error("fetchProxy: all retries exhausted");
   }, [getIdToken]);
 
-  // FIX: helper to safely revoke blob URLs — prevents RAM accumulation
-  // every fetchProxy call creates a blob:// that must be explicitly freed
   const revokeBlobUrl = useCallback((url) => {
     if (url && url.startsWith("blob:")) URL.revokeObjectURL(url);
   }, []);
 
-  // FIX: cleanup on unmount — releases the last active blob from memory
-  useEffect(() => {
-    return () => { revokeBlobUrl(prevUrl.current); };
-  }, []); // eslint-disable-line
+  useEffect(() => { return () => { revokeBlobUrl(prevUrl.current); }; }, []); // eslint-disable-line
 
-  // Page-reload resume: reconnect to an in-progress generation
+  // Page-reload resume
   useEffect(() => {
     const persisted = loadPersistedGen();
     if (!persisted) return;
     console.log("[TripoPanel] Resuming after reload:", persisted.taskId);
-    setIsRunning(true);
-    setProgress(persisted.lastProgress ?? 0);
-    setStatusMsg("Resuming generation…");
-    currentTaskId.current = persisted.taskId;
-    userStoppedRef.current = false;
-    const requestId = crypto.randomUUID();
-    currentRequestId.current = requestId;
-    const pt = { cancelled: false };
-    pollAb.current = pt;
+    setIsRunning(true); setProgress(persisted.lastProgress ?? 0); setStatusMsg("Resuming generation…");
+    currentTaskId.current = persisted.taskId; userStoppedRef.current = false;
+    const requestId = crypto.randomUUID(); currentRequestId.current = requestId;
+    const pt = { cancelled: false }; pollAb.current = pt;
     (async () => {
       try {
         const t = getIdToken ? await getIdToken() : "";
@@ -522,26 +532,18 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
           if (pt.cancelled) { revokeBlobUrl(blob); return; }
           revokeBlobUrl(prevUrl.current);
           setModelUrl(blob); prevUrl.current = blob;
-          setGenStatus("succeeded"); setProgress(100); setStatusMsg("");
-          setIsRunning(false);
-          currentTaskId.current = null;
-          clearPersistedGen();
+          setGenStatus("succeeded"); setProgress(100); setStatusMsg(""); setIsRunning(false);
+          currentTaskId.current = null; clearPersistedGen();
           await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "" });
         });
       } catch (e) {
-        setIsRunning(false); setProgress(0); setStatusMsg("");
-        currentTaskId.current = null;
-        clearPersistedGen();
-        if (!pt.cancelled) {
-          setGenStatus(e.autoStop ? "idle" : "failed");
-          setErrorMsg(e.message ?? "Resumed generation failed");
-        } else {
-          setGenStatus(prevUrl.current ? "succeeded" : "idle");
-        }
+        setIsRunning(false); setProgress(0); setStatusMsg(""); currentTaskId.current = null; clearPersistedGen();
+        if (!pt.cancelled) { setGenStatus(e.autoStop ? "idle" : "failed"); setErrorMsg(e.message ?? "Resumed generation failed"); }
+        else { setGenStatus(prevUrl.current ? "succeeded" : "idle"); }
       }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally runs once on mount
+  }, []);
 
   const saveHist = useCallback(async (taskId, rawUrl, extra = {}) => {
     const item = { prompt: prompt.trim() || extra.label || mode, status: "succeeded", model_url: rawUrl, source: "tripo", mode, taskId, params: { model_version: modelVer, mode, ...extra }, ts: Date.now() };
@@ -552,24 +554,17 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
 
   const handleGen = useCallback(async () => {
     if (!canGen) return;
-    setGenStatus("pending");
-    setIsRunning(true); // ← explicit true
-    setErrorMsg(""); setProgress(0); setStatusMsg("");
+    setGenStatus("pending"); setIsRunning(true); setErrorMsg(""); setProgress(0); setStatusMsg("");
     prevUrl.current = modelUrl; setModelUrl(null); setGenStatus("pending");
     if (pollAb.current) pollAb.current.cancelled = true;
     const pt = { cancelled: false }; pollAb.current = pt;
-
-    // Unique requestId for stale-response detection
-    const requestId = crypto.randomUUID();
-    currentRequestId.current = requestId;
+    const requestId = crypto.randomUUID(); currentRequestId.current = requestId;
     userStoppedRef.current = false;
-
     const srcId = activeTaskId;
     const animSlug = selAnim ? getAnimById(selAnim)?.slug : null;
     try {
       const headers = await authH();
       let body;
-      // isModernModel: P1-20260311 és V3.x modellek támogatják a geometry_quality (Ultra) módot
       const _isModern = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
       switch (mode) {
         case "generate":
@@ -657,15 +652,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
             };
           }
           break;
-        case "segment":
-          body = { type: "mesh_segmentation", original_model_task_id: (segId.trim() || srcId) }; break;
-        case "fill_parts":
-          body = { type: "mesh_completion", original_model_task_id: (fillId.trim() || srcId) }; break;
+        case "segment":      body = { type: "mesh_segmentation", original_model_task_id: (segId.trim() || srcId) }; break;
+        case "fill_parts":   body = { type: "mesh_completion",   original_model_task_id: (fillId.trim() || srcId) }; break;
         case "retopo":
           if (smartLowPoly) {
             body = { type: "smart_low_poly", original_model_task_id: (retopoId.trim() || srcId), face_limit: polycount > 0 ? polycount : undefined, ...(quadMesh && { quad: true }) };
           } else {
-            body = { type: "convert_model", original_model_task_id: (retopoId.trim() || srcId), format: quadMesh ? "fbx" : (outFormat || "glb"), ...(quadMesh && { quad: true }), ...(polycount > 0 && { face_limit: polycount }), ...(pivotToBottom && { pivot_to_center_bottom: true }) };
+            body = { type: "convert_model",  original_model_task_id: (retopoId.trim() || srcId), format: quadMesh ? "fbx" : (outFormat || "glb"), ...(quadMesh && { quad: true }), ...(polycount > 0 && { face_limit: polycount }), ...(pivotToBottom && { pivot_to_center_bottom: true }) };
           }
           break;
         case "texture":
@@ -674,113 +667,53 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
             texture_quality: tex4K ? "detailed" : "standard",
             ...(texPbr && { pbr: true }),
             ...(texPrompt.trim() && { prompt: texPrompt.trim() }),
-            ...(texNeg.trim() && { negative_prompt: texNeg.trim() }),
-            ...((texInputTab === "image" && imgToken) && { file: { type: "png", file_token: imgToken } }),
+            ...(texNeg.trim()    && { negative_prompt: texNeg.trim() }),
+            ...((texInputTab === "image" && imgToken)       && { file:  { type: "png", file_token: imgToken } }),
             ...((texInputTab === "multi" && multiImages.length > 0) && { files: multiImages.map(i => ({ type: "png", file_token: i.token })) }),
             ...(texAlignment && { texture_alignment: texAlignment }),
           };
           break;
-        case "texture_edit":
-          body = { type: "texture_edit", original_model_task_id: (editId.trim() || srcId), ...(brushPrompt.trim() && { prompt: brushPrompt.trim() }), creativity_strength: creativity };
-          break;
-        case "animate":
-          body = { type: "animate_retarget", original_model_task_id: riggedId, animation: animSlug, out_format: "glb" };
-          break;
+        case "texture_edit": body = { type: "texture_edit",    original_model_task_id: (editId.trim() || srcId), ...(brushPrompt.trim() && { prompt: brushPrompt.trim() }), creativity_strength: creativity }; break;
+        case "animate":      body = { type: "animate_retarget", original_model_task_id: riggedId, animation: animSlug, out_format: "glb" }; break;
         default: return;
       }
 
       setStatusMsg("Starting…");
       const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify(body) });
       const td = await tr.json();
-
-      // ── Ismert hibatípusok felismerése task létrehozáskor ──────────────
       if (!td.success) {
-        const msg = td.message ?? "Task failed";
+        const msg   = td.message ?? "Task failed";
         const lower = msg.toLowerCase();
-        if (lower.includes("insufficient") || lower.includes("credit") || lower.includes("balance")) {
-          throw Object.assign(new Error("Insufficient credits. Please top up your balance."), { type: "credits" });
-        }
-        if (lower.includes("nsfw") || lower.includes("content policy") || lower.includes("moderat")) {
-          throw Object.assign(new Error("Content blocked: NSFW or policy violation detected."), { type: "nsfw" });
-        }
+        if (lower.includes("insufficient") || lower.includes("credit") || lower.includes("balance")) throw Object.assign(new Error("Insufficient credits. Please top up your balance."), { type: "credits" });
+        if (lower.includes("nsfw") || lower.includes("content policy") || lower.includes("moderat"))   throw Object.assign(new Error("Content blocked: NSFW or policy violation detected."), { type: "nsfw" });
         throw new Error(msg);
       }
 
-      // ── Tároljuk a taskId-t, hogy Stop-kor le tudjuk cancelolni ───────
       currentTaskId.current = td.taskId;
-      persistGen({
-        taskId: td.taskId, requestId, mode, prompt: prompt.trim(), modelVer,
-        lastProgress: 0, lastProgressAt: Date.now(), startedAt: Date.now(),
-      });
+      persistGen({ taskId: td.taskId, requestId, mode, prompt: prompt.trim(), modelVer, lastProgress: 0, lastProgressAt: Date.now(), startedAt: Date.now() });
       setStatusMsg("Generating…");
       await pollTask(td.taskId, pt, headers, async d => {
         if (pt.cancelled) return;
-
-        // ── Poll-szintű hibák felismerése (NSFW, credit, failed) ──────────
-
-
-        // Stale response guard
         if (currentRequestId.current !== requestId) return;
-
         const rawUrl = d.modelUrl;
-        if (!rawUrl) {
-          throw Object.assign(
-            new Error("Generation blocked: content policy or empty output. Credits were not charged."),
-            { type: "nsfw" }
-          );
-        }
+        if (!rawUrl) throw Object.assign(new Error("Generation blocked: content policy or empty output. Credits were not charged."), { type: "nsfw" });
         const blob = await fetchProxy(rawUrl);
         if (pt.cancelled) { revokeBlobUrl(blob); return; }
         revokeBlobUrl(prevUrl.current);
         setModelUrl(blob); prevUrl.current = blob;
-        setGenStatus("succeeded"); setProgress(100); setStatusMsg("");
-        setIsRunning(false);
-        currentTaskId.current = null;
-        clearPersistedGen();
-        // History: only if user did NOT explicitly stop
-        if (!userStoppedRef.current) {
-          await saveHist(td.taskId, rawUrl, { prompt: prompt.trim() });
-        }
+        setGenStatus("succeeded"); setProgress(100); setStatusMsg(""); setIsRunning(false);
+        currentTaskId.current = null; clearPersistedGen();
+        if (!userStoppedRef.current) await saveHist(td.taskId, rawUrl, { prompt: prompt.trim() });
       });
     } catch (e) {
-      setIsRunning(false);
-      setProgress(0);
-      setStatusMsg("");
-      currentTaskId.current = null;
-      clearPersistedGen();
-
-      // User cancelled
-      if (pt.cancelled) {
-        setModelUrl(prevUrl.current);
-        setGenStatus(prevUrl.current ? "succeeded" : "idle");
-        return;
-      }
-
-      // System auto-stop (progress jump / stuck)
-      if (e.autoStop) {
-        setModelUrl(prevUrl.current);
-        setGenStatus(prevUrl.current ? "succeeded" : "idle");
-        setErrorMsg(e.message);
-        return;
-      }
-
-      // ── Hibatípus felismerés ───────────────────────────────────────────
+      setIsRunning(false); setProgress(0); setStatusMsg(""); currentTaskId.current = null; clearPersistedGen();
+      if (pt.cancelled) { setModelUrl(prevUrl.current); setGenStatus(prevUrl.current ? "succeeded" : "idle"); return; }
+      if (e.autoStop)   { setModelUrl(prevUrl.current); setGenStatus(prevUrl.current ? "succeeded" : "idle"); setErrorMsg(e.message); return; }
       if (!e.type && e.rawOutput) {
-        const reason = (
-          e.rawOutput?.rawOutput?.error_msg ??
-          e.rawOutput?.rawOutput?.message ??
-          e.rawOutput?.rawOutput?.reason ??
-          ""
-        ).toLowerCase();
-        if (reason.includes("nsfw") || reason.includes("content policy") || reason.includes("safety")) {
-          e.type = "nsfw";
-          e.message = "Content blocked: NSFW or policy violation detected.";
-        } else if (reason.includes("insufficient") || reason.includes("credit")) {
-          e.type = "credits";
-          e.message = "Insufficient credits. Please top up your balance.";
-        }
+        const reason = (e.rawOutput?.rawOutput?.error_msg ?? e.rawOutput?.rawOutput?.message ?? e.rawOutput?.rawOutput?.reason ?? "").toLowerCase();
+        if (reason.includes("nsfw") || reason.includes("content policy") || reason.includes("safety")) { e.type = "nsfw"; e.message = "Content blocked: NSFW or policy violation detected."; }
+        else if (reason.includes("insufficient") || reason.includes("credit"))                          { e.type = "credits"; e.message = "Insufficient credits. Please top up your balance."; }
       }
-
       const isHardError = e.type === "credits" || e.type === "nsfw";
       setModelUrl(prevUrl.current);
       setGenStatus(prevUrl.current ? "succeeded" : (isHardError ? "idle" : "failed"));
@@ -810,39 +743,27 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
         if (pt.cancelled) return;
         const blob = d.modelUrl ? await fetchProxy(d.modelUrl) : null;
         if (pt.cancelled) { revokeBlobUrl(blob); return; }
-        if (blob) {
-          // FIX: revoke old blob before replacing
-          revokeBlobUrl(prevUrl.current);
-          setModelUrl(blob); prevUrl.current = blob;
-        }
+        if (blob) { revokeBlobUrl(prevUrl.current); setModelUrl(blob); prevUrl.current = blob; }
         setRiggedId(rd.taskId); setRigStep("rigged"); setStatusMsg(""); setGenStatus("succeeded");
       });
     } catch (e) { if (pt.cancelled) return; setRigStep("idle"); setErrorMsg(e.message); setStatusMsg(""); }
   }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl]);
+
   const handleStop = useCallback(async () => {
-    userStoppedRef.current = true; // user-initiated: suppress history save
+    userStoppedRef.current = true;
     if (pollAb.current) pollAb.current.cancelled = true;
-    setIsRunning(false);
-    setProgress(0);
-    setStatusMsg("");
-    clearPersistedGen();
+    setIsRunning(false); setProgress(0); setStatusMsg(""); clearPersistedGen();
     const taskId = currentTaskId.current;
     if (taskId) {
       currentTaskId.current = null;
       try {
         const t = getIdToken ? await getIdToken() : "";
-        await fetch(BASE_URL + "/api/tripo/task/" + taskId + "/cancel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + t },
-        });
-      } catch (err) {
-        console.warn("[handleStop] cancel request failed:", err.message);
-      }
+        await fetch(BASE_URL + "/api/tripo/task/" + taskId + "/cancel", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + t } });
+      } catch (err) { console.warn("[handleStop] cancel request failed:", err.message); }
     }
-    setModelUrl(prevUrl.current);
-    setGenStatus(prevUrl.current ? "succeeded" : "idle");
-    setErrorMsg("");
+    setModelUrl(prevUrl.current); setGenStatus(prevUrl.current ? "succeeded" : "idle"); setErrorMsg("");
   }, [getIdToken]);
+
   const loadFirst = useCallback(async () => {
     if (!userId || histInit.current) return;
     histInit.current = true; setHistLoad(true);
@@ -853,12 +774,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
       if (it.length > 0) {
         const l = it[0]; setActiveH(l); setGenStatus("succeeded");
         if (l.model_url) {
-          try {
-            const b = await fetchProxy(l.model_url);
-            // FIX: revoke old blob before setting new one
-            revokeBlobUrl(prevUrl.current);
-            setModelUrl(b); prevUrl.current = b;
-          } catch { setModelUrl(l.model_url); prevUrl.current = l.model_url; }
+          try { const b = await fetchProxy(l.model_url); revokeBlobUrl(prevUrl.current); setModelUrl(b); prevUrl.current = b; }
+          catch { setModelUrl(l.model_url); prevUrl.current = l.model_url; }
         }
       }
     } catch (e) { console.error(e); } finally { setHistLoad(false); }
@@ -883,15 +800,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     if (item.model_url) {
       try {
         const b = await fetchProxy(item.model_url);
-        if (!t.cancelled) {
-          revokeBlobUrl(prevUrl.current);
-          setModelUrl(b); prevUrl.current = b;
-        } else {
-          revokeBlobUrl(b);
-        }
+        if (!t.cancelled) { revokeBlobUrl(prevUrl.current); setModelUrl(b); prevUrl.current = b; }
+        else { revokeBlobUrl(b); }
       } catch (loadErr) {
         console.warn("[selHist] fetchProxy failed, using direct URL:", loadErr.message);
-        // Fallback: use direct URL — viewer can still attempt to load it
         if (!t.cancelled) { setModelUrl(item.model_url); prevUrl.current = item.model_url; }
       }
     }
@@ -915,15 +827,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
         setHistory(prev => {
           const next = prev.filter(i => i.id !== dId);
           if (wasA) {
-            if (next.length === 0) {
-              setActiveH(null);
-              // FIX: revoke blob when clearing the active model
-              revokeBlobUrl(prevUrl.current);
-              setModelUrl(null); prevUrl.current = null; setGenStatus("idle");
-            } else {
-              const idx = prev.findIndex(i => i.id === dId);
-              setTimeout(() => selHist(next[Math.max(0, idx - 1)]), 0);
-            }
+            if (next.length === 0) { setActiveH(null); revokeBlobUrl(prevUrl.current); setModelUrl(null); prevUrl.current = null; setGenStatus("idle"); }
+            else { const idx = prev.findIndex(i => i.id === dId); setTimeout(() => selHist(next[Math.max(0, idx - 1)]), 0); }
           }
           return next;
         });
@@ -938,9 +843,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
       const res = await fetch(BASE_URL + "/api/tripo/history", { method: "DELETE", headers });
       const d = await res.json();
       if (d.success) {
-        setHistory([]); setActiveH(null);
-        // FIX: revoke blob before nulling it
-        revokeBlobUrl(prevUrl.current);
+        setHistory([]); setActiveH(null); revokeBlobUrl(prevUrl.current);
         setModelUrl(null); prevUrl.current = null; setGenStatus("idle");
         histInit.current = false; lastDocR.current = null; setHasMore(false);
       }
@@ -964,68 +867,25 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   })[mode] ?? mode, [mode]);
 
   const genCost = useMemo(() => {
-    // Texture Generation (önálló retexture task): std=10, HD=20
     if (mode === "texture") return tex4K ? 20 : 10;
-    // Post Processing: Retopology
-    if (mode === "retopo") return smartLowPoly ? 10 : 5;
-    // Egyéb rögzített módok (segment, fill_parts, texture_edit, animate)
+    if (mode === "retopo")  return smartLowPoly ? 10 : 5;
     if (mode !== "generate") return MODE_COST[mode] ?? 10;
-
-    // ── 3D Generálás ─────────────────────────────────────────────────
-    const type = genTab === "text"  ? "text_to_model"
-               : genTab === "multi" ? "multiview_to_model"
-                                    : "image_to_model";
-
-    // V1.4: lapos árazás, nincs textúra addon
-    if (modelVer === "v1.4-20240625") {
-      return type === "text_to_model" ? 20 : 30;
-    }
-
-    /*
-     * Alapár = WITHOUT TEXTURE ár (CREDIT_COSTS["type:mv"]):
-     *   P1-20260311  text: 30  |  P1-20260311  image/multi: 40
-     *   Többi text: 10  |  Többi image/multi: 20
-     *
-     * Textúra addonok (modelltől függetlenül egységes):
-     *   Standard Texture: +10
-     *   Detailed Texture: +20  (standard +10, HD/detailed upgrade +10)
-     *
-     * Összesített árak:
-     *   P1-20260311  text:  30 (no tex) | 40 (std) | 50 (HD)
-     *   P1-20260311  image: 40 (no tex) | 50 (std) | 60 (HD)
-     *   Többi text:  10 (no tex) | 20 (std) | 30 (detailed)
-     *   Többi image: 20 (no tex) | 30 (std) | 40 (detailed)
-     *
-     * Advanced Generation Setup addonok az alapárra adódnak:
-     *   Detailed Geometry Quality (Ultra): +20
-     *   Low Poly:                          +10
-     *   Generate in parts:                 +20
-     *   Quad Topology:                      +5
-     *   Style:                              +5
-     */
+    const type = genTab === "text" ? "text_to_model" : genTab === "multi" ? "multiview_to_model" : "image_to_model";
+    if (modelVer === "v1.4-20240625") return type === "text_to_model" ? 20 : 30;
     const isP1     = modelVer === "P1-20260311";
     const isText   = type === "text_to_model";
     const isModern = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
     const isUltra  = meshQ === "ultra" && isModern;
-
-    // Without-texture alap (modell + típus függő)
-    const base = isP1 ? (isText ? 30 : 40) : (isText ? 10 : 20);
-
-    // Textúra addon: std=+10, HD=+20
-    const hasTex  = texOn || pbrOn;
+    const base     = isP1 ? (isText ? 30 : 40) : (isText ? 10 : 20);
+    const hasTex   = texOn || pbrOn;
     const texAddon = !hasTex ? 0 : tex4K ? 20 : 10;
-
-    // Advanced Generation Setup addonok
     const ultraAddon = isUltra      ? 20 : 0;
     const slpCost    = smartLowPoly ? 10 : 0;
     const partsCost  = inParts      ? 20 : 0;
     const quadCost   = quadMesh     ?  5 : 0;
-    // const styleCost = genStyle ? 5 : 0;
-
     return base + texAddon + ultraAddon + slpCost + partsCost + quadCost;
   }, [mode, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh, smartLowPoly, modelVer]);
-  // FIX: download modal blob cleanup — the onDownload handler creates a new
-  // fetchProxy blob for the download modal. When the modal is closed we revoke it.
+
   const handleDlClose = useCallback(() => {
     if (dlItem?.blobUrl) revokeBlobUrl(dlItem.blobUrl);
     setDlOpen(false); setDlItem(null);
@@ -1036,6 +896,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
       <style>{CSS}</style>
       <div style={{ display: "flex", height: "100%", overflow: "hidden", fontFamily: "'DM Sans',-apple-system,sans-serif", background: "var(--bg-base)" }}>
 
+        {/* ── NAV ── */}
         <div style={{ width: 58, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", background: "var(--bg-panel)", borderRight: "1px solid var(--border)", paddingTop: 8, overflowY: "auto" }} className="tp-scroll">
           {NAV.map(n => (
             <button key={n.id} className={"tp-nav-btn" + (mode === n.id ? " active" : "")} onClick={() => { setMode(n.id); setErrorMsg(""); }}>
@@ -1051,13 +912,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
           <div style={{ width: leftW, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
             <div style={{ padding: "16px 18px 12px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: mode === "segment" ? 10 : 0 }}>
-                {mode === "generate" && <Sparkles style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "segment" && <Scissors style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "fill_parts" && <Boxes style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "retopo" && <Grid3x3 style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "texture" && <PaintBucket style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "texture_edit" && <Wand2 style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "animate" && <PersonStanding style={{ width: 14, height: 14, color: "#6c63ff" }} />}
+                {mode === "generate"     && <Sparkles      style={{ width: 14, height: 14, color: "#6c63ff" }} />}
+                {mode === "segment"      && <Scissors      style={{ width: 14, height: 14, color: "#6c63ff" }} />}
+                {mode === "fill_parts"   && <Boxes         style={{ width: 14, height: 14, color: "#6c63ff" }} />}
+                {mode === "retopo"       && <Grid3x3       style={{ width: 14, height: 14, color: "#6c63ff" }} />}
+                {mode === "texture"      && <PaintBucket   style={{ width: 14, height: 14, color: "#6c63ff" }} />}
+                {mode === "texture_edit" && <Wand2         style={{ width: 14, height: 14, color: "#6c63ff" }} />}
+                {mode === "animate"      && <PersonStanding style={{ width: 14, height: 14, color: "#6c63ff" }} />}
                 <span style={{ color: "var(--text-primary)", fontSize: 14, fontWeight: 700 }}>{modeTitle}</span>
               </div>
               {mode === "segment" && (
@@ -1102,6 +963,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                     handleMultiImg={uploadImageFile}
                     handleBatchImg={uploadImageFile}
                     getIdToken={getIdToken}
+                    backendCaps={backendCaps}
                   />
                 )}
                 {(mode === "segment" || mode === "fill_parts") && (
@@ -1223,9 +1085,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
             <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
               <span style={{ color: "#1a1a30", fontSize: 9, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "monospace", marginRight: 2 }}>Camera</span>
               <IconBtn icon={<RotateCcw />} tip="Reset" onClick={() => camP("reset")} />
-              <IconBtn icon={<Camera />} tip="Front" onClick={() => camP("front")} />
-              <IconBtn icon={<Move3d />} tip="Side" onClick={() => camP("side")} />
-              <IconBtn icon={<Layers />} tip="Top" onClick={() => camP("top")} />
+              <IconBtn icon={<Camera />}    tip="Front" onClick={() => camP("front")} />
+              <IconBtn icon={<Move3d />}    tip="Side"  onClick={() => camP("side")}  />
+              <IconBtn icon={<Layers />}    tip="Top"   onClick={() => camP("top")}   />
               <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.06)", margin: "0 4px" }} />
               <button onClick={() => setAutoSpin(v => !v)}
                 style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 9px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer", border: "none", background: autoSpin ? "rgba(108,99,255,0.18)" : "rgba(255,255,255,0.03)", color: autoSpin ? "var(--accent-bright)" : "var(--text-muted)", outline: autoSpin ? "1px solid var(--border-accent)" : "1px solid var(--border)", fontFamily: "inherit" }}>
@@ -1257,7 +1119,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 9 }}>
                 <Clock style={{ width: 11, height: 11, color: "#2d2d48" }} />
                 <span style={{ color: "var(--text-secondary)", fontSize: 12, fontWeight: 700 }}>History</span>
-                <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700, padding: "1px 7px", borderRadius: 99, background: "rgba(124,111,255,0.15)", color: "var(--accent-bright)", border: "1px solid var(--border-accent)", fontFamily: "monospace" }}>{history.length}{hasMore ? "+ " : ""}</span>
+                <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700, padding: "1px 7px", borderRadius: 99, background: "rgba(124,111,255,0.15)", color: "var(--accent-bright)", border: "1px solid var(--border-accent)", fontFamily: "monospace" }}>{history.length}{hasMore ? "+" : ""}</span>
               </div>
               <input placeholder="Search…" value={histQ} onChange={e => setHistQ(e.target.value)} className="tp-input" style={{ fontSize: 11 }}
                 onFocus={e => e.target.style.borderColor = "rgba(108,99,255,0.45)"}
@@ -1277,12 +1139,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                     item={item} isActive={activeH?.id === item.id} isLoading={loadingId === item.id}
                     disabled={loadingId !== null} onSelect={selHist} onReuse={reuse}
                     onDownload={async (i) => {
-                      try {
-                        const b = await fetchProxy(i.model_url);
-                        // FIX: store blob in dlItem so handleDlClose can revoke it on close
-                        setDlItem({ blobUrl: b, item: i });
-                        setDlOpen(true);
-                      } catch (e) { alert(e.message); }
+                      try { const b = await fetchProxy(i.model_url); setDlItem({ blobUrl: b, item: i }); setDlOpen(true); }
+                      catch (e) { alert(e.message); }
                     }}
                     onDelete={i => { setToDel(i); setDelModal(true); }}
                     color={color} getIdToken={getIdToken}
@@ -1313,7 +1171,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
 
       <ConfirmModal isOpen={delModal} onClose={() => { if (!deleting) { setDelModal(false); setToDel(null); } }} onConfirm={confirmDel} title="Delete model" message={"Delete \"" + ((toDel?.prompt?.slice(0, 60)) || "") + "…\"?"} confirmText="Delete" confirmColor="#ef4444" isDeleting={deleting} />
       <ConfirmModal isOpen={clrModal} onClose={() => { if (!deleting) setClrModal(false); }} onConfirm={confirmClr} title="Clear history" message={"Delete all " + history.length + " Tripo models?"} confirmText="Clear all" confirmColor="#dc2626" isDeleting={deleting} />
-      {/* FIX: onClose now calls handleDlClose which revokes the download blob */}
       <DownloadModal isOpen={dlOpen} onClose={handleDlClose} glbBlobUrl={dlItem ? dlItem.blobUrl : modelUrl} scene={sceneRef.current?.scene ?? sceneRef.current} filename={dlItem ? (dlItem.item?.prompt?.slice(0, 30) ?? ("tripo_" + Date.now())) : (activeH?.prompt?.slice(0, 30) ?? ("tripo_" + Date.now()))} color={color} />
     </>
   );

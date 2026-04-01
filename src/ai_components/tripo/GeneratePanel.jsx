@@ -17,43 +17,101 @@ export const GEN_TABS = [
 /* "Make Image Better" (enable_image_autofix) only on image-based tabs */
 const TABS_WITH_MAKE_BETTER = new Set(["image", "batch"]);
 
-/* ─── Model versions — real Tripo API strings ─────────────────────────────
- *
- *  P1-20260311              → Latest Model, prémium minőség
- *  v3.1-20260211     → V3.1, kiváló minőség
- *  v3.0-20250812     → V3.0, Ultra mód (geometry_quality), akár 2M polygon
- *  v2.5-20250123     → gyors & kiegyensúlyozott (~25-30s)
- *  Turbo-v1.0-20250506 → leggyorsabb prototipizálás (~5-10s)
- *  v1.4-20240625     → Fastest (lapos árazás: text=20, image=30)
- * ─────────────────────────────────────────────────────────────────────── */
+/* ─── Model versions — real Tripo API strings ─────────────────────────── */
 export const MODEL_VERSIONS = [
-  { id: "P1-20260311",                   label: "P1-20260311 (Latest Model)"    },
-  { id: "v3.1-20260211",          label: "V3.1"                   },
-  { id: "v3.0-20250812",          label: "V3.0"                   },
-  { id: "v2.5-20250123",          label: "V2.5"                   },
-  { id: "Turbo-v1.0-20250506",    label: "Turbo V1.0"             },
-  { id: "v2.0-20240919",          label: "V2.0"                   },
-  { id: "v1.4-20240625",          label: "V1.4 (Fastest Model)"   },
+  { id: "P1-20260311",            label: "P1-20260311 (Latest Model)" },
+  { id: "v3.1-20260211",         label: "V3.1" },
+  { id: "v3.0-20250812",         label: "V3.0" },
+  { id: "v2.5-20250123",         label: "V2.5" },
+  { id: "Turbo-v1.0-20250506",   label: "Turbo V1.0" },
+  { id: "v2.0-20240919",         label: "V2.0" },
+  { id: "v1.4-20240625",         label: "V1.4 (Fastest Model)" },
 ];
 
-/* ─── API face_limit constraints (official Tripo docs) ───────────────────
- *
- *  smart_low_poly=false, quad=false  → Auto (adaptive), max 500 000, step 5 000
- *  smart_low_poly=false, quad=true   → Auto defaults to 10 000; max 100 000, step 1 000
- *  smart_low_poly=true,  quad=false  → required: 1 000 – 20 000, step 1 000
- *  smart_low_poly=true,  quad=true   → required:   500 – 10 000, step   500
- *
- *  When smart_low_poly is ON the API requires a value in the stated range —
- *  "Auto" (0) is NOT valid; the slider minimum is forced to the lower bound.
- *
- *  For Retopo panel (smart_low_poly task type) the same ranges apply.
+/* ─── Per-model capability map ───────────────────────────────────────────
+ *  Defines which API parameters each model version actually accepts.
+ *  UI elements receive the .model-na class (dimmed, blocked) when the
+ *  currently selected model doesn't support that feature.
  * ─────────────────────────────────────────────────────────────────────── */
+export const MODEL_CAPS = {
+  "P1-20260311": {
+    ultraMesh:    true,  texture:   true,  pbr:        true,  tex4K:       true,
+    multiview:    true,  batch:     true,  tPose:      true,  inParts:     true,
+    negPrompt:    true,  smartLowPoly: true, quad:     true,
+    autoSize:     true,  exportUv:  true,  makeBetter: true,
+    modelSeed:    true,  imageSeed: true,  textureSeed: true,
+  },
+  "v3.1-20260211": {
+    ultraMesh:    true,  texture:   true,  pbr:        true,  tex4K:       true,
+    multiview:    true,  batch:     true,  tPose:      true,  inParts:     true,
+    negPrompt:    true,  smartLowPoly: true, quad:     true,
+    autoSize:     true,  exportUv:  true,  makeBetter: true,
+    modelSeed:    true,  imageSeed: true,  textureSeed: true,
+  },
+  "v3.0-20250812": {
+    ultraMesh:    true,  texture:   true,  pbr:        true,  tex4K:       true,
+    multiview:    true,  batch:     true,  tPose:      true,  inParts:     true,
+    negPrompt:    true,  smartLowPoly: true, quad:     true,
+    autoSize:     true,  exportUv:  true,  makeBetter: true,
+    modelSeed:    true,  imageSeed: true,  textureSeed: true,
+  },
+  "v2.5-20250123": {
+    ultraMesh:    false, texture:   true,  pbr:        true,  tex4K:       true,
+    multiview:    true,  batch:     true,  tPose:      false, inParts:     true,
+    negPrompt:    true,  smartLowPoly: false, quad:    true,
+    autoSize:     true,  exportUv:  true,  makeBetter: true,
+    modelSeed:    true,  imageSeed: true,  textureSeed: true,
+  },
+  "Turbo-v1.0-20250506": {
+    ultraMesh:    false, texture:   false, pbr:        false, tex4K:       false,
+    multiview:    false, batch:     true,  tPose:      false, inParts:     false,
+    negPrompt:    false, smartLowPoly: false, quad:    false,
+    autoSize:     false, exportUv:  true,  makeBetter: true,
+    modelSeed:    true,  imageSeed: false, textureSeed: false,
+  },
+  "v2.0-20240919": {
+    ultraMesh:    false, texture:   true,  pbr:        true,  tex4K:       true,
+    multiview:    true,  batch:     true,  tPose:      false, inParts:     true,
+    negPrompt:    true,  smartLowPoly: false, quad:    true,
+    autoSize:     true,  exportUv:  true,  makeBetter: true,
+    modelSeed:    true,  imageSeed: true,  textureSeed: true,
+  },
+  "v1.4-20240625": {
+    ultraMesh:    false, texture:   true,  pbr:        false, tex4K:       false,
+    multiview:    false, batch:     false, tPose:      false, inParts:     false,
+    negPrompt:    false, smartLowPoly: false, quad:    false,
+    autoSize:     false, exportUv:  true,  makeBetter: true,
+    modelSeed:    false, imageSeed: false, textureSeed: false,
+  },
+};
+
+export function getModelCaps(modelVer) {
+  return MODEL_CAPS[modelVer] ?? MODEL_CAPS["v2.5-20250123"];
+}
+
+/* ─── API face_limit constraints ─────────────────────────────────────── */
 export function getFaceLimitConfig(smartLowPoly, quad) {
-  if (smartLowPoly && quad) return { min: 500, max: 10_000, step: 500, defaultVal: 5_000, allowAuto: false };
-  if (smartLowPoly && !quad) return { min: 1_000, max: 20_000, step: 1_000, defaultVal: 8_000, allowAuto: false };
-  if (!smartLowPoly && quad) return { min: 0, max: 100_000, step: 1_000, defaultVal: 10_000, allowAuto: true };
-  /* triangle, no smart_low_poly */
-  return { min: 0, max: 500_000, step: 5_000, defaultVal: 0, allowAuto: true };
+  if (smartLowPoly && quad)  return { min: 500,   max: 10_000,  step: 500,   defaultVal: 5_000,  allowAuto: false };
+  if (smartLowPoly && !quad) return { min: 1_000, max: 20_000,  step: 1_000, defaultVal: 8_000,  allowAuto: false };
+  if (!smartLowPoly && quad) return { min: 0,     max: 100_000, step: 1_000, defaultVal: 10_000, allowAuto: true  };
+  return                            { min: 0,     max: 500_000, step: 5_000, defaultVal: 0,      allowAuto: true  };
+}
+
+/* ─── Model-NA wrapper ───────────────────────────────────────────────────
+ *  Renders children inside a .model-na wrapper when `unsupported` is true.
+ *  The tooltip is still accessible via the wrapper's title attribute.
+ * ─────────────────────────────────────────────────────────────────────── */
+function Na({ unsupported, tip, children }) {
+  if (!unsupported) return <>{children}</>;
+  return (
+    <div
+      className="model-na"
+      title={tip ?? "Not available with this model"}
+      style={{ cursor: "not-allowed" }}
+    >
+      {children}
+    </div>
+  );
 }
 
 /* ─── helpers ─────────────────────────────────────────────────────────── */
@@ -72,7 +130,10 @@ function CoinIcon({ size = 15 }) {
 function Toggle({ label, value, onChange, hint = false, premium = false, disabled = false }) {
   return (
     <div
-      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1 }}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "9px 0", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1,
+      }}
       onClick={() => !disabled && onChange(!value)}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -109,7 +170,10 @@ function Collapsible({ label, children, border = true, extra }) {
 }
 
 /* ─── TopoControls ────────────────────────────────────────────────────── */
-function TopoControls({ quad, setQuad, smartLowPoly, setSmartLowPoly, polycount, setPolycount }) {
+function TopoControls({
+  quad, setQuad, smartLowPoly, setSmartLowPoly, polycount, setPolycount,
+  capsQuad = true, capsSmartLowPoly = true,
+}) {
   const cfg = getFaceLimitConfig(smartLowPoly, quad);
   const [localVal, setLocalVal] = React.useState(() => Math.max(cfg.min, polycount));
 
@@ -118,24 +182,23 @@ function TopoControls({ quad, setQuad, smartLowPoly, setSmartLowPoly, polycount,
   }, [polycount]); // eslint-disable-line
 
   function handleSetQuad(val) {
+    if (!capsQuad && val) return;
     setQuad(val);
     const next = getFaceLimitConfig(smartLowPoly, val);
     const reset = next.allowAuto ? 0 : next.defaultVal;
-    setPolycount(reset);
-    setLocalVal(reset);
+    setPolycount(reset); setLocalVal(reset);
   }
   function handleSetSmartLowPoly(val) {
+    if (!capsSmartLowPoly && val) return;
     setSmartLowPoly(val);
     const next = getFaceLimitConfig(val, quad);
     const reset = next.allowAuto ? 0 : next.defaultVal;
-    setPolycount(reset);
-    setLocalVal(reset);
+    setPolycount(reset); setLocalVal(reset);
   }
 
   function commit(raw) {
     const v = isNaN(raw) ? cfg.min : Math.max(cfg.min, Math.min(cfg.max, raw));
-    setLocalVal(v);
-    setPolycount(v);
+    setLocalVal(v); setPolycount(v);
   }
 
   const showAuto = cfg.allowAuto && localVal === 0;
@@ -144,22 +207,26 @@ function TopoControls({ quad, setQuad, smartLowPoly, setSmartLowPoly, polycount,
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
 
       {/* Smart Low Poly */}
-      <div
-        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", cursor: "pointer" }}
-        onClick={() => handleSetSmartLowPoly(!smartLowPoly)}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <CoinIcon />
-          <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Smart Low Poly</span>
-          <span style={{ background: "linear-gradient(135deg,#c026d3,#a21caf)", color: "#fff", fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 4 }}>v2</span>
-          <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+      <Na unsupported={!capsSmartLowPoly} tip="Smart Low Poly not supported by this model">
+        <div
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "9px 0", cursor: capsSmartLowPoly ? "pointer" : "not-allowed",
+          }}
+          onClick={() => capsSmartLowPoly && handleSetSmartLowPoly(!smartLowPoly)}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <CoinIcon />
+            <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Smart Low Poly</span>
+            <span style={{ background: "linear-gradient(135deg,#c026d3,#a21caf)", color: "#fff", fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 4 }}>v2</span>
+            <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+          </div>
+          <div className={"tp-switch" + (smartLowPoly && capsSmartLowPoly ? " on" : "")}
+            style={{ background: smartLowPoly && capsSmartLowPoly ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
         </div>
-        <div className={"tp-switch" + (smartLowPoly ? " on" : "")}
-          style={{ background: smartLowPoly ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
-      </div>
+      </Na>
 
-      {/* Smart Low Poly info note */}
-      {smartLowPoly && (
+      {smartLowPoly && capsSmartLowPoly && (
         <div style={{ padding: "6px 9px", borderRadius: 8, background: "rgba(108,99,255,0.06)", border: "1px solid rgba(108,99,255,0.18)", display: "flex", gap: 6, marginBottom: 4 }}>
           <HelpCircle style={{ width: 11, height: 11, color: "#a5a0ff", marginTop: 1, flexShrink: 0 }} />
           <p style={{ color: "#a5a0ff", fontSize: 10, margin: 0, lineHeight: 1.5 }}>
@@ -174,11 +241,25 @@ function TopoControls({ quad, setQuad, smartLowPoly, setSmartLowPoly, polycount,
         <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-        <button className={"tp-topo-btn" + (quad ? " sel" : "")} onClick={() => handleSetQuad(true)}>Quad</button>
-        <button className={"tp-topo-btn" + (!quad ? " sel" : "")} onClick={() => handleSetQuad(false)}>Triangle</button>
+        {/* Quad */}
+        <Na unsupported={!capsQuad} tip="Quad topology not supported by this model">
+          <button
+            className={"tp-topo-btn" + (quad && capsQuad ? " sel" : "")}
+            onClick={() => handleSetQuad(true)}
+            style={{ cursor: capsQuad ? "pointer" : "not-allowed" }}
+          >
+            Quad
+          </button>
+        </Na>
+        <button
+          className={"tp-topo-btn" + (!quad || !capsQuad ? " sel" : "")}
+          onClick={() => handleSetQuad(false)}
+        >
+          Triangle
+        </button>
       </div>
 
-      {/* Face Limit / Polycount */}
+      {/* Face Limit */}
       <div style={{ marginTop: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
           <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Face Limit</span>
@@ -187,26 +268,19 @@ function TopoControls({ quad, setQuad, smartLowPoly, setSmartLowPoly, polycount,
             {cfg.allowAuto ? `Auto – ${(cfg.max / 1000).toFixed(0)}k` : `${cfg.min.toLocaleString()} – ${cfg.max.toLocaleString()}`}
           </span>
         </div>
-
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input
-            type="range"
-            min={cfg.min} max={cfg.max} step={cfg.step}
-            value={localVal}
+            type="range" min={cfg.min} max={cfg.max} step={cfg.step} value={localVal}
             onChange={e => setLocalVal(Number(e.target.value))}
             onMouseUp={e => commit(Number(e.target.value))}
             onTouchEnd={e => commit(Number(e.target.value))}
             style={{ flex: 1, accentColor: "#6c63ff" }}
           />
           <input
-            type="number"
-            min={cfg.min} max={cfg.max} step={cfg.step}
+            type="number" min={cfg.min} max={cfg.max} step={cfg.step}
             value={showAuto ? "" : localVal}
             placeholder={cfg.allowAuto ? "Auto" : String(cfg.defaultVal)}
-            onChange={e => {
-              const v = parseInt(e.target.value, 10);
-              commit(isNaN(v) ? cfg.min : v);
-            }}
+            onChange={e => { const v = parseInt(e.target.value, 10); commit(isNaN(v) ? cfg.min : v); }}
             style={{
               width: 80, padding: "5px 8px", borderRadius: 8,
               border: "1px solid rgba(255,255,255,0.12)",
@@ -216,18 +290,14 @@ function TopoControls({ quad, setQuad, smartLowPoly, setSmartLowPoly, polycount,
             }}
           />
         </div>
-
-        {/* Contextual hint */}
         <p style={{ color: "#4a4a68", fontSize: 10, margin: "5px 0 0", lineHeight: 1.5 }}>
           {showAuto && "Auto — model adaptively determines optimal face count"}
-          {!showAuto && smartLowPoly && quad && "Quad smart-low-poly: 500 – 10 000 faces (required)"}
+          {!showAuto && smartLowPoly && quad  && "Quad smart-low-poly: 500 – 10 000 faces (required)"}
           {!showAuto && smartLowPoly && !quad && "Smart-low-poly: 1 000 – 20 000 faces (required)"}
-          {!showAuto && !smartLowPoly && quad && "Quad: default 10 000 when unset"}
+          {!showAuto && !smartLowPoly && quad  && "Quad: default 10 000 when unset"}
           {!showAuto && !smartLowPoly && !quad && `${localVal.toLocaleString()} faces`}
         </p>
-
-        {/* Quad incompatibility warning */}
-        {quad && (
+        {quad && capsQuad && (
           <div style={{ marginTop: 6, padding: "6px 9px", borderRadius: 8, background: "rgba(245,197,24,0.06)", border: "1px solid rgba(245,197,24,0.15)", display: "flex", gap: 6 }}>
             <span style={{ color: "#f5c518", fontSize: 9, marginTop: 1, flexShrink: 0 }}>⚠</span>
             <p style={{ color: "#fcd34d", fontSize: 10, margin: 0, lineHeight: 1.5 }}>
@@ -246,13 +316,10 @@ function ModelDropdown({ modelVer, setModelVer }) {
   const selected = MODEL_VERSIONS.find(v => v.id === modelVer) ?? MODEL_VERSIONS[0];
 
   const icons = [
-    // v3.0 star
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a5a0ff" strokeWidth="2">
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
     </svg>,
-    // v2.5 zap
     <Zap width={13} height={13} color="#a5a0ff" />,
-    // Turbo zap double
     <Zap width={13} height={13} color="#f5c518" />,
   ];
 
@@ -317,48 +384,70 @@ function ModelDropdown({ modelVer, setModelVer }) {
 export default function GeneratePanel({
   genTab, setGenTab,
   prompt, setPrompt,
-  makeBetter, setMakeBetter,       // enable_image_autofix
+  makeBetter, setMakeBetter,
   imgPrev, imgToken, imgUploading, handleImg, fileRef,
   multiImages, setMultiImages,
   batchImages, setBatchImages,
-  meshQ, setMeshQ,                 // "ultra" → geometry_quality:"detailed" for P1-20260311 / v3.x
-  inParts, setInParts,             // generate_parts
+  meshQ, setMeshQ,
+  inParts, setInParts,
   privacy, setPrivacy,
-  texOn, setTexOn,                 // texture (bool)
-  tex4K, setTex4K,                 // texture_quality: "HD" vs "detailed"
-  pbrOn, setPbrOn,                 // pbr (bool)
-  quadMesh, setQuadMesh,           // quad (bool)
-  smartLowPoly, setSmartLowPoly,   // smart_low_poly (bool) at generation time
-  polycount, setPolycount,         // face_limit
-  modelVer, setModelVer,           // model_version API string
+  texOn, setTexOn,
+  tex4K, setTex4K,
+  pbrOn, setPbrOn,
+  quadMesh, setQuadMesh,
+  smartLowPoly, setSmartLowPoly,
+  polycount, setPolycount,
+  modelVer, setModelVer,
   isRunning,
   canGen,
   handleGen,
-    negPrompt, setNegPrompt,
+  negPrompt, setNegPrompt,
   getIdToken,
-  // A GeneratePanel function paramétereibe INSERT (a handleImg után):
-  handleMultiImg,   // NEW: (file) => Promise<token>
-  handleBatchImg,   // NEW: (file) => Promise<token>
+  handleMultiImg,
+  handleBatchImg,
   setErrorMsg,
-tPose, setTPose,
-  // Advanced params
+  tPose, setTPose,
   modelSeed, setModelSeed,
   textureSeed, setTextureSeed,
   imageSeed, setImageSeed,
   autoSize, setAutoSize,
   exportUv, setExportUv,
+  // backendCaps: capability map fetched from backend.
+  // If provided, overrides the static MODEL_CAPS fallback.
+  // Shape: { [modelVersionId]: { ultraMesh, texture, negPrompt, ... } }
+  backendCaps = null,
 }) {
   const MV_SLOTS = ["Front", "Left", "Right", "Back"];
   const batchInputRef = useRef(null);
 
-  // V1.4: csak text/image elérhető — ha multi/batch volt aktív, válts image-re
-  useEffect(() => {
-    if (modelVer === "v1.4-20240625" && (genTab === "multi" || genTab === "batch")) {
-      setGenTab("image");
-    }
-  }, [modelVer, genTab, setGenTab]);
+  /* ─── Capabilities for current model ──────────────────────────────────
+   * Priority: backendCaps (fetched from API) > static MODEL_CAPS fallback.
+   * This makes the frontend dynamically adapt to backend-defined capabilities
+   * without any hardcoded model-specific logic here.
+   * ────────────────────────────────────────────────────────────────────── */
+  const caps = backendCaps
+    ? (backendCaps[modelVer] ?? backendCaps["v2.5-20250123"] ?? getModelCaps(modelVer))
+    : getModelCaps(modelVer);
 
-  // A function signature-t módosítsd (a komponens propjaiba is kell handleBatchImg):
+  /* ─── Auto-reset incompatible settings when model changes ─────────── */
+  useEffect(() => {
+    const c = getModelCaps(modelVer);
+    if (!c.multiview && genTab === "multi")    setGenTab("image");
+    if (!c.batch    && genTab === "batch")     setGenTab("image");
+    if (!c.tPose    && tPose)                  setTPose(false);
+    if (!c.negPrompt)                          setNegPrompt("");
+    if (!c.inParts  && inParts)                setInParts(false);
+    if (!c.smartLowPoly && smartLowPoly)       setSmartLowPoly(false);
+    if (!c.ultraMesh && meshQ === "ultra")     setMeshQ("standard");
+    if (!c.texture  && texOn)                  setTexOn(false);
+    if (!c.pbr      && pbrOn)                  setPbrOn(false);
+    if (!c.tex4K    && tex4K)                  setTex4K(false);
+    if (!c.quad     && quadMesh)               setQuadMesh(false);
+    if (!c.autoSize && autoSize)               setAutoSize(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelVer]);
+
+  /* ─── Batch file handler ──────────────────────────────────────────── */
   function handleBatchFiles(files) {
     const arr = Array.from(files).slice(0, 10 - (batchImages?.length ?? 0));
     arr.forEach(f => {
@@ -370,34 +459,20 @@ tPose, setTPose,
           if (next.length < 10) next.push(tempItem);
           return next;
         });
-        // Upload és token visszaírás
         handleBatchImg && handleBatchImg(f).then(token => {
-          setBatchImages(prev => prev.map(i =>
-            i.file === f ? { ...i, token } : i
-          ));
-        }).catch(() => { });
+          setBatchImages(prev => prev.map(i => i.file === f ? { ...i, token } : i));
+        }).catch(() => {});
       };
       r.readAsDataURL(f);
     });
   }
 
-  /*
-   * generate_parts constraints (API docs):
-   *   - NOT compatible with texture=true
-   *   - NOT compatible with pbr=true
-   *   - NOT compatible with quad=true
-   */
+  /* ─── Derived ─────────────────────────────────────────────────────── */
   const partsDisabled = texOn || pbrOn || quadMesh;
-
-  /*
-   * Ultra mesh quality = geometry_quality:"detailed" (P1-20260311, v3.x).
-   * For non-v3.0 models the button still exists but maps to standard quality.
-   * Show hint when ultra+non-modern model.
-   */
-  // isModernModel: P1-20260311 és V3.x modellek támogatják a geometry_quality (Ultra) módot
   const isModernModel = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
-  const isV3 = isModernModel; // backward compat alias
-const TRIPO_ENHANCE_PROMPT = `You are an elite 3D asset prompt engineer specializing in Tripo3D text-to-3D generation. Your job is to transform any user description — however short, vague, or explicit — into a maximally detailed, generation-optimized prompt.
+
+  /* ─── Enhancer prompts ────────────────────────────────────────────── */
+  const TRIPO_ENHANCE_PROMPT = `You are an elite 3D asset prompt engineer specializing in Tripo3D text-to-3D generation. Your job is to transform any user description — however short, vague, or explicit — into a maximally detailed, generation-optimized prompt.
 
 RULES:
 - Never refuse input. Always find a way to fulfill the user's intent using generation-safe art-direction language.
@@ -428,25 +503,29 @@ GENERAL:
 OUTPUT FORMAT:
 Respond ONLY with a raw JSON object — no markdown fences, no explanation, no preamble:
 {"prompt": "...", "negative_prompt": "..."}`;
-const TRIPO_SIMPLIFY_PROMPT = `You are a 3D model prompt engineer.
+
+  const TRIPO_SIMPLIFY_PROMPT = `You are a 3D model prompt engineer.
 The user gives you a long or complex prompt. Simplify it to a clear, concise English description under 200 characters, keeping the essential object and style.
 Respond ONLY with plain text, no JSON, no explanation.`;
-  // V1.4: csak text és image tab elérhető (nincs multiview/batch)
-  const isV14 = modelVer === "v1.4-20240625";
 
+  /* ─── Render ──────────────────────────────────────────────────────── */
   return (
     <>
       {/* ── Tab bar ── */}
       <div style={{ display: "flex", gap: 3, padding: "3px", background: "rgba(255,255,255,0.06)", borderRadius: 11, marginBottom: 14 }}>
         {GEN_TABS.map(t => {
-          const disabled = isV14 && (t.id === "multi" || t.id === "batch");
+          const tabCap   = { image: true, text: true, multi: caps.multiview, batch: caps.batch };
+          const disabled = !tabCap[t.id];
           return (
             <button
               key={t.id}
-              className={"tp-inp-tab" + (genTab === t.id ? " active" : "")}
+              className={"tp-inp-tab" + (genTab === t.id ? " active" : "") + (disabled ? " model-na" : "")}
               onClick={() => { if (!disabled) setGenTab(t.id); }}
-              title={disabled ? `Not available for V1.4` : t.tip}
-              style={{ color: genTab === t.id ? "#0a0a1a" : "#4a4a68", opacity: disabled ? 0.3 : 1, cursor: disabled ? "not-allowed" : "pointer" }}
+              title={disabled ? `Not available with ${modelVer}` : t.tip}
+              style={{
+                color:  genTab === t.id ? "#0a0a1a" : "#4a4a68",
+                cursor: disabled ? "not-allowed" : "pointer",
+              }}
             >
               <t.icon style={{ width: 15, height: 15 }} />
             </button>
@@ -455,46 +534,62 @@ Respond ONLY with plain text, no JSON, no explanation.`;
       </div>
 
       {/* ── Text tab ── */}
-{genTab === "text" && (
-  <>
-    <Enhancer
-      value={prompt}
-      onChange={val => { setPrompt(val); setErrorMsg?.(""); }}
-      onNegativeChange={setNegPrompt}
-      onSubmit={() => canGen && handleGen()}
-      color="#6c63ff"
-      getIdToken={getIdToken}
-      enhancing_prompt={TRIPO_ENHANCE_PROMPT}
-      dechanting_prompt={TRIPO_SIMPLIFY_PROMPT}
-      onBusyChange={() => {}}
-    />
-    {/* Negative prompt */}
-    <div style={{ marginBottom: 10 }}>
-      <textarea
-        className="tp-ta"
-        placeholder="Negative prompt (optional)…"
-        value={negPrompt}
-        onChange={e => setNegPrompt(e.target.value)}
-        rows={2}
-        style={{
-          border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9,
-          background: "rgba(255,255,255,0.03)", fontSize: 11, resize: "none", width: "100%",
-          boxSizing: "border-box", padding: "8px 11px",
-        }}
-      />
-    </div>
+      {genTab === "text" && (
+        <>
+          <Enhancer
+            value={prompt}
+            onChange={val => { setPrompt(val); setErrorMsg?.(""); }}
+            onNegativeChange={setNegPrompt}
+            onSubmit={() => canGen && handleGen()}
+            color="#6c63ff"
+            getIdToken={getIdToken}
+            enhancing_prompt={TRIPO_ENHANCE_PROMPT}
+            dechanting_prompt={TRIPO_SIMPLIFY_PROMPT}
+            onBusyChange={() => {}}
+          />
 
-    {/* T-Pose toggle */}
-    <div
-      style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, cursor: "pointer", marginTop: -8, marginBottom: 10 }}
-      onClick={() => setTPose(v => !v)}
-    >
-      <span style={{ color: tPose ? "#a5a0ff" : "#4a4a68", fontSize: 11, fontWeight: 600 }}>T-Pose</span>
-      <div className={"tp-switch" + (tPose ? " on" : "")}
-        style={{ width: 28, height: 16, background: tPose ? "#6c63ff" : "rgba(255,255,255,0.12)" }} />
-    </div>
-  </>
-)}
+          {/* T-Pose toggle */}
+          <Na unsupported={!caps.tPose} tip={`T-Pose not supported by ${modelVer}`}>
+            <div
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "flex-end",
+                gap: 6, cursor: caps.tPose ? "pointer" : "not-allowed",
+                marginTop: -8, marginBottom: 10,
+              }}
+              onClick={() => caps.tPose && setTPose(v => !v)}
+            >
+              <span style={{ color: tPose && caps.tPose ? "#a5a0ff" : "#4a4a68", fontSize: 11, fontWeight: 600 }}>T-Pose</span>
+              <div className={"tp-switch" + (tPose && caps.tPose ? " on" : "")}
+                style={{ width: 28, height: 16, background: tPose && caps.tPose ? "#6c63ff" : "rgba(255,255,255,0.12)" }} />
+            </div>
+          </Na>
+        </>
+      )}
+
+      {/* ── Negative prompt — shown for all tabs that support it ─────────
+       *  FIX: was inside {genTab === "text" && ...} so image/multi/batch
+       *  users could never set it even though the API supports it.
+       * ─────────────────────────────────────────────────────────────────── */}
+      <Na unsupported={!caps.negPrompt} tip={`Negative prompt not supported by ${modelVer}`}>
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ color: "#4a4a68", fontSize: 11, fontWeight: 600, display: "block", marginBottom: 5 }}>
+            Negative Prompt
+          </label>
+          <textarea
+            className="tp-ta"
+            placeholder={caps.negPrompt ? "Negative prompt (optional)…" : "Not supported by this model"}
+            value={negPrompt}
+            onChange={e => caps.negPrompt && setNegPrompt(e.target.value)}
+            rows={2}
+            disabled={!caps.negPrompt}
+            style={{
+              border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9,
+              background: "rgba(255,255,255,0.03)", fontSize: 11, resize: "none", width: "100%",
+              boxSizing: "border-box", padding: "8px 11px",
+            }}
+          />
+        </div>
+      </Na>
 
       {/* ── Multi-view tab ── */}
       {genTab === "multi" && (
@@ -507,7 +602,6 @@ Respond ONLY with plain text, no JSON, no explanation.`;
                   onClick={() => {
                     const inp = document.createElement("input");
                     inp.type = "file"; inp.accept = "image/*";
-                    // REPLACE az inp.onchange-t:
                     inp.onchange = e => {
                       const f = e.target.files[0];
                       if (f) {
@@ -516,14 +610,13 @@ Respond ONLY with plain text, no JSON, no explanation.`;
                           const next = [...(multiImages ?? [])];
                           next[i] = { file: f, preview: ev.target.result, token: null };
                           setMultiImages(next);
-                          // Upload
                           handleMultiImg && handleMultiImg(f).then(token => {
                             setMultiImages(prev => {
                               const updated = [...prev];
                               if (updated[i]) updated[i] = { ...updated[i], token };
                               return updated;
                             });
-                          }).catch(() => { });
+                          }).catch(() => {});
                         };
                         r.readAsDataURL(f);
                       }
@@ -653,16 +746,13 @@ Respond ONLY with plain text, no JSON, no explanation.`;
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }}
         onChange={e => { const f = e.target.files?.[0]; if (f) handleImg(f); }} />
 
-      {/* ── Make Image Better (enable_image_autofix) — image + batch tabs only ── */}
+      {/* ── Make Image Better ── */}
       {TABS_WITH_MAKE_BETTER.has(genTab) && (
-        <Toggle
-          label="Make Image Better"
-          value={makeBetter}
-          onChange={setMakeBetter}
-          hint
-        />
+        <Na unsupported={!caps.makeBetter} tip={`Make Image Better not supported by ${modelVer}`}>
+          <Toggle label="Make Image Better" value={makeBetter} onChange={setMakeBetter} hint disabled={!caps.makeBetter} />
+        </Na>
       )}
-      {TABS_WITH_MAKE_BETTER.has(genTab) && makeBetter && (
+      {TABS_WITH_MAKE_BETTER.has(genTab) && makeBetter && caps.makeBetter && (
         <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 6px", lineHeight: 1.5 }}>
           AI optimizes the input image before generation. Slower but may improve quality.
         </p>
@@ -674,37 +764,51 @@ Respond ONLY with plain text, no JSON, no explanation.`;
         <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 2 }}>
-        {[
-          { id: "ultra", label: "Ultra", prem: true, hint: isV3 ? "geometry_quality: detailed" : "P1-20260311 / v3.x only" },
-          { id: "standard", label: "Standard", prem: false, hint: "geometry_quality: standard" },
-        ].map(q => (
-          <button key={q.id} className="tp-qual-btn" onClick={() => setMeshQ(q.id)}
-            title={q.hint}
+        {/* Ultra — model-na when not supported */}
+        <Na unsupported={!caps.ultraMesh} tip={`Ultra quality not supported by ${modelVer} — requires P1-20260311 or v3.x`}>
+          <button
+            className="tp-qual-btn"
+            onClick={() => caps.ultraMesh && setMeshQ("ultra")}
+            title={caps.ultraMesh ? "geometry_quality: detailed" : `Requires P1-20260311 or v3.x`}
             style={{
-              background: meshQ === q.id ? "rgba(108,99,255,0.2)" : "rgba(255,255,255,0.05)",
-              color: meshQ === q.id ? "#a5a0ff" : "#3d3d5a",
-              outline: meshQ === q.id ? "1.5px solid rgba(108,99,255,0.4)" : "1.5px solid rgba(255,255,255,0.07)",
-              opacity: q.id === "ultra" && !isV3 ? 0.5 : 1,
+              background: meshQ === "ultra" && caps.ultraMesh ? "rgba(108,99,255,0.2)" : "rgba(255,255,255,0.05)",
+              color:      meshQ === "ultra" && caps.ultraMesh ? "#a5a0ff" : "#3d3d5a",
+              outline:    meshQ === "ultra" && caps.ultraMesh ? "1.5px solid rgba(108,99,255,0.4)" : "1.5px solid rgba(255,255,255,0.07)",
+              cursor: caps.ultraMesh ? "pointer" : "not-allowed",
             }}>
-            {q.prem && <CoinIcon size={14} />}{q.label}
+            <CoinIcon size={14} />Ultra
           </button>
-        ))}
+        </Na>
+        {/* Standard — always available */}
+        <button
+          className="tp-qual-btn"
+          onClick={() => setMeshQ("standard")}
+          title="geometry_quality: standard"
+          style={{
+            background: meshQ === "standard" || !caps.ultraMesh ? "rgba(108,99,255,0.2)" : "rgba(255,255,255,0.05)",
+            color:      meshQ === "standard" || !caps.ultraMesh ? "#a5a0ff" : "#3d3d5a",
+            outline:    meshQ === "standard" || !caps.ultraMesh ? "1.5px solid rgba(108,99,255,0.4)" : "1.5px solid rgba(255,255,255,0.07)",
+          }}>
+          Standard
+        </button>
       </div>
-      {meshQ === "ultra" && !isV3 && (
+      {meshQ === "ultra" && !caps.ultraMesh && (
         <p style={{ color: "#f5c518", fontSize: 10, margin: "2px 0 4px", lineHeight: 1.5 }}>
           Ultra quality requires P1-20260311 or v3.x model.
         </p>
       )}
 
       {/* ── Generate in Parts ── */}
-      <Toggle
-        label="Generate in Parts"
-        value={inParts}
-        onChange={setInParts}
-        hint premium
-        disabled={partsDisabled}
-      />
-      {partsDisabled && (
+      <Na unsupported={!caps.inParts} tip={`Generate in Parts not supported by ${modelVer}`}>
+        <Toggle
+          label="Generate in Parts"
+          value={inParts}
+          onChange={setInParts}
+          hint premium
+          disabled={partsDisabled || !caps.inParts}
+        />
+      </Na>
+      {partsDisabled && caps.inParts && (
         <p style={{ color: "#f87171", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
           Generate in Parts requires Texture off, PBR off, and Triangle topology.
         </p>
@@ -725,46 +829,59 @@ Respond ONLY with plain text, no JSON, no explanation.`;
       </div>
 
       {/* ── Texture ── */}
-      <Toggle label="Texture" value={texOn} onChange={setTexOn} />
+      <Na unsupported={!caps.texture} tip={`Texture not supported by ${modelVer}`}>
+        <Toggle label="Texture" value={texOn && caps.texture} onChange={v => caps.texture && setTexOn(v)} disabled={!caps.texture} />
+      </Na>
+
       <Collapsible label="Texture Settings">
         <div style={{ display: "flex", flexDirection: "column" }}>
-          {/* 4K Texture → texture_quality: "HD" */}
-          <div
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", cursor: texOn ? "pointer" : "not-allowed", opacity: (texOn || pbrOn) ? 1 : 0.4
-            }}
-            onClick={() => (texOn || pbrOn) && setTex4K(v => !v)}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <CoinIcon size={14} />
-              <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>4K Texture</span>
-              <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
-            </div>
-            <div className={"tp-switch" + (tex4K && (texOn || pbrOn) ? " on" : "")}
 
-              style={{ background: tex4K && texOn ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
-          </div>
-          {tex4K && (texOn || pbrOn) && (
+          {/* 4K Texture */}
+          <Na unsupported={!caps.tex4K} tip={`4K Texture not supported by ${modelVer}`}>
+            <div
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "9px 0",
+                cursor: (texOn || pbrOn) && caps.tex4K ? "pointer" : "not-allowed",
+                opacity: (texOn || pbrOn) && caps.tex4K ? 1 : 0.4,
+              }}
+              onClick={() => (texOn || pbrOn) && caps.tex4K && setTex4K(v => !v)}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <CoinIcon size={14} />
+                <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>4K Texture</span>
+                <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+              </div>
+              <div className={"tp-switch" + (tex4K && (texOn || pbrOn) && caps.tex4K ? " on" : "")}
+                style={{ background: tex4K && texOn && caps.tex4K ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
+            </div>
+          </Na>
+          {tex4K && (texOn || pbrOn) && caps.tex4K && (
             <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
               texture_quality: "HD" — higher resolution, slower generation.
             </p>
           )}
 
           {/* PBR */}
-          <div
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", cursor: texOn ? "pointer" : "not-allowed", opacity: (texOn || pbrOn) ? 1 : 0.4
-            }}
-            onClick={() => texOn && setPbrOn(v => !v)}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>PBR</span>
-              <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+          <Na unsupported={!caps.pbr} tip={`PBR not supported by ${modelVer}`}>
+            <div
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "9px 0",
+                cursor: texOn && caps.pbr ? "pointer" : "not-allowed",
+                opacity: (texOn || pbrOn) && caps.pbr ? 1 : 0.4,
+              }}
+              onClick={() => texOn && caps.pbr && setPbrOn(v => !v)}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>PBR</span>
+                <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+              </div>
+              <div className={"tp-switch" + (pbrOn && texOn && caps.pbr ? " on" : "")}
+                style={{ background: pbrOn && texOn && caps.pbr ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
             </div>
-            <div className={"tp-switch" + (pbrOn && texOn ? " on" : "")}
-              style={{ background: pbrOn && texOn ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
-          </div>
-          {pbrOn && texOn && (
+          </Na>
+          {pbrOn && texOn && caps.pbr && (
             <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
               Generates albedo, normal, roughness & metallic maps. Overrides texture=true.
             </p>
@@ -778,6 +895,8 @@ Respond ONLY with plain text, no JSON, no explanation.`;
           quad={quadMesh} setQuad={setQuadMesh}
           smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly}
           polycount={polycount} setPolycount={setPolycount}
+          capsQuad={caps.quad}
+          capsSmartLowPoly={caps.smartLowPoly}
         />
       </Collapsible>
 
@@ -786,72 +905,73 @@ Respond ONLY with plain text, no JSON, no explanation.`;
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
 
           {/* model_seed */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Model Seed</span>
-              <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
-            </div>
-            <input
-              type="number" min="0" placeholder="Random"
-              value={modelSeed ?? ""}
-              onChange={e => setModelSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
-              className="tp-input"
-              style={{ width: 90, textAlign: "right", fontSize: 11, padding: "4px 8px" }}
-            />
-          </div>
-
-          {/* image_seed */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Image Seed</span>
-              <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
-            </div>
-            <input
-              type="number" min="0" placeholder="Random"
-              value={imageSeed ?? ""}
-              onChange={e => setImageSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
-              className="tp-input"
-              style={{ width: 90, textAlign: "right", fontSize: 11, padding: "4px 8px" }}
-            />
-          </div>
-
-          {/* texture_seed — csak ha textúra be van kapcsolva */}
-          {(texOn || pbrOn) && (
+          <Na unsupported={!caps.modelSeed} tip={`Model Seed not supported by ${modelVer}`}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Texture Seed</span>
+                <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Model Seed</span>
                 <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
               </div>
               <input
                 type="number" min="0" placeholder="Random"
-                value={textureSeed ?? ""}
-                onChange={e => setTextureSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
+                value={modelSeed ?? ""}
+                onChange={e => caps.modelSeed && setModelSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
+                disabled={!caps.modelSeed}
                 className="tp-input"
                 style={{ width: 90, textAlign: "right", fontSize: 11, padding: "4px 8px" }}
               />
             </div>
+          </Na>
+
+          {/* image_seed */}
+          <Na unsupported={!caps.imageSeed} tip={`Image Seed not supported by ${modelVer}`}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Image Seed</span>
+                <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+              </div>
+              <input
+                type="number" min="0" placeholder="Random"
+                value={imageSeed ?? ""}
+                onChange={e => caps.imageSeed && setImageSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
+                disabled={!caps.imageSeed}
+                className="tp-input"
+                style={{ width: 90, textAlign: "right", fontSize: 11, padding: "4px 8px" }}
+              />
+            </div>
+          </Na>
+
+          {/* texture_seed */}
+          {(texOn || pbrOn) && (
+            <Na unsupported={!caps.textureSeed} tip={`Texture Seed not supported by ${modelVer}`}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Texture Seed</span>
+                  <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+                </div>
+                <input
+                  type="number" min="0" placeholder="Random"
+                  value={textureSeed ?? ""}
+                  onChange={e => caps.textureSeed && setTextureSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
+                  disabled={!caps.textureSeed}
+                  className="tp-input"
+                  style={{ width: 90, textAlign: "right", fontSize: 11, padding: "4px 8px" }}
+                />
+              </div>
+            </Na>
           )}
 
           {/* auto_size */}
-          <Toggle
-            label="Auto Size"
-            value={autoSize}
-            onChange={setAutoSize}
-            hint
-          />
-          {autoSize && (
+          <Na unsupported={!caps.autoSize} tip={`Auto Size not supported by ${modelVer}`}>
+            <Toggle label="Auto Size" value={autoSize && caps.autoSize} onChange={v => caps.autoSize && setAutoSize(v)} hint disabled={!caps.autoSize} />
+          </Na>
+          {autoSize && caps.autoSize && (
             <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
               Scales the model to real-world dimensions (meters).
             </p>
           )}
 
           {/* export_uv */}
-          <Toggle
-            label="Export UV"
-            value={exportUv}
-            onChange={setExportUv}
-            hint
-          />
+          <Toggle label="Export UV" value={exportUv} onChange={setExportUv} hint />
           {!exportUv && (
             <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
               Skips UV unwrap during generation — faster & smaller file. UV added at texturing stage.

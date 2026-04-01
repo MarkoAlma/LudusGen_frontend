@@ -20,6 +20,7 @@ export default function ThreeViewer({
   wireHexColor = 0xffffff,
   autoSpin = false,
   onSpinStop,
+  onNonGlbUrl,
   bgColor = 'default',
   gridColor1 = '#1e1e3a',
   gridColor2 = '#111128',
@@ -221,11 +222,13 @@ export default function ThreeViewer({
   useEffect(() => {
     if (!modelUrl || !S.current?.scene) return;
     // Blob URL-nél nincs kiterjesztés — azok mindig GLB (fetchGlbAsBlob hozza létre)
-    // Raw https URL-nél ellenőrzés: FBX/OBJ-t a GLTFLoader nem tud olvasni
     if (!modelUrl.startsWith('blob:')) {
       const ext = modelUrl.split('?')[0].split('.').pop().toLowerCase();
       if (!['glb', 'gltf'].includes(ext)) {
+        // FIX: ne dobjuk el csendben — értesítsük a szülőt hogy ez nem renderelhető
+        // (pl. FBX/OBJ/STL) → szülő megjeleníthet letöltés gombot helyette
         console.warn('ThreeViewer: nem GLB/GLTF URL, kihagyva:', modelUrl);
+        if (onNonGlbUrl) onNonGlbUrl(modelUrl, ext);
         return;
       }
     }

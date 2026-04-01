@@ -87,8 +87,8 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken) {
   if (modelUrl.startsWith('/api/')) {
     // BUG FIX: volt hardcoded http://localhost:3001 — production-ban törött
     fetchUrl = `${API_BASE}${modelUrl}`;
-  } else if (modelUrl.includes('tripo3d.com')) {
-    // tripo CDN CORS-blokkolt, saját proxy endpointja van (nem a trellis proxy!)
+  } else if (modelUrl.includes('tripo3d.com') || modelUrl.includes('tripo3d.ai')) {
+    // FIX: tripo CDN CORS-blokkolt — ide tartozik a tripo-data.rg1.data.tripo3d.com is
     fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}`;
   } else if (
     modelUrl.startsWith('https://s3.') ||
@@ -155,6 +155,9 @@ export async function streamChat(url, headers, body) {
   return accumulated;
 }
 
+// History TTL: 7 days in milliseconds
+const HISTORY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 // ────────────────────────────────────────────────────────────────────────────
 // Firestore history — paginated load
 //
@@ -162,6 +165,9 @@ export async function streamChat(url, headers, body) {
 // A régi itemeknek nincs ts mezőjük (csak createdAt serverTimestamp).
 // A Firestore kihagyta ezeket a dokumentumokat az orderBy("ts") querynél.
 // createdAt minden rekordban megvan. Client-side getItemTs() rendez pontosan.
+//
+// TTL: expired items (older than 7 days) are filtered out client-side.
+// The /api/tripo/history/expired endpoint handles server-side cleanup.
 // ────────────────────────────────────────────────────────────────────────────
 
 export async function loadHistoryPageFromFirestore(userId, { limit = 10, startAfter: cursor = null } = {}) {
@@ -176,8 +182,14 @@ export async function loadHistoryPageFromFirestore(userId, { limit = 10, startAf
   const q = query(collection(db, 'trellis_history'), ...constraints);
   const snap = await getDocs(q);
 
+  const now = Date.now();
   const items = snap.docs
     .map((doc) => ({ id: doc.id, ...doc.data() }))
+    // Filter out expired items (older than TTL)
+    .filter((item) => {
+      const ts = getItemTs(item);
+      return ts === 0 || (now - ts) < HISTORY_TTL_MS;
+    })
     .sort((a, b) => getItemTs(b) - getItemTs(a));
 
   const lastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
@@ -189,14 +201,19 @@ export async function loadHistoryPageFromFirestore(userId, { limit = 10, startAf
 //
 // BUG FIX: a firestore.js-ben lévő saveHistoryToFirestore elavult duplikátum
 // volt, ami nem mentette a ts mezőt. Ez az egyetlen helyes verzió.
+//
+// TTL: expiresAt mező = most + 7 nap (ms). Firestore TTL policy használható
+// ezzel a mezővel automatikus törléshez (ha engedélyezve van).
 // ────────────────────────────────────────────────────────────────────────────
 
 export async function saveHistoryToFirestore(userId, itemData) {
+  const now = Date.now();
   const docRef = await addDoc(collection(db, 'trellis_history'), {
     userId,
     ...itemData,
-    createdAt: serverTimestamp(),   // Firestore index + load
-    ts: itemData.ts ?? Date.now(),  // client-side rendezés
+    createdAt: serverTimestamp(),          // Firestore index + load
+    ts: itemData.ts ?? now,               // client-side rendezés
+    expiresAt: now + HISTORY_TTL_MS,      // TTL: 7 nap — Firestore TTL policy használható
   });
   return { docId: docRef.id };
 }
