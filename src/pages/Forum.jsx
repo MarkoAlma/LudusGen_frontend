@@ -287,13 +287,13 @@ const NOTIF_COLORS = {
   system: "#fbbf24",
 };
 
-const NotifDropdown = ({ notifs, onMarkRead, onMarkAllRead, onClose }) => {
+const NotifDropdown = ({ notifs, onNotifClick, onDeleteAll, onDeleteOne, onClose }) => {
   return (
     <div className="absolute right-0 top-full w-80 rounded-2xl overflow-hidden mt-2"
       style={{ zIndex: 100000, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
         <span className="text-white font-semibold text-sm">Értesítések</span>
-        <button onClick={(e) => { e.stopPropagation(); onMarkAllRead(); }} className="cursor-pointer text-xs text-purple-400 hover:text-purple-300">Mind olvasott</button>
+        <button onClick={(e) => { e.stopPropagation(); onDeleteAll(); }} className="cursor-pointer text-xs text-red-400 hover:text-red-300">Összes törlése</button>
       </div>
       {notifs.length === 0 && (
         <div className="px-4 py-6 text-center">
@@ -301,25 +301,30 @@ const NotifDropdown = ({ notifs, onMarkRead, onMarkAllRead, onClose }) => {
           <p className="text-gray-600 text-xs">Nincs értesítés</p>
         </div>
       )}
-      {notifs.slice(0, 8).map(n => (
-        <div key={n.id}
-          onClick={(e) => { e.stopPropagation(); onMarkRead(n.id); }}
-          className="flex items-start gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
-          style={{ background: !n.read ? "rgba(167,139,250,0.04)" : "transparent" }}>
-          {!n.read && <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: NOTIF_COLORS[n.type] || "#a78bfa" }} />}
-          {n.read && <div className="w-1.5 h-1.5 flex-shrink-0" />}
-          <div className="flex-1 min-w-0">
-            <p className="text-xs leading-relaxed" style={{ color: n.read ? "#6b7280" : "#d1d5db" }}>{n.text}</p>
-            <p className="text-gray-600 text-xs mt-0.5">{typeof n.time === "string" ? n.time : formatNotifTime(n.createdAt)}</p>
+      <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+        {notifs.map(n => (
+          <div key={n.id}
+            onClick={(e) => { e.stopPropagation(); onNotifClick(n); }}
+            className="flex items-start gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer group/notif"
+            style={{ background: !n.read ? "rgba(167,139,250,0.04)" : "transparent" }}>
+            {!n.read && <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: NOTIF_COLORS[n.type] || "#a78bfa" }} />}
+            {n.read && <div className="w-1.5 h-1.5 flex-shrink-0" />}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs leading-relaxed" style={{ color: n.read ? "#6b7280" : "#d1d5db" }}>{n.text}</p>
+              <p className="text-gray-600 text-xs mt-0.5">{typeof n.time === "string" ? n.time : formatNotifTime(n.createdAt)}</p>
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              {!n.read && <CheckCircle className="w-3 h-3 text-gray-700" />}
+              <button 
+                onClick={(e) => { e.stopPropagation(); onDeleteOne(n.id); }}
+                className="cursor-pointer p-1 rounded-md text-gray-700 hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/notif:opacity-100"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           </div>
-          {!n.read && <div className="flex-shrink-0 mt-1"><CheckCircle className="w-3 h-3 text-gray-700 hover:text-purple-400 transition-colors" /></div>}
-        </div>
-      ))}
-      {notifs.length > 8 && (
-        <div className="px-4 py-2.5 text-center">
-          <span className="text-xs text-gray-600">+{notifs.length - 8} további értesítés</span>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 };
@@ -1059,20 +1064,45 @@ export default function Forum() {
   };
 
   // ── Értesítés kezelők ────────────────────────────────────────
-  const markNotifRead = async (notifId) => {
+  const handleNotifClick = async (notif) => {
     try {
-      await updateDoc(doc(db, "forum_notifications", notifId), { read: true });
-    } catch (e) { console.error("Notif read error:", e); }
+      if (!notif.read) {
+        await updateDoc(doc(db, "forum_notifications", notif.id), { read: true });
+      }
+      
+      // Navigáció a bejegyzéshez
+      if (notif.postId) {
+        // Megkeressük a posztot az összes poszt között
+        const postToOpen = posts.find(p => p.id === notif.postId);
+        if (postToOpen) {
+          handleOpenPost(postToOpen);
+        } else {
+          // Ha nincs a betöltöttek között, próbáljuk meg lekérni (vagy legalább a slug alapján navigálni)
+          console.warn("[Forum] Notification linked post not found in local state:", notif.postId);
+          // Opcionálisan ide jöhet egy fetchDoc logic
+        }
+      }
+      setShowNotifs(false);
+    } catch (e) { console.error("Notif click error:", e); }
   };
 
-  const markAllNotifsRead = async () => {
+  const deleteNotification = async (notifId) => {
+    try {
+      await deleteDoc(doc(db, "forum_notifications", notifId));
+      dbg("Notification deleted:", notifId);
+    } catch (e) { console.error("Notif delete error:", e); }
+  };
+
+  const deleteAllNotifications = async () => {
+    if (notifications.length === 0) return;
     try {
       const batch = writeBatch(db);
-      notifications.filter(n => !n.read).forEach(n => {
-        batch.update(doc(db, "forum_notifications", n.id), { read: true });
+      notifications.forEach(n => {
+        batch.delete(doc(db, "forum_notifications", n.id));
       });
       await batch.commit();
-    } catch (e) { console.error("Notif batch read error:", e); }
+      dbg("All notifications deleted for user:", currentUserId);
+    } catch (e) { console.error("Notif batch delete error:", e); }
   };
 
   // Értesítés létrehozás segédfüggvény
@@ -1358,7 +1388,15 @@ export default function Forum() {
                       style={{ background: "linear-gradient(135deg,#7c3aed,#db2777)", fontSize: "0.6rem" }}>{unreadCount > 9 ? "9+" : unreadCount}</span>
                   )}
                 </button>
-                {showNotifs && <NotifDropdown notifs={notifications} onMarkRead={markNotifRead} onMarkAllRead={markAllNotifsRead} onClose={() => setShowNotifs(false)} />}
+                {showNotifs && (
+                  <NotifDropdown 
+                    notifs={notifications} 
+                    onNotifClick={handleNotifClick} 
+                    onDeleteAll={deleteAllNotifications} 
+                    onDeleteOne={deleteNotification}
+                    onClose={() => setShowNotifs(false)} 
+                  />
+                )}
               </div>
 
               <div ref={userMenuRef} className="relative">

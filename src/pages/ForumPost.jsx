@@ -851,6 +851,27 @@ export default function ForumPost({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // ── Értesítés létrehozása ──────────────────────────────────────────
+  const createNotification = useCallback(async (recipientId, type, text) => {
+    if (!recipientId || recipientId === currentUserId) return; // ne értesítsd magad
+    try {
+      await addDoc(collection(db, "forum_notifications"), {
+        recipientId,
+        type,
+        text,
+        read: false,
+        createdAt: serverTimestamp(),
+        // Opcionálisan hozzátesszük a bejegyzés adatait a kattinthatósághoz
+        postId: post.id,
+        category: post.category,
+        slug: post.slug
+      });
+      console.log("[ForumPost] Értesítés létrehozva:", { recipientId, type, text });
+    } catch (e) {
+      console.error("[ForumPost] Hiba az értesítés létrehozásakor:", e);
+    }
+  }, [currentUserId, post?.id, post?.category, post?.slug]);
+
   // ── Firebase Figyelő ─────────────────────────────────────────────
   useEffect(() => {
     if (!post?.id) return;
@@ -923,6 +944,16 @@ export default function ForumPost({
 
       await addDoc(collection(db, "forum_comments"), nc);
       console.log("[ForumPost] Hozzászólás mentve a Firebase-be");
+
+      // Értesítés a bejegyzés szerzőjének (ha nem saját magunknak írunk)
+      if (post.authorId && post.authorId !== currentUserId) {
+        const authorName = globalUser?.displayName || "Valaki";
+        createNotification(
+          post.authorId,
+          "comment",
+          `${authorName} hozzászólt a(z) "${post.title}" témádhoz.`
+        );
+      }
     } catch (e) {
       console.error("[ForumPost] Hiba a hozzászólás mentésekor:", e);
     }
@@ -950,6 +981,18 @@ export default function ForumPost({
 
       await addDoc(collection(db, "forum_comments"), nr);
       console.log("[ForumPost] Válasz mentve a Firebase-be (parentId:", parentId, ")");
+
+      // Értesítés a szülő hozzászólás szerzőjének
+      // Megkeressük a szülő hozzászólást a listában
+      const parentComment = comments.find(c => c.id === parentId);
+      if (parentComment && parentComment.authorId && parentComment.authorId !== currentUserId) {
+        const authorName = globalUser?.displayName || "Valaki";
+        createNotification(
+          parentComment.authorId,
+          "reply",
+          `${authorName} válaszolt a hozzászólásodra itt: "${post.title}".`
+        );
+      }
     } catch (e) {
       console.error("[ForumPost] Hiba a válasz mentésekor:", e);
     }
