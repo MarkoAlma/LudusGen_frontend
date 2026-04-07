@@ -8,7 +8,7 @@ import {
   Box,
   Sparkles,
 } from "lucide-react";
-import { getCachedThumbnail } from "./GlbThumbnail";
+import { getCachedThumbnail } from "./Glbthumbnail";
 import { fetchGlbAsBlob } from "./utils";
 
 const R = { sm: 5, md: 10, lg: 14 };
@@ -73,6 +73,12 @@ const HistoryCard = React.memo(function HistoryCard({
 
   useEffect(() => {
     if (!item?.model_url) return;
+
+    // GLTFLoader csak GLB/GLTF-et tud renderelni — FBX-re ne próbáljuk
+    const urlWithoutParams = item.model_url.split('?')[0];
+    const ext = urlWithoutParams.split('.').pop().toLowerCase();
+    if (!['glb', 'gltf'].includes(ext)) return;
+
     let cancelled = false;
     setThumbError(false);
     (async () => {

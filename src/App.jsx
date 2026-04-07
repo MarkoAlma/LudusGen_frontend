@@ -46,6 +46,7 @@ function App() {
     } else {
       document.body.style.overflow = '';
     }
+    
 
     // Cleanup when the component is unmounted or modal is closed
     return () => {
