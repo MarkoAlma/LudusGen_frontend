@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useContext } from "react";
 import { MyUserContext } from "../context/MyUserProvider";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, ThumbsUp, Eye, MessageSquare, Clock, Pin, Flame,
   Share2, Bookmark, MoreHorizontal, Send, ChevronDown, ChevronUp,
@@ -242,8 +243,8 @@ const ReactionBar = ({ reactions: initReactions, color, commentId }) => {
           <Smile className="w-3 h-3" /> +
         </button>
         {showPicker && (
-          <div className="absolute bottom-full mb-1 left-0 z-20 flex gap-1 p-2 rounded-xl"
-            style={{ background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.15)", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+          <div className="absolute bottom-full mb-1 left-0 flex gap-1 p-2 rounded-xl"
+            style={{ zIndex: 9999, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.15)", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
             {EMOJI_REACTIONS.map(e => (
               <button key={e} onClick={() => toggleReaction(e)}
                 className="cursor-pointer w-7 h-7 flex items-center justify-center rounded-lg text-sm hover:bg-white/10 transition-all active:scale-90"
@@ -340,7 +341,7 @@ const ReportModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
   const reasons = ["Spam vagy hirdetés", "Sértő vagy zaklató tartalom", "Félrevezető információ", "Szerzői jog megsértése", "Egyéb"];
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl overflow-hidden"
         style={{ background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 20px 60px rgba(0,0,0,0.8)" }}>
@@ -420,6 +421,8 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, currentUser 
           background: comment.pinned ? "rgba(167,139,250,0.06)" : isReply ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.03)",
           border: comment.pinned ? "1px solid rgba(167,139,250,0.25)" : `1px solid ${isReply ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.07)"}`,
           borderRadius: "0.875rem", padding: isReply ? "0.75rem 0.875rem" : "1rem 1.125rem",
+          zIndex: showMenu ? 50 : "auto",
+          position: "relative",
         }}>
 
         {comment.pinned && (
@@ -453,8 +456,8 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, currentUser 
               <MoreHorizontal className="w-3.5 h-3.5" />
             </button>
             {showMenu && (
-              <div className="absolute right-0 top-full mt-1 z-20 rounded-xl overflow-hidden w-44"
-                style={{ background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 12px 40px rgba(0,0,0,0.7)" }}>
+              <div className="absolute right-0 top-full mt-1 rounded-xl overflow-hidden w-44"
+                style={{ zIndex: 9999, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 12px 40px rgba(0,0,0,0.7)" }}>
                 <button onClick={copyCommentLink} className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/8 transition-colors">
                   <Copy className="w-3.5 h-3.5" /> Link másolása
                 </button>
@@ -659,6 +662,92 @@ const PermalinkWidget = ({ category, slug, color }) => {
   );
 };
 
+// ─── User Profile Modal ───────────────────────────────────────────
+const UserProfileModal = ({ isOpen, onClose, author, authorAvatar, authorAvatarUrl, authorColor, authorPosts = [], onOpenPost }) => {
+  if (!isOpen) return null;
+  const totalLikes = authorPosts.reduce((s, p) => s + (p.likes || 0), 0);
+  const totalViews = authorPosts.reduce((s, p) => s + (p.views || 0), 0);
+  const totalComments = authorPosts.reduce((s, p) => s + (p.comments || 0), 0);
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg rounded-2xl overflow-hidden flex flex-col"
+        style={{ background: "rgba(10,10,28,0.98)", border: `1px solid ${authorColor}30`, maxHeight: "85vh", boxShadow: `0 30px 80px rgba(0,0,0,0.8), 0 0 60px ${authorColor}12` }}>
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-white/8 flex items-center justify-between flex-shrink-0">
+          <h3 className="text-white font-bold text-sm flex items-center gap-2">
+            <User className="w-4 h-4" style={{ color: authorColor }} /> Felhasználó profil
+          </h3>
+          <button onClick={onClose} className="cursor-pointer p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all"><X className="w-4 h-4" /></button>
+        </div>
+        {/* Profile info */}
+        <div className="px-5 py-4 border-b border-white/6">
+          <div className="flex items-center gap-3 mb-4">
+            {authorAvatarUrl
+              ? <img src={authorAvatarUrl} alt="avatar" className="w-14 h-14 rounded-2xl object-cover" />
+              : <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-lg text-white"
+                  style={{ background: authorColor + "45", border: `1px solid ${authorColor}35` }}>{authorAvatar}</div>
+            }
+            <div>
+              <div className="text-white font-bold text-base" style={{ color: authorColor }}>{author}</div>
+              <div className="text-gray-500 text-xs">Fórum tag</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: "Bejegyzés", value: authorPosts.length, color: authorColor },
+              { label: "Like", value: totalLikes.toLocaleString(), color: "#f472b6" },
+              { label: "Megtekintés", value: totalViews.toLocaleString(), color: "#38bdf8" },
+              { label: "Hozzászólás", value: totalComments.toLocaleString(), color: "#4ade80" },
+            ].map(s => (
+              <div key={s.label} className="text-center py-2 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="font-bold text-sm" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-gray-600 text-xs">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Posts list */}
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3 flex items-center gap-2">
+            <PenSquare className="w-3.5 h-3.5" style={{ color: authorColor }} /> Bejegyzései ({authorPosts.length})
+          </h4>
+          {authorPosts.length > 0 ? (
+            <div className="space-y-2">
+              {authorPosts.map(p => {
+                const pc = CATEGORIES[p.category];
+                return (
+                  <button key={p.id} onClick={() => { onClose(); onOpenPost?.(p); }}
+                    className="cursor-pointer w-full text-left p-3 rounded-xl transition-all hover:bg-white/5 group"
+                    style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      {p.pinned && <span className="text-xs px-1 py-0.5 rounded-full" style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", fontSize: "0.6rem" }}>📌</span>}
+                      {p.hot && <span className="text-xs px-1 py-0.5 rounded-full" style={{ background: "rgba(251,113,33,0.15)", color: "#fb923c", fontSize: "0.6rem" }}>🔥</span>}
+                      <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: `${pc?.color || authorColor}15`, color: pc?.color || authorColor, fontSize: "0.65rem" }}>{pc?.emoji} {pc?.label}</span>
+                    </div>
+                    <p className="text-white text-xs font-semibold leading-snug group-hover:text-purple-200 transition-colors">{p.title}</p>
+                    <div className="flex items-center gap-3 mt-1.5 text-gray-600 text-xs">
+                      <span className="flex items-center gap-0.5"><Heart className="w-2.5 h-2.5" />{p.likes}</span>
+                      <span className="flex items-center gap-0.5"><MessageSquare className="w-2.5 h-2.5" />{p.comments}</span>
+                      <span className="flex items-center gap-0.5"><Eye className="w-2.5 h-2.5" />{p.views?.toLocaleString()}</span>
+                      <span className="ml-auto">{p.time}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center py-8 gap-2">
+              <PenSquare className="w-8 h-8 text-gray-700" />
+              <p className="text-gray-600 text-xs">Még nincs bejegyzése</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Törlés megerősítő dialog (lokális, poszt nézetben) ───────────
 const ConfirmDeleteModal = ({ isOpen, onConfirm, onCancel }) => {
   if (!isOpen) return null;
@@ -715,8 +804,10 @@ export default function ForumPost({
   const [commentSearch, setCommentSearch] = useState("");
   const [showCommentSearch, setShowCommentSearch] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   const { user: globalUser } = useContext(MyUserContext);
+  const navigate = useNavigate();
   const cat = CATEGORIES[post?.category] || CATEGORIES.chat;
   const color = cat.color;
 
@@ -778,6 +869,18 @@ export default function ForumPost({
       <ReadingProgress color={color} />
       <ScrollToTop />
 
+      {/* Profil modal */}
+      <UserProfileModal
+        isOpen={showProfile}
+        onClose={() => setShowProfile(false)}
+        author={post.author}
+        authorAvatar={post.avatar}
+        authorAvatarUrl={post.avatarUrl}
+        authorColor={post.avatarColor}
+        authorPosts={allPosts.filter(p => p.author === post.author)}
+        onOpenPost={onOpenPost}
+      />
+
       {/* Törlés megerősítő (lokális) */}
       <ConfirmDeleteModal
         isOpen={showDeleteConfirm}
@@ -804,14 +907,6 @@ export default function ForumPost({
           <span className="text-xs" style={{ color }}>{cat.emoji} {cat.label}</span>
           <ChevronRight className="w-3 h-3 text-gray-700" />
           <span className="text-gray-600 text-xs truncate max-w-[180px]">{post.title}</span>
-          {post.slug && post.category && (
-            <>
-              <ChevronRight className="w-3 h-3 text-gray-700" />
-              <span className="text-gray-700 text-xs font-mono truncate max-w-[180px]">
-                /forum/{post.category}/{post.slug}
-              </span>
-            </>
-          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4">
@@ -831,23 +926,28 @@ export default function ForumPost({
 
                 <h1 className="text-white font-bold text-xl md:text-2xl leading-tight mb-4">{post.title}</h1>
 
-                <div className="flex items-center gap-3 mb-5 pb-5 border-b border-white/6">
-                  {post.avatarUrl ? <img src={post.avatarUrl} alt="avatar" className="w-10 h-10 rounded-xl object-cover" /> : <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
-                    style={{ background: post.avatarColor + "45", border: `1px solid ${post.avatarColor}35` }}>{post.avatar}</div>}
-                  <div>
-                    <span className="font-semibold text-sm" style={{ color: post.avatarColor }}>{post.author}</span>
-                    <div className="flex items-center gap-2 text-gray-600 text-xs mt-0.5">
-                      <Clock className="w-2.5 h-2.5" />{post.time}
-                      <span>·</span>
-                      <Eye className="w-2.5 h-2.5" />{post.views?.toLocaleString()} megtekintés
-                      {post.slug && post.category && (
-                        <>
-                          <span>·</span>
-                          <span className="font-mono text-gray-700 hidden sm:inline">
-                            /forum/{post.category}/{post.slug}
-                          </span>
-                        </>
-                      )}
+                <div className="flex items-center gap-4 mb-6 py-4 border-y border-white/5">
+                  <div className="relative cursor-pointer group" onClick={() => setShowProfile(true)}>
+                    {post.avatarUrl ? (
+                      <img src={post.avatarUrl} alt="avatar" className="w-12 h-12 rounded-2xl object-cover ring-2 ring-white/5 group-hover:ring-[color:var(--accent)] transition-all" style={{ '--accent': color }} />
+                    ) : (
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg text-white group-hover:scale-105 transition-all"
+                        style={{ background: `linear-gradient(135deg, ${post.avatarColor}45, ${post.avatarColor}25)`, border: `1px solid ${post.avatarColor}35` }}>
+                        {post.avatar}
+                      </div>
+                    )}
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0a0118]" title="Online" />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-base text-white hover:underline cursor-pointer" onClick={() => setShowProfile(true)} style={{ color: post.avatarColor }}>{post.author}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-500 font-medium uppercase tracking-wider">Szerző</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-gray-500 text-xs">
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {post.time}</span>
+                      <span className="w-1 h-1 rounded-full bg-gray-800" />
+                      <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {post.views?.toLocaleString()} megtekintés</span>
                     </div>
                   </div>
 
@@ -1018,9 +1118,7 @@ export default function ForumPost({
           <div className="space-y-3">
             <TableOfContents content={post.content} color={color} />
 
-            {post.slug && post.category && (
-              <PermalinkWidget category={post.category} slug={post.slug} color={color} />
-            )}
+
 
             <GlassCard>
               <div className="px-4 pt-4 pb-3">
@@ -1060,7 +1158,8 @@ export default function ForumPost({
                     </div>
                   ))}
                 </div>
-                <button className="cursor-pointer w-full py-2 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90"
+                <button onClick={() => setShowProfile(true)}
+                  className="cursor-pointer w-full py-2 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90"
                   style={{ background: `linear-gradient(135deg, ${post.avatarColor}50, ${post.avatarColor}30)`, border: `1px solid ${post.avatarColor}40` }}>
                   Profil megtekintése
                 </button>

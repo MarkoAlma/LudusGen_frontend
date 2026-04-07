@@ -16,7 +16,7 @@ import { auth, db } from "../firebase/firebaseApp";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection, addDoc, getDocs, deleteDoc, doc, updateDoc,
-  query, orderBy, serverTimestamp, getDoc,
+  query, orderBy, serverTimestamp, getDoc, onSnapshot, where, limit, Timestamp, writeBatch,
 } from "firebase/firestore";
 
 // ─── Admin UIDs ───────────────────────────────────────────────────
@@ -268,34 +268,58 @@ const AnnouncementBanner = () => {
 };
 
 // ─── Notification dropdown ────────────────────────────────────────
-const NotifDropdown = ({ onClose }) => {
-  const notifs = [
-    { id: 1, text: "pixel_witch válaszolt a hozzászólásodra", time: "3p", read: false, color: "#f472b6" },
-    { id: 2, text: "prompt_guru like-olta a bejegyzésedet", time: "15p", read: false, color: "#a78bfa" },
-    { id: 3, text: "Új téma a Chat AI kategóriában", time: "1ó", read: true, color: "#34d399" },
-    { id: 4, text: "typescript_king megemlített egy témában", time: "2ó", read: true, color: "#34d399" },
-  ];
+const formatNotifTime = (ts) => {
+  if (!ts?.toDate) return "Most";
+  const diff = Date.now() - ts.toDate();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "Most";
+  if (m < 60) return `${m}p`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}ó`;
+  return `${Math.floor(h / 24)}n`;
+};
+
+const NOTIF_COLORS = {
+  like: "#f472b6",
+  comment: "#a78bfa",
+  reply: "#34d399",
+  mention: "#38bdf8",
+  system: "#fbbf24",
+};
+
+const NotifDropdown = ({ notifs, onMarkRead, onMarkAllRead, onClose }) => {
   return (
-    <div className="absolute right-0 top-full mt-2 w-72 z-50 rounded-2xl overflow-hidden"
-      style={{ background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
+    <div className="absolute right-5 top-18 w-80 rounded-2xl overflow-hidden mt-2"
+      style={{ zIndex: 100000, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
         <span className="text-white font-semibold text-sm">Értesítések</span>
-        <button className="cursor-pointer text-xs text-purple-400 hover:text-purple-300">Mind olvasott</button>
+        <button onClick={(e) => { e.stopPropagation(); onMarkAllRead(); }} className="cursor-pointer text-xs text-purple-400 hover:text-purple-300">Mind olvasott</button>
       </div>
-      {notifs.map(n => (
-        <div key={n.id} className="flex items-start gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+      {notifs.length === 0 && (
+        <div className="px-4 py-6 text-center">
+          <Bell className="w-6 h-6 text-gray-700 mx-auto mb-2" />
+          <p className="text-gray-600 text-xs">Nincs értesítés</p>
+        </div>
+      )}
+      {notifs.slice(0, 8).map(n => (
+        <div key={n.id}
+          onClick={(e) => { e.stopPropagation(); onMarkRead(n.id); }}
+          className="flex items-start gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
           style={{ background: !n.read ? "rgba(167,139,250,0.04)" : "transparent" }}>
-          {!n.read && <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: n.color }} />}
+          {!n.read && <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: NOTIF_COLORS[n.type] || "#a78bfa" }} />}
           {n.read && <div className="w-1.5 h-1.5 flex-shrink-0" />}
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-gray-300 leading-relaxed">{n.text}</p>
-            <p className="text-gray-600 text-xs mt-0.5">{n.time}</p>
+            <p className="text-xs leading-relaxed" style={{ color: n.read ? "#6b7280" : "#d1d5db" }}>{n.text}</p>
+            <p className="text-gray-600 text-xs mt-0.5">{typeof n.time === "string" ? n.time : formatNotifTime(n.createdAt)}</p>
           </div>
+          {!n.read && <div className="flex-shrink-0 mt-1"><CheckCircle className="w-3 h-3 text-gray-700 hover:text-purple-400 transition-colors" /></div>}
         </div>
       ))}
-      <div className="px-4 py-2.5 text-center">
-        <button className="cursor-pointer text-xs text-gray-600 hover:text-gray-400">Összes értesítés →</button>
-      </div>
+      {notifs.length > 8 && (
+        <div className="px-4 py-2.5 text-center">
+          <span className="text-xs text-gray-600">+{notifs.length - 8} további értesítés</span>
+        </div>
+      )}
     </div>
   );
 };
@@ -338,6 +362,8 @@ const PostCard = ({
         border: `1px solid ${isRead ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.08)"}`,
         borderRadius: "1rem", padding: "1.125rem 1.25rem",
         overflow: "visible",
+        zIndex: showMenu ? 50 : "auto",
+        position: "relative",
       }}
       onMouseEnter={e => {
         e.currentTarget.style.background = "rgba(255,255,255,0.05)";
@@ -886,7 +912,7 @@ export default function Forum() {
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
   const [filterLocked, setFilterLocked] = useState(false);
   const [filterSolved, setFilterSolved] = useState(false);
-  const [unreadCount] = useState(2);
+  const [notifications, setNotifications] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -895,6 +921,7 @@ export default function Forum() {
   const userMenuRef = useRef(null);
   const initialSlugRef = useRef(false);
 
+  const unreadCount = notifications.filter(n => !n.read).length;
   const accentColor = CATEGORIES.find(c => c.id === activeCategory)?.color || "#a78bfa";
 
   // ── Auth figyelés ────────────────────────────────────────────────
@@ -912,6 +939,25 @@ export default function Forum() {
     });
     return unsub;
   }, []);
+
+  // ── Értesítések Firebase figyelés ───────────────────────────────
+  useEffect(() => {
+    if (!currentUserId) { setNotifications([]); return; }
+    const q = query(
+      collection(db, "forum_notifications"),
+      where("recipientId", "==", currentUserId),
+      orderBy("createdAt", "desc"),
+      limit(20)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      dbg(`Notifications loaded: ${items.length}`);
+      setNotifications(items);
+    }, (err) => {
+      console.error("Notification listener error:", err);
+    });
+    return unsub;
+  }, [currentUserId]);
 
   useEffect(() => { dbg("confirmDelete state:", confirmDelete); }, [confirmDelete]);
   useEffect(() => { dbg("editingPost state:", editingPost ? `id=${editingPost.id}` : "null"); }, [editingPost]);
@@ -1010,6 +1056,38 @@ export default function Forum() {
     setOpenPost(null);
     pushForumURL();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // ── Értesítés kezelők ────────────────────────────────────────
+  const markNotifRead = async (notifId) => {
+    try {
+      await updateDoc(doc(db, "forum_notifications", notifId), { read: true });
+    } catch (e) { console.error("Notif read error:", e); }
+  };
+
+  const markAllNotifsRead = async () => {
+    try {
+      const batch = writeBatch(db);
+      notifications.filter(n => !n.read).forEach(n => {
+        batch.update(doc(db, "forum_notifications", n.id), { read: true });
+      });
+      await batch.commit();
+    } catch (e) { console.error("Notif batch read error:", e); }
+  };
+
+  // Értesítés létrehozás segédfüggvény
+  const createNotification = async (recipientId, type, text) => {
+    if (!recipientId || recipientId === currentUserId) return; // ne értesítsd magad
+    try {
+      await addDoc(collection(db, "forum_notifications"), {
+        recipientId,
+        type,
+        text,
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+      dbg("Notification created:", { recipientId, type, text });
+    } catch (e) { console.error("Create notif error:", e); }
   };
 
   // ── Új / szerkesztett poszt mentése ─────────────────────────────
@@ -1229,7 +1307,39 @@ export default function Forum() {
       <div className="relative z-10 max-w-7xl mx-auto px-3 md:px-5 py-5">
 
         {/* ══ HEADER ══ */}
-        <GlassCard style={{ marginBottom: "1rem", padding: "0.875rem 1.25rem" }}>
+        {showNotifs && <NotifDropdown notifs={notifications} onMarkRead={markNotifRead} onMarkAllRead={markAllNotifsRead} onClose={() => setShowNotifs(false)} />}
+        
+        {showUserMenu && (
+          <div className="absolute right-[135px] top-18 mt-2 w-52 rounded-2xl overflow-hidden"
+            style={{ zIndex: 100000, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
+            <div className="px-4 py-3 border-b border-white/8">
+              <p className="text-white font-semibold text-sm">{currentUser?.displayName || currentUser?.email || "Felhasználó"}</p>
+              <p className="text-gray-500 text-xs">{isAdmin ? "👑 Admin" : "Tag"}</p>
+            </div>
+            {[
+              { icon: <Home className="w-3.5 h-3.5" />, label: "Kezdőlap", action: () => { setShowUserMenu(false); navigate('/'); } },
+              { icon: <Bookmark className="w-3.5 h-3.5" />, label: "Mentett témák", action: () => { setShowOnlyBookmarks(v => !v); setShowUserMenu(false); } },
+              { icon: <Settings className="w-3.5 h-3.5" />, label: "Beállítások", action: () => { setShowUserMenu(false); navigate('/settings'); } },
+              ...(isAdmin ? [{ icon: <Shield className="w-3.5 h-3.5" />, label: "Admin panel", action: null }] : []),
+            ].map(item => (
+              <button key={item.label} onClick={item.action || undefined}
+                className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-gray-400 hover:text-white hover:bg-white/8 transition-colors text-xs">
+                {item.icon}{item.label}
+                {item.label === "Mentett témák" && bookmarks.size > 0 && (
+                  <span className="ml-auto text-xs px-1.5 rounded-full" style={{ background: "rgba(167,139,250,0.2)", color: "#a78bfa" }}>{bookmarks.size}</span>
+                )}
+              </button>
+            ))}
+            <div className="border-t border-white/8">
+              <button onClick={() => { setShowUserMenu(false); logoutUser(); navigate('/'); }}
+                className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-red-400 hover:bg-red-400/10 transition-colors text-xs">
+                <LogOut className="w-3.5 h-3.5" /> Kijelentkezés
+              </button>
+            </div>
+          </div>
+        )}
+
+        <GlassCard style={{ marginBottom: "1rem", padding: "0.875rem 1.25rem", zIndex: (showNotifs || showUserMenu) ? 1000 : 100 }}>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <button onClick={() => navigate('/')} title="Kezdőlap"
@@ -1268,17 +1378,16 @@ export default function Forum() {
                 {search && <button onClick={() => setSearch("")} className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400"><X className="w-3 h-3" /></button>}
               </div>
 
-              <div ref={notifRef} className="relative">
+              <div ref={notifRef} className="relative" style={{ zIndex: showNotifs ? 99999 : "auto" }}>
                 <button onClick={() => setShowNotifs(v => !v)}
                   className="cursor-pointer relative p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/8 transition-all"
                   style={{ background: showNotifs ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${showNotifs ? "rgba(167,139,250,0.4)" : "rgba(255,255,255,0.08)"}` }}>
                   <Bell className="w-4 h-4" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                      style={{ background: "linear-gradient(135deg,#7c3aed,#db2777)", fontSize: "0.6rem" }}>{unreadCount}</span>
+                      style={{ background: "linear-gradient(135deg,#7c3aed,#db2777)", fontSize: "0.6rem" }}>{unreadCount > 9 ? "9+" : unreadCount}</span>
                   )}
                 </button>
-                {showNotifs && <NotifDropdown onClose={() => setShowNotifs(false)} />}
               </div>
 
               <div ref={userMenuRef} className="relative">
@@ -1291,35 +1400,6 @@ export default function Forum() {
                     globalUser?.displayName?.[0]?.toUpperCase() || currentUser?.displayName?.[0]?.toUpperCase() || currentUser?.email?.[0]?.toUpperCase() || "?"
                   )}
                 </button>
-                {showUserMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-52 z-50 rounded-2xl overflow-hidden"
-                    style={{ background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
-                    <div className="px-4 py-3 border-b border-white/8">
-                      <p className="text-white font-semibold text-sm">{currentUser?.displayName || currentUser?.email || "Felhasználó"}</p>
-                      <p className="text-gray-500 text-xs">{isAdmin ? "👑 Admin" : "Tag"}</p>
-                    </div>
-                    {[
-                      { icon: <Home className="w-3.5 h-3.5" />, label: "Kezdőlap", action: () => { setShowUserMenu(false); navigate('/'); } },
-                      { icon: <Bookmark className="w-3.5 h-3.5" />, label: "Mentett témák", action: () => { setShowOnlyBookmarks(v => !v); setShowUserMenu(false); } },
-                      { icon: <Settings className="w-3.5 h-3.5" />, label: "Beállítások", action: () => { setShowUserMenu(false); navigate('/settings'); } },
-                      ...(isAdmin ? [{ icon: <Shield className="w-3.5 h-3.5" />, label: "Admin panel", action: null }] : []),
-                    ].map(item => (
-                      <button key={item.label} onClick={item.action || undefined}
-                        className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-gray-400 hover:text-white hover:bg-white/8 transition-colors text-xs">
-                        {item.icon}{item.label}
-                        {item.label === "Mentett témák" && bookmarks.size > 0 && (
-                          <span className="ml-auto text-xs px-1.5 rounded-full" style={{ background: "rgba(167,139,250,0.2)", color: "#a78bfa" }}>{bookmarks.size}</span>
-                        )}
-                      </button>
-                    ))}
-                    <div className="border-t border-white/8">
-                      <button onClick={() => { setShowUserMenu(false); logoutUser(); navigate('/'); }}
-                        className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-red-400 hover:bg-red-400/10 transition-colors text-xs">
-                        <LogOut className="w-3.5 h-3.5" /> Kijelentkezés
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
 
               <button onClick={() => setNewPostOpen(true)}
