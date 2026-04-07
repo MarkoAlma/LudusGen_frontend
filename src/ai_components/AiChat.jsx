@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   Wand2,
   Box,
@@ -131,6 +131,248 @@ const ModelBtn = ({ model, isActive, onSelect }) => (
   </button>
 );
 
+// ─── Sidebar content (defined OUTSIDE AIChat to prevent remount on state change) ──
+const SidebarContent = ({
+  selectedAI,
+  selectedModel,
+  openGroups,
+  openCats,
+  toggleGroup,
+  toggleCat,
+  handleSelectModel,
+  setSidebarOpen,
+}) => (
+  <div className="flex flex-col h-full">
+    {/* Header */}
+    <div className="px-4 pt-5 pb-3 flex-shrink-0">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <Wand2 className="w-4 h-4 text-purple-400" />
+          AI Modellek
+        </h2>
+        <button
+          className="cursor-pointer md:hidden p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all"
+          onClick={() => setSidebarOpen(false)}
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <p className="text-gray-600 text-xs mt-0.5">
+        Válassz egyet az indításhoz
+      </p>
+    </div>
+
+    {/* Scrollable model list */}
+    <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1 scrollbar-thin">
+      {MODEL_GROUPS.map((group) => {
+        const groupOpen = openGroups.has(group.id);
+        const hasActiveInGroup = group.categories
+          .flatMap((c) => c.models)
+          .some((m) => m.id === selectedAI);
+
+        return (
+          <div key={group.id}>
+            {/* Group header */}
+            <button
+              onClick={() => toggleGroup(group.id)}
+              className="cursor-pointer w-full flex items-center justify-between px-2.5 py-2 rounded-xl transition-all duration-150 mt-1"
+              style={{
+                background: groupOpen
+                  ? `${group.color}12`
+                  : hasActiveInGroup
+                    ? `${group.color}0a`
+                    : "rgba(255,255,255,0.02)",
+                border: groupOpen
+                  ? `1px solid ${group.color}30`
+                  : hasActiveInGroup
+                    ? `1px solid ${group.color}20`
+                    : "1px solid rgba(255,255,255,0.05)",
+              }}
+              onMouseEnter={(e) => {
+                if (!groupOpen && !hasActiveInGroup) {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                  e.currentTarget.style.border =
+                    "1px solid rgba(255,255,255,0.1)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!groupOpen && !hasActiveInGroup) {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.02)";
+                  e.currentTarget.style.border =
+                    "1px solid rgba(255,255,255,0.05)";
+                }
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <span
+                  className="w-6 h-6 rounded-lg flex items-center justify-center text-xs flex-shrink-0"
+                  style={{
+                    background: `${group.color}20`,
+                    color: group.color,
+                  }}
+                >
+                  {group.emoji}
+                </span>
+                <span
+                  className="text-xs font-bold"
+                  style={{
+                    color:
+                      groupOpen || hasActiveInGroup ? "white" : "#9ca3af",
+                  }}
+                >
+                  {group.label}
+                </span>
+                {hasActiveInGroup && (
+                  <CircleDot
+                    className="w-2 h-2 animate-pulse"
+                    style={{ color: group.color }}
+                  />
+                )}
+              </span>
+              {groupOpen ? (
+                <ChevronDown className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+              )}
+            </button>
+
+            {/* Group body */}
+            {groupOpen && (
+              <div className="pl-2 mt-1 space-y-1">
+                {group.categories.map((cat) => {
+                  const catOpen = openCats.has(cat.id);
+                  const hasActiveInCat = cat.models.some(
+                    (m) => m.id === selectedAI,
+                  );
+
+                  return (
+                    <div key={cat.id}>
+                      {cat.label && (
+                        <button
+                          onClick={() => toggleCat(cat.id)}
+                          className="cursor-pointer w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-all duration-150 hover:bg-white/5"
+                          style={{
+                            background: hasActiveInCat
+                              ? `${group.color}10`
+                              : "transparent",
+                          }}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-gray-500 text-xs">
+                              {cat.label}
+                            </span>
+                            {hasActiveInCat && (
+                              <CircleDot
+                                className="w-2 h-2 animate-pulse"
+                                style={{ color: group.color }}
+                              />
+                            )}
+                          </span>
+                          {catOpen ? (
+                            <ChevronDown className="w-3 h-3 text-gray-600" />
+                          ) : (
+                            <ChevronRight className="w-3 h-3 text-gray-600" />
+                          )}
+                        </button>
+                      )}
+
+                      {(catOpen || !cat.label) && (
+                        <div className="space-y-1 mt-0.5">
+                          {cat.models.length === 2 && (
+                            <div className="flex gap-2 px-2 pt-0.5 pb-0.5">
+                              <span className="text-xs text-gray-700 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />{" "}
+                                Gyors
+                              </span>
+                              <span className="text-gray-700 text-xs">·</span>
+                              <span className="text-xs text-purple-500 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />{" "}
+                                Prémium
+                              </span>
+                            </div>
+                          )}
+                          {cat.models.map((model) => (
+                            <ModelBtn
+                              key={model.id}
+                              model={model}
+                              isActive={selectedAI === model.id}
+                              onSelect={handleSelectModel}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Active model info card */}
+      <div
+        className="mt-3 p-3 rounded-xl"
+        style={{
+          background: "rgba(255,255,255,0.02)",
+          border: "1px solid rgba(255,255,255,0.05)",
+        }}
+      >
+        <div className="flex items-center gap-1.5 text-purple-400 mb-2">
+          <Star className="w-3 h-3" />
+          <span className="text-xs font-semibold">Aktív modell</span>
+        </div>
+        <div className="space-y-1 text-xs">
+          <div className="flex justify-between gap-2">
+            <span className="text-gray-600">Modell:</span>
+            <span className="text-white font-semibold text-right truncate">
+              {selectedModel.name}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Típus:</span>
+            <span
+              className="font-semibold"
+              style={{ color: selectedModel.color }}
+            >
+              {selectedModel.panelType === "chat"
+                ? "💬 Chat"
+                : selectedModel.panelType === "image"
+                  ? "🖼️ Kép"
+                  : selectedModel.panelType === "audio"
+                    ? "🎵 Hang"
+                    : selectedModel.panelType === "threed"
+                      ? `🧊 ${selectedModel.inputType === "image" ? "Kép" : "Szöveg"} → 3D`
+                      : "—"}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Ár:</span>
+            <span className="text-white font-semibold">
+              {selectedModel.badge}
+            </span>
+          </div>
+          {selectedModel.badgeDetail && (
+            <div className="mt-0.5">
+              <span className="text-gray-700 text-xs">
+                {selectedModel.badgeDetail}
+              </span>
+            </div>
+          )}
+          {selectedModel.provider && (
+            <div className="flex justify-between">
+              <span className="text-gray-600">Provider:</span>
+              <span className="text-gray-400 font-medium">
+                {selectedModel.provider}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 // ─── Main component ────────────────────────────────────
 export default function AIChat({ user, getIdToken }) {
   const [selectedAI, setSelectedAI] = useState("claude_sonnet");
@@ -180,7 +422,6 @@ export default function AIChat({ user, getIdToken }) {
         return <AudioPanel {...props} />;
       case "threed":
         return <Trellis2Panel {...props} />;
-
       case "trellis":
         return <TrellisPanel {...props} />;
       case "tripo":
@@ -191,237 +432,16 @@ export default function AIChat({ user, getIdToken }) {
     }
   };
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-4 pt-5 pb-3 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Wand2 className="w-4 h-4 text-purple-400" />
-            AI Modellek
-          </h2>
-          <button
-            className="cursor-pointer md:hidden p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <p className="text-gray-600 text-xs mt-0.5">
-          Válassz egyet az indításhoz
-        </p>
-      </div>
-
-      {/* Scrollable model list */}
-      <div className="flex-1  overflow-y-auto px-3 pb-4 space-y-1 scrollbar-thin">
-        {MODEL_GROUPS.map((group) => {
-          const groupOpen = openGroups.has(group.id);
-          const hasActiveInGroup = group.categories
-            .flatMap((c) => c.models)
-            .some((m) => m.id === selectedAI);
-
-          return (
-            <div key={group.id}>
-              {/* Group header */}
-              <button
-                onClick={() => toggleGroup(group.id)}
-                className="cursor-pointer w-full flex items-center justify-between px-2.5 py-2 rounded-xl transition-all duration-150 mt-1"
-                style={{
-                  background: groupOpen
-                    ? `${group.color}12`
-                    : hasActiveInGroup
-                      ? `${group.color}0a`
-                      : "rgba(255,255,255,0.02)",
-                  border: groupOpen
-                    ? `1px solid ${group.color}30`
-                    : hasActiveInGroup
-                      ? `1px solid ${group.color}20`
-                      : "1px solid rgba(255,255,255,0.05)",
-                }}
-                onMouseEnter={(e) => {
-                  if (!groupOpen && !hasActiveInGroup) {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                    e.currentTarget.style.border =
-                      "1px solid rgba(255,255,255,0.1)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!groupOpen && !hasActiveInGroup) {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-                    e.currentTarget.style.border =
-                      "1px solid rgba(255,255,255,0.05)";
-                  }
-                }}
-              >
-                <span className="flex items-center gap-2">
-                  <span
-                    className="w-6 h-6 rounded-lg flex items-center justify-center text-xs flex-shrink-0"
-                    style={{
-                      background: `${group.color}20`,
-                      color: group.color,
-                    }}
-                  >
-                    {group.emoji}
-                  </span>
-                  <span
-                    className="text-xs font-bold"
-                    style={{
-                      color:
-                        groupOpen || hasActiveInGroup ? "white" : "#9ca3af",
-                    }}
-                  >
-                    {group.label}
-                  </span>
-                  {hasActiveInGroup && (
-                    <CircleDot
-                      className="w-2 h-2 animate-pulse"
-                      style={{ color: group.color }}
-                    />
-                  )}
-                </span>
-                {groupOpen ? (
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                )}
-              </button>
-
-              {/* Group body */}
-              {groupOpen && (
-                <div className="pl-2 mt-1 space-y-1">
-                  {group.categories.map((cat) => {
-                    const catOpen = openCats.has(cat.id);
-                    const hasActiveInCat = cat.models.some(
-                      (m) => m.id === selectedAI,
-                    );
-
-                    return (
-                      <div key={cat.id}>
-                        {cat.label && (
-                          <button
-                            onClick={() => toggleCat(cat.id)}
-                            className="cursor-pointer w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-all duration-150 hover:bg-white/5"
-                            style={{
-                              background: hasActiveInCat
-                                ? `${group.color}10`
-                                : "transparent",
-                            }}
-                          >
-                            <span className="flex items-center gap-1.5">
-                              <span className="text-gray-500 text-xs">
-                                {cat.label}
-                              </span>
-                              {hasActiveInCat && (
-                                <CircleDot
-                                  className="w-2 h-2 animate-pulse"
-                                  style={{ color: group.color }}
-                                />
-                              )}
-                            </span>
-                            {catOpen ? (
-                              <ChevronDown className="w-3 h-3 text-gray-600" />
-                            ) : (
-                              <ChevronRight className="w-3 h-3 text-gray-600" />
-                            )}
-                          </button>
-                        )}
-
-                        {(catOpen || !cat.label) && (
-                          <div className="space-y-1 mt-0.5">
-                            {cat.models.length === 2 && (
-                              <div className="flex gap-2 px-2 pt-0.5 pb-0.5">
-                                <span className="text-xs text-gray-700 flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />{" "}
-                                  Gyors
-                                </span>
-                                <span className="text-gray-700 text-xs">·</span>
-                                <span className="text-xs text-purple-500 flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />{" "}
-                                  Prémium
-                                </span>
-                              </div>
-                            )}
-                            {cat.models.map((model) => (
-                              <ModelBtn
-                                key={model.id}
-                                model={model}
-                                isActive={selectedAI === model.id}
-                                onSelect={handleSelectModel}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Active model info card */}
-        <div
-          className="mt-3 p-3 rounded-xl"
-          style={{
-            background: "rgba(255,255,255,0.02)",
-            border: "1px solid rgba(255,255,255,0.05)",
-          }}
-        >
-          <div className="flex items-center gap-1.5 text-purple-400 mb-2">
-            <Star className="w-3 h-3" />
-            <span className="text-xs font-semibold">Aktív modell</span>
-          </div>
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between gap-2">
-              <span className="text-gray-600">Modell:</span>
-              <span className="text-white font-semibold text-right truncate">
-                {selectedModel.name}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Típus:</span>
-              <span
-                className="font-semibold"
-                style={{ color: selectedModel.color }}
-              >
-                {selectedModel.panelType === "chat"
-                  ? "💬 Chat"
-                  : selectedModel.panelType === "image"
-                    ? "🖼️ Kép"
-                    : selectedModel.panelType === "audio"
-                      ? "🎵 Hang"
-                      : selectedModel.panelType === "threed"
-                        ? `🧊 ${selectedModel.inputType === "image" ? "Kép" : "Szöveg"} → 3D`
-                        : "—"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Ár:</span>
-              <span className="text-white font-semibold">
-                {selectedModel.badge}
-              </span>
-            </div>
-            {selectedModel.badgeDetail && (
-              <div className="mt-0.5">
-                <span className="text-gray-700 text-xs">
-                  {selectedModel.badgeDetail}
-                </span>
-              </div>
-            )}
-            {selectedModel.provider && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Provider:</span>
-                <span className="text-gray-400 font-medium">
-                  {selectedModel.provider}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const sidebarProps = {
+    selectedAI,
+    selectedModel,
+    openGroups,
+    openCats,
+    toggleGroup,
+    toggleCat,
+    handleSelectModel,
+    setSidebarOpen,
+  };
 
   return (
     <div
@@ -453,7 +473,7 @@ export default function AIChat({ user, getIdToken }) {
 
       {/* ════════ LAYOUT ════════ */}
       <div
-        className="relative w-full pt-10  flex gap-3 z-10"
+        className="relative w-full pt-10 flex gap-3 z-10"
         style={{ height: `calc(100vh - ${navHeight}px)` }}
       >
         {/* ── Sidebar ── */}
@@ -474,7 +494,7 @@ export default function AIChat({ user, getIdToken }) {
               "0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07)",
           }}
         >
-          <SidebarContent />
+          <SidebarContent {...sidebarProps} />
         </aside>
 
         {/* ── Main content area ── */}
@@ -551,7 +571,7 @@ export default function AIChat({ user, getIdToken }) {
             </div>
           </div>
 
-          {/* Panel — overflow-hidden keeps scrolling inside panel, not on page */}
+          {/* Panel */}
           <div className="flex-1 min-h-0 overflow-hidden">{renderPanel()}</div>
         </main>
       </div>

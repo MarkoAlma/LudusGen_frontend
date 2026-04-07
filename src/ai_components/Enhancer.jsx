@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Loader2, Zap, Wand2, AlertCircle } from 'lucide-react';
+import { Loader2, Zap, Wand2, AlertCircle, Eye } from 'lucide-react';
 
 function Tooltip({ text, children, side = 'top' }) {
   const [show, setShow] = useState(false);
@@ -49,16 +49,43 @@ function Tooltip({ text, children, side = 'top' }) {
 
 const MAX_CHARS = 1000;
 
+// ── Gemma Vision: képleírás prompt ──────────────────────────────────────────
+// Ez a prompt kerül elküldésre a Gemma 3 27B IT (NVIDIA) modellnek,
+// hogy strukturált vizuális leírást adjon a feltöltött képekről.
+// A leírás ezután kontextusként kerül a fő edit enhancer promptba.
+const GEMMA_IMAGE_DESCRIBE_PROMPT = `You are a precise visual analyst for an AI image editing pipeline.
+Analyze the uploaded image(s) and provide a detailed, structured description of each one.
+
+For EACH image, describe:
+1. SUBJECTS: Who or what is in the image — species/type, physical traits (hair color/style, skin tone, eyes, build), every visible clothing item listed individually (jacket, shirt, trousers, shoes, accessories, etc.), pose, expression, position in frame
+2. BACKGROUND: Environment, setting, colors, textures, depth, any objects in the background
+3. LIGHTING: Direction (left/right/top/front/back), quality (soft/hard/diffuse/natural), color temperature (warm/cool/neutral)
+4. NOTABLE ELEMENTS: Specific objects, accessories, props, spatial relationships between elements
+5. VISUAL STYLE: Photograph/illustration/3D render/painting, color grading, artistic style if applicable
+
+Format your response EXACTLY as:
+IMAGE 1:
+[detailed structured description]
+
+IMAGE 2:
+[detailed structured description]
+
+(continue for each uploaded image)
+
+Be specific, visual, and objective. No interpretation or creative additions. Describe only what is visually present. This description will be used by another AI model to write precise image editing instructions.`;
+
 function Enhancer({
   value,
   onChange,
-  onNegativeChange,   // ← új: negative_prompt visszaírásához
+  onNegativeChange,
   onSubmit,
   color = '#818cf8',
   getIdToken,
   enhancing_prompt,
   dechanting_prompt,
   onBusyChange,
+  inputImages = [],          // ← feltöltött képek [{dataUrl, name}]
+  gemmaVisionPrompt = '',    // ← opcionális override; ha üres, GEMMA_IMAGE_DESCRIBE_PROMPT-ot használ
 }) {
   const disabled = false;
 
@@ -67,15 +94,18 @@ function Enhancer({
     return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
   }, [getIdToken]);
 
-  const [enhancing,   setEnhancing]   = useState(false);
-  const [dechanting,  setDechanting]  = useState(false);
-  const [streamError, setStreamError] = useState(null);
+  const [enhancing,        setEnhancing]        = useState(false);
+  const [dechanting,       setDechanting]        = useState(false);
+  const [describingImages, setDescribingImages]  = useState(false);
+  const [streamError,      setStreamError]       = useState(null);
+
+  const isBusy = enhancing || dechanting || describingImages;
 
   useEffect(() => {
-    onBusyChange?.(enhancing || dechanting);
-  }, [enhancing, dechanting, onBusyChange]);
+    onBusyChange?.(isBusy);
+  }, [isBusy, onBusyChange]);
 
-  // ── API hívás ─────────────────────────────────────────────────────────────
+  // ── Cerebras API hívás ───────────────────────────────────────────────────
   const callChat = useCallback(async (systemPrompt, userContent, temperature, top_p, max_tokens) => {
     const headers = await authHeaders();
 
@@ -83,8 +113,8 @@ function Enhancer({
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model:             'gpt-oss-120b',
-        provider:          'cerebras',
+        model:    'openai/gpt-oss-120b',
+        provider: 'groq',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user',   content: userContent  },
@@ -103,31 +133,48 @@ function Enhancer({
 
     const json = await res.json();
     if (!json.success) throw new Error(json.message || 'API hiba');
-
     return (json.content || '').trim();
   }, [authHeaders]);
 
+  // ── Gemma Vision API hívás (NVIDIA) ─────────────────────────────────────
+  // Elküldi a feltöltött képeket a /api/vision-describe endpointnak,
+  // ami a google/gemma-3-27b-it modellt hívja NVIDIA API-n keresztül.
+  const callVisionDescribe = useCallback(async (images) => {
+    const headers = await authHeaders();
+
+    const res = await fetch('http://localhost:3001/api/vision-describe', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        images:       images.map(img => img.dataUrl),
+        systemPrompt: gemmaVisionPrompt || GEMMA_IMAGE_DESCRIBE_PROMPT,
+      }),
+    });
+
+    if (!res.ok) {
+      let errMsg = `HTTP ${res.status}`;
+      try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+      throw new Error(errMsg);
+    }
+
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Vision describe hiba');
+    return (json.description || '').trim();
+  }, [authHeaders, gemmaVisionPrompt]);
+
   // ── AI válasz feldolgozása: JSON vagy plain string ────────────────────────
-  // Ha az AI { "prompt": "...", "negative_prompt": "..." } JSON-t küld vissza,
-  // szétválasztjuk és mindkét mezőt beírjuk a megfelelő state-be.
-  // Ha plain string jön (Z-Image mód), simán az onChange-re rakjuk.
   const applyResult = useCallback((raw) => {
-    // Próbáljuk meg JSON-ként értelmezni
-    // Az AI néha ``` backtick fence-be csomagolja, azt levágjuk
     const cleaned = raw
       .replace(/^```json\s*/i, '')
       .replace(/^```\s*/i, '')
-      .replace(/\s*```$/,  '')
+      .replace(/\s*```$/, '')
       .trim();
 
     try {
       const parsed = JSON.parse(cleaned);
-
       if (parsed && typeof parsed === 'object') {
-        // Szerkesztő mód: van prompt + negative_prompt
         if (typeof parsed.prompt === 'string' && parsed.prompt.trim()) {
           onChange(parsed.prompt.trim());
-
           if (typeof parsed.negative_prompt === 'string' && onNegativeChange) {
             onNegativeChange(parsed.negative_prompt.trim());
           }
@@ -135,10 +182,9 @@ function Enhancer({
         }
       }
     } catch {
-      // nem JSON — plain string mód, mehet tovább
+      // nem JSON — plain string mód
     }
 
-    // Fallback: plain string (Z-Image generálás mód)
     if (raw.trim()) {
       onChange(raw.trim());
       return true;
@@ -148,22 +194,51 @@ function Enhancer({
   }, [onChange, onNegativeChange]);
 
   // ── Enhance ───────────────────────────────────────────────────────────────
+  // Ha vannak feltöltött képek (edit mód), először Gemma leírja őket,
+  // majd a leírás + felhasználói szöveg együtt megy a Cerebras edit enhancernek.
   const handleEnhance = useCallback(async () => {
-    if (!value.trim() || enhancing) return;
+    if (!value.trim() || enhancing || describingImages) return;
     setEnhancing(true);
     setStreamError(null);
+
     try {
-      const raw    = await callChat(enhancing_prompt, value.trim(), 0.4, 0.9, 10000);
-      const ok     = applyResult(raw);
+      let userContent = value.trim();
+
+      // Ha vannak feltöltött képek → vision describe lépés
+      if (inputImages.length > 0) {
+        setDescribingImages(true);
+        try {
+          const description = await callVisionDescribe(inputImages);
+          if (description) {
+            // A Cerebras edit enhancer ezt kapja:
+            // felhasználói utasítás + Gemma képleírás mint kontextus
+            userContent =
+              `USER'S EDIT INSTRUCTION:\n${value.trim()}\n\n` +
+              `---\n` +
+              `VISUAL CONTEXT — uploaded images analyzed by vision AI (Gemma 3 27B IT):\n${description}`;
+          }
+        } catch (vErr) {
+          // Vision describe sikertelen → graceful fallback, csak szöveggel próbáljuk
+          console.warn('Vision describe failed, falling back to text-only enhance:', vErr.message);
+          setStreamError(`⚠️ Képelemzés sikertelen (${vErr.message}), csak szöveges prompttal próbálom.`);
+          // Ne dobjuk tovább — folytassuk szöveg-only módban
+        } finally {
+          setDescribingImages(false);
+        }
+      }
+
+      const raw = await callChat(enhancing_prompt, userContent, 0.4, 0.9, 10000);
+      const ok  = applyResult(raw);
       if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
+      else if (streamError?.startsWith('⚠️')) setStreamError(null); // sikeres → töröljük a warning-ot
     } catch (err) {
-        
       console.error('Enhance hiba:', err);
       setStreamError(err.message || 'Enhance sikertelen');
     } finally {
       setEnhancing(false);
+      setDescribingImages(false);
     }
-  }, [value, enhancing, enhancing_prompt, callChat, applyResult]);
+  }, [value, enhancing, describingImages, enhancing_prompt, inputImages, callChat, callVisionDescribe, applyResult, streamError]);
 
   // ── Dechance ──────────────────────────────────────────────────────────────
   const handleDechance = useCallback(async () => {
@@ -171,8 +246,8 @@ function Enhancer({
     setDechanting(true);
     setStreamError(null);
     try {
-      const raw    = await callChat(dechanting_prompt, value.trim(), 0.4, 0.9, 800);
-      const ok     = applyResult(raw);
+      const raw = await callChat(dechanting_prompt, value.trim(), 0.4, 0.9, 800);
+      const ok  = applyResult(raw);
       if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
     } catch (err) {
       console.error('Dechance hiba:', err);
@@ -187,6 +262,7 @@ function Enhancer({
   const remaining   = MAX_CHARS - value.length;
   const isOverLimit = remaining < 0;
   const hasContent  = value.trim().length > 0;
+  const hasImages   = inputImages.length > 0;
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -201,8 +277,8 @@ function Enhancer({
     }
   }, [disabled, value, isOverLimit, onSubmit]);
 
-  const simplifyDisabled = !hasContent || dechanting || disabled;
-  const enhanceDisabled  = !hasContent || enhancing  || disabled;
+  const simplifyDisabled = !hasContent || dechanting  || disabled;
+  const enhanceDisabled  = !hasContent || enhancing   || describingImages || disabled;
 
   const borderColor = isOverLimit
     ? 'rgba(248,113,113,0.5)'
@@ -216,6 +292,15 @@ function Enhancer({
 
   const fillPct  = Math.min(100, ((MAX_CHARS - remaining) / MAX_CHARS) * 100);
   const barColor = isOverLimit ? '#f87171' : remaining < 100 ? '#f59e0b' : color;
+
+  // Enhance gomb tooltip szövege
+  const enhanceTooltip = !hasContent
+    ? 'Írj be egy promptot először'
+    : describingImages
+      ? 'Képelemzés folyamatban…'
+      : hasImages
+        ? `AI prompt fejlesztés (${inputImages.length} kép → vision + reprompt)`
+        : 'AI prompt fejlesztés';
 
   return (
     <div style={{ marginBottom: 14 }}>
@@ -307,15 +392,55 @@ function Enhancer({
         </div>
       </div>
 
-      {/* Hiba banner */}
+      {/* Vision describe folyamatban banner */}
+      {describingImages && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          marginTop: 6, padding: '6px 10px', borderRadius: 8,
+          background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
+        }}>
+          <Eye style={{ width: 11, height: 11, color: '#34d399', flexShrink: 0 }} />
+          <span style={{ fontSize: 10, color: '#6ee7b7', lineHeight: 1.4 }}>
+            Gemma 3 27B elemzi a képeket ({inputImages.length} db)…
+          </span>
+          <Loader2 style={{ width: 10, height: 10, color: '#34d399', marginLeft: 'auto', flexShrink: 0, animation: 'enhancerSpin 1s linear infinite' }} />
+        </div>
+      )}
+
+      {/* Hiba / warning banner */}
       {streamError && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
           marginTop: 6, padding: '6px 10px', borderRadius: 8,
-          background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)',
+          background: streamError.startsWith('⚠️')
+            ? 'rgba(251,191,36,0.08)' : 'rgba(248,113,113,0.08)',
+          border: `1px solid ${streamError.startsWith('⚠️')
+            ? 'rgba(251,191,36,0.2)' : 'rgba(248,113,113,0.2)'}`,
         }}>
-          <AlertCircle style={{ width: 11, height: 11, color: '#f87171', flexShrink: 0 }} />
-          <span style={{ fontSize: 10, color: '#fca5a5', lineHeight: 1.4 }}>{streamError}</span>
+          <AlertCircle style={{
+            width: 11, height: 11, flexShrink: 0,
+            color: streamError.startsWith('⚠️') ? '#fbbf24' : '#f87171',
+          }} />
+          <span style={{
+            fontSize: 10, lineHeight: 1.4,
+            color: streamError.startsWith('⚠️') ? '#fde68a' : '#fca5a5',
+          }}>
+            {streamError}
+          </span>
+        </div>
+      )}
+
+      {/* Kép-kontextus jelző (ha képek vannak feltöltve) */}
+      {hasImages && !describingImages && !enhancing && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          marginTop: 5, padding: '4px 8px', borderRadius: 6,
+          background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.12)',
+        }}>
+          <Eye style={{ width: 9, height: 9, color: '#34d399', flexShrink: 0 }} />
+          <span style={{ fontSize: 9, color: '#6ee7b7', lineHeight: 1.4 }}>
+            Enhance: Gemma {inputImages.length} képet elemez → Cerebras fejleszti a promptot
+          </span>
         </div>
       )}
 
@@ -332,18 +457,25 @@ function Enhancer({
             loadingLabel="Simplify…"
           />
         </Tooltip>
-        <Tooltip text={!hasContent ? 'Írj be egy promptot először' : 'AI prompt fejlesztés'} side="top">
+        <Tooltip text={enhanceTooltip} side="top">
           <ActionButton
             onClick={handleEnhance}
             disabled={enhanceDisabled}
-            loading={enhancing}
+            loading={enhancing || describingImages}
             accentColor={color}
-            icon={<Wand2 style={{ width: 10, height: 10 }} />}
-            label="Enhance"
-            loadingLabel="Enhance…"
+            icon={hasImages
+              ? <><Eye style={{ width: 10, height: 10 }} /><Wand2 style={{ width: 10, height: 10 }} /></>
+              : <Wand2 style={{ width: 10, height: 10 }} />
+            }
+            label={hasImages ? 'Enhance+Vision' : 'Enhance'}
+            loadingLabel={describingImages ? 'Gemma…' : 'Enhance…'}
           />
         </Tooltip>
       </div>
+
+      <style>{`
+        @keyframes enhancerSpin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }

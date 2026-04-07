@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Sparkles, Download, RefreshCw, Settings2,
   ChevronDown, ChevronUp, Loader2, AlertCircle,
@@ -114,8 +114,8 @@ const Lightbox = ({ src, onClose }) => (
 
 export default function ImagePanel({ selectedModel, userId, getIdToken }) {
 
-  // ── Qwen Image Edit repromter (JSON output) ──────────────────────────────
-const enhancing_prompt_edit = `
+  // ── Qwen Image Edit enhancer prompt (JSON output) ────────────────────────
+  const enhancing_prompt_edit = `
 You are a prompt rewriter specialized for Qwen-Image-Edit running on ModelScope / DashScope.
 
 Qwen-Image-Edit is an IMAGE EDITING model — not a generation model.
@@ -292,6 +292,18 @@ negative_prompt field:
   Complex / multi-image:    55–90 words
 
 ────────────────────────────
+IMPORTANT: USING VISUAL CONTEXT FROM VISION AI
+────────────────────────────
+When the user message contains a "VISUAL CONTEXT" section (provided by Gemma 3 27B IT vision analysis),
+use this information to:
+1. Reference specific visual details from the images (exact clothing items, colors, background elements)
+2. Build more precise preservation anchors based on what is actually in the images
+3. Correctly identify which image is the canvas (Image 1) and which is the donor (Image 2+)
+4. Use the lighting description to write accurate integration instructions
+
+Do NOT reference or quote the visual context section in the output JSON. Only use it to write better prompts.
+
+────────────────────────────
 WORKED EXAMPLE
 ────────────────────────────
 
@@ -342,7 +354,7 @@ No commentary. No markdown. No text outside the JSON.
 `;
 
   // ── Z-Image-Turbo generálás mód ──────────────────────────────────────────
-const enhancing_prompt_image = `
+  const enhancing_prompt_image = `
 You are a prompt rewriter optimized specifically for Z-Image-Turbo.
 
 Your task:
@@ -478,6 +490,28 @@ Rules:
 8) Output ONLY the simplified prompt. No commentary.
 `;
 
+  // ── Gemma Vision prompt ──────────────────────────────────────────────────
+  const gemmaVisionPrompt = `You are a precise visual analyst for an AI image editing pipeline.
+Analyze the uploaded image(s) and provide a detailed, structured description of each one.
+
+For EACH image, describe:
+1. SUBJECTS: Who or what is in the image — species/type, physical traits (hair color/style, skin tone, eyes, build), every visible clothing item listed individually (jacket, shirt, trousers, shoes, accessories, etc.), pose, expression, position in frame
+2. BACKGROUND: Environment, setting, colors, textures, depth, any objects in the background
+3. LIGHTING: Direction (left/right/top/front/back), quality (soft/hard/diffuse/natural), color temperature (warm/cool/neutral)
+4. NOTABLE ELEMENTS: Specific objects, accessories, props, spatial relationships between elements
+5. VISUAL STYLE: Photograph/illustration/3D render/painting, color grading, artistic style if applicable
+
+Format your response EXACTLY as:
+IMAGE 1:
+[detailed structured description]
+
+IMAGE 2:
+[detailed structured description]
+
+(continue for each uploaded image)
+
+Be specific, visual, and objective. No interpretation or creative additions. Describe only what is visually present. This description will be used by another AI model to write precise image editing instructions.`;
+
   // ── State ─────────────────────────────────────────────────────────────────
   const [isEnhancerBusy, setIsEnhancerBusy] = useState(false);
   const [promptExtend, setPromptExtend]       = useState(true);
@@ -493,8 +527,8 @@ Rules:
   const [quality, setQuality]         = useState("balanced");
   const [numImages, setNumImages]     = useState(1);
   const [seed, setSeed]               = useState("");
-  const [steps, setSteps]             = useState(8);
-  const [guidance, setGuidance]       = useState(7.5);
+  const [steps, setSteps]             = useState(35);
+  const [guidance, setGuidance]       = useState(3);
   const [fluxSizeIdx, setFluxSizeIdx] = useState(0);
 
   const [inputImages, setInputImages] = useState([]);
@@ -523,6 +557,38 @@ Rules:
   const selectedAR = isFlux
     ? FLUX_SIZES[fluxSizeIdx]
     : { value: aspectRatio, label: aspectRatio, ...QUALITY_PRESETS[quality].sizes[aspectRatio] };
+
+  // ── Edit-mód állapot mentése/visszaállítása modellváltáskor ──────────────
+  const savedEditState  = useRef({ negativePrompt: "", promptExtend: true });
+  const prevIsEditRef   = useRef(isModelScopeEdit);
+  const isFirstRender   = useRef(true);
+
+  const negativePromptRef = useRef(negativePrompt);
+  const promptExtendRef   = useRef(promptExtend);
+  useEffect(() => { negativePromptRef.current = negativePrompt; }, [negativePrompt]);
+  useEffect(() => { promptExtendRef.current   = promptExtend;   }, [promptExtend]);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const wasEdit = prevIsEditRef.current;
+
+    if (wasEdit && !isModelScopeEdit) {
+      savedEditState.current = {
+        negativePrompt: negativePromptRef.current,
+        promptExtend:   promptExtendRef.current,
+      };
+      setNegativePrompt("");
+      setPromptExtend(false);
+    } else if (!wasEdit && isModelScopeEdit) {
+      setNegativePrompt(savedEditState.current.negativePrompt);
+      setPromptExtend(savedEditState.current.promptExtend);
+    }
+
+    prevIsEditRef.current = isModelScopeEdit;
+  }, [isModelScopeEdit]);
 
   // ── Kép upload ────────────────────────────────────────────────────────────
   const handleImageUpload = (e) => {
@@ -772,9 +838,11 @@ Rules:
               enhancing_prompt={isModelScopeEdit ? enhancing_prompt_edit : enhancing_prompt_image}
               dechanting_prompt={isModelScopeEdit ? dehancing_prompt_edit : dehancing_prompt_image}
               onBusyChange={handleEnhancerBusy}
+              inputImages={isModelScopeEdit ? inputImages : []}
+              gemmaVisionPrompt={isModelScopeEdit ? gemmaVisionPrompt : ""}
             />
 
-            {/* ── Negatív prompt — edit módban az Enhancer tölti, de manuálisan is szerkeszthető ── */}
+            {/* ── Negatív prompt — csak edit módban ── */}
             {isModelScopeEdit && !isGoogleImage && !isFlux && (
               <div>
                 <label style={{
@@ -889,6 +957,7 @@ Rules:
                     }} />
                 </div>
 
+                {/* Prompt Extend — csak edit módban jelenik meg */}
                 {isModelScopeEdit && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <span style={{ color: "#6b7280", fontSize: 12 }}>Prompt Extend</span>
@@ -925,7 +994,7 @@ Rules:
                       <label style={{ color: "#6b7280", fontSize: 12 }}>CFG Scale</label>
                       <span style={{ fontSize: 11, fontWeight: 700, color }}>{guidance}</span>
                     </div>
-                    <input type="range" min={1} max={isFlux ? 30 : 20} step={0.5} value={guidance}
+                    <input type="range" min={1.5} max={isFlux ? 30 : 20} step={0.5} value={guidance}
                       onChange={(e) => setGuidance(parseFloat(e.target.value))}
                       style={{ width: "100%", cursor: "pointer", accentColor: color }} />
                     <p style={{ color: "#4b5563", fontSize: 11, marginTop: 2 }}>Alacsony = kreatív · Magas = prompt-hű</p>
@@ -1053,40 +1122,89 @@ Rules:
 
             {!isGenerating && generatedImages.length > 0 && (
               <div style={{
-                position: "absolute", inset: 0, padding: 16,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 12, overflow: "hidden",
+                position: "absolute",
+                inset: 0,
+                padding: 16,
+                boxSizing: "border-box",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                overflow: "hidden",
               }}>
                 {generatedImages.map((img, i) => (
-                  <div key={i} style={{
-                    position: "relative", borderRadius: 16, flexShrink: 0, lineHeight: 0,
-                    border: `1px solid ${color}25`, overflow: "hidden",
-                    maxWidth: generatedImages.length > 1 ? "calc(50% - 6px)" : "100%",
-                  }}>
-                    <img src={img.url} alt={`Generated ${i + 1}`}
-                      style={{ display: "block", width: "100%", height: "auto", objectFit: "contain", borderRadius: 16 }} />
+                  <div
+                    key={i}
+                    style={{
+                      position: "relative",
+                      // KULCS: explicit magasság → az img maxHeight: 100%-nak lesz
+                      // egy konkrét referencia értéke (a konténer belső magassága)
+                      height: "100%",
+                      // Vízszintes korlát: több kép esetén fél szélesség
+                      maxWidth: generatedImages.length > 1 ? "calc(50% - 6px)" : "100%",
+                      flexShrink: 1,
+                      flexGrow: 0,
+                      minWidth: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: 16,
+                      border: `1px solid ${color}25`,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <img
+                      src={img.url}
+                      alt={`Generated ${i + 1}`}
+                      style={{
+                        display: "block",
+                        // Mindkét tengely korlátozott — az arány megmarad
+                        maxWidth: "100%",
+                        maxHeight: "100%",
+                        width: "auto",
+                        height: "auto",
+                        borderRadius: 16,
+                      }}
+                    />
                     <div
                       style={{
-                        position: "absolute", inset: 0, opacity: 0, transition: "opacity 0.2s",
+                        position: "absolute",
+                        inset: 0,
+                        opacity: 0,
+                        transition: "opacity 0.2s",
                         background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 55%)",
-                        display: "flex", alignItems: "flex-end", justifyContent: "space-between", padding: 12,
-                        borderRadius: isModelScopeEdit ? 16 : 0, overflow: "hidden",
+                        display: "flex",
+                        alignItems: "flex-end",
+                        justifyContent: "space-between",
+                        padding: 12,
+                        borderRadius: 16,
+                        overflow: "hidden",
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
                       onMouseLeave={(e) => (e.currentTarget.style.opacity = 0)}
                     >
-                      <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{img.width ? `${img.width}×${img.height}` : ""}</span>
+                      <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
+                        {img.width ? `${img.width}×${img.height}` : ""}
+                      </span>
                       <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={() => setLightboxSrc(img.url)} title="Teljes méret" style={{
-                          padding: 8, borderRadius: 10, color: "white", cursor: "pointer",
-                          background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", border: "none",
-                        }}>
+                        <button
+                          onClick={() => setLightboxSrc(img.url)}
+                          title="Teljes méret"
+                          style={{
+                            padding: 8, borderRadius: 10, color: "white", cursor: "pointer",
+                            background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", border: "none",
+                          }}
+                        >
                           <ZoomIn style={{ width: 14, height: 14 }} />
                         </button>
-                        <button onClick={() => downloadImage(img.url, i)} style={{
-                          display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10,
-                          color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                          background: `${color}cc`, backdropFilter: "blur(8px)", border: "none",
-                        }}>
+                        <button
+                          onClick={() => downloadImage(img.url, i)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10,
+                            color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                            background: `${color}cc`, backdropFilter: "blur(8px)", border: "none",
+                          }}
+                        >
                           <Download style={{ width: 14, height: 14 }} /> Letöltés
                         </button>
                       </div>

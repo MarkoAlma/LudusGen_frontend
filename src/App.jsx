@@ -20,12 +20,15 @@ import Settings from './pages/Settings';
 import { ProtectedRoute } from './ProtectedRoute';
 import AIChat from './ai_components/AiChat';
 import { auth } from './firebase/firebaseApp';
+import Forum from './pages/Forum';
 
 function App() {
   const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled} = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
-// Meglévő App.jsx-ben:
+
+  // Forum has its own header/nav, so hide the global Navbar & Footer there
+  const isForumRoute = location.pathname.startsWith('/forum');
 
   useEffect(()=>{
     console.log('====================================');
@@ -38,8 +41,6 @@ function App() {
     setShowNavbar(true);
   };
 
-
-  // Scroll lock on modal open
   useEffect(() => {
     if (isAuthOpen) {
       document.body.style.overflow = 'hidden';
@@ -55,16 +56,12 @@ function App() {
   }, [isAuthOpen]);
 
   useEffect(() => {
-    // Ha a gyökérúton van Firebase action
     if (location.pathname === '/') {
       const params = new URLSearchParams(location.search);
       const mode = params.get('mode');
-      
       if (mode === 'resetPassword') {
-        // ✅ Átirányítás a reset oldalra PARAMÉTEREKKEL (a ResetPassword komponens majd kitörli őket)
         navigate(`/reset-password${location.search}`, { replace: true });
       } else if (mode === 'verifyEmail') {
-        // ✅ Átirányítás az email verification oldalra PARAMÉTEREKKEL
         navigate(`/verify-email${location.search}`, { replace: true });
       }
     }
@@ -73,25 +70,29 @@ function App() {
   return (
     <div className="min-h-screen bg-black text-white relative">
       <Background />
-      <Navbar />
+      {!isForumRoute && <Navbar />}
 
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/chat" element={<ProtectedRoute>
-<AIChat user={user} getIdToken={() => auth.currentUser?.getIdToken(true)}   /></ProtectedRoute>} />
+            <AIChat user={user} getIdToken={() => auth.currentUser?.getIdToken(true)} />
+          </ProtectedRoute>} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forum" element={<Forum />} />
+          {/* ÚJ: kategória/slug alapú route */}
+          <Route path="/forum/:category/:slug" element={<Forum />} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         </Routes>
       </main>
-  
+
       <LudusGenAdmin />
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => bezar()}
       />
-      <Footer />
+      {!isForumRoute && <Footer />}
 
       {msg && <MyToastify {...msg} />}
     </div>
