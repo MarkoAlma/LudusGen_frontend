@@ -1,6 +1,11 @@
-import React, { useState, useRef, useEffect, useContext } from "react";
+import React, { useState, useRef, useEffect, useContext, useCallback } from "react";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
+import { auth, db } from "../firebase/firebaseApp";
+import {
+  collection, addDoc, getDocs, deleteDoc, doc, updateDoc,
+  query, orderBy, serverTimestamp, getDoc, onSnapshot, where, limit, Timestamp, writeBatch,
+} from "firebase/firestore";
 import {
   ArrowLeft, ThumbsUp, Eye, MessageSquare, Clock, Pin, Flame,
   Share2, Bookmark, MoreHorizontal, Send, ChevronDown, ChevronUp,
@@ -96,6 +101,21 @@ Ezzel Claude teljesítménye még jobban kiemelkedik.`,
     replies: [],
   },
 ];
+
+// ─── Firebase timestamp → olvasható szöveg ────────────────────────
+const formatFirebaseTime = (timestamp) => {
+  if (!timestamp?.toDate) return "Nemrég";
+  const date = timestamp.toDate();
+  const diff = Date.now() - date;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "Most";
+  if (m < 60) return `${m} perce`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} órája`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d} napja`;
+  return `${Math.floor(d / 7)} hete`;
+};
 
 const EMOJI_REACTIONS = ["👍", "🔥", "🤯", "😂", "❤️", "⭐", "🤔", "🎉"];
 
@@ -794,7 +814,8 @@ export default function ForumPost({
   onEdit,
   onToggle,
 }) {
-  const [comments, setComments] = useState(INITIAL_COMMENTS);
+  const [comments, setComments] = useState([]);
+  const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post?.likes || 0);
   const [bookmarked, setBookmarked] = useState(false);
@@ -830,22 +851,108 @@ export default function ForumPost({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleAddComment = (text) => {
-    const nc = {
-      id: Date.now(), parentId: null,
-      author: globalUser?.displayName || globalUser?.email?.split("@")[0] || "én", avatar: (globalUser?.displayName?.[0] || globalUser?.email?.[0] || "É").toUpperCase(), avatarColor: color, avatarUrl: globalUser?.profilePicture || null,
-      content: text, time: "Most", likes: 0, liked: false,
-      reactions: {}, pinned: false, replies: [],
-    };
-    setComments(prev => [nc, ...prev]);
+  // ── Firebase Figyelő ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!post?.id) return;
+
+    console.log("[ForumPost] Hozzászólások betöltése a bejegyzéshez:", post.id);
+    setIsLoadingComments(true);
+
+    const q = query(
+      collection(db, "forum_comments"),
+      where("postId", "==", post.id),
+      orderBy("createdAt", "asc")
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const allComms = snap.docs.map(d => ({
+        ...d.data(),
+        id: d.id,
+        time: formatFirebaseTime(d.data().createdAt)
+      }));
+
+      // Csoportosítás parentId alapján
+      const rootComments = allComms.filter(c => !c.parentId);
+      const replies = allComms.filter(c => c.parentId);
+
+      const assembled = rootComments.map(rc => ({
+        ...rc,
+        replies: replies.filter(r => r.parentId === rc.id)
+      }));
+
+      console.log(`[ForumPost] ${assembled.length} fő hozzászólás betöltve (+ ${replies.length} válasz)`);
+      
+      // Ha nincs még adat, és ez egy mock post id (szám), használjuk az inicialis mockokat
+      if (assembled.length === 0 && (typeof post.id === 'number' || String(post.id).length < 5)) {
+        setComments(INITIAL_COMMENTS);
+      } else {
+        setComments(assembled);
+      }
+      
+      setIsLoadingComments(false);
+    }, (err) => {
+      console.error("[ForumPost] Firebase hiba:", err);
+      setIsLoadingComments(false);
+      // Hiba esetén fallback a mockokra ha mock post
+      if (typeof post.id === 'number' || String(post.id).length < 5) setComments(INITIAL_COMMENTS);
+    });
+
+    return unsub;
+  }, [post?.id]);
+
+  const handleAddComment = async (text) => {
+    if (!post?.id) return;
+
+    try {
+      const nc = {
+        postId: post.id,
+        parentId: null,
+        author: globalUser?.displayName || globalUser?.email?.split("@")[0] || "Felhasználó",
+        authorId: currentUserId || null,
+        avatar: (globalUser?.displayName?.[0] || globalUser?.email?.[0] || "F").toUpperCase(),
+        avatarColor: color,
+        avatarUrl: globalUser?.profilePicture || null,
+        content: text,
+        createdAt: serverTimestamp(),
+        likes: 0,
+        likedIds: [],
+        reactions: {},
+        pinned: false,
+        isOP: currentUserId === post.authorId
+      };
+
+      await addDoc(collection(db, "forum_comments"), nc);
+      console.log("[ForumPost] Hozzászólás mentve a Firebase-be");
+    } catch (e) {
+      console.error("[ForumPost] Hiba a hozzászólás mentésekor:", e);
+    }
   };
 
-  const handleAddReply = (parentId, text) => {
-    setComments(prev => prev.map(c =>
-      c.id === parentId
-        ? { ...c, replies: [...(c.replies || []), { id: Date.now(), parentId, author: globalUser?.displayName || globalUser?.email?.split("@")[0] || "én", avatar: (globalUser?.displayName?.[0] || globalUser?.email?.[0] || "É").toUpperCase(), avatarColor: color, avatarUrl: globalUser?.profilePicture || null, content: text, time: "Most", likes: 0, liked: false, reactions: {}, replies: [] }] }
-        : c
-    ));
+  const handleAddReply = async (parentId, text) => {
+    if (!post?.id || !parentId) return;
+
+    try {
+      const nr = {
+        postId: post.id,
+        parentId: parentId,
+        author: globalUser?.displayName || globalUser?.email?.split("@")[0] || "Felhasználó",
+        authorId: currentUserId || null,
+        avatar: (globalUser?.displayName?.[0] || globalUser?.email?.[0] || "F").toUpperCase(),
+        avatarColor: color,
+        avatarUrl: globalUser?.profilePicture || null,
+        content: text,
+        createdAt: serverTimestamp(),
+        likes: 0,
+        likedIds: [],
+        reactions: {},
+        isOP: currentUserId === post.authorId
+      };
+
+      await addDoc(collection(db, "forum_comments"), nr);
+      console.log("[ForumPost] Válasz mentve a Firebase-be (parentId:", parentId, ")");
+    } catch (e) {
+      console.error("[ForumPost] Hiba a válasz mentésekor:", e);
+    }
   };
 
   const totalComments = comments.reduce((s, c) => s + 1 + (c.replies?.length || 0), 0);

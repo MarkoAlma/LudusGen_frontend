@@ -289,7 +289,7 @@ const NOTIF_COLORS = {
 
 const NotifDropdown = ({ notifs, onMarkRead, onMarkAllRead, onClose }) => {
   return (
-    <div className="absolute right-5 top-18 w-80 rounded-2xl overflow-hidden mt-2"
+    <div className="absolute right-0 top-full w-80 rounded-2xl overflow-hidden mt-2"
       style={{ zIndex: 100000, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
         <span className="text-white font-semibold text-sm">Értesítések</span>
@@ -1307,37 +1307,7 @@ export default function Forum() {
       <div className="relative z-10 max-w-7xl mx-auto px-3 md:px-5 py-5">
 
         {/* ══ HEADER ══ */}
-        {showNotifs && <NotifDropdown notifs={notifications} onMarkRead={markNotifRead} onMarkAllRead={markAllNotifsRead} onClose={() => setShowNotifs(false)} />}
-        
-        {showUserMenu && (
-          <div className="absolute right-[135px] top-18 mt-2 w-52 rounded-2xl overflow-hidden"
-            style={{ zIndex: 100000, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
-            <div className="px-4 py-3 border-b border-white/8">
-              <p className="text-white font-semibold text-sm">{currentUser?.displayName || currentUser?.email || "Felhasználó"}</p>
-              <p className="text-gray-500 text-xs">{isAdmin ? "👑 Admin" : "Tag"}</p>
-            </div>
-            {[
-              { icon: <Home className="w-3.5 h-3.5" />, label: "Kezdőlap", action: () => { setShowUserMenu(false); navigate('/'); } },
-              { icon: <Bookmark className="w-3.5 h-3.5" />, label: "Mentett témák", action: () => { setShowOnlyBookmarks(v => !v); setShowUserMenu(false); } },
-              { icon: <Settings className="w-3.5 h-3.5" />, label: "Beállítások", action: () => { setShowUserMenu(false); navigate('/settings'); } },
-              ...(isAdmin ? [{ icon: <Shield className="w-3.5 h-3.5" />, label: "Admin panel", action: null }] : []),
-            ].map(item => (
-              <button key={item.label} onClick={item.action || undefined}
-                className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-gray-400 hover:text-white hover:bg-white/8 transition-colors text-xs">
-                {item.icon}{item.label}
-                {item.label === "Mentett témák" && bookmarks.size > 0 && (
-                  <span className="ml-auto text-xs px-1.5 rounded-full" style={{ background: "rgba(167,139,250,0.2)", color: "#a78bfa" }}>{bookmarks.size}</span>
-                )}
-              </button>
-            ))}
-            <div className="border-t border-white/8">
-              <button onClick={() => { setShowUserMenu(false); logoutUser(); navigate('/'); }}
-                className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-red-400 hover:bg-red-400/10 transition-colors text-xs">
-                <LogOut className="w-3.5 h-3.5" /> Kijelentkezés
-              </button>
-            </div>
-          </div>
-        )}
+
 
         <GlassCard style={{ marginBottom: "1rem", padding: "0.875rem 1.25rem", zIndex: (showNotifs || showUserMenu) ? 1000 : 100 }}>
           <div className="flex items-center justify-between gap-3">
@@ -1388,6 +1358,7 @@ export default function Forum() {
                       style={{ background: "linear-gradient(135deg,#7c3aed,#db2777)", fontSize: "0.6rem" }}>{unreadCount > 9 ? "9+" : unreadCount}</span>
                   )}
                 </button>
+                {showNotifs && <NotifDropdown notifs={notifications} onMarkRead={markNotifRead} onMarkAllRead={markAllNotifsRead} onClose={() => setShowNotifs(false)} />}
               </div>
 
               <div ref={userMenuRef} className="relative">
@@ -1400,6 +1371,36 @@ export default function Forum() {
                     globalUser?.displayName?.[0]?.toUpperCase() || currentUser?.displayName?.[0]?.toUpperCase() || currentUser?.email?.[0]?.toUpperCase() || "?"
                   )}
                 </button>
+
+                {showUserMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-52 rounded-2xl overflow-hidden"
+                    style={{ zIndex: 100000, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
+                    <div className="px-4 py-3 border-b border-white/8">
+                      <p className="text-white font-semibold text-sm truncate">{currentUser?.displayName || currentUser?.email || "Felhasználó"}</p>
+                      <p className="text-gray-500 text-xs">{isAdmin ? "👑 Admin" : "Tag"}</p>
+                    </div>
+                    {[
+                      { icon: <Home className="w-3.5 h-3.5" />, label: "Kezdőlap", action: () => { setShowUserMenu(false); navigate('/'); } },
+                      { icon: <Bookmark className="w-3.5 h-3.5" />, label: "Mentett témák", action: () => { setShowOnlyBookmarks(v => !v); setShowUserMenu(false); } },
+                      { icon: <Settings className="w-3.5 h-3.5" />, label: "Beállítások", action: () => { setShowUserMenu(false); navigate('/settings'); } },
+                      ...(isAdmin ? [{ icon: <Shield className="w-3.5 h-3.5" />, label: "Admin panel", action: null }] : []),
+                    ].map(item => (
+                      <button key={item.label} onClick={item.action || undefined}
+                        className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-gray-400 hover:text-white hover:bg-white/8 transition-colors text-xs">
+                        {item.icon}{item.label}
+                        {item.label === "Mentett témák" && bookmarks.size > 0 && (
+                          <span className="ml-auto text-xs px-1.5 rounded-full" style={{ background: "rgba(167,139,250,0.2)", color: "#a78bfa" }}>{bookmarks.size}</span>
+                        )}
+                      </button>
+                    ))}
+                    <div className="border-t border-white/8">
+                      <button onClick={() => { setShowUserMenu(false); logoutUser(); navigate('/'); }}
+                        className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-red-400 hover:bg-red-400/10 transition-colors text-xs">
+                        <LogOut className="w-3.5 h-3.5" /> Kijelentkezés
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <button onClick={() => setNewPostOpen(true)}
