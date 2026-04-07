@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useContext } from "react";
 import { MyUserContext } from "../context/MyUserProvider";
+import { useNavigate } from "react-router-dom";
 import {
   MessageSquare, ChevronRight, ChevronDown,
   ThumbsUp, Eye, Clock, Pin, Flame, Sparkles, Trophy,
@@ -8,7 +9,7 @@ import {
   Shield, Lock, CheckCircle, RefreshCw, SlidersHorizontal,
   ArrowUp, Rss, Award, Tag, Globe, Heart, Smile,
   BarChart2, PenSquare, HelpCircle, Megaphone, AtSign,
-  Trash2, Edit3, Unlock,
+  Trash2, Edit3, Unlock, Home,
 } from "lucide-react";
 import ForumPost from "./ForumPost";
 import { auth, db } from "../firebase/firebaseApp";
@@ -867,7 +868,8 @@ const CatSidebarCard = ({ cat, isActive, onClick }) => (
 
 // ─── FŐ KOMPONENS ─────────────────────────────────────────────────
 export default function Forum() {
-  const { user: globalUser } = useContext(MyUserContext);
+  const { user: globalUser, logoutUser, setIsAuthOpen, setShowNavbar } = useContext(MyUserContext);
+  const navigate = useNavigate();
   const [posts, setPosts] = useState(MOCK_POSTS);
   const [activeCategory, setActiveCategory] = useState("all");
   const [sortBy, setSortBy] = useState("hot");
@@ -1230,10 +1232,11 @@ export default function Forum() {
         <GlassCard style={{ marginBottom: "1rem", padding: "0.875rem 1.25rem" }}>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              <button onClick={() => navigate('/')} title="Kezdőlap"
+                className="cursor-pointer w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all hover:scale-105 active:scale-95"
                 style={{ background: "linear-gradient(135deg, #7c3aed40, #7c3aed20)", border: "1px solid #7c3aed35" }}>
-                <Bot className="w-4 h-4 text-purple-400" />
-              </div>
+                <Home className="w-4 h-4 text-purple-400" />
+              </button>
               <div>
                 <h1 className="text-white font-bold text-base leading-tight flex items-center gap-2">
                   AI Fórum
@@ -1296,9 +1299,9 @@ export default function Forum() {
                       <p className="text-gray-500 text-xs">{isAdmin ? "👑 Admin" : "Tag"}</p>
                     </div>
                     {[
-                      { icon: <User className="w-3.5 h-3.5" />, label: "Profilom", action: null },
+                      { icon: <Home className="w-3.5 h-3.5" />, label: "Kezdőlap", action: () => { setShowUserMenu(false); navigate('/'); } },
                       { icon: <Bookmark className="w-3.5 h-3.5" />, label: "Mentett témák", action: () => { setShowOnlyBookmarks(v => !v); setShowUserMenu(false); } },
-                      { icon: <Settings className="w-3.5 h-3.5" />, label: "Beállítások", action: null },
+                      { icon: <Settings className="w-3.5 h-3.5" />, label: "Beállítások", action: () => { setShowUserMenu(false); navigate('/settings'); } },
                       ...(isAdmin ? [{ icon: <Shield className="w-3.5 h-3.5" />, label: "Admin panel", action: null }] : []),
                     ].map(item => (
                       <button key={item.label} onClick={item.action || undefined}
@@ -1310,7 +1313,8 @@ export default function Forum() {
                       </button>
                     ))}
                     <div className="border-t border-white/8">
-                      <button className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-red-400 hover:bg-red-400/10 transition-colors text-xs">
+                      <button onClick={() => { setShowUserMenu(false); logoutUser(); navigate('/'); }}
+                        className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-red-400 hover:bg-red-400/10 transition-colors text-xs">
                         <LogOut className="w-3.5 h-3.5" /> Kijelentkezés
                       </button>
                     </div>

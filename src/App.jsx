@@ -27,6 +27,9 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Forum has its own header/nav, so hide the global Navbar & Footer there
+  const isForumRoute = location.pathname.startsWith('/forum');
+
   useEffect(()=>{
     console.log('====================================');
     console.log("Változott", isAuthOpen);
@@ -64,7 +67,7 @@ function App() {
   return (
     <div className="min-h-screen bg-black text-white relative">
       <Background />
-      <Navbar />
+      {!isForumRoute && <Navbar />}
 
       <main>
         <Routes>
@@ -86,7 +89,7 @@ function App() {
         isOpen={isAuthOpen}
         onClose={() => bezar()}
       />
-      <Footer />
+      {!isForumRoute && <Footer />}
 
       {msg && <MyToastify {...msg} />}
     </div>
