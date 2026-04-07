@@ -732,6 +732,7 @@ const handleEnhance = useCallback(async () => {
     setDownloadItem(null);
     setDownloadModalOpen(true);
   }, [modelUrl]);
+  
 
   const handleDownloadItem = useCallback(async (item) => {
     try {
