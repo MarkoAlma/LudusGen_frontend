@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
+import { MyUserContext } from "../context/MyUserProvider";
 import {
   ArrowLeft, ThumbsUp, Eye, MessageSquare, Clock, Pin, Flame,
   Share2, Bookmark, MoreHorizontal, Send, ChevronDown, ChevronUp,
@@ -12,11 +13,11 @@ import {
 
 // ─── Kategória map ────────────────────────────────────────────────
 const CATEGORIES = {
-  chat:   { label: "Chat AI",  emoji: "💬", color: "#a78bfa" },
-  code:   { label: "Code AI",  emoji: "🧠", color: "#34d399" },
-  image:  { label: "Kép AI",   emoji: "🖼️", color: "#f472b6" },
-  audio:  { label: "Hang AI",  emoji: "🎵", color: "#fb923c" },
-  threed: { label: "3D AI",    emoji: "🧊", color: "#38bdf8" },
+  chat: { label: "Chat AI", emoji: "💬", color: "#a78bfa" },
+  code: { label: "Code AI", emoji: "🧠", color: "#34d399" },
+  image: { label: "Kép AI", emoji: "🖼️", color: "#f472b6" },
+  audio: { label: "Hang AI", emoji: "🎵", color: "#fb923c" },
+  threed: { label: "3D AI", emoji: "🧊", color: "#38bdf8" },
 };
 
 // ─── Mock related posts ───────────────────────────────────────────
@@ -106,7 +107,7 @@ const renderMd = (text) => {
       const content = part.slice(3, -3);
       const lines = content.split("\n");
       const firstLine = lines[0].trim().toLowerCase();
-      const knownLangs = ["python","py","javascript","js","typescript","ts","jsx","tsx","html","css","bash","sh","json","sql","java","c","cpp","rust","go"];
+      const knownLangs = ["python", "py", "javascript", "js", "typescript", "ts", "jsx", "tsx", "html", "css", "bash", "sh", "json", "sql", "java", "c", "cpp", "rust", "go"];
       const lang = knownLangs.includes(firstLine) ? firstLine : "";
       const code = lang ? lines.slice(1).join("\n") : content;
       return (
@@ -125,12 +126,12 @@ const renderMd = (text) => {
       <span key={i}>
         {part.split("\n").map((line, li, arr) => {
           if (line.startsWith("## ")) return <h2 key={li} className="text-white font-bold text-base mt-5 mb-2 flex items-center gap-2"><span className="w-0.5 h-5 rounded-full bg-purple-500 inline-block" />{line.slice(3)}</h2>;
-          if (line.startsWith("# "))  return <h1 key={li} className="text-white font-bold text-lg mt-4 mb-2">{line.slice(2)}</h1>;
-          if (line.startsWith("> "))  return <blockquote key={li} className="my-2 pl-3 border-l-2 border-purple-500 text-gray-400 italic text-sm">{line.slice(2)}</blockquote>;
+          if (line.startsWith("# ")) return <h1 key={li} className="text-white font-bold text-lg mt-4 mb-2">{line.slice(2)}</h1>;
+          if (line.startsWith("> ")) return <blockquote key={li} className="my-2 pl-3 border-l-2 border-purple-500 text-gray-400 italic text-sm">{line.slice(2)}</blockquote>;
           const parsed = line.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g).map((chunk, ci) => {
-            if (chunk.startsWith("**") && chunk.endsWith("**")) return <strong key={ci} className="text-white font-semibold">{chunk.slice(2,-2)}</strong>;
-            if (chunk.startsWith("*") && chunk.endsWith("*"))  return <em key={ci} className="text-gray-300 italic">{chunk.slice(1,-1)}</em>;
-            if (chunk.startsWith("`") && chunk.endsWith("`"))  return <code key={ci} className="px-1.5 py-0.5 rounded text-xs" style={{ background: "rgba(0,0,0,0.35)", color: "#67e8f9" }}>{chunk.slice(1,-1)}</code>;
+            if (chunk.startsWith("**") && chunk.endsWith("**")) return <strong key={ci} className="text-white font-semibold">{chunk.slice(2, -2)}</strong>;
+            if (chunk.startsWith("*") && chunk.endsWith("*")) return <em key={ci} className="text-gray-300 italic">{chunk.slice(1, -1)}</em>;
+            if (chunk.startsWith("`") && chunk.endsWith("`")) return <code key={ci} className="px-1.5 py-0.5 rounded text-xs" style={{ background: "rgba(0,0,0,0.35)", color: "#67e8f9" }}>{chunk.slice(1, -1)}</code>;
             return chunk;
           });
           if (line.match(/^\d+\. /)) return <div key={li} className="flex gap-2 my-0.5"><span className="text-purple-400 flex-shrink-0 font-bold text-xs mt-0.5">{line.match(/^\d+/)[0]}.</span><span className="text-gray-300 text-sm">{line.replace(/^\d+\. /, "")}</span></div>;
@@ -430,10 +431,10 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, currentUser 
 
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white flex-shrink-0"
+            {comment.avatarUrl ? <img src={comment.avatarUrl} alt="avatar" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" /> : <div className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white flex-shrink-0"
               style={{ background: comment.avatarColor + "45", border: `1px solid ${comment.avatarColor}35` }}>
               {comment.avatar}
-            </div>
+            </div>}
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-xs" style={{ color: comment.avatarColor }}>{comment.author}</span>
@@ -715,6 +716,7 @@ export default function ForumPost({
   const [showCommentSearch, setShowCommentSearch] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const { user: globalUser } = useContext(MyUserContext);
   const cat = CATEGORIES[post?.category] || CATEGORIES.chat;
   const color = cat.color;
 
@@ -740,7 +742,7 @@ export default function ForumPost({
   const handleAddComment = (text) => {
     const nc = {
       id: Date.now(), parentId: null,
-      author: "én", avatar: "É", avatarColor: color,
+      author: globalUser?.displayName || globalUser?.email?.split("@")[0] || "én", avatar: (globalUser?.displayName?.[0] || globalUser?.email?.[0] || "É").toUpperCase(), avatarColor: color, avatarUrl: globalUser?.profilePicture || null,
       content: text, time: "Most", likes: 0, liked: false,
       reactions: {}, pinned: false, replies: [],
     };
@@ -750,7 +752,7 @@ export default function ForumPost({
   const handleAddReply = (parentId, text) => {
     setComments(prev => prev.map(c =>
       c.id === parentId
-        ? { ...c, replies: [...(c.replies || []), { id: Date.now(), parentId, author: "én", avatar: "É", avatarColor: color, content: text, time: "Most", likes: 0, liked: false, reactions: {}, replies: [] }] }
+        ? { ...c, replies: [...(c.replies || []), { id: Date.now(), parentId, author: globalUser?.displayName || globalUser?.email?.split("@")[0] || "én", avatar: (globalUser?.displayName?.[0] || globalUser?.email?.[0] || "É").toUpperCase(), avatarColor: color, avatarUrl: globalUser?.profilePicture || null, content: text, time: "Most", likes: 0, liked: false, reactions: {}, replies: [] }] }
         : c
     ));
   };
@@ -767,6 +769,8 @@ export default function ForumPost({
   });
 
   if (!post) return null;
+  post && console.log(post);
+
 
   return (
     <div className="min-h-screen relative"
@@ -828,8 +832,8 @@ export default function ForumPost({
                 <h1 className="text-white font-bold text-xl md:text-2xl leading-tight mb-4">{post.title}</h1>
 
                 <div className="flex items-center gap-3 mb-5 pb-5 border-b border-white/6">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
-                    style={{ background: post.avatarColor + "45", border: `1px solid ${post.avatarColor}35` }}>{post.avatar}</div>
+                  {post.avatarUrl ? <img src={post.avatarUrl} alt="avatar" className="w-10 h-10 rounded-xl object-cover" /> : <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
+                    style={{ background: post.avatarColor + "45", border: `1px solid ${post.avatarColor}35` }}>{post.avatar}</div>}
                   <div>
                     <span className="font-semibold text-sm" style={{ color: post.avatarColor }}>{post.author}</span>
                     <div className="flex items-center gap-2 text-gray-600 text-xs mt-0.5">
@@ -905,8 +909,8 @@ export default function ForumPost({
                     <Sparkles className="w-3.5 h-3.5" style={{ color }} /> Szólj hozzá
                   </h3>
                   <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white flex-shrink-0 mt-0.5"
-                      style={{ background: `${color}40`, border: `1px solid ${color}35` }}>É</div>
+                    {globalUser?.profilePicture ? <img src={globalUser.profilePicture} alt="avatar" className="w-8 h-8 rounded-xl object-cover flex-shrink-0 mt-0.5" /> : <div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white flex-shrink-0 mt-0.5"
+                      style={{ background: `${color}40`, border: `1px solid ${color}35` }}>{(globalUser?.displayName?.[0] || globalUser?.email?.[0] || "É").toUpperCase()}</div>}
                     <div className="flex-1">
                       <CommentEditor placeholder="Írd meg a véleményed..." onSubmit={handleAddComment} color={color} />
                     </div>
@@ -1041,8 +1045,8 @@ export default function ForumPost({
             <GlassCard style={{ border: `1px solid ${post.avatarColor}20` }}>
               <div className="px-4 pt-4 pb-4">
                 <div className="flex items-center gap-2.5 mb-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
-                    style={{ background: post.avatarColor + "45", border: `1px solid ${post.avatarColor}35` }}>{post.avatar}</div>
+                  {post.avatarUrl ? <img src={post.avatarUrl} alt="avatar" className="w-10 h-10 rounded-xl object-cover" /> : <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
+                    style={{ background: post.avatarColor + "45", border: `1px solid ${post.avatarColor}35` }}>{post.avatar}</div>}
                   <div>
                     <div className="text-white font-bold text-sm" style={{ color: post.avatarColor }}>{post.author}</div>
                     <div className="text-gray-600 text-xs">Rangidős tag · 4.8k pont</div>
@@ -1146,7 +1150,7 @@ export default function ForumPost({
                     {/* Törlés — saját vagy admin */}
                     <div className="border-t border-white/8 mt-1 pt-1">
                       <button
-                        onClick={() => setShowDeleteConfirm(true)}
+                        onClick={() => onDelete?.(post.id, post.authorId)}
                         className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-red-400/10"
                         style={{ color: "#f87171" }}>
                         <Trash2 className="w-3.5 h-3.5" /> Téma törlése

@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useContext } from "react";
+import { MyUserContext } from "../context/MyUserProvider";
 import {
   MessageSquare, ChevronRight, ChevronDown,
   ThumbsUp, Eye, Clock, Pin, Flame, Sparkles, Trophy,
@@ -55,17 +56,27 @@ const formatFirebaseTime = (timestamp) => {
 
 // ─── Adatok ───────────────────────────────────────────────────────
 const CATEGORIES = [
-  { id: "all",    label: "Összes",   emoji: "🌐", color: "#a78bfa", threads: 5241, online: 203 },
-  { id: "chat",   label: "Chat AI",  emoji: "💬", color: "#a78bfa", threads: 1284, online: 47,
-    description: "GPT, Claude, Gemini és egyéb chat modellek", icon: "MessageSquare" },
-  { id: "code",   label: "Code AI",  emoji: "🧠", color: "#34d399", threads: 893,  online: 31,
-    description: "GitHub Copilot, Cursor, kód generálás és review" },
-  { id: "image",  label: "Kép AI",   emoji: "🖼️", color: "#f472b6", threads: 2156, online: 89,
-    description: "Midjourney, DALL·E, Stable Diffusion promptok" },
-  { id: "audio",  label: "Hang AI",  emoji: "🎵", color: "#fb923c", threads: 567,  online: 22,
-    description: "Suno, Udio, ElevenLabs, hangklónozás" },
-  { id: "threed", label: "3D AI",    emoji: "🧊", color: "#38bdf8", threads: 341,  online: 14,
-    description: "Meshy, Tripo3D, TripoSG, szövegből/képből 3D" },
+  { id: "all", label: "Összes", emoji: "🌐", color: "#a78bfa", threads: 5241, online: 203 },
+  {
+    id: "chat", label: "Chat AI", emoji: "💬", color: "#a78bfa", threads: 1284, online: 47,
+    description: "GPT, Claude, Gemini és egyéb chat modellek", icon: "MessageSquare"
+  },
+  {
+    id: "code", label: "Code AI", emoji: "🧠", color: "#34d399", threads: 893, online: 31,
+    description: "GitHub Copilot, Cursor, kód generálás és review"
+  },
+  {
+    id: "image", label: "Kép AI", emoji: "🖼️", color: "#f472b6", threads: 2156, online: 89,
+    description: "Midjourney, DALL·E, Stable Diffusion promptok"
+  },
+  {
+    id: "audio", label: "Hang AI", emoji: "🎵", color: "#fb923c", threads: 567, online: 22,
+    description: "Suno, Udio, ElevenLabs, hangklónozás"
+  },
+  {
+    id: "threed", label: "3D AI", emoji: "🧊", color: "#38bdf8", threads: 341, online: 14,
+    description: "Meshy, Tripo3D, TripoSG, szövegből/képből 3D"
+  },
 ];
 
 const ALL_TAGS = [
@@ -88,19 +99,19 @@ const ANNOUNCEMENTS = [
 ];
 
 const LEADERBOARD = [
-  { name: "prompt_guru",     points: 4821, badge: "🥇", color: "#fbbf24", posts: 234 },
-  { name: "pixel_witch",     points: 3214, badge: "🥈", color: "#94a3b8", posts: 189 },
-  { name: "devmaster_hu",    points: 2987, badge: "🥉", color: "#b45309", posts: 156 },
-  { name: "3d_builder",      points: 1876, badge: "⭐", color: "#a78bfa", posts: 98  },
-  { name: "typescript_king", points: 1543, badge: "⭐", color: "#34d399", posts: 87  },
+  { name: "prompt_guru", points: 4821, badge: "🥇", color: "#fbbf24", posts: 234 },
+  { name: "pixel_witch", points: 3214, badge: "🥈", color: "#94a3b8", posts: 189 },
+  { name: "devmaster_hu", points: 2987, badge: "🥉", color: "#b45309", posts: 156 },
+  { name: "3d_builder", points: 1876, badge: "⭐", color: "#a78bfa", posts: 98 },
+  { name: "typescript_king", points: 1543, badge: "⭐", color: "#34d399", posts: 87 },
 ];
 
 const RECENT_ACTIVITY = [
-  { user: "pixel_witch",     action: "hozzászólt",       post: "Midjourney v7 guide",       time: "2p",  color: "#f472b6" },
-  { user: "devmaster_hu",    action: "új témát nyitott", post: "Claude API tippek",         time: "5p",  color: "#7c3aed" },
-  { user: "beatmaker99",     action: "like-olt",         post: "Suno prompting technikák",  time: "12p", color: "#ea580c" },
-  { user: "typescript_king", action: "hozzászólt",       post: "Cursor AI konfig",          time: "18p", color: "#34d399" },
-  { user: "3d_builder",      action: "új témát nyitott", post: "Meshy vs TripoSG 2025",     time: "31p", color: "#0284c7" },
+  { user: "pixel_witch", action: "hozzászólt", post: "Midjourney v7 guide", time: "2p", color: "#f472b6" },
+  { user: "devmaster_hu", action: "új témát nyitott", post: "Claude API tippek", time: "5p", color: "#7c3aed" },
+  { user: "beatmaker99", action: "like-olt", post: "Suno prompting technikák", time: "12p", color: "#ea580c" },
+  { user: "typescript_king", action: "hozzászólt", post: "Cursor AI konfig", time: "18p", color: "#34d399" },
+  { user: "3d_builder", action: "új témát nyitott", post: "Meshy vs TripoSG 2025", time: "31p", color: "#0284c7" },
 ];
 
 export const MOCK_POSTS = [
@@ -345,10 +356,10 @@ const PostCard = ({
       }
 
       <div className="flex items-start gap-3 pl-1">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0 mt-0.5"
+        {post.avatarUrl ? <img src={post.avatarUrl} alt="avatar" className="w-9 h-9 rounded-xl object-cover flex-shrink-0 mt-0.5" /> : <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0 mt-0.5"
           style={{ background: post.avatarColor + "45", border: `1px solid ${post.avatarColor}35` }}>
           {post.avatar}
-        </div>
+        </div>}
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
@@ -473,7 +484,7 @@ const PostCard = ({
                       {DEBUG && (
                         <div className="px-3 py-1.5 border-b border-white/10" style={{ background: "rgba(239,68,68,0.1)" }}>
                           <p style={{ color: "#f87171", fontSize: "0.55rem", fontFamily: "monospace" }}>
-                            DEBUG | isOwn={String(isOwn)} | isAdmin={String(isAdmin)}<br/>
+                            DEBUG | isOwn={String(isOwn)} | isAdmin={String(isAdmin)}<br />
                             authorId={String(post.authorId)} | uid={String(currentUserId)}
                           </p>
                         </div>
@@ -856,6 +867,7 @@ const CatSidebarCard = ({ cat, isActive, onClick }) => (
 
 // ─── FŐ KOMPONENS ─────────────────────────────────────────────────
 export default function Forum() {
+  const { user: globalUser } = useContext(MyUserContext);
   const [posts, setPosts] = useState(MOCK_POSTS);
   const [activeCategory, setActiveCategory] = useState("all");
   const [sortBy, setSortBy] = useState("hot");
@@ -1047,8 +1059,9 @@ export default function Forum() {
       slug: finalSlug,
       ...data,
       pinned: false, hot: false, locked: false, solved: false,
-      author: currentUser?.displayName || currentUser?.email?.split("@")[0] || "Névtelen",
-      avatar: (currentUser?.displayName?.[0] || currentUser?.email?.[0] || "?").toUpperCase(),
+      author: globalUser?.displayName || currentUser?.displayName || currentUser?.email?.split("@")[0] || "Névtelen",
+      avatar: (globalUser?.displayName?.[0] || currentUser?.displayName?.[0] || currentUser?.email?.[0] || "?").toUpperCase(),
+      avatarUrl: globalUser?.profilePicture || null,
       avatarColor: accentColor,
       authorId: currentUser?.uid || null,
       time: "Most", views: 1, likes: 0, comments: 0, readTime: 1,
@@ -1267,9 +1280,13 @@ export default function Forum() {
 
               <div ref={userMenuRef} className="relative">
                 <button onClick={() => setShowUserMenu(v => !v)}
-                  className="cursor-pointer w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm text-white transition-all"
-                  style={{ background: "linear-gradient(135deg,#7c3aed,#db2777)", boxShadow: showUserMenu ? "0 0 20px rgba(124,58,237,0.5)" : "none" }}>
-                  {currentUser?.displayName?.[0]?.toUpperCase() || currentUser?.email?.[0]?.toUpperCase() || "?"}
+                  className="cursor-pointer w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm text-white transition-all overflow-hidden"
+                  style={{ background: globalUser?.profilePicture ? "transparent" : "linear-gradient(135deg,#7c3aed,#db2777)", boxShadow: showUserMenu ? "0 0 20px rgba(124,58,237,0.5)" : "none" }}>
+                  {globalUser?.profilePicture ? (
+                    <img src={globalUser.profilePicture} alt="user avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    globalUser?.displayName?.[0]?.toUpperCase() || currentUser?.displayName?.[0]?.toUpperCase() || currentUser?.email?.[0]?.toUpperCase() || "?"
+                  )}
                 </button>
                 {showUserMenu && (
                   <div className="absolute right-0 top-full mt-2 w-52 z-50 rounded-2xl overflow-hidden"
