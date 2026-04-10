@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { tokens } from '../../styles/tokens';
+import bgMobileMenu from '../../assets/bg-mobile-menu.png';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -18,6 +19,55 @@ export default function Navbar() {
   const { setIsAuthOpen, showNavbar, user, logoutUser } = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Animation Variants for Fluidity
+  const containerVariants = {
+    hidden: { opacity: 0, x: '20%', scale: 1.05, filter: 'blur(10px)' },
+    visible: { 
+      opacity: 1, 
+      x: 0, 
+      scale: 1,
+      filter: 'blur(0px)',
+      transition: {
+        type: "spring",
+        damping: 30,
+        stiffness: 200,
+        staggerChildren: 0.08,
+        delayChildren: 0.1
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      x: '10%',
+      filter: 'blur(10px)',
+      transition: {
+        duration: 0.4,
+        ease: "easeInOut",
+        staggerChildren: 0.05,
+        staggerDirection: -1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30, scale: 0.9 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      scale: 1,
+      transition: { 
+        type: "spring",
+        damping: 25,
+        stiffness: 200
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      y: 20, 
+      scale: 0.95,
+      transition: { duration: 0.2 } 
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -30,6 +80,17 @@ export default function Navbar() {
     setStudioDropdownOpen(false);
     setUserDropdownOpen(false);
   }, [location.pathname]);
+
+  // Close mobile menu on resize to desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const studioItems = [
     { label: 'AI Chat', icon: MessageSquare, path: '/chat?tab=chat' },
@@ -189,17 +250,52 @@ export default function Navbar() {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div 
-            initial={{ opacity: 0, x: '100%' }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: '100%' }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-0 z-[100] flex flex-col bg-[#020205] overflow-hidden"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="fixed inset-0 z-[100] flex flex-col bg-[#050508] overflow-hidden"
           >
-            {/* Ambient Lighting in Menu */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[100px] pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 blur-[100px] pointer-events-none" />
+            {/* Ambient Background & Mesh */}
+            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+              {/* Faint Background Image */}
+              <AnimatePresence>
+                <motion.img
+                  key="menu-bg"
+                  src={bgMobileMenu}
+                  initial={{ opacity: 0, scale: 1.05 }}
+                  animate={{ opacity: 0.35, scale: 1, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }}
+                  transition={{ duration: 1.2, ease: [0.23, 1, 0.32, 1] }}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  alt=""
+                />
+              </AnimatePresence>
 
-            <div className="relative z-10 flex flex-col h-full bg-black/40 backdrop-blur-3xl">
+              {/* Stealth Deep Blue Gradient Overlay (Bottom-Right to Top) */}
+              <div className="absolute inset-0 bg-[linear-gradient(15deg,rgba(2,6,23,0.95)_0%,rgba(2,6,23,0.8)_40%,rgba(0,0,0,0.95)_100%)] z-[1]" />
+              
+              {/* Ambient Mesh & Vignette */}
+              <motion.div 
+                animate={{ 
+                  rotate: [0, 90, 180, 270, 360],
+                  scale: [1, 1.1, 1, 0.9, 1]
+                }}
+                transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+                className="absolute -top-1/2 -right-1/2 w-[200%] h-[200%] opacity-30 pointer-events-none mix-blend-screen z-[2]"
+                style={{
+                  background: `radial-gradient(circle at 30% 30%, ${tokens.color.accent.purple}30 0%, transparent 50%),
+                               radial-gradient(circle at 70% 70%, #3b82f630 0%, transparent 50%)`,
+                  filter: 'blur(80px)'
+                }}
+              />
+
+              {/* Light Scanline Overlay */}
+              <div className="absolute inset-0 z-[3] pointer-events-none opacity-20" 
+                   style={{ background: 'linear-gradient(rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02))', backgroundSize: '100% 4px, 3px 100%' }} />
+            </div>
+
+            <div className="relative z-10 flex flex-col h-full bg-transparent">
               {/* Header */}
               <div className="p-6 flex justify-between items-center border-b border-white/5 bg-white/5">
                 <div className="flex items-center gap-3">
@@ -213,11 +309,10 @@ export default function Navbar() {
               <div className="flex-1 overflow-y-auto px-6 py-8 flex flex-col">
                 {/* User Card if Authenticated */}
                 {user && (
-                   <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="mb-8 p-5 rounded-3xl bg-white/[0.03] border border-white/10 shadow-2xl relative overflow-hidden group"
-                   >
+                    <motion.div 
+                     variants={itemVariants}
+                     className="mb-8 p-5 rounded-3xl bg-white/[0.03] border border-white/10 shadow-2xl relative overflow-hidden group"
+                    >
                       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                       <div className="relative z-10 flex items-center gap-4">
                         <div className="relative h-14 w-14 rounded-2xl overflow-hidden border-2 border-primary/20 bg-black shadow-inner">
@@ -236,68 +331,75 @@ export default function Navbar() {
 
                 {/* Bento Grid Navigation */}
                 <div className="flex-1 grid grid-cols-2 gap-4 mb-4 mt-2">
-                  <a
+                   <motion.a
+                    variants={itemVariants}
                     onClick={() => { setMobileMenuOpen(false); navigate('/'); }}
-                    className="col-span-2 group relative overflow-hidden rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer"
+                    className="col-span-2 group relative overflow-hidden rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer shadow-2xl"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-fuchsia-600 opacity-0 group-hover:opacity-20 transition-opacity duration-500 rounded-3xl blur-xl" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-fuchsia-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500 rounded-3xl blur-xl" />
                     <div className="relative z-10 flex items-center sm:block">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center sm:mb-4 group-hover:scale-110 transition-transform duration-300 mr-4 sm:mr-0">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center sm:mb-4 group-hover:scale-110 transition-transform duration-300 mr-4 sm:mr-0 shadow-[0_0_20px_rgba(168,85,247,0.3)]">
                         <Home className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                         <h3 className="text-white font-bold text-xl sm:mb-1">Main Hall</h3>
-                         <p className="text-white/50 text-sm hidden sm:block">Kezdőlap és Irányítópult</p>
+                         <h3 className="text-white font-black text-xl sm:mb-1 uppercase tracking-widest italic">Main Hall</h3>
+                         <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em] hidden sm:block">Protocol_Dashboard</p>
                       </div>
                     </div>
-                  </a>
+                  </motion.a>
 
-                  <a
+                  <motion.a
+                    variants={itemVariants}
                     onClick={() => { setMobileMenuOpen(false); navigate('/chat'); }}
-                    className="group relative overflow-hidden rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer"
+                    className="group relative overflow-hidden rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer shadow-2xl"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-400 to-blue-600 opacity-0 group-hover:opacity-20 transition-opacity duration-500 rounded-3xl blur-xl" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-400 to-blue-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500 rounded-3xl blur-xl" />
                     <div className="relative z-10">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_20px_rgba(6,182,212,0.3)]">
                         <Sparkles className="w-6 h-6 text-white" />
                       </div>
-                      <h3 className="text-white font-bold text-lg sm:text-xl md:mb-1">Studio</h3>
-                      <p className="text-white/50 text-xs sm:text-sm">Neuronhálózat</p>
+                      <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-widest italic md:mb-1">Studio</h3>
+                      <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">Neural_Link</p>
                     </div>
-                  </a>
+                  </motion.a>
 
-                  <a
+                  <motion.a
+                    variants={itemVariants}
                     onClick={() => { setMobileMenuOpen(false); navigate('/forum'); }}
-                    className="group relative overflow-hidden rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer"
+                    className="group relative overflow-hidden rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer shadow-2xl"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-br from-rose-400 to-pink-600 opacity-0 group-hover:opacity-20 transition-opacity duration-500 rounded-3xl blur-xl" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-rose-400 to-pink-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500 rounded-3xl blur-xl" />
                     <div className="relative z-10">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-pink-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-pink-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
                         <Users className="w-6 h-6 text-white" />
                       </div>
-                      <h3 className="text-white font-bold text-lg sm:text-xl md:mb-1">Forum</h3>
-                      <p className="text-white/50 text-xs sm:text-sm">Közösség</p>
+                      <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-widest italic md:mb-1">Forum</h3>
+                      <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">Comm_Hub</p>
                     </div>
-                  </a>
+                  </motion.a>
 
                   {user && (
-                  <a
+                   <motion.a
+                    variants={itemVariants}
                     onClick={() => { setMobileMenuOpen(false); navigate('/settings'); }}
-                    className="group relative overflow-hidden rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer"
+                    className="group relative overflow-hidden rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer shadow-2xl"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-600 opacity-0 group-hover:opacity-20 transition-opacity duration-500 rounded-3xl blur-xl" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500 rounded-3xl blur-xl" />
                     <div className="relative z-10">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
                         <Settings className="w-6 h-6 text-white" />
                       </div>
-                      <h3 className="text-white font-bold text-lg sm:text-xl md:mb-1">System</h3>
-                      <p className="text-white/50 text-xs sm:text-sm">Beállítások</p>
+                      <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-widest italic md:mb-1">System</h3>
+                      <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">Core_Settings</p>
                     </div>
-                  </a>
+                  </motion.a>
                   )}
                 </div>
 
-                <div className="mt-4">
+                <motion.div 
+                  variants={itemVariants}
+                  className="mt-4"
+                >
                   {user ? (
                     <button 
                       onClick={() => { setMobileMenuOpen(false); logoutUser(); }} 
@@ -314,7 +416,7 @@ export default function Navbar() {
                       Neural_Access
                     </button>
                   )}
-                </div>
+                </motion.div>
               </div>
 
               {/* Mobile Footer */}

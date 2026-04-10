@@ -1,10 +1,10 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Sparkles, Type, Sliders, Box, Zap, RotateCcw, Shuffle, Hash } from 'lucide-react';
+import React, { useRef, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, Type, Sliders, Box, Zap, RotateCcw, Shuffle, Hash, RotateCcw as ResetIcon } from 'lucide-react';
 import { STYLE_OPTIONS, TRELLIS_PRESETS } from '../../ai_components/trellis/Constants';
 
-/* ── Glass Card primitive (enhanced) ── */
-const GlassCard = ({ children, className = '', style = {}, glow = false }) => (
+/* ── Glass Card primitive ── */
+const GlassCard = ({ children, className = '', style = {} }) => (
   <div
     className={className}
     style={{
@@ -13,9 +13,7 @@ const GlassCard = ({ children, className = '', style = {}, glow = false }) => (
       WebkitBackdropFilter: 'blur(20px) saturate(1.2)',
       border: '1px solid rgba(255,255,255,0.07)',
       borderRadius: '1.25rem',
-      boxShadow: glow
-        ? '0 8px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 40px rgba(139,92,246,0.06)'
-        : '0 4px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06)',
+      boxShadow: '0 4px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06)',
       ...style,
     }}
   >
@@ -29,6 +27,217 @@ const SectionLabel = ({ children }) => (
     {children}
   </label>
 );
+
+/* ── Premium Slider with floating bubble ── */
+function SliderControl({ label, value, min, max, step, onChange, onReset, defaultValue }) {
+  const trackRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [bubbleX, setBubbleX] = useState(0);
+
+  const pct = ((value - min) / (max - min)) * 100;
+
+  const updateBubble = useCallback(() => {
+    if (!trackRef.current) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    setBubbleX((pct / 100) * rect.width);
+  }, [pct]);
+
+  const handlePointerDown = (e) => {
+    setIsDragging(true);
+    updateBubble();
+  };
+
+  const handlePointerUp = () => {
+    setIsDragging(false);
+  };
+
+  React.useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('pointerup', handlePointerUp);
+      return () => window.removeEventListener('pointerup', handlePointerUp);
+    }
+  }, [isDragging]);
+
+  React.useEffect(() => {
+    updateBubble();
+  }, [updateBubble]);
+
+  return (
+    <div className="relative">
+      {/* Label + Reset row */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">{label}</span>
+        {onReset && (
+          <motion.button
+            whileHover={{ scale: 1.15, rotate: -15 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={onReset}
+            className="p-1 rounded-md transition-colors"
+            style={{ color: '#52525b' }}
+            title={`Reset to ${defaultValue}`}
+          >
+            <ResetIcon className="w-3 h-3" />
+          </motion.button>
+        )}
+      </div>
+
+      {/* Track */}
+      <div
+        ref={trackRef}
+        className="relative h-[10px] rounded-full cursor-pointer"
+        style={{
+          background: `linear-gradient(to right, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.75) ${pct}%, rgba(255,255,255,0.07) ${pct}%, rgba(255,255,255,0.07) 100%)`,
+        }}
+        onPointerDown={handlePointerDown}
+      >
+        {/* Floating value bubble */}
+        <AnimatePresence>
+          {(isDragging) && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.15 }}
+              className="absolute pointer-events-none"
+              style={{
+                left: bubbleX,
+                transform: 'translateX(-50%)',
+                bottom: '100%',
+                marginBottom: '8px',
+              }}
+            >
+              <div
+                className="px-2 py-0.5 rounded-lg text-[10px] font-bold text-white whitespace-nowrap"
+                style={{
+                  background: 'rgba(30,30,40,0.9)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                }}
+              >
+                {value}
+              </div>
+              {/* Bubble arrow */}
+              <div
+                className="absolute left-1/2 -translate-x-1/2 w-2 h-2 rotate-45"
+                style={{
+                  top: '100%',
+                  marginTop: '-1px',
+                  background: 'rgba(30,30,40,0.9)',
+                  borderRight: '1px solid rgba(255,255,255,0.1)',
+                  borderBottom: '1px solid rgba(255,255,255,0.1)',
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Thumb */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[18px] h-[18px] rounded-full pointer-events-none"
+          style={{
+            left: `${pct}%`,
+            background: '#e4e4e7',
+            boxShadow: '0 0 8px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.3)',
+            border: '2px solid rgba(255,255,255,0.15)',
+          }}
+        />
+      </div>
+
+      {/* Hidden native input for accessibility */}
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        aria-label={label}
+      />
+    </div>
+  );
+}
+
+/* ── Hover-enhanced style button ── */
+function StyleButton({ label, isActive, onClick, accentColor }) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className="py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all duration-300 relative overflow-hidden group"
+      style={isActive ? {
+        background: `linear-gradient(135deg, ${accentColor}22, ${accentColor}0a)`,
+        borderColor: `${accentColor}45`,
+        color: accentColor,
+        boxShadow: `0 0 24px ${accentColor}12, inset 0 1px 0 rgba(255,255,255,0.1)`,
+        backdropFilter: 'blur(10px)',
+      } : {
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01))',
+        borderColor: 'rgba(255,255,255,0.06)',
+        color: '#52525b',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
+      {isActive && (
+        <motion.div
+          className="absolute inset-0 opacity-20"
+          style={{ background: `radial-gradient(circle at 50% 0%, ${accentColor}30, transparent 70%)` }}
+          transition={{ duration: 0.3 }}
+        />
+      )}
+      {/* Shimmer on hover */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+        style={{
+          background: `linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.04) 45%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 55%, transparent 60%)`,
+          backgroundSize: '200% 100%',
+          animation: isActive ? 'none' : 'shimmer 2s ease-in-out infinite',
+        }}
+      />
+      <span className="relative z-10">{label}</span>
+    </motion.button>
+  );
+}
+
+/* ── Hover-enhanced preset button ── */
+function PresetButton({ label, steps, isActive, onClick, accentColor }) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      onClick={onClick}
+      className="p-3.5 rounded-[1.25rem] border flex flex-col items-start justify-center transition-all duration-300 relative overflow-hidden group"
+      style={isActive ? {
+        background: `linear-gradient(135deg, ${accentColor}18, ${accentColor}06)`,
+        borderColor: `${accentColor}40`,
+        color: accentColor,
+        boxShadow: `0 0 24px ${accentColor}10, inset 0 1px 0 rgba(255,255,255,0.08)`,
+        backdropFilter: 'blur(10px)',
+      } : {
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))',
+        borderColor: 'rgba(255,255,255,0.06)',
+        color: '#a1a1aa',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
+      {isActive && (
+        <div className="absolute inset-0 opacity-15"
+          style={{ background: `radial-gradient(circle at 30% 50%, ${accentColor}25, transparent 60%)` }}
+        />
+      )}
+      {/* Shimmer on hover */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+        style={{
+          background: `linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.03) 45%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 55%, transparent 60%)`,
+          backgroundSize: '200% 100%',
+        }}
+      />
+      <span className="relative z-10 text-[10px] font-black uppercase tracking-widest">{label}</span>
+      <span className="relative z-10 text-[8px] opacity-40 font-black uppercase tracking-tighter italic mt-1">{steps} steps</span>
+    </motion.button>
+  );
+}
 
 export default function TrellisControls({
   prompt, setPrompt,
@@ -70,7 +279,6 @@ export default function TrellisControls({
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 blur-[90px] rounded-full"
           style={{ background: 'radial-gradient(circle, #8b5cf6, transparent)' }}
         />
-        {/* Cyan accent orb */}
         <motion.div
           animate={{ x: [0, -10, 0], y: [0, 20, 0], opacity: [0.02, 0.04, 0.02] }}
           transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut', delay: 5 }}
@@ -84,7 +292,6 @@ export default function TrellisControls({
             backgroundSize: '32px 32px',
           }}
         />
-        {/* Subtle top gradient fade */}
         <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-black/20 to-transparent" />
       </div>
 
@@ -116,7 +323,6 @@ export default function TrellisControls({
             <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest mt-1.5">Voxel Engine v2.0</p>
           </div>
         </div>
-        {/* Gradient accent line */}
         <div className="h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
       </div>
 
@@ -127,37 +333,15 @@ export default function TrellisControls({
         <div>
           <SectionLabel>Engine Algorithm</SectionLabel>
           <div className="grid grid-cols-2 gap-2">
-            {STYLE_OPTIONS.slice(0, 6).map(style => {
-              const isActive = selectedStyle === style.id;
-              return (
-                <motion.button
-                  key={style.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSelectedStyle(style.id)}
-                  className="py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all duration-300 relative overflow-hidden"
-                  style={isActive ? {
-                    background: `linear-gradient(135deg, ${color}22, ${color}0a)`,
-                    borderColor: `${color}45`,
-                    color,
-                    boxShadow: `0 0 24px ${color}12, inset 0 1px 0 rgba(255,255,255,0.1)`,
-                    backdropFilter: 'blur(10px)',
-                  } : {
-                    background: 'linear-gradient(135deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01))',
-                    borderColor: 'rgba(255,255,255,0.06)',
-                    color: '#52525b',
-                    backdropFilter: 'blur(8px)',
-                  }}
-                >
-                  {isActive && (
-                    <div className="absolute inset-0 opacity-20"
-                      style={{ background: `radial-gradient(circle at 50% 0%, ${color}30, transparent 70%)` }}
-                    />
-                  )}
-                  <span className="relative z-10">{style.label}</span>
-                </motion.button>
-              );
-            })}
+            {STYLE_OPTIONS.slice(0, 6).map(style => (
+              <StyleButton
+                key={style.id}
+                label={style.label}
+                isActive={selectedStyle === style.id}
+                onClick={() => setSelectedStyle(style.id)}
+                accentColor={color}
+              />
+            ))}
           </div>
         </div>
 
@@ -172,7 +356,6 @@ export default function TrellisControls({
               rows={3}
               className="w-full bg-transparent p-4 text-[13px] text-zinc-200 placeholder-zinc-600 focus:outline-none resize-none leading-relaxed"
             />
-            {/* Focus glow overlay */}
             <div className="absolute inset-0 rounded-[1.25rem] opacity-0 group-focus-within:opacity-100 transition-opacity duration-500 pointer-events-none"
               style={{ boxShadow: `0 0 30px ${color}15, inset 0 0 0 1px ${color}30` }}
             />
@@ -185,7 +368,7 @@ export default function TrellisControls({
               whileTap={{ scale: 0.98 }}
               onClick={onEnhance}
               disabled={enhancing || !prompt.trim()}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed relative overflow-hidden"
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed relative overflow-hidden group/enhance"
               style={{
                 background: enhancing
                   ? `linear-gradient(135deg, ${color}15, ${color}08)`
@@ -264,139 +447,84 @@ export default function TrellisControls({
           </div>
         </GlassCard>
 
-        {/* CFG Scale Sliders */}
-        <GlassCard glow>
+        {/* Combined Sliders Card: CFG + Manual Override */}
+        <GlassCard>
           <div className="p-4">
             <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic mb-4 block flex items-center gap-2">
               <Sliders className="w-3 h-3" /> CFG Scale
             </label>
-            <div className="space-y-4">
+            <div className="space-y-5">
               {/* SLAT CFG */}
-              <div className="flex items-center gap-3">
-                <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500 w-16 shrink-0">SLAT CFG</span>
-                <input
-                  type="range"
-                  min="1"
-                  max="20"
-                  step="0.5"
-                  value={params.slat_cfg_scale}
-                  onChange={(e) => setParams(prev => ({ ...prev, slat_cfg_scale: parseFloat(e.target.value) }))}
-                  className="flex-1 h-[10px] rounded-full appearance-none cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, ${color} 0%, ${color} ${((params.slat_cfg_scale - 1) / 19) * 100}%, rgba(255,255,255,0.06) ${((params.slat_cfg_scale - 1) / 19) * 100}%, rgba(255,255,255,0.06) 100%)`,
-                    boxShadow: `0 0 10px ${color}20`,
-                  }}
-                />
-                <span className="text-[11px] font-bold w-8 text-right shrink-0" style={{ color }}>{params.slat_cfg_scale.toFixed(1)}</span>
-              </div>
+              <SliderControl
+                label="SLAT CFG"
+                value={params.slat_cfg_scale}
+                min={1}
+                max={20}
+                step={0.5}
+                onChange={(v) => setParams(prev => ({ ...prev, slat_cfg_scale: v }))}
+                onReset={() => setParams(prev => ({ ...prev, slat_cfg_scale: 3.0 }))}
+                defaultValue={3.0}
+              />
               {/* SS CFG */}
-              <div className="flex items-center gap-3">
-                <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500 w-16 shrink-0">SS CFG</span>
-                <input
-                  type="range"
-                  min="1"
-                  max="20"
-                  step="0.5"
-                  value={params.ss_cfg_scale}
-                  onChange={(e) => setParams(prev => ({ ...prev, ss_cfg_scale: parseFloat(e.target.value) }))}
-                  className="flex-1 h-[10px] rounded-full appearance-none cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, ${color} 0%, ${color} ${((params.ss_cfg_scale - 1) / 19) * 100}%, rgba(255,255,255,0.06) ${((params.ss_cfg_scale - 1) / 19) * 100}%, rgba(255,255,255,0.06) 100%)`,
-                    boxShadow: `0 0 10px ${color}20`,
-                  }}
-                />
-                <span className="text-[11px] font-bold w-8 text-right shrink-0" style={{ color }}>{params.ss_cfg_scale.toFixed(1)}</span>
-              </div>
+              <SliderControl
+                label="SS CFG"
+                value={params.ss_cfg_scale}
+                min={1}
+                max={20}
+                step={0.5}
+                onChange={(v) => setParams(prev => ({ ...prev, ss_cfg_scale: v }))}
+                onReset={() => setParams(prev => ({ ...prev, ss_cfg_scale: 7.5 }))}
+                defaultValue={7.5}
+              />
+              {/* Divider */}
+              <div className="h-px bg-white/5" />
+              {/* SLAT Steps */}
+              <SliderControl
+                label="SLAT"
+                value={params.slat_sampling_steps}
+                min={5}
+                max={50}
+                step={1}
+                onChange={(v) => setParams(prev => ({ ...prev, slat_sampling_steps: v }))}
+                onReset={() => setParams(prev => ({ ...prev, slat_sampling_steps: 25 }))}
+                defaultValue={25}
+              />
+              {/* SS Steps */}
+              <SliderControl
+                label="SS"
+                value={params.ss_sampling_steps}
+                min={5}
+                max={50}
+                step={1}
+                onChange={(v) => setParams(prev => ({ ...prev, ss_sampling_steps: v }))}
+                onReset={() => setParams(prev => ({ ...prev, ss_sampling_steps: 25 }))}
+                defaultValue={25}
+              />
             </div>
           </div>
         </GlassCard>
 
-        {/* Presets + Manual Steps */}
+        {/* Presets */}
         <div>
           <SectionLabel>Inference Fidelity</SectionLabel>
-          <div className="space-y-2 mb-4">
-            {TRELLIS_PRESETS.map(preset => {
-              const isActive = params.slat_sampling_steps === preset.slat_steps && params.ss_sampling_steps === preset.ss_steps;
-              return (
-                <motion.button
-                  key={preset.label}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={() => setParams(prev => ({
-                    ...prev,
-                    slat_sampling_steps: preset.slat_steps,
-                    ss_sampling_steps: preset.ss_steps,
-                    slat_cfg_scale: preset.slat_cfg,
-                    ss_cfg_scale: preset.ss_cfg,
-                  }))}
-                  className="w-full p-4 rounded-[1.25rem] border flex items-center justify-between transition-all duration-300 relative overflow-hidden"
-                  style={isActive ? {
-                    background: `linear-gradient(135deg, ${color}18, ${color}06)`,
-                    borderColor: `${color}40`,
-                    color,
-                    boxShadow: `0 0 24px ${color}10, inset 0 1px 0 rgba(255,255,255,0.08)`,
-                    backdropFilter: 'blur(10px)',
-                  } : {
-                    background: 'linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))',
-                    borderColor: 'rgba(255,255,255,0.06)',
-                    color: '#a1a1aa',
-                    backdropFilter: 'blur(8px)',
-                  }}
-                >
-                  {isActive && (
-                    <div className="absolute inset-0 opacity-15"
-                      style={{ background: `radial-gradient(circle at 30% 50%, ${color}25, transparent 60%)` }}
-                    />
-                  )}
-                  <span className="relative z-10 text-[11px] font-black uppercase tracking-widest">{preset.label}</span>
-                  <span className="relative z-10 text-[9px] opacity-40 font-black uppercase tracking-tighter italic">{preset.slat_steps} steps</span>
-                </motion.button>
-              );
-            })}
+          <div className="grid grid-cols-2 gap-2">
+            {TRELLIS_PRESETS.map(preset => (
+              <PresetButton
+                key={preset.label}
+                label={preset.label}
+                steps={preset.slat_steps}
+                isActive={params.slat_sampling_steps === preset.slat_steps && params.ss_sampling_steps === preset.ss_steps}
+                onClick={() => setParams(prev => ({
+                  ...prev,
+                  slat_sampling_steps: preset.slat_steps,
+                  ss_sampling_steps: preset.ss_steps,
+                  slat_cfg_scale: preset.slat_cfg,
+                  ss_cfg_scale: preset.ss_cfg,
+                }))}
+                accentColor={color}
+              />
+            ))}
           </div>
-
-          {/* Manual Step Controls */}
-          <GlassCard>
-            <div className="p-4">
-              <label className="text-[8px] font-black uppercase tracking-[0.3em] text-zinc-500 italic mb-3 block">Manual Override</label>
-              <div className="space-y-4">
-                {/* SLAT Steps */}
-                <div className="flex items-center gap-3">
-                  <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500 w-16 shrink-0">SLAT</span>
-                  <input
-                    type="range"
-                    min="5"
-                    max="50"
-                    step="1"
-                    value={params.slat_sampling_steps}
-                    onChange={(e) => setParams(prev => ({ ...prev, slat_sampling_steps: parseInt(e.target.value) }))}
-                    className="flex-1 h-[10px] rounded-full appearance-none cursor-pointer"
-                    style={{
-                      background: `linear-gradient(to right, ${color} 0%, ${color} ${((params.slat_sampling_steps - 5) / 45) * 100}%, rgba(255,255,255,0.06) ${((params.slat_sampling_steps - 5) / 45) * 100}%, rgba(255,255,255,0.06) 100%)`,
-                    }}
-                  />
-                  <span className="text-[11px] font-bold w-6 text-right shrink-0" style={{ color }}>{params.slat_sampling_steps}</span>
-                </div>
-                {/* SS Steps */}
-                <div className="flex items-center gap-3">
-                  <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500 w-16 shrink-0">SS</span>
-                  <input
-                    type="range"
-                    min="5"
-                    max="50"
-                    step="1"
-                    value={params.ss_sampling_steps}
-                    onChange={(e) => setParams(prev => ({ ...prev, ss_sampling_steps: parseInt(e.target.value) }))}
-                    className="flex-1 h-[10px] rounded-full appearance-none cursor-pointer"
-                    style={{
-                      background: `linear-gradient(to right, ${color} 0%, ${color} ${((params.ss_sampling_steps - 5) / 45) * 100}%, rgba(255,255,255,0.06) ${((params.ss_sampling_steps - 5) / 45) * 100}%, rgba(255,255,255,0.06) 100%)`,
-                    }}
-                  />
-                  <span className="text-[11px] font-bold w-6 text-right shrink-0" style={{ color }}>{params.ss_sampling_steps}</span>
-                </div>
-              </div>
-            </div>
-          </GlassCard>
         </div>
       </div>
 
@@ -421,7 +549,6 @@ export default function TrellisControls({
               : 'none',
           }}
         >
-          {/* Shimmer overlay */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000" />
           {isRunning ? (
             <>

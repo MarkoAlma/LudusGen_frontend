@@ -23,22 +23,28 @@ input[type="range"]::-webkit-slider-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #a78bfa;
+  background: #e4e4e7;
   cursor: pointer;
-  box-shadow: 0 0 12px rgba(167,139,250,0.5), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
-  border: 2px solid rgba(255,255,255,0.25);
+  box-shadow: 0 0 8px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+  border: 2px solid rgba(255,255,255,0.15);
   transition: transform 0.15s, box-shadow 0.15s;
 }
 input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.15);
-  box-shadow: 0 0 18px rgba(167,139,250,0.7), 0 2px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow: 0 0 12px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.35);
 }
 input[type="range"]::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #a78bfa;
+  background: #e4e4e7;
   cursor: pointer;
-  box-shadow: 0 0 12px rgba(167,139,250,0.5), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
-  border: 2px solid rgba(255,255,255,0.25);
+  box-shadow: 0 0 8px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+  border: 2px solid rgba(255,255,255,0.15);
+}
+
+/* Shimmer animation for hover effects */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
