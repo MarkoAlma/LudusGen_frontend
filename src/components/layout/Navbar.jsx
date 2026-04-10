@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Sparkles, Menu, X, LogOut, Settings,
-  ChevronDown, LayoutDashboard, MessageSquare,
+import { 
+  Sparkles, Menu, X, LogOut, Settings, 
+  ChevronDown, LayoutDashboard, MessageSquare, 
   Image as ImageIcon, Music, Box, Users,
   Zap, Plus, User as UserIcon
 } from 'lucide-react';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { tokens } from '../../styles/tokens';
-import bgMobileMenu from '../../assets/bg-mobile-menu.png';
 import CreditTopup from '../CreditTopup';
 
 export default function Navbar() {
@@ -18,7 +17,7 @@ export default function Navbar() {
   const [studioDropdownOpen, setStudioDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [showCreditTopup, setShowCreditTopup] = useState(false);
-
+  
   const { setIsAuthOpen, showNavbar, user, logoutUser } = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
@@ -169,10 +168,12 @@ export default function Navbar() {
             {/* Actions */}
             <div className="flex items-center gap-4">
               {user ? (
-                <div className="hidden md:block relative">
+                <div className="relative" style={{ isolation: "isolate" }}>
                   <button
-                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                    className="w-10 h-10 rounded-xl border border-white/10 p-0.5 hover:border-primary/50 transition-all overflow-hidden"
+                    id="user-menu-trigger"
+                    onClick={(e) => { e.stopPropagation(); setUserDropdownOpen(!userDropdownOpen); }}
+                    className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-2xl border border-white/10 hover:border-white/20 transition-all"
+                    style={{ background: "rgba(255,255,255,0.04)" }}
                   >
                     <div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0 bg-white/10">
                       <img
