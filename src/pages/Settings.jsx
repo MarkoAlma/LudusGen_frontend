@@ -17,6 +17,7 @@ import {
   Upload,
   Trash2,
   XCircle,
+  Zap,
 } from "lucide-react";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
@@ -24,12 +25,14 @@ import Enable2FA from "../components/Enable2Fa";
 import axios from "axios";
 import UpdatePassword from "../components/UpdatePassword";
 import { auth } from "../firebase/firebaseApp";
+import CreditTopup from "../components/CreditTopup";
 
 export default function Settings() {
   const { user, updateUser, is2FAEnabled, loading2FA, refresh2FAStatus } =
     useContext(MyUserContext);
   const navigate = useNavigate();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showCreditTopup, setShowCreditTopup] = useState(false);
   const fileInputRef = useRef(null);
   const [mouseDownTarget, setMouseDownTarget] = useState(null);
   
@@ -724,10 +727,88 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
+
+              {/* ── Kredit kártya ──────────────────────────── */}
+              <div className="rounded-2xl bg-gradient-to-br from-purple-900/30 to-cyan-900/30 border border-purple-500/30 backdrop-blur-xl overflow-hidden">
+                {/* Card header */}
+                <div className="p-6 border-b border-purple-500/20">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{
+                        background: "linear-gradient(135deg, #7c3aed, #db2777)",
+                        boxShadow: "0 0 16px rgba(168,85,247,0.5)",
+                      }}
+                    >
+                      <Zap className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Kreditek</h3>
+                      <p className="text-xs text-gray-400">Egyenleged kezelése</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Balance display */}
+                <div className="p-6">
+                  <div
+                    className="rounded-xl mb-4 flex items-center justify-between"
+                    style={{
+                      padding: "16px 20px",
+                      background:
+                        "linear-gradient(135deg, rgba(124,58,237,0.15), rgba(219,39,119,0.1))",
+                      border: "1px solid rgba(168,85,247,0.2)",
+                    }}
+                  >
+                    <div>
+                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">
+                        Jelenlegi egyenleg
+                      </p>
+                      <p
+                        className="font-black text-white"
+                        style={{ fontSize: 28, lineHeight: 1 }}
+                      >
+                        {(user.credits ?? 0).toLocaleString("hu-HU")}
+                        <span className="text-purple-400 text-sm font-bold ml-2">
+                          kr
+                        </span>
+                      </p>
+                    </div>
+                    <Zap className="w-6 h-6 text-purple-400" />
+                  </div>
+
+                  <button
+                    onClick={() => setShowCreditTopup(true)}
+                    className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white transition-all duration-300 hover:scale-105"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #7c3aed 0%, #db2777 100%)",
+                      boxShadow: "0 4px 20px rgba(124,58,237,0.3)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.boxShadow =
+                        "0 8px 32px rgba(124,58,237,0.55)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.boxShadow =
+                        "0 4px 20px rgba(124,58,237,0.3)";
+                    }}
+                  >
+                    <Zap className="w-4 h-4" />
+                    Kredit Feltöltése
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* CreditTopup Modal */}
+      <CreditTopup
+        isOpen={showCreditTopup}
+        onClose={() => setShowCreditTopup(false)}
+      />
 
 {/* Profile Picture Modal */}
 {showProfileModal && (

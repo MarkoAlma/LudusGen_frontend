@@ -132,8 +132,8 @@ const renderMd = (text) => {
       const lang = knownLangs.includes(firstLine) ? firstLine : "";
       const code = lang ? lines.slice(1).join("\n") : content;
       return (
-        <div key={i} className="my-3 rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
-          <div className="flex items-center justify-between px-3 py-1.5" style={{ background: "rgba(18,18,40,0.97)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+        <div key={i} className="my-3 rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="flex items-center justify-between px-3 py-1.5" style={{ background: "#13111c", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <span className="text-gray-500 text-xs font-mono">{lang || "code"}</span>
             <CopyCodeBtn code={code} />
           </div>
@@ -152,7 +152,7 @@ const renderMd = (text) => {
           const parsed = line.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g).map((chunk, ci) => {
             if (chunk.startsWith("**") && chunk.endsWith("**")) return <strong key={ci} className="text-white font-semibold">{chunk.slice(2, -2)}</strong>;
             if (chunk.startsWith("*") && chunk.endsWith("*")) return <em key={ci} className="text-gray-300 italic">{chunk.slice(1, -1)}</em>;
-            if (chunk.startsWith("`") && chunk.endsWith("`")) return <code key={ci} className="px-1.5 py-0.5 rounded text-xs" style={{ background: "rgba(0,0,0,0.35)", color: "#67e8f9" }}>{chunk.slice(1, -1)}</code>;
+            if (chunk.startsWith("`") && chunk.endsWith("`")) return <code key={ci} className="px-1.5 py-0.5 rounded text-xs" style={{ background: "#0c0a12", color: "#67e8f9", border: "1px solid rgba(255,255,255,0.06)" }}>{chunk.slice(1, -1)}</code>;
             return chunk;
           });
           if (line.match(/^\d+\. /)) return <div key={li} className="flex gap-2 my-0.5"><span className="text-purple-400 flex-shrink-0 font-bold text-xs mt-0.5">{line.match(/^\d+/)[0]}.</span><span className="text-gray-300 text-sm">{line.replace(/^\d+\. /, "")}</span></div>;
@@ -169,7 +169,7 @@ const CopyCodeBtn = ({ code }) => {
   return (
     <button onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
       className="cursor-pointer flex items-center gap-1 px-2 py-0.5 rounded-md text-xs transition-all"
-      style={{ background: copied ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.08)", color: copied ? "#4ade80" : "#9ca3af", border: `1px solid ${copied ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.1)"}` }}>
+      style={{ background: copied ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.08)", color: copied ? "#4ade80" : "#9ca3af", border: `1px solid ${copied ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.08)"}` }}>
       {copied ? <><Check className="w-3 h-3" /> Másolva</> : <><Copy className="w-3 h-3" /> Másolás</>}
     </button>
   );
@@ -178,9 +178,7 @@ const CopyCodeBtn = ({ code }) => {
 // ─── Glass card ───────────────────────────────────────────────────
 const GlassCard = ({ children, style = {}, className = "" }) => (
   <div className={className} style={{
-    background: "rgba(12,12,30,0.75)", backdropFilter: "blur(24px)",
-    border: "1px solid rgba(255,255,255,0.08)", borderRadius: "1.25rem",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)",
+    background: "#13111c", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "1rem",
     ...style,
   }}>{children}</div>
 );
@@ -202,7 +200,7 @@ const PollWidget = ({ poll, color }) => {
         return (
           <button key={opt.id} onClick={() => !voted && setVoted(opt.id)}
             className="cursor-pointer w-full text-left relative overflow-hidden rounded-xl transition-all active:scale-[0.99]"
-            style={{ border: `1px solid ${voted === opt.id ? color + "60" : "rgba(255,255,255,0.1)"}` }}
+            style={{ border: `1px solid ${voted === opt.id ? color + "60" : "rgba(255,255,255,0.08)"}` }}
             disabled={!!voted}>
             <div className="absolute inset-0 transition-all duration-700 rounded-xl"
               style={{ width: voted ? `${pct}%` : "0%", background: voted === opt.id ? `${color}30` : `${color}12`, transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)" }} />
@@ -252,19 +250,19 @@ const ReactionBar = ({ reactions: initReactions, color, commentId }) => {
       {nonZero.map(([emoji, count]) => (
         <button key={emoji} onClick={() => toggleReaction(emoji)}
           className="cursor-pointer flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-all active:scale-90"
-          style={{ background: myReactions.has(emoji) ? `${color}22` : "rgba(255,255,255,0.06)", border: `1px solid ${myReactions.has(emoji) ? color + "45" : "rgba(255,255,255,0.1)"}`, color: myReactions.has(emoji) ? color : "#9ca3af" }}>
+          style={{ background: myReactions.has(emoji) ? `${color}22` : "rgba(255,255,255,0.04)", border: `1px solid ${myReactions.has(emoji) ? color + "45" : "rgba(255,255,255,0.06)"}`, color: myReactions.has(emoji) ? color : "#9ca3af" }}>
           {emoji} <span className="font-medium">{count}</span>
         </button>
       ))}
       <div ref={pickerRef} className="relative">
         <button onClick={() => setShowPicker(v => !v)}
           className="cursor-pointer flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-gray-600 hover:text-gray-300 transition-all"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
           <Smile className="w-3 h-3" /> +
         </button>
         {showPicker && (
           <div className="absolute bottom-full mb-1 left-0 flex gap-1 p-2 rounded-xl"
-            style={{ zIndex: 9999, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.15)", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+            style={{ zIndex: 9999, background: "rgba(16,12,24,0.98)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
             {EMOJI_REACTIONS.map(e => (
               <button key={e} onClick={() => toggleReaction(e)}
                 className="cursor-pointer w-7 h-7 flex items-center justify-center rounded-lg text-sm hover:bg-white/10 transition-all active:scale-90"
@@ -314,7 +312,7 @@ const CommentEditor = ({ placeholder, onSubmit, onCancel, color, isReply = false
           <div className="w-px h-4 bg-white/10 mx-1" />
           <button onClick={() => setPreview(v => !v)}
             className="cursor-pointer px-2.5 py-1 rounded-lg text-xs transition-all"
-            style={{ background: preview ? `${color}20` : "rgba(255,255,255,0.05)", color: preview ? color : "#6b7280", border: `1px solid ${preview ? color + "40" : "rgba(255,255,255,0.08)"}` }}>
+            style={{ background: preview ? `${color}20` : "rgba(255,255,255,0.04)", color: preview ? color : "#6b7280", border: `1px solid ${preview ? color + "40" : "rgba(255,255,255,0.08)"}` }}>
             {preview ? "Szerkesztés" : "Előnézet"}
           </button>
         </div>
@@ -327,10 +325,10 @@ const CommentEditor = ({ placeholder, onSubmit, onCancel, color, isReply = false
           placeholder={placeholder}
           rows={isReply ? 2 : 4}
           className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 resize-none focus:outline-none transition-all font-mono"
-          style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${text ? color + "40" : "rgba(255,255,255,0.08)"}`, minHeight: isReply ? "56px" : "100px" }} />
+          style={{ background: "#0c0a12", border: `1px solid ${text ? color + "40" : "rgba(255,255,255,0.08)"}`, minHeight: isReply ? "56px" : "100px" }} />
       ) : (
         <div className="w-full px-3 py-2.5 rounded-xl text-gray-300 text-sm leading-relaxed min-h-[80px]"
-          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          style={{ background: "#0c0a12", border: "1px solid rgba(255,255,255,0.08)" }}>
           {text ? renderMd(text) : <span className="text-gray-600 italic">Előnézet...</span>}
         </div>
       )}
@@ -346,7 +344,7 @@ const CommentEditor = ({ placeholder, onSubmit, onCancel, color, isReply = false
           <button onClick={() => { if (text.trim()) { onSubmit(text); setText(""); } }}
             disabled={!text.trim()}
             className="cursor-pointer flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90 active:scale-[0.97] disabled:opacity-30"
-            style={{ background: text.trim() ? `linear-gradient(135deg, ${color}, ${color}99)` : "rgba(255,255,255,0.05)", boxShadow: text.trim() ? `0 4px 16px ${color}25` : "none" }}>
+            style={{ background: text.trim() ? `linear-gradient(135deg, ${color}, ${color}99)` : "rgba(255,255,255,0.04)", boxShadow: text.trim() ? `0 4px 16px ${color}25` : "none" }}>
             <Send className="w-3 h-3" /> {submitLabel}
           </button>
         </div>
@@ -364,8 +362,8 @@ const ReportModal = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl overflow-hidden"
-        style={{ background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 20px 60px rgba(0,0,0,0.8)" }}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+        style={{ background: "#13111c", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
           <h3 className="text-white font-bold text-sm flex items-center gap-2"><Flag className="w-4 h-4 text-red-400" /> Bejelentés</h3>
           <button onClick={onClose} className="cursor-pointer text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all"><X className="w-4 h-4" /></button>
         </div>
@@ -373,7 +371,7 @@ const ReportModal = ({ isOpen, onClose }) => {
           <p className="text-gray-400 text-xs mb-3">Miért szeretnéd bejelenteni ezt a tartalmat?</p>
           {reasons.map(r => (
             <label key={r} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all"
-              style={{ background: reason === r ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${reason === r ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.07)"}` }}>
+              style={{ background: reason === r ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${reason === r ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.06)"}` }}>
               <div className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
                 style={{ borderColor: reason === r ? "#f87171" : "#4b5563", background: reason === r ? "#f87171" : "transparent" }}>
                 {reason === r && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
@@ -383,9 +381,9 @@ const ReportModal = ({ isOpen, onClose }) => {
             </label>
           ))}
         </div>
-        <div className="px-5 py-4 border-t border-white/8 flex gap-2">
+        <div className="px-5 py-4 border-t border-white/5 flex gap-2">
           <button onClick={onClose} className="cursor-pointer flex-1 py-2 rounded-xl text-sm text-gray-400 hover:text-white transition-all"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>Mégse</button>
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>Mégse</button>
           <button disabled={!reason} onClick={onClose}
             className="cursor-pointer flex-1 py-2 rounded-xl text-sm text-white font-semibold transition-all disabled:opacity-30"
             style={{ background: "linear-gradient(135deg,#dc2626,#991b1b)" }}>
@@ -435,11 +433,11 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, currentUser 
   };
 
   return (
-    <div id={`comment-${comment.id}`} className={isReply ? "ml-6 mt-2" : ""}>
+    <div id={`comment-${comment.id}`} className={isReply ? "ml-6 mt-2" : "mt-3"}>
       <div className="group transition-all duration-150 relative"
         style={{
-          background: comment.pinned ? "rgba(167,139,250,0.06)" : isReply ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.03)",
-          border: comment.pinned ? "1px solid rgba(167,139,250,0.25)" : `1px solid ${isReply ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.07)"}`,
+          background: comment.pinned ? "#16132a" : isReply ? "#110f1a" : "#13111c",
+          border: comment.pinned ? "1px solid rgba(167,139,250,0.2)" : `1px solid ${isReply ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.06)"}`,
           borderRadius: "0.875rem", padding: isReply ? "0.75rem 0.875rem" : "1rem 1.125rem",
           zIndex: showMenu ? 50 : "auto",
           position: "relative",
@@ -477,7 +475,7 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, currentUser 
             </button>
             {showMenu && (
               <div className="absolute right-0 top-full mt-1 rounded-xl overflow-hidden w-44"
-                style={{ zIndex: 9999, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 12px 40px rgba(0,0,0,0.7)" }}>
+                style={{ zIndex: 9999, background: "rgba(16,12,24,0.98)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 12px 40px rgba(0,0,0,0.7)" }}>
                 <button onClick={copyCommentLink} className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/8 transition-colors">
                   <Copy className="w-3.5 h-3.5" /> Link másolása
                 </button>
@@ -502,7 +500,7 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, currentUser 
             <div>
               <textarea value={editedContent} onChange={e => setEditedContent(e.target.value)} rows={3}
                 className="w-full px-3 py-2 rounded-xl text-white text-sm placeholder-gray-600 resize-none focus:outline-none"
-                style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${color}40` }} />
+                style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${color}40` }} />
               <div className="flex gap-2 mt-2">
                 <button onClick={() => { setContent(editedContent); setEditing(false); }}
                   className="cursor-pointer px-3 py-1.5 rounded-lg text-xs text-white font-semibold transition-all"
@@ -580,7 +578,7 @@ const ReadingProgress = ({ color }) => {
     return () => window.removeEventListener("scroll", handler);
   }, []);
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 h-0.5" style={{ background: "rgba(255,255,255,0.05)" }}>
+    <div className="fixed top-0 left-0 right-0 z-50 h-0.5" style={{ background: "rgba(255,255,255,0.04)" }}>
       <div className="h-full transition-all duration-150 rounded-r-full"
         style={{ width: `${progress}%`, background: `linear-gradient(90deg, #7c3aed, ${color})` }} />
     </div>
@@ -599,7 +597,7 @@ const ScrollToTop = () => {
   return (
     <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       className="cursor-pointer fixed bottom-6 right-6 z-40 w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-all hover:scale-110 active:scale-95"
-      style={{ background: "linear-gradient(135deg,#7c3aed,#db2777)", boxShadow: "0 4px 20px rgba(124,58,237,0.4)" }}>
+      style={{ background: "#13111c", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
       <ArrowUp className="w-4 h-4" />
     </button>
   );
@@ -638,7 +636,7 @@ const HelpfulWidget = ({ color }) => {
         <button key={label} onClick={() => setVoted(i)}
           className="cursor-pointer px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95"
           style={{
-            background: voted === i ? (i === 0 ? "rgba(74,222,128,0.2)" : "rgba(239,68,68,0.15)") : "rgba(255,255,255,0.05)",
+            background: voted === i ? (i === 0 ? "rgba(74,222,128,0.2)" : "rgba(239,68,68,0.15)") : "rgba(255,255,255,0.04)",
             border: `1px solid ${voted === i ? (i === 0 ? "rgba(74,222,128,0.4)" : "rgba(239,68,68,0.35)") : "rgba(255,255,255,0.08)"}`,
             color: voted === i ? (i === 0 ? "#4ade80" : "#f87171") : "#9ca3af",
           }}>
@@ -666,10 +664,10 @@ const PermalinkWidget = ({ category, slug, color }) => {
     <GlassCard>
       <div className="px-4 pt-4 pb-3">
         <h4 className="text-white font-semibold text-xs uppercase tracking-wider flex items-center gap-2 mb-2">
-          <Link className="w-3.5 h-3.5" style={{ color }} /> Permalink
+          <Link className="w-3.5 h-3.5" style={{ color }} /> Közvetlen link
         </h4>
         <div className="flex items-center gap-2 p-2 rounded-xl"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
           <span className="text-gray-500 text-xs font-mono truncate flex-1">{displayPath}</span>
           <button onClick={handleCopy}
             className="cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all flex-shrink-0"
@@ -692,16 +690,16 @@ const UserProfileModal = ({ isOpen, onClose, author, authorAvatar, authorAvatarU
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-2xl overflow-hidden flex flex-col"
-        style={{ background: "rgba(10,10,28,0.98)", border: `1px solid ${authorColor}30`, maxHeight: "85vh", boxShadow: `0 30px 80px rgba(0,0,0,0.8), 0 0 60px ${authorColor}12` }}>
+        style={{ background: "#13111c", border: `1px solid ${authorColor}30`, maxHeight: "85vh", boxShadow: `0 30px 80px rgba(0,0,0,0.8), 0 0 60px ${authorColor}12` }}>
         {/* Header */}
-        <div className="px-5 py-4 border-b border-white/8 flex items-center justify-between flex-shrink-0">
+        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between flex-shrink-0">
           <h3 className="text-white font-bold text-sm flex items-center gap-2">
             <User className="w-4 h-4" style={{ color: authorColor }} /> Felhasználó profil
           </h3>
           <button onClick={onClose} className="cursor-pointer p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all"><X className="w-4 h-4" /></button>
         </div>
         {/* Profile info */}
-        <div className="px-5 py-4 border-b border-white/6">
+        <div className="px-5 py-4 border-b border-white/5">
           <div className="flex items-center gap-3 mb-4">
             {authorAvatarUrl
               ? <img src={authorAvatarUrl} alt="avatar" className="w-14 h-14 rounded-2xl object-cover" />
@@ -720,7 +718,7 @@ const UserProfileModal = ({ isOpen, onClose, author, authorAvatar, authorAvatarU
               { label: "Megtekintés", value: totalViews.toLocaleString(), color: "#38bdf8" },
               { label: "Hozzászólás", value: totalComments.toLocaleString(), color: "#4ade80" },
             ].map(s => (
-              <div key={s.label} className="text-center py-2 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <div key={s.label} className="text-center py-2 rounded-xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                 <div className="font-bold text-sm" style={{ color: s.color }}>{s.value}</div>
                 <div className="text-gray-600 text-xs">{s.label}</div>
               </div>
@@ -775,7 +773,7 @@ const ConfirmDeleteModal = ({ isOpen, onConfirm, onCancel }) => {
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10001 }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative rounded-2xl p-6 max-w-sm w-full"
-        style={{ background: "rgba(10,10,28,0.99)", border: "1px solid rgba(239,68,68,0.3)", boxShadow: "0 20px 60px rgba(0,0,0,0.8)" }}>
+        style={{ background: "#13111c", border: "1px solid rgba(239,68,68,0.3)", boxShadow: "0 20px 60px rgba(0,0,0,0.8)" }}>
         <div className="flex items-center gap-3 mb-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
@@ -787,7 +785,7 @@ const ConfirmDeleteModal = ({ isOpen, onConfirm, onCancel }) => {
         <div className="flex gap-2">
           <button onClick={onCancel}
             className="cursor-pointer flex-1 py-2 rounded-xl text-xs text-gray-400 hover:text-white transition-all"
-            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
             Mégse
           </button>
           <button onClick={onConfirm}
@@ -1014,8 +1012,18 @@ export default function ForumPost({
 
 
   return (
-    <div className="min-h-screen relative"
-      style={{ background: "radial-gradient(ellipse at top, #1a0b2e 0%, #0a0118 50%, #000000 100%)", fontFamily: "'SF Pro Display', -apple-system, system-ui, sans-serif" }}>
+    <div
+      className="min-h-screen relative overflow-x-hidden text-white"
+      style={{
+        background: "#0c0a12",
+        fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+      }}
+    >
+      {/* Subtle top gradient accent */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full blur-[160px]" style={{ background: "rgba(139,92,246,0.04)" }} />
+      </div>
+
       <ReadingProgress color={color} />
       <ScrollToTop />
 
@@ -1041,34 +1049,79 @@ export default function ForumPost({
         onCancel={() => setShowDeleteConfirm(false)}
       />
 
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl" style={{ background: `${color}08`, animation: "floatB 22s ease-in-out infinite" }} />
-        <div className="absolute bottom-1/3 right-1/4 w-72 h-72 bg-blue-500/8 rounded-full blur-3xl" style={{ animation: "floatB 30s ease-in-out infinite reverse" }} />
-      </div>
+      <nav className="relative z-50 max-w-[1200px] mx-auto mt-6 px-4">
+        <div className="flex items-center justify-between bg-[#13111c]/80 border border-white/5 rounded-2xl px-6 md:px-8 py-3">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(139,92,246,0.15)" }}>
+              <Sparkles className="w-4 h-4 text-purple-400" />
+            </div>
+            <span className="text-lg font-bold tracking-tight text-white/90">LudusGen</span>
+          </div>
 
-      <div className="relative z-10 max-w-4xl mx-auto px-3 md:px-5 py-5">
-        {/* ── Breadcrumb ── */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <button onClick={onBack} className="cursor-pointer flex items-center gap-1.5 text-gray-500 hover:text-white transition-colors group">
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-            <span className="text-sm">Fórum</span>
-          </button>
-          <ChevronRight className="w-3 h-3 text-gray-700" />
-          <span className="text-xs" style={{ color }}>{cat.emoji} {cat.label}</span>
-          <ChevronRight className="w-3 h-3 text-gray-700" />
-          <span className="text-gray-600 text-xs truncate max-w-[180px]">{post.title}</span>
+          <div className="hidden md:flex items-center gap-8">
+            {[{ key: "KEZDŐLAP", action: () => navigate("/") }, { key: "AI STÚDIÓ", action: null }, { key: "KÖZÖSSÉG", action: () => onBack?.() }].map((link) => (
+              <button
+                key={link.key}
+                onClick={() => {
+                  if (link.action) link.action();
+                }}
+                className={`text-[0.7rem] font-semibold tracking-wide cursor-pointer transition-colors ${link.key === "KÖZÖSSÉG" ? "text-purple-400" : "text-gray-500 hover:text-white/80"}`}
+              >
+                {link.key}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onBack}
+              className="cursor-pointer hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/5 text-gray-400 hover:text-white hover:bg-white/8 transition-all"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span className="text-xs font-medium">Vissza</span>
+            </button>
+            <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center overflow-hidden">
+              {globalUser?.profilePicture ? (
+                <img
+                  src={globalUser.profilePicture}
+                  alt="profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User className="w-4 h-4 text-gray-500" />
+              )}
+            </div>
+          </div>
         </div>
+      </nav>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4">
+      <div className="relative z-10 max-w-[1200px] mx-auto px-4 pt-6 pb-10">
+        {/* ── Breadcrumb ── */}
+        <GlassCard className="mb-4" style={{ background: "#13111c" }}>
+          <div className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
+            <button onClick={onBack} className="cursor-pointer flex items-center gap-1.5 text-gray-500 hover:text-white transition-colors group">
+              <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+              <span className="text-xs font-medium">Fórum</span>
+            </button>
+            <ChevronRight className="w-3 h-3 text-gray-700" />
+            <span className="text-xs px-2 py-0.5 rounded-md font-medium" style={{ color, background: `${color}10`, border: `1px solid ${color}18` }}>
+              {cat.emoji} {cat.label}
+            </span>
+            <ChevronRight className="w-3 h-3 text-gray-700" />
+            <span className="text-gray-500 text-xs truncate max-w-full md:max-w-[400px]">{post.title}</span>
+          </div>
+        </GlassCard>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px] xl:grid-cols-[minmax(0,1fr)_260px] gap-4">
           <div className="space-y-4">
-            <GlassCard style={{ border: `1px solid ${color}20` }}>
+            <GlassCard style={{ border: `1px solid ${color}15` }}>
               <div className="p-5 md:p-6">
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
-                  {post.pinned && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}><Pin className="w-2.5 h-2.5" />Kitűzve</span>}
-                  {post.hot && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(251,113,33,0.15)", color: "#fb923c", border: "1px solid rgba(251,113,33,0.25)" }}><Flame className="w-2.5 h-2.5" />Trending</span>}
-                  {post.locked && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}><Lock className="w-2.5 h-2.5" />Lezárva</span>}
-                  {post.solved && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(74,222,128,0.15)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)" }}><CheckCircle className="w-2.5 h-2.5" />Megoldva</span>}
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}>{cat.emoji} {cat.label}</span>
+                  {post.pinned && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.2)" }}><Pin className="w-2.5 h-2.5" />Kitűzve</span>}
+                  {post.hot && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(251,113,33,0.12)", color: "#fb923c", border: "1px solid rgba(251,113,33,0.2)" }}><Flame className="w-2.5 h-2.5" />Felkapott</span>}
+                  {post.locked && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(239,68,68,0.10)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}><Lock className="w-2.5 h-2.5" />Lezárva</span>}
+                  {post.solved && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}><CheckCircle className="w-2.5 h-2.5" />Megoldva</span>}
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: `${color}12`, color, border: `1px solid ${color}25` }}>{cat.emoji} {cat.label}</span>
                   <span className="ml-auto text-gray-600 text-xs flex items-center gap-1">
                     <Clock className="w-2.5 h-2.5" />{post.readTime} perc olvasás
                   </span>
@@ -1086,7 +1139,7 @@ export default function ForumPost({
                         {post.avatar}
                       </div>
                     )}
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0a0118]" title="Online" />
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0a0118]" title="Elérhető" />
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -1104,7 +1157,7 @@ export default function ForumPost({
                   <div className="ml-auto flex items-center gap-1.5">
                     <button onClick={() => setFollowing(v => !v)}
                       className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
-                      style={{ background: following ? `${color}20` : "rgba(255,255,255,0.05)", color: following ? color : "#9ca3af", border: `1px solid ${following ? color + "40" : "rgba(255,255,255,0.1)"}` }}>
+                      style={{ background: following ? `${color}20` : "rgba(255,255,255,0.04)", color: following ? color : "#9ca3af", border: `1px solid ${following ? color + "40" : "rgba(255,255,255,0.08)"}` }}>
                       <Rss className="w-3 h-3" />{following ? "Követed" : "Követés"}
                     </button>
                     <button onClick={() => setBookmarked(v => !v)} className="cursor-pointer p-2 rounded-xl transition-all hover:bg-white/8"
@@ -1132,12 +1185,12 @@ export default function ForumPost({
                   ))}
                 </div>
 
-                <div className="flex flex-col gap-3 pt-4 border-t border-white/6">
+                <div className="flex flex-col gap-3 pt-4 border-t border-white/5">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <button onClick={() => { setLiked(v => !v); setLikeCount(c => liked ? c - 1 : c + 1); }}
                         className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95"
-                        style={{ background: liked ? `${color}25` : "rgba(255,255,255,0.05)", border: `1px solid ${liked ? color + "45" : "rgba(255,255,255,0.08)"}`, color: liked ? color : "#9ca3af", boxShadow: liked ? `0 0 20px ${color}20` : "none" }}>
+                        style={{ background: liked ? `${color}25` : "rgba(255,255,255,0.04)", border: `1px solid ${liked ? color + "45" : "rgba(255,255,255,0.08)"}`, color: liked ? color : "#9ca3af", boxShadow: liked ? `0 0 20px ${color}20` : "none" }}>
                         <ThumbsUp className={`w-4 h-4 ${liked ? "fill-current" : ""}`} />{likeCount}
                       </button>
                       <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-600"
@@ -1182,14 +1235,13 @@ export default function ForumPost({
                   <MessageSquare className="w-3.5 h-3.5" style={{ color }} />
                   Hozzászólások ({totalComments})
                 </h3>
-
                 <div className="flex items-center gap-2">
                   {showCommentSearch && (
                     <div className="relative">
                       <input value={commentSearch} onChange={e => setCommentSearch(e.target.value)}
                         placeholder="Keresés a hozzászólásokban..."
                         className="w-48 px-3 py-1.5 rounded-xl text-white text-xs placeholder-gray-600 focus:outline-none"
-                        style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${color}30` }} />
+                        style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${color}30` }} />
                       {commentSearch && <button onClick={() => setCommentSearch("")} className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 text-gray-600"><X className="w-3 h-3" /></button>}
                     </div>
                   )}
@@ -1198,9 +1250,8 @@ export default function ForumPost({
                     style={{ color: showCommentSearch ? color : undefined }}>
                     <Search className="w-3.5 h-3.5" />
                   </button>
-
                   <div className="flex items-center gap-0.5 p-0.5 rounded-lg"
-                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                    style={{ background: "#13111c", border: "1px solid rgba(255,255,255,0.06)" }}>
                     {[
                       { id: "top", label: "Legjobb" },
                       { id: "new", label: "Legújabb" },
@@ -1215,7 +1266,6 @@ export default function ForumPost({
                   </div>
                 </div>
               </div>
-
               <div className="space-y-3">
                 {filteredComments.length > 0
                   ? filteredComments.map(c => (
@@ -1268,8 +1318,6 @@ export default function ForumPost({
           <div className="space-y-3">
             <TableOfContents content={post.content} color={color} />
 
-
-
             <GlassCard>
               <div className="px-4 pt-4 pb-3">
                 <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3">Bejegyzés infó</h4>
@@ -1279,7 +1327,7 @@ export default function ForumPost({
                   { label: "Közzétéve", value: post.time },
                   { label: "Megtekintés", value: post.views?.toLocaleString() },
                   { label: "Hozzászólások", value: totalComments },
-                  { label: "Like-ok", value: likeCount },
+                  { label: "Kedvelések", value: likeCount },
                   { label: "Olvasási idő", value: `${post.readTime} perc` },
                 ].map(item => (
                   <div key={item.label} className="flex justify-between items-center py-1.5 border-b border-white/5 last:border-0">
@@ -1301,8 +1349,8 @@ export default function ForumPost({
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-1.5 mb-3">
-                  {[{ label: "Témák", value: "42" }, { label: "Hozzász.", value: "312" }, { label: "Like-ok", value: "2.1k" }].map(s => (
-                    <div key={s.label} className="text-center py-1.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                  {[{ label: "Témák", value: "42" }, { label: "Hozzász.", value: "312" }, { label: "Kedvelés", value: "2.1k" }].map(s => (
+                    <div key={s.label} className="text-center py-1.5 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
                       <div className="text-white font-bold text-sm">{s.value}</div>
                       <div className="text-gray-600 text-xs">{s.label}</div>
                     </div>
@@ -1319,7 +1367,7 @@ export default function ForumPost({
             {post.tags?.length > 0 && (
               <GlassCard>
                 <div className="px-4 pt-4 pb-3">
-                  <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-2">Tagek</h4>
+                  <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-2">Címkék</h4>
                   <div className="flex gap-1.5 flex-wrap">
                     {post.tags.map(t => (
                       <span key={t} className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -1330,8 +1378,6 @@ export default function ForumPost({
               </GlassCard>
             )}
 
-            {/* ── MODERÁCIÓ PANEL — JAVÍTVA ── */}
-            {/* Csak akkor jelenik meg, ha a felhasználónak van jogosultsága */}
             {canManage && (
               <GlassCard>
                 <div className="px-4 pt-4 pb-3">
@@ -1339,32 +1385,23 @@ export default function ForumPost({
                     <Shield className="w-3 h-3" /> {isAdmin && !isOwn ? "Admin műveletek" : "Saját téma"}
                   </h4>
                   <div className="space-y-0.5">
-
-                    {/* Szerkesztés — csak saját poszthoz */}
                     {isOwn && (
-                      <button
-                        onClick={() => onEdit?.(post)}
+                      <button onClick={() => onEdit?.(post)}
                         className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                         style={{ color: "#60a5fa" }}>
                         <Edit3 className="w-3.5 h-3.5" /> Szerkesztés
                       </button>
                     )}
-
-                    {/* Megoldottnak jelöl — csak saját poszthoz */}
                     {isOwn && (
-                      <button
-                        onClick={() => onToggle?.(post.id, "solved", !post.solved)}
+                      <button onClick={() => onToggle?.(post.id, "solved", !post.solved)}
                         className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                         style={{ color: post.solved ? "#6b7280" : "#4ade80" }}>
                         <CheckCircle className="w-3.5 h-3.5" />
-                        {post.solved ? "Megoldás visszavon" : "Megoldottnak jelöl"}
+                        {post.solved ? "Megoldás visszavonása" : "Megoldottnak jelölés"}
                       </button>
                     )}
-
-                    {/* Zárolás — saját vagy admin */}
                     {canManage && (
-                      <button
-                        onClick={() => onToggle?.(post.id, "locked", !post.locked)}
+                      <button onClick={() => onToggle?.(post.id, "locked", !post.locked)}
                         className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                         style={{ color: post.locked ? "#60a5fa" : "#fb923c" }}>
                         {post.locked
@@ -1373,33 +1410,24 @@ export default function ForumPost({
                         }
                       </button>
                     )}
-
-                    {/* Kitűzés — csak admin */}
                     {isAdmin && (
-                      <button
-                        onClick={() => onToggle?.(post.id, "pinned", !post.pinned)}
+                      <button onClick={() => onToggle?.(post.id, "pinned", !post.pinned)}
                         className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                         style={{ color: "#fbbf24" }}>
                         <Pin className="w-3.5 h-3.5" />
                         {post.pinned ? "Kitűzés eltávolítása" : "Kitűzés"}
                       </button>
                     )}
-
-                    {/* Trending — csak admin */}
                     {isAdmin && (
-                      <button
-                        onClick={() => onToggle?.(post.id, "hot", !post.hot)}
+                      <button onClick={() => onToggle?.(post.id, "hot", !post.hot)}
                         className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                         style={{ color: "#fb923c" }}>
                         <Flame className="w-3.5 h-3.5" />
-                        {post.hot ? "Trending eltávolítása" : "Trending jelölés"}
+                        {post.hot ? "Felkapott eltávolítása" : "Felkapott jelölés"}
                       </button>
                     )}
-
-                    {/* Törlés — saját vagy admin */}
-                    <div className="border-t border-white/8 mt-1 pt-1">
-                      <button
-                        onClick={() => onDelete?.(post.id, post.authorId)}
+                    <div className="border-t border-white/5 mt-1 pt-1">
+                      <button onClick={() => onDelete?.(post.id, post.authorId)}
                         className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-red-400/10"
                         style={{ color: "#f87171" }}>
                         <Trash2 className="w-3.5 h-3.5" /> Téma törlése
