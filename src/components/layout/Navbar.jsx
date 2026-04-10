@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Sparkles, Menu, X, LogOut, Settings, 
-  ChevronDown, LayoutDashboard, MessageSquare, 
-  Image as ImageIcon, Music, Box, Users,
+import {
+  Sparkles, Menu, X, LogOut, Settings,
+  ChevronDown, LayoutDashboard, MessageSquare,
+  Image as ImageIcon, Music, Box, Users, Home,
   Zap, Plus, User as UserIcon
 } from 'lucide-react';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { tokens } from '../../styles/tokens';
 import CreditTopup from '../CreditTopup';
+import bgMobileMenu from '../../assets/bg-mobile-menu.png';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -17,7 +18,7 @@ export default function Navbar() {
   const [studioDropdownOpen, setStudioDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [showCreditTopup, setShowCreditTopup] = useState(false);
-  
+
   const { setIsAuthOpen, showNavbar, user, logoutUser } = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();

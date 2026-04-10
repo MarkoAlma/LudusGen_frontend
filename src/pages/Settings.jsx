@@ -1,62 +1,50 @@
 import { useState, useEffect, useContext, useRef } from "react";
-import {
-  User,
-  Mail,
-  Calendar,
-  Shield,
-  Edit2,
-  Save,
-  X,
-  Check,
-  AlertCircle,
-  Lock,
-  Sparkles,
-  ChevronLeft,
-  Camera,
-  Upload,
-  Trash2,
-  XCircle,
-  Zap,
-} from "lucide-react";
+import { User, Mail, Calendar, Shield, Edit2, Save, X, Check, AlertCircle, Lock, Sparkles, ChevronLeft, Camera, Upload, Trash2, XCircle, Zap } from "lucide-react";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
 import Enable2FA from "../components/Enable2Fa";
 import axios from "axios";
 import UpdatePassword from "../components/UpdatePassword";
 import { auth } from "../firebase/firebaseApp";
+import { motion, AnimatePresence } from "framer-motion";
+import { tokens } from "../styles/tokens";
 import CreditTopup from "../components/CreditTopup";
+
+// UI Components
+import Button from "../components/ui/Button";
+import Avatar from "../components/ui/Avatar";
+import Badge from "../components/ui/Badge";
+import Divider from "../components/ui/Divider";
+import Modal from "../components/ui/Modal";
+import PageTransition from "../components/layout/PageTransition";
+
+import settings_bg from "../assets/backgrounds/settings_bg.png";
 
 export default function Settings() {
   const { user, updateUser, is2FAEnabled, loading2FA, refresh2FAStatus } = useContext(MyUserContext);
   const navigate = useNavigate();
-
-  // Modal states
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showCreditTopup, setShowCreditTopup]     = useState(false);
-  const [show2FA, setShow2FA]                     = useState(false);
-  const [showDisable2FA, setShowDisable2FA]       = useState(false);
-  const [showProfileModal, setShowProfileModal]   = useState(false);
-
-  // Profile picture
   const fileInputRef = useRef(null);
-  const [selectedFile, setSelectedFile]     = useState(null);
-  const [imagePreview, setImagePreview]     = useState(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [mouseDownTarget, setMouseDownTarget] = useState(null);
 
-  // Disable 2FA
-  const [disable2FACode, setDisable2FACode]       = useState("");
-  const [disable2FALoading, setDisable2FALoading] = useState(false);
-  const [disable2FAError, setDisable2FAError]     = useState("");
-  const [disable2FAMouseDownTarget, setDisable2FAMouseDownTarget] = useState(null);
-
-  // Form
   const [editMode, setEditMode] = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [success, setSuccess]   = useState(false);
-  const [error, setError]       = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(null);
+
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  const [show2FA, setShow2FA] = useState(false);
+  const [showDisable2FA, setShowDisable2FA] = useState(false);
+  const [disable2FACode, setDisable2FACode] = useState("");
+  const [disable2FALoading, setDisable2FALoading] = useState(false);
+  const [disable2FAError, setDisable2FAError] = useState("");
+
+  const [showCreditTopup, setShowCreditTopup] = useState(false);
+
   const [formData, setFormData] = useState({ name: "", displayName: "", email: "", bio: "" });
-  const [validationErrors, setValidationErrors] = useState({ name: "", displayName: "" });
 
   useEffect(() => {
     if (user) {
@@ -69,43 +57,31 @@ export default function Settings() {
     }
   }, [user]);
 
-  // ─── Helpers ──────────────────────────────────────────────────────
-  const capitalizeWords = (str) =>
-    str.split(" ").map((w) => (w.length === 0 ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())).join(" ");
-
-  const normalize = (v) => (v ?? "").trim();
+  const handleUpdatePW = () => setShowPasswordModal(true);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "email") return;
-    const processed = name === "name" || name === "displayName" ? capitalizeWords(value) : value;
-    setFormData({ ...formData, [name]: processed });
-    setValidationErrors({ ...validationErrors, [name]: "" });
+    setFormData({ ...formData, [name]: value });
     setError(null);
   };
 
-  // ─── Save profile ─────────────────────────────────────────────────
   const handleSave = async () => {
     try {
       setLoading(true);
       setError(null);
       const token = await auth.currentUser.getIdToken();
-      const dataToSend = {};
-      if (normalize(formData.name) !== normalize(user.name)) dataToSend.name = normalize(formData.name);
-      if (normalize(formData.displayName) !== normalize(user.displayName)) dataToSend.displayName = normalize(formData.displayName);
-      if (normalize(formData.bio) !== normalize(user.bio)) dataToSend.bio = normalize(formData.bio);
-      if (Object.keys(dataToSend).length === 0) { setError("Nincs változás a profilban"); setLoading(false); return; }
-      const res = await axios.post("http://localhost:3001/api/update-profile", dataToSend, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await axios.post("http://localhost:3001/api/update-profile", formData, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (res.data.success) {
-        updateUser(res.data.user || dataToSend);
+        updateUser(formData);
         setSuccess(true);
         setEditMode(false);
         setTimeout(() => setSuccess(false), 3000);
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Hiba történt a mentés során");
+      setError(err.response?.data?.message || "Error saving profile");
     } finally {
       setLoading(false);
     }
@@ -113,20 +89,13 @@ export default function Settings() {
 
   const handleCancel = () => {
     setFormData({ name: user.name || "", displayName: user.displayName || "", email: user.email || "", bio: user.bio || "" });
-    setValidationErrors({ name: "", displayName: "" });
     setEditMode(false);
     setError(null);
   };
 
-  // ─── Profile picture ──────────────────────────────────────────────
-  const openProfileModal = () => { setShowProfileModal(true); setImagePreview(null); setSelectedFile(null); };
-  const closeProfileModal = () => { setShowProfileModal(false); setImagePreview(null); setSelectedFile(null); };
-
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) { setError("Csak képfájlokat tölthetsz fel!"); return; }
-    if (file.size > 5 * 1024 * 1024) { setError("A kép mérete maximum 5MB lehet!"); return; }
     setSelectedFile(file);
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
@@ -137,573 +106,251 @@ export default function Settings() {
     if (!selectedFile) return;
     try {
       setUploadingImage(true);
-      setError(null);
       const token = await auth.currentUser.getIdToken();
       const fd = new FormData();
       fd.append("profilePicture", selectedFile);
       const res = await axios.post("http://localhost:3001/api/upload-profile-picture", fd, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
       });
       if (res.data.success) {
         updateUser({ profilePicture: res.data.profilePictureUrl });
+        setShowProfileModal(false);
         setSuccess(true);
-        closeProfileModal();
         setTimeout(() => setSuccess(false), 3000);
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Hiba történt a kép feltöltése során");
+      setError("Upload failed");
     } finally {
       setUploadingImage(false);
     }
   };
 
-  const handleDeleteProfilePicture = async () => {
-    if (!user.profilePicture) return;
-    if (!window.confirm("Biztosan törlöd a profilképedet?")) return;
-    try {
-      setUploadingImage(true);
-      setError(null);
-      const token = await auth.currentUser.getIdToken();
-      const res = await axios.delete("http://localhost:3001/api/delete-profile-picture", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.data.success) {
-        updateUser({ profilePicture: null });
-        setSuccess(true);
-        closeProfileModal();
-        setTimeout(() => setSuccess(false), 3000);
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || "Hiba történt a kép törlése során");
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
-  // ─── Disable 2FA ─────────────────────────────────────────────────
-  const openDisable2FA = () => { setShowDisable2FA(true); setDisable2FACode(""); setDisable2FAError(""); };
-  const closeDisable2FA = () => { setShowDisable2FA(false); setDisable2FACode(""); setDisable2FAError(""); };
-
-  const handleDisable2FA = async () => {
-    if (disable2FACode.length !== 6) { setDisable2FAError("6 jegyű kódot adj meg!"); return; }
-    try {
-      setDisable2FALoading(true);
-      setDisable2FAError("");
-      const token = await auth.currentUser.getIdToken();
-      const res = await axios.post("http://localhost:3001/api/disable-2fa", { code: disable2FACode }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.data.success) {
-        await refresh2FAStatus();
-        closeDisable2FA();
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
-      }
-    } catch (err) {
-      setDisable2FAError(err.response?.data?.message || "Érvénytelen kód");
-    } finally {
-      setDisable2FALoading(false);
-    }
-  };
-
-  const handleCodeChange = (e) => {
-    setDisable2FACode(e.target.value.replace(/\D/g, "").slice(0, 6));
-    setDisable2FAError("");
-  };
-
-  // ─── Guard ────────────────────────────────────────────────────────
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-purple-950/50 to-black flex items-center justify-center">
-        <p className="text-white">Bejelentkezés szükséges...</p>
-      </div>
-    );
-  }
+  if (!user) return null;
 
   return (
-    <>
-      <div className="min-h-screen bg-gradient-to-br from-black via-purple-950/50 to-black py-20 px-4">
-        {/* Background effects */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-3xl animate-pulse" />
+    <PageTransition>
+      <div className="min-h-screen bg-[#03000a] text-white pb-20 px-4 md:px-6 lg:px-8 relative overflow-hidden">
+        {/* Cinematic Backgrounds */}
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
+          <img 
+            src={settings_bg} 
+            className="absolute inset-0 w-full h-full object-cover opacity-[0.06] grayscale scale-110" 
+            alt="" 
+          />
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 blur-[120px] rounded-full" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-900/10 blur-[120px] rounded-full" />
         </div>
 
-        <div className="max-w-4xl mx-auto relative z-10">
-          {/* Back button */}
-          <button
-            onClick={() => navigate("/")}
-            className="flex cursor-pointer items-center gap-2 text-purple-300 hover:text-purple-200 mb-6 transition-colors group"
-          >
-            <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-semibold">Vissza</span>
-          </button>
-
+        <div className="max-w-4xl mx-auto relative z-10 pt-20">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent mb-2">
-              Beállítások
-            </h1>
-            <p className="text-gray-400">Kezeld a fiókod és a biztonsági beállításaidat</p>
-          </div>
-
-          {/* Success */}
-          {success && (
-            <div className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/30 flex items-center gap-3 animate-slideDown">
-              <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-              <p className="text-green-400 font-semibold">Változtatások sikeresen mentve!</p>
-            </div>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-              <p className="text-red-400">{error}</p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* ── Profile Card ─────────────────────────────────── */}
-            <div className="lg:col-span-2">
-              <div className="rounded-2xl bg-gradient-to-br from-purple-900/30 to-cyan-900/30 border border-purple-500/30 backdrop-blur-xl overflow-hidden">
-                <div className="p-6 border-b border-purple-500/30 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={openProfileModal}
-                      className="relative w-12 cursor-pointer h-12 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center overflow-hidden group hover:ring-4 hover:ring-purple-500/50 transition-all"
-                    >
-                      {user.profilePicture ? (
-                        <img src={user.profilePicture} alt="Profile" className="w-full h-full object-cover" />
-                      ) : (
-                        <User className="w-6 h-6 text-white" />
-                      )}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <Camera className="w-5 h-5 text-white" />
-                      </div>
-                    </button>
-                    <div>
-                      <h2 className="text-xl font-bold text-white">Profil Adatok</h2>
-                      <p className="text-sm text-gray-400">Személyes információid kezelése</p>
-                    </div>
-                  </div>
-
-                  {!editMode ? (
-                    <button
-                      onClick={() => setEditMode(true)}
-                      className="flex items-center cursor-pointer gap-2 px-4 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 font-semibold transition-all hover:scale-105"
-                    >
-                      <Edit2 className="w-4 h-4" /> Szerkesztés
-                    </button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleCancel}
-                        disabled={loading}
-                        className="p-2 rounded-xl cursor-pointer bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 transition-all hover:scale-105 disabled:opacity-50"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={handleSave}
-                        disabled={loading}
-                        className="flex items-center cursor-pointer gap-2 px-4 py-2 rounded-xl bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-300 font-semibold transition-all hover:scale-105 disabled:opacity-50"
-                      >
-                        {loading ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-green-300/30 border-t-green-300 rounded-full animate-spin" />
-                            <span>Mentés...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Save className="w-4 h-4" /> <span>Mentés</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-6 space-y-4">
-                  {/* Display Name */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
-                      <Sparkles className="w-4 h-4 text-purple-400" /> Megjelenített név
-                    </label>
-                    <input
-                      type="text" name="displayName" value={formData.displayName}
-                      onChange={handleChange} disabled={!editMode}
-                      className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${validationErrors.displayName ? "border-red-500/50" : editMode ? "border-purple-500/30" : "border-purple-500/10"} text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
-                      placeholder="pl. János"
-                    />
-                  </div>
-
-                  {/* Name */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
-                      <User className="w-4 h-4 text-purple-400" /> Teljes név
-                    </label>
-                    <input
-                      type="text" name="name" value={formData.name}
-                      onChange={handleChange} disabled={!editMode}
-                      className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${validationErrors.name ? "border-red-500/50" : editMode ? "border-purple-500/30" : "border-purple-500/10"} text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
-                      placeholder="pl. Kovács János"
-                    />
-                  </div>
-
-                  {/* Email */}
-                  <div>
-                    <label className="flex items-center justify-between text-sm font-semibold text-gray-300 mb-2">
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-purple-400" /> Email cím
-                      </div>
-                      <span className="text-xs text-gray-500 font-normal">Nem módosítható</span>
-                    </label>
-                    <input
-                      type="email" name="email" value={formData.email} disabled
-                      className="w-full px-4 py-3 rounded-xl bg-black/30 border border-purple-500/10 text-gray-500 placeholder-gray-500 focus:outline-none transition-all opacity-60 cursor-not-allowed"
-                    />
-                  </div>
-
-                  {/* Bio */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
-                      <Edit2 className="w-4 h-4 text-purple-400" /> Bemutatkozás
-                    </label>
-                    <textarea
-                      name="bio" value={formData.bio} onChange={handleChange} disabled={!editMode} rows={4}
-                      className={`w-full px-4 py-3 rounded-xl bg-black/30 border ${editMode ? "border-purple-500/30" : "border-purple-500/10"} text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-60 disabled:cursor-not-allowed resize-none`}
-                      placeholder="Írj pár szót magadról..."
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Sidebar ──────────────────────────────────────── */}
-            <div className="space-y-6">
-              {/* Security Card */}
-              <div className="rounded-2xl bg-gradient-to-br from-purple-900/30 to-cyan-900/30 border border-purple-500/30 backdrop-blur-xl overflow-hidden">
-                <div className="p-6 border-b border-purple-500/30">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">Biztonság</h3>
-                      <p className="text-xs text-gray-400">Fiók védelme</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-semibold text-gray-300">Kétlépcsős azonosítás</span>
-                      {loading2FA ? (
-                        <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
-                      ) : (
-                        <div className={`px-3 py-1 rounded-full text-xs font-bold ${is2FAEnabled ? "bg-green-500/20 text-green-400 border border-green-500/30" : "bg-gray-500/20 text-gray-400 border border-gray-500/30"}`}>
-                          {is2FAEnabled ? "Aktív" : "Inaktív"}
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mb-4">Extra biztonsági réteg a fiókod számára</p>
-                    {!is2FAEnabled ? (
-                      <button
-                        onClick={() => setShow2FA(true)}
-                        className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 transition-all duration-300"
-                      >
-                        <Lock className="w-4 h-4" /> 2FA Bekapcsolása
-                      </button>
-                    ) : (
-                      <button
-                        onClick={openDisable2FA}
-                        className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 font-semibold transition-all hover:scale-105"
-                      >
-                        <X className="w-4 h-4" /> 2FA Kikapcsolása
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="pt-4 border-t border-purple-500/20">
-                    <button
-                      onClick={() => setShowPasswordModal(true)}
-                      className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 font-semibold transition-all hover:scale-105"
-                    >
-                      <Lock className="w-4 h-4" /> Jelszó Módosítása
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <UpdatePassword isOpen={showPasswordModal} onClose={() => setShowPasswordModal(false)} />
-
-              {/* Account Info Card */}
-              <div className="rounded-2xl bg-gradient-to-br from-purple-900/30 to-cyan-900/30 border border-purple-500/30 backdrop-blur-xl overflow-hidden">
-                <div className="p-6">
-                  <h3 className="text-sm font-bold text-gray-300 mb-4">Fiók információk</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">Létrehozva</span>
-                      <div className="flex items-center gap-2 text-sm text-white font-semibold">
-                        <Calendar className="w-3 h-3 text-purple-400" />
-                        {user.createdAt?._seconds
-                          ? new Date(user.createdAt._seconds * 1000).toLocaleDateString("hu-HU")
-                          : "–"}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">Fiók típus</span>
-                      <div className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-bold border border-purple-500/30">
-                        {user.accountType || "Standard"}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400">User ID</span>
-                      <span className="text-xs text-gray-500 font-mono">{user.uid?.substring(0, 8) || "N/A"}...</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Kredit kártya ─────────────────────────────── */}
-              <div className="rounded-2xl bg-gradient-to-br from-purple-900/30 to-cyan-900/30 border border-purple-500/30 backdrop-blur-xl overflow-hidden">
-                <div className="p-6 border-b border-purple-500/20">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center"
-                      style={{ background: "linear-gradient(135deg, #7c3aed, #db2777)", boxShadow: "0 0 16px rgba(168,85,247,0.5)" }}
-                    >
-                      <Zap className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">Kreditek</h3>
-                      <p className="text-xs text-gray-400">Egyenleged kezelése</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-6">
-                  <div
-                    className="rounded-xl mb-4 flex items-center justify-between"
-                    style={{ padding: "16px 20px", background: "linear-gradient(135deg, rgba(124,58,237,0.15), rgba(219,39,119,0.1))", border: "1px solid rgba(168,85,247,0.2)" }}
-                  >
-                    <div>
-                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-1">Jelenlegi egyenleg</p>
-                      <p className="font-black text-white" style={{ fontSize: 28, lineHeight: 1 }}>
-                        {(user.credits ?? 0).toLocaleString("hu-HU")}
-                        <span className="text-purple-400 text-sm font-bold ml-2">kr</span>
-                      </p>
-                    </div>
-                    <Zap className="w-6 h-6 text-purple-400" />
-                  </div>
-
-                  <button
-                    onClick={() => setShowCreditTopup(true)}
-                    className="w-full cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-white transition-all duration-300 hover:scale-105"
-                    style={{ background: "linear-gradient(135deg, #7c3aed 0%, #db2777 100%)", boxShadow: "0 4px 20px rgba(124,58,237,0.3)" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 8px 32px rgba(124,58,237,0.55)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 4px 20px rgba(124,58,237,0.3)"; }}
-                  >
-                    <Zap className="w-4 h-4" /> Kredit Feltöltése
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── CreditTopup Modal ─────────────────────────────────────── */}
-      <CreditTopup isOpen={showCreditTopup} onClose={() => setShowCreditTopup(false)} />
-
-      {/* ── Profile Picture Modal ─────────────────────────────────── */}
-      {showProfileModal && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4"
-            onMouseDown={(e) => setMouseDownTarget(e.target)}
-            onMouseUp={(e) => {
-              if (e.target === e.currentTarget && mouseDownTarget === e.currentTarget) closeProfileModal();
-              setMouseDownTarget(null);
-            }}
-          >
-            <div
-              className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-inKetto"
-              onClick={(e) => e.stopPropagation()}
-              style={{ transform: "scale(0.88)", background: "linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)", border: "1px solid rgba(168, 85, 247, 0.3)" }}
-            >
-              <button
-                style={{ cursor: "pointer" }} onClick={closeProfileModal} disabled={uploadingImage}
-                className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white disabled:opacity-50"
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+            <div>
+              <button 
+                onClick={() => navigate("/")} 
+                className="flex items-center gap-2 text-primary font-black uppercase tracking-widest text-[10px] mb-4 hover:opacity-70 transition-all cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <ChevronLeft className="w-4 h-4" /> Vissza a központba
               </button>
+              <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter mb-2">Beállítások.</h1>
+              <p className="text-gray-500 font-medium">Személyre szabott élmény és biztonság.</p>
+            </div>
+            {!editMode ? (
+              <Button variant="primary" onClick={() => setEditMode(true)} className="cursor-pointer">
+                <Edit2 className="w-4 h-4 mr-2" /> Profil szerkesztése
+              </Button>
+            ) : (
+              <div className="flex gap-3">
+                <Button variant="subtle" onClick={handleCancel} className="cursor-pointer">Mégse</Button>
+                <Button variant="primary" onClick={handleSave} loading={loading} className="cursor-pointer">Mentés</Button>
+              </div>
+            )}
+          </div>
 
-              <div className="relative z-10 p-8">
-                <div className="text-center mb-8">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 mb-4">
-                    <Camera className="w-8 h-8 text-white" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Main Area */}
+            <div className="lg:col-span-8 space-y-8">
+              {/* Profile Card */}
+              <div className="glass-panel p-8 rounded-[2.5rem] border border-white/10 relative overflow-hidden">
+                <div className="flex flex-col md:flex-row items-center gap-8">
+                  <div 
+                    className="relative group cursor-pointer"
+                    onClick={() => setShowProfileModal(true)}
+                  >
+                    <div className="w-32 h-32 rounded-[2.5rem] border-2 border-primary/30 p-1 group-hover:border-primary/60 transition-all">
+                      <img 
+                        src={user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover rounded-[2.2rem]"
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-black/60 rounded-[2.5rem] opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                      <Camera className="w-6 h-6 text-white" />
+                    </div>
                   </div>
-                  <h2 className="text-3xl font-black text-white mb-2">Profilkép</h2>
-                  <p className="text-gray-400">Nézd meg vagy módosítsd</p>
+
+                  <div className="flex-1 text-center md:text-left">
+                    <h2 className="text-2xl font-black italic tracking-tight text-white mb-1">{user.displayName || "Ludus Genius"}</h2>
+                    <p className="text-sm text-gray-400 font-medium mb-4">{user.email}</p>
+                    <div className="flex flex-wrap justify-center md:justify-start gap-2">
+                      <Badge variant="primary">{user.accountType || "Standard"}</Badge>
+                      {is2FAEnabled && <Badge variant="success">2FA Aktív</Badge>}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="mb-6">
-                  <div className="w-40 h-40 mx-auto rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center overflow-hidden"
-                    style={{ border: "3px solid rgba(168, 85, 247, 0.4)" }}>
-                    {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                    ) : user.profilePicture ? (
-                      <img src={user.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                <div className="mt-12 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <SettingsInput 
+                      label="Megjelenített név" 
+                      name="displayName" 
+                      value={formData.displayName} 
+                      onChange={handleChange} 
+                      disabled={!editMode} 
+                    />
+                    <SettingsInput 
+                      label="Teljes név" 
+                      name="name" 
+                      value={formData.name} 
+                      onChange={handleChange} 
+                      disabled={!editMode} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-4">Bemutatkozás</label>
+                    <textarea
+                      name="bio"
+                      value={formData.bio}
+                      onChange={handleChange}
+                      disabled={!editMode}
+                      className="w-full bg-white/[0.03] border border-white/10 rounded-3xl p-6 text-sm font-medium focus:outline-none focus:border-primary/50 transition-all min-h-[120px] resize-none disabled:opacity-50"
+                      placeholder="Mesélj magadról..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Security Card */}
+              <div className="glass-panel p-8 rounded-[2.5rem] border border-white/10">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                    <Shield className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-xl font-black italic tracking-tight">Biztonsági központ.</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                      <Lock className="w-4 h-4 text-primary" />
+                      <Badge variant="subtle">Jelszó</Badge>
+                    </div>
+                    <p className="text-sm font-bold text-white mb-1">Jelszó módosítása</p>
+                    <p className="text-[10px] text-gray-500 mb-6 font-medium">Ajánlott legalább 6 havonta frissíteni.</p>
+                    <Button variant="subtle" size="sm" onClick={handleUpdatePW} className="w-full cursor-pointer">Megnyitás</Button>
+                  </div>
+
+                  <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                      <Shield className="w-4 h-4 text-primary" />
+                      <Badge variant={is2FAEnabled ? "success" : "danger"}>{is2FAEnabled ? "Védett" : "Sebezhető"}</Badge>
+                    </div>
+                    <p className="text-sm font-bold text-white mb-1">Kétlépcsős azonosítás</p>
+                    <p className="text-[10px] text-gray-500 mb-6 font-medium">Extra védelmi réteg a fiókodhoz.</p>
+                    {!is2FAEnabled ? (
+                      <Button variant="primary" size="sm" onClick={() => setShow2FA(true)} className="w-full cursor-pointer">Beállítás</Button>
                     ) : (
-                      <User className="w-20 h-20 text-white" />
+                      <Button variant="danger" size="sm" onClick={() => setShowDisable2FA(true)} className="w-full cursor-pointer">Kikapcsolás</Button>
                     )}
                   </div>
                 </div>
-
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-
-                <div className="space-y-3">
-                  {!imagePreview ? (
-                    <>
-                      <button
-                        onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}
-                        style={{ cursor: !uploadingImage ? "pointer" : "not-allowed" }}
-                        className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
-                      >
-                        <Upload className="w-5 h-5" /> Új kép feltöltése
-                      </button>
-                      {user.profilePicture && (
-                        <button
-                          onClick={handleDeleteProfilePicture} disabled={uploadingImage}
-                          style={{ cursor: !uploadingImage ? "pointer" : "not-allowed", border: "1px solid rgba(239,68,68,0.3)" }}
-                          className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-red-600/10 hover:bg-red-600/20 text-red-300 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
-                        >
-                          {uploadingImage ? (
-                            <><div className="w-5 h-5 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin" /><span>Törlés...</span></>
-                          ) : (
-                            <><Trash2 className="w-5 h-5" /><span>Profilkép törlése</span></>
-                          )}
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => { setImagePreview(null); setSelectedFile(null); }} disabled={uploadingImage}
-                        style={{ cursor: !uploadingImage ? "pointer" : "not-allowed" }}
-                        className="flex-1 py-4 rounded-xl font-bold text-base flex items-center justify-center transition-all duration-300 bg-white/5 hover:bg-white/10 text-gray-300 hover:scale-105 disabled:opacity-50"
-                      >
-                        Mégse
-                      </button>
-                      <button
-                        onClick={handleUploadProfilePicture} disabled={uploadingImage}
-                        style={{ cursor: !uploadingImage ? "pointer" : "not-allowed" }}
-                        className="flex-1 py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 disabled:opacity-50"
-                      >
-                        {uploadingImage ? (
-                          <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Feltöltés...</span></>
-                        ) : (
-                          <><Check className="w-5 h-5" /><span>Mentés</span></>
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <p className="mt-5 text-xs text-center text-gray-500">Támogatott formátumok: JPG, PNG, GIF (max. 5MB)</p>
               </div>
             </div>
-          </div>
-        </>
-      )}
 
-      {/* ── 2FA Enable Modal ──────────────────────────────────────── */}
-      <Enable2FA isOpen={show2FA} onClose={() => { setShow2FA(false); refresh2FAStatus(); }} />
-
-      {/* ── 2FA Disable Modal ─────────────────────────────────────── */}
-      {showDisable2FA && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in"
-          onMouseDown={(e) => setDisable2FAMouseDownTarget(e.target)}
-          onMouseUp={(e) => {
-            if (e.target === e.currentTarget && disable2FAMouseDownTarget === e.currentTarget) closeDisable2FA();
-            setDisable2FAMouseDownTarget(null);
-          }}
-        >
-          <div
-            className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-inKetto"
-            onClick={(e) => e.stopPropagation()}
-            style={{ transform: "scale(0.88)", background: "linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)", border: "1px solid rgba(168, 85, 247, 0.3)" }}
-          >
-            <button
-              type="button" style={{ cursor: "pointer" }} onClick={closeDisable2FA} disabled={disable2FALoading}
-              className="absolute top-4 left-4 z-50 p-2 rounded-full bg-white/5 hover:bg-white/10 transition text-gray-400 hover:text-white disabled:opacity-50"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="relative z-10 p-8">
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-pink-600 mb-4">
-                  <Shield className="w-8 h-8 text-white" />
+            {/* Sidebar */}
+            <div className="lg:col-span-4 space-y-6">
+              <div className="glass-panel p-6 rounded-[2.5rem] border border-white/10">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-6 px-2">Fiók Adatok</h4>
+                <div className="space-y-4">
+                  <InfoRow label="Létrehozva" value={user.createdAt?._seconds ? new Date(user.createdAt._seconds * 1000).toLocaleDateString("hu-HU") : "Ismeretlen"} icon={Calendar} />
+                  <InfoRow label="Profil Típus" value={user.accountType || "Standard"} icon={Sparkles} color="text-primary" />
+                  <InfoRow label="Unique ID" value={user.uid?.substring(0, 10) + "..."} icon={Shield} />
                 </div>
-                <h2 className="text-3xl font-black text-white mb-2">2FA Kikapcsolása</h2>
-                <p className="text-gray-400">Add meg az autentikátor kódodat a megerősítéshez</p>
               </div>
 
-              <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-gray-300">A 2FA kikapcsolásával csökken a fiókod biztonsága. Ez a lépés nem vonható vissza automatikusan.</p>
-              </div>
-
-              <form onSubmit={(e) => { e.preventDefault(); handleDisable2FA(); }}>
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold text-purple-300 mb-2">6 jegyű autentikátor kód</label>
-                  <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10">
-                      <Lock className="w-5 h-5" />
-                    </div>
-                    <input
-                      type="text" inputMode="numeric" value={disable2FACode} onChange={handleCodeChange}
-                      maxLength={6} placeholder="000000" disabled={disable2FALoading} autoFocus
-                      className="w-full pl-12 pr-4 py-3 rounded-xl bg-black/40 border border-purple-500/30 text-white text-center text-2xl font-mono tracking-widest placeholder-gray-600 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 transition-all disabled:opacity-50"
-                    />
+              {/* Credits Card addition */}
+              <div className="glass-panel p-6 rounded-[2.5rem] border border-white/10">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                    <Zap className="w-5 h-5" />
                   </div>
-                  {disable2FAError && (
-                    <div className="flex items-center gap-2 mt-2 text-sm text-red-400">
-                      <XCircle className="w-4 h-4 flex-shrink-0" />
-                      <span>{disable2FAError}</span>
-                    </div>
-                  )}
+                  <h3 className="text-xl font-black italic tracking-tight">Kreditek.</h3>
                 </div>
 
-                <button
-                  type="submit" disabled={disable2FALoading || disable2FACode.length !== 6}
-                  style={{ cursor: !disable2FALoading && disable2FACode.length === 6 ? "pointer" : "not-allowed" }}
-                  className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 ${!disable2FALoading && disable2FACode.length === 6 ? "bg-gradient-to-r from-red-600 to-pink-600 text-white hover:shadow-2xl hover:shadow-red-500/50 hover:scale-105" : "bg-gradient-to-r from-red-600/40 to-pink-600/40 text-white/50"}`}
-                >
-                  {disable2FALoading ? (
-                    <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Ellenőrzés...</span></>
-                  ) : (
-                    <><X className="w-5 h-5" /><span>2FA Kikapcsolása</span></>
-                  )}
-                </button>
-              </form>
+                <div className="rounded-2xl mb-4 bg-white/[0.02] border border-white/5 p-5 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Jelenlegi</p>
+                    <p className="font-black text-white text-3xl italic tracking-tighter">
+                      {(user.credits ?? 0).toLocaleString("hu-HU")}
+                      <span className="text-primary text-sm ml-1 not-italic tracking-normal">kr</span>
+                    </p>
+                  </div>
+                  <Zap className="w-6 h-6 text-primary" />
+                </div>
+
+                <Button variant="primary" onClick={() => setShowCreditTopup(true)} className="w-full cursor-pointer">
+                  Kredit feltöltése
+                </Button>
+              </div>
+
             </div>
           </div>
         </div>
-      )}
 
-      <style jsx>{`
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-slideDown { animation: slideDown 0.3s ease-out forwards; }
-        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fade-in { animation: fade-in 0.2s ease-out; }
-        @keyframes scale-inKetto { from { opacity: 0; transform: scale(0.72); } to { opacity: 1; transform: scale(0.88); } }
-        .animate-scale-inKetto { animation: scale-inKetto 0.3s ease-out; }
-      `}</style>
-    </>
+        {/* Modals */}
+        <UpdatePassword isOpen={showPasswordModal} onClose={() => setShowPasswordModal(false)} />
+        <Enable2FA isOpen={show2FA} onClose={() => { setShow2FA(false); refresh2FAStatus();  }} />
+        <CreditTopup isOpen={showCreditTopup} onClose={() => setShowCreditTopup(false)} />
+        
+        <Modal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} title="Profilkép frissítése">
+          <div className="flex flex-col items-center p-6">
+            <div className="w-40 h-40 rounded-[2.5rem] border-4 border-primary/20 overflow-hidden mb-8">
+              <img src={imagePreview || user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`} className="w-full h-full object-cover" />
+            </div>
+            <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
+            <div className="grid grid-cols-2 gap-4 w-full">
+              <Button variant="subtle" onClick={() => fileInputRef.current.click()} className="cursor-pointer">Választás</Button>
+              <Button variant="primary" onClick={handleUploadProfilePicture} loading={uploadingImage} className="cursor-pointer">Feltöltés</Button>
+            </div>
+          </div>
+        </Modal>
+      </div>
+    </PageTransition>
+  );
+}
+
+function SettingsInput({ label, value, onChange, name, disabled }) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-4">{label}</label>
+      <input
+        name={name}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        className="w-full bg-white/[0.03] border border-white/10 rounded-2xl h-12 px-6 text-sm font-bold focus:outline-none focus:border-primary/50 transition-all disabled:opacity-50"
+      />
+    </div>
+  );
+}
+
+function InfoRow({ label, value, icon: Icon, color = "text-white" }) {
+  return (
+    <div className="flex items-center justify-between p-3 rounded-2xl hover:bg-white/[0.02] transition-colors group cursor-pointer">
+      <div className="flex items-center gap-3">
+        <Icon className="w-3.5 h-3.5 text-gray-600 group-hover:text-primary transition-colors" />
+        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">{label}</span>
+      </div>
+      <span className={`text-xs font-bold ${color}`}>{value}</span>
+    </div>
   );
 }
