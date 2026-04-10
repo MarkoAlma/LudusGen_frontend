@@ -23,6 +23,7 @@ const MyUserProvider = ({ children }) => {
   const [showNavbar, setShowNavbar] = useState(true);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [loading2FA, setLoading2FA] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
 // UserContext vagy valahol központilag
 // UserContext vagy valahol központilag
 const [navHeight, setNavHeight] = useState(0);
@@ -58,6 +59,7 @@ useEffect(() => {
         setIs2FAEnabled(false);
         setLoading2FA(false);
       }
+      setAuthLoading(false);
     });
 
     return () => unsub();
@@ -330,6 +332,7 @@ useEffect(() => {
         refresh2FAStatus,
         loadUserFromFirestore,
         signInWithGoogle,
+        authLoading,
       }}
     >
       {children}

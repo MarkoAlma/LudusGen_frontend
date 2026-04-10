@@ -1,7 +1,9 @@
-// viewer/ThreeViewer.jsx — Three.js 3D viewport (fully optimized)
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback } from "react";
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import {
-  loadScript, syncCamera, buildPlaceholder,
+  syncCamera, buildPlaceholder,
   createSunLight,
   applyLights, applyViewMode, applyWireframeOverlay,
   setSceneBg, setGridColor, loadGLB,
@@ -40,9 +42,6 @@ export default function ThreeViewer({
     let resizeObs;
 
     (async () => {
-      if (!window.THREE) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
-      if (!window.THREE.GLTFLoader) await loadScript('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js');
-      const THREE = window.THREE;
       const W = el.clientWidth || 640, H = el.clientHeight || 480;
 
       const scene    = new THREE.Scene();
@@ -53,13 +52,13 @@ export default function ThreeViewer({
         powerPreference: 'high-performance',
         stencil: false,
       });
-      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.4;
       renderer.setSize(W, H);
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
       renderer.sortObjects = false;
       el.appendChild(renderer.domElement);
 
@@ -120,10 +119,11 @@ export default function ThreeViewer({
       applyViewMode(S.current, viewMode);
       setSceneBg(S.current, bgColor);
 
-      const clock = new THREE.Clock();
+      const timer = new THREE.Timer();
       const loop = () => {
         S.current.frame = requestAnimationFrame(loop);
-        const dt = clock.getDelta();
+        timer.update();
+        const dt = timer.getDelta();
         const spinning = S.current.autoSpin && !S.current.drag.active;
         const lightMoving = S.current.lightAutoRotate;
 
@@ -224,10 +224,10 @@ export default function ThreeViewer({
     // Blob URL-nél nincs kiterjesztés — azok mindig GLB (fetchGlbAsBlob hozza létre)
     if (!modelUrl.startsWith('blob:')) {
       const ext = modelUrl.split('?')[0].split('.').pop().toLowerCase();
-      if (!['glb', 'gltf'].includes(ext)) {
+      if (!['glb', 'gltf', 'fbx'].includes(ext)) {
         // FIX: ne dobjuk el csendben — értesítsük a szülőt hogy ez nem renderelhető
-        // (pl. FBX/OBJ/STL) → szülő megjeleníthet letöltés gombot helyette
-        console.warn('ThreeViewer: nem GLB/GLTF URL, kihagyva:', modelUrl);
+        // (most már az FBX is támogatott)
+        console.warn('ThreeViewer: nem GLB/GLTF/FBX URL, kihagyva:', modelUrl);
         if (onNonGlbUrl) onNonGlbUrl(modelUrl, ext);
         return;
       }

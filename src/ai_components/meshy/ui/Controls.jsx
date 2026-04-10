@@ -2,27 +2,25 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { Tooltip } from './Primitives';
+
 // ─── Toggle ──────────────────────────────────────────────────────────────────
 export function Toggle({ value, onChange, label, hint, color }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+    <div className="flex items-center justify-between mb-2 px-1">
       <div>
-        <p style={{ color: '#d1d5db', fontSize: 11, fontWeight: 600, margin: '0 0 2px' }}>{label}</p>
-        {hint && <p style={{ color: '#4b5563', fontSize: 10, margin: 0 }}>{hint}</p>}
+        <p className="text-zinc-400 font-black text-[9px] uppercase tracking-[0.4em] italic leading-none mb-1">{label}</p>
+        {hint && <p className="text-zinc-700 text-[8px] font-bold uppercase tracking-widest leading-none m-0">{hint}</p>}
       </div>
       <button
         onClick={() => onChange(!value)}
-        style={{
-          position: 'relative', width: 36, height: 20, borderRadius: 10, flexShrink: 0,
-          cursor: 'pointer', border: 'none',
-          background: value ? (color || '#84cc16') : 'rgba(255,255,255,0.1)',
-          transition: 'background 0.2s',
-        }}
+        className={`relative w-8 h-4.5 rounded-full flex-shrink-0 cursor-pointer border-none transition-all duration-300 ${
+          value ? '' : 'bg-white/[0.05]'
+        }`}
+        style={value ? { background: color || '#10b981', boxShadow: `0 0 10px ${color || '#10b981'}40` } : {}}
       >
-        <span style={{
-          position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%',
-          background: '#fff', transition: 'left 0.2s', left: value ? 18 : 2,
-        }} />
+        <span className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-all duration-300 ${
+          value ? 'left-[18px]' : 'left-[2px]'
+        }`} />
       </button>
     </div>
   );
@@ -31,22 +29,15 @@ export function Toggle({ value, onChange, label, hint, color }) {
 // ─── SegControl ───────────────────────────────────────────────────────────────
 export function SegControl({ value, options, onChange, color }) {
   return (
-    <div style={{
-      display: 'flex', borderRadius: 10, overflow: 'hidden',
-      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-      marginBottom: 10,
-    }}>
+    <div className="flex bg-white/[0.02] border border-white/5 rounded-xl overflow-hidden mb-3">
       {options.map((opt) => {
         const isActive = value === opt.value;
         return (
-          <button key={opt.value} onClick={() => onChange(opt.value)} style={{
-            flex: 1, padding: '6px 4px', border: 'none', fontSize: 11, fontWeight: 700,
-            cursor: 'pointer', transition: 'all 0.15s',
-            background: isActive ? (color || '#84cc16') : 'transparent',
-            color: isActive ? '#fff' : '#6b7280',
-          }}
-            onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.color = '#d1d5db'; }}
-            onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.color = '#6b7280'; }}
+          <button key={opt.value} onClick={() => onChange(opt.value)} 
+            className={`flex-1 py-2 px-1 border-none text-[9px] font-black uppercase tracking-widest cursor-pointer transition-all duration-300 ${
+              isActive ? 'text-white' : 'text-zinc-600 hover:text-zinc-400'
+            }`}
+            style={isActive ? { background: color || '#10b981' } : {}}
           >
             {opt.label}
           </button>
@@ -67,31 +58,22 @@ export function Select({ label, value, options, onChange }) {
   }, []);
 
   return (
-    <div style={{ marginBottom: 10 }} ref={ref}>
-      {label && <p style={{ color: '#6b7280', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 5px' }}>{label}</p>}
-      <div style={{ position: 'relative' }}>
-        <button onClick={() => setOpen((o) => !o)} style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '6px 10px', borderRadius: 9, fontSize: 11, color: '#e5e7eb',
-          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
-        }}>
+    <div className="mb-3" ref={ref}>
+      {label && <p className="text-zinc-700 font-black text-[8px] uppercase tracking-[0.4em] italic mb-2 px-1">{label}</p>}
+      <div className="relative">
+        <button onClick={() => setOpen((o) => !o)} 
+          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-300 bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all cursor-pointer"
+        >
           {options.find((o) => o.value === value)?.label ?? value}
-          {open ? <ChevronUp style={{ width: 12, height: 12, color: '#6b7280' }} /> : <ChevronDown style={{ width: 12, height: 12, color: '#6b7280' }} />}
+          <ChevronDown className={`w-3.5 h-3.5 text-zinc-700 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
         </button>
         {open && (
-          <div style={{
-            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 999,
-            borderRadius: 10, background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)', overflow: 'hidden',
-          }}>
+          <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-[1000] rounded-xl bg-[#0d0d12] border border-white/10 shadow-2xl overflow-hidden p-1">
             {options.map((o) => (
-              <button key={o.value} onClick={() => { onChange(o.value); setOpen(false); }} style={{
-                width: '100%', textAlign: 'left', padding: '7px 10px', fontSize: 11, cursor: 'pointer',
-                color: value === o.value ? '#a78bfa' : '#d1d5db',
-                background: value === o.value ? 'rgba(124,58,237,0.12)' : 'transparent', border: 'none',
-              }}
-                onMouseEnter={(e) => { if (value !== o.value) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-                onMouseLeave={(e) => { if (value !== o.value) e.currentTarget.style.background = 'transparent'; }}
+              <button key={o.value} onClick={() => { onChange(o.value); setOpen(false); }} 
+                className={`w-full text-left px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest cursor-pointer border-none transition-all ${
+                  value === o.value ? 'bg-white/5 text-emerald-400' : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.02]'
+                }`}
               >
                 {o.label}
               </button>
@@ -106,15 +88,15 @@ export function Select({ label, value, options, onChange }) {
 // ─── MeshyRow ─────────────────────────────────────────────────────────────────
 export function MeshyRow({ label, tip, children, premium }) {
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
-        <span style={{ color: '#6b7280', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+    <div className="mb-4">
+      <div className="flex items-center gap-2 mb-2 px-1">
+        <span className="text-zinc-600 font-black text-[9px] uppercase tracking-[0.4em] italic">{label}</span>
         {tip && (
           <Tooltip text={tip} side="right">
-            <Info style={{ width: 11, height: 11, color: '#374151', cursor: 'help' }} />
+            <Info className="w-2.5 h-2.5 text-zinc-800 cursor-help" />
           </Tooltip>
         )}
-        {premium && <span style={{ fontSize: 10 }}>👑</span>}
+        {premium && <span className="text-[8px] opacity-20">👑</span>}
       </div>
       {children}
     </div>
@@ -124,24 +106,18 @@ export function MeshyRow({ label, tip, children, premium }) {
 // ─── NumStepper ───────────────────────────────────────────────────────────────
 export function NumStepper({ value, onChange, min = 1, max = 4 }) {
   return (
-    <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: 0, borderRadius: 9,
-      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-      overflow: 'hidden',
-    }}>
-      <button onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} style={{
-        width: 26, height: 28, border: 'none', background: 'transparent',
-        color: value <= min ? '#2d2d45' : '#9ca3af',
-        cursor: value <= min ? 'not-allowed' : 'pointer', fontSize: 16,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>‹</button>
-      <span style={{ minWidth: 24, textAlign: 'center', color: '#e5e7eb', fontSize: 13, fontWeight: 700 }}>{value}</span>
-      <button onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} style={{
-        width: 26, height: 28, border: 'none', background: 'transparent',
-        color: value >= max ? '#2d2d45' : '#9ca3af',
-        cursor: value >= max ? 'not-allowed' : 'pointer', fontSize: 16,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>›</button>
+    <div className="inline-flex items-center bg-white/[0.02] border border-white/5 rounded-xl overflow-hidden shadow-sm">
+      <button onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} 
+        className={`w-8 h-8 flex items-center justify-center border-none bg-transparent transition-colors ${
+          value <= min ? 'text-zinc-900' : 'text-zinc-600 hover:text-zinc-200 hover:bg-white/5 cursor-pointer'
+        } text-lg font-bold`}
+      >‹</button>
+      <span className="min-w-[2rem] text-center text-zinc-300 text-[11px] font-black font-mono">{value}</span>
+      <button onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} 
+        className={`w-8 h-8 flex items-center justify-center border-none bg-transparent transition-colors ${
+          value >= max ? 'text-zinc-900' : 'text-zinc-600 hover:text-zinc-200 hover:bg-white/5 cursor-pointer'
+        } text-lg font-bold`}
+      >›</button>
     </div>
   );
 }
@@ -150,18 +126,17 @@ export function NumStepper({ value, onChange, min = 1, max = 4 }) {
 export function Collapsible({ title, icon, children, defaultOpen = false, color }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ marginBottom: 6 }}>
-      <button onClick={() => setOpen((o) => !o)} style={{
-        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 6px',
-      }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#9ca3af', fontSize: 11, fontWeight: 700 }}>
-          {icon && React.cloneElement(icon, { style: { width: 11, height: 11, color: color || '#7c3aed' } })}
+    <div className="mb-2">
+      <button onClick={() => setOpen((o) => !o)} 
+        className="w-full flex items-center justify-between bg-none border-none cursor-pointer py-2 px-1 group"
+      >
+        <span className="flex items-center gap-3 text-zinc-500 group-hover:text-zinc-300 transition-colors text-[9px] font-black uppercase tracking-[0.4em] italic">
+          {icon && React.cloneElement(icon, { className: "w-3 h-3 transition-colors", style: { color: open ? (color || '#10b981') : '#3f3f46' } })}
           {title}
         </span>
-        {open ? <ChevronUp style={{ width: 12, height: 12, color: '#4b5563' }} /> : <ChevronDown style={{ width: 12, height: 12, color: '#4b5563' }} />}
+        <ChevronDown className={`w-3.5 h-3.5 text-zinc-800 transition-transform duration-500 ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div style={{ paddingBottom: 6 }}>{children}</div>}
+      {open && <div className="py-2">{children}</div>}
     </div>
   );
 }
@@ -171,30 +146,34 @@ const fmtDate = (d) => new Date(d).toLocaleString('hu-HU', { month: 'short', day
 
 export function HistoryCard({ item, isActive, onSelect, color }) {
   return (
-    <button onClick={() => onSelect(item)} style={{
-      width: '100%', textAlign: 'left', borderRadius: 12, padding: 10, cursor: 'pointer',
-      transition: 'all 0.15s',
-      background: isActive ? `${color}15` : 'rgba(255,255,255,0.025)',
-      border: `1px solid ${isActive ? color + '42' : 'rgba(255,255,255,0.06)'}`,
-    }}
-      onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-      onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.025)'; }}
+    <button onClick={() => onSelect(item)} 
+      className={`w-full text-left rounded-2xl p-2.5 cursor-pointer transition-all duration-500 relative overflow-hidden group/card ${
+        isActive 
+          ? 'bg-white/[0.04] border border-white/10 shadow-2xl' 
+          : 'bg-white/[0.01] border border-white/5 hover:bg-white/[0.03] hover:border-white/10'
+      }`}
     >
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-        <div style={{
-          width: 38, height: 38, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
-          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
+      <div className="flex gap-3 items-center relative z-10">
+        <div className={`w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-zinc-950 border border-white/5 flex items-center justify-center transition-transform duration-500 group-hover/card:scale-105`}>
           {item.thumbnail
-            ? <img src={item.thumbnail} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ fontSize: 16 }}>📦</span>}
+            ? <img src={item.thumbnail} alt="" className="w-full h-full object-cover" />
+            : <Box className="w-5 h-5 text-zinc-800" />}
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ color: '#d1d5db', fontSize: 11, fontWeight: 600, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.prompt}</p>
-          <p style={{ color: '#374151', fontSize: 9, margin: 0 }}>{fmtDate(item.ts)}</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-zinc-200 font-black text-[10px] uppercase tracking-tight truncate m-0 group-hover/card:text-white transition-colors">
+            {item.prompt || "Untitled Unit"}
+          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-zinc-700 font-black text-[8px] uppercase tracking-widest">{fmtDate(item.ts)}</span>
+            {isActive && <div className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: color || '#10b981' }} />}
+          </div>
         </div>
       </div>
+      
+      {/* Decorative pulse for active card */}
+      {isActive && (
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.02] to-transparent animate-[shimmer_2s_infinite]" />
+      )}
     </button>
   );
 }

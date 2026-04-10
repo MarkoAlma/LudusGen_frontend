@@ -25,6 +25,10 @@ export const BG_OPTIONS = [
     render: () => <div style={{ width: 14, height: 14, borderRadius: 3, background: '#111118', border: '1px solid rgba(255,255,255,0.1)' }} />,
   },
   {
+    id: 'grayish', label: 'Szürkés',
+    render: () => <div style={{ width: 14, height: 14, borderRadius: 3, background: '#24242e', border: '1px solid rgba(255,255,255,0.1)' }} />,
+  },
+  {
     id: 'white', label: 'Fehér',
     render: () => <div style={{ width: 14, height: 14, borderRadius: 3, background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} />,
   },

@@ -9,7 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { getCachedThumbnail } from "./Glbthumbnail";
-import { fetchGlbAsBlob } from "./utils";
+import { fetchModelData } from "./utils";
 
 const R = { sm: 5, md: 10, lg: 14 };
 
@@ -74,26 +74,37 @@ const HistoryCard = React.memo(function HistoryCard({
   useEffect(() => {
     if (!item?.model_url) return;
 
-    // GLTFLoader csak GLB/GLTF-et tud renderelni — FBX-re ne próbáljuk
-    const urlWithoutParams = item.model_url.split('?')[0];
-    const ext = urlWithoutParams.split('.').pop().toLowerCase();
-    if (!['glb', 'gltf'].includes(ext)) return;
-
+    // Try to render thumbnails for everything — Glbthumbnail will handle sniffing
     let cancelled = false;
     setThumbError(false);
     (async () => {
       setThumbLoading(true);
       try {
-        const blobUrl = await fetchGlbAsBlob(item.model_url, getIdToken);
-        if (cancelled || !blobUrl) return;
-        const thumb = await getCachedThumbnail(blobUrl, {
-          width: 280,
-          height: 280,
-        });
-        if (!cancelled) setThumbnail(thumb);
+        const data = await fetchModelData(item.model_url, getIdToken);
+        if (cancelled || !data) return;
+        
+        // Pass ArrayBuffer directly — no double-fetch needed
+        const thumb = await getCachedThumbnail(
+          data.buffer,
+          { width: 280, height: 280 },
+          item.model_url  // cache key
+        );
+        
+        // Revoke the blob URL since we don't need it for thumbnails
+        if (data.blobUrl) URL.revokeObjectURL(data.blobUrl);
+        
+        if (!cancelled) {
+          if (thumb) {
+            setThumbnail(thumb);
+          } else {
+            setThumbError(true);
+          }
+        }
       } catch (err) {
-        if (!cancelled) setThumbError(true);
-        console.warn("HistoryCard thumbnail hiba:", err?.message ?? err);
+        if (!cancelled) {
+          setThumbError(true);
+          console.error("[HistoryCard] thumbnail error:", err?.message, "URL:", item.model_url);
+        }
       } finally {
         if (!cancelled) setThumbLoading(false);
       }

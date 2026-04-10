@@ -7,7 +7,7 @@ import {
   Camera, Move3d, Layers, Play, Square, Clock,
   ChevronRight, ChevronLeft, Box, Zap, ChevronDown,
   Sparkles, Grid3x3, Scissors, PaintBucket,
-  Boxes, PersonStanding, Wand2,
+  Boxes, PersonStanding, Wand2, Activity,
 } from "lucide-react";
 
 import ThreeViewer from "../meshy/viewer/ThreeViewer";
@@ -28,6 +28,7 @@ import Segment from "./Segment";
 import Retopo from "./Retopo";
 import Texture from "./Texture";
 import Animate from "./Animate";
+import { motion, AnimatePresence } from "framer-motion";
 
 /* ─── constants ─────────────────────────────────────────────────────── */
 const PAGE_SIZE = 10;
@@ -63,21 +64,21 @@ const MODE_COST = {
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
   :root {
-    --bg-base: #0a0a12;
-    --bg-panel: #0f0f1e;
-    --bg-surface: #16162a;
-    --bg-raised: #1e1e36;
-    --accent: #7c6fff;
-    --accent-bright: #a08fff;
-    --accent-glow: rgba(124,111,255,0.35);
-    --text-primary: #f0f0ff;
-    --text-secondary: #a8a8cc;
-    --text-muted: #5a5a80;
-    --text-faint: #2e2e50;
-    --border: rgba(255,255,255,0.1);
-    --border-accent: rgba(124,111,255,0.4);
-    --error: #ff6b6b;
-    --success: #4fffb0;
+    --bg-base: #0a0a14;
+    --bg-panel: rgba(10, 10, 20, 0.4);
+    --bg-surface: rgba(255, 255, 255, 0.02);
+    --bg-raised: rgba(255, 255, 255, 0.04);
+    --accent: #8b5cf6;
+    --accent-bright: #a78bfa;
+    --accent-glow: rgba(139, 92, 246, 0.3);
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;
+    --text-muted: #475569;
+    --text-faint: #1e293b;
+    --border: rgba(255, 255, 255, 0.05);
+    --border-accent: rgba(139, 92, 246, 0.3);
+    --error: #ef4444;
+    --success: #10b981;
   }
   @keyframes spin   { to { transform: rotate(360deg); } }
   @keyframes fadeUp { from { opacity:0;transform:translateY(6px) } to { opacity:1;transform:none } }
@@ -113,9 +114,9 @@ const CSS = `
   .tp-inp-tab.active { background:#ffffff;box-shadow:0 1px 6px rgba(0,0,0,0.35); }
   .tp-qual-btn { flex:1;padding:10px 4px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all 0.14s;display:flex;align-items:center;justify-content:center;gap:5px;font-family:inherit; }
   .tp-gen-btn { width:100%;padding:16px 0;border-radius:13px;font-size:15px;font-weight:800;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:0.03em;transition:all 0.2s;font-family:inherit; }
-  .tp-gen-btn.go { background:linear-gradient(135deg,#ffe066,#f5a623);color:#0a0500;box-shadow:0 4px 28px rgba(245,166,35,0.45); }
-  .tp-gen-btn.go:hover { box-shadow:0 6px 36px rgba(245,166,35,0.6);transform:translateY(-2px); }
-  .tp-gen-btn.no { background:var(--bg-raised);color:var(--text-muted);cursor:not-allowed;border:1px solid var(--border); }
+  .tp-gen-btn.go { background: var(--accent); color:#ffffff; box-shadow:0 15px 45px rgba(139, 92, 246, 0.3); }
+  .tp-gen-btn.go:hover { box-shadow:0 20px 60px rgba(139, 92, 246, 0.45); transform:translateY(-2px) scale(1.02); }
+  .tp-gen-btn.no { background:rgba(255,255,255,0.03); color:var(--text-muted); cursor:not-allowed; border:1px solid var(--border); }
   .tp-model-card { padding:11px 12px;border-radius:10px;background:var(--bg-raised);border:1px solid var(--border);cursor:pointer;transition:all 0.13s;margin-bottom:5px; }
   .tp-model-card.sel { background:rgba(124,111,255,0.14);border-color:var(--border-accent);box-shadow:0 0 0 1px rgba(124,111,255,0.2); }
   .tp-model-card:hover:not(.sel) { background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.2); }
@@ -349,14 +350,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   // ── Weekly history cleanup ───────────────────────────────────────────────
   // Runs once per session (not per component mount) to prune expired items.
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !getIdToken) return;
     const CLEANUP_KEY = "tripo_history_cleanup_ts";
     const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
     const last = parseInt(localStorage.getItem(CLEANUP_KEY) || "0", 10);
     if (Date.now() - last < WEEK_MS) return; // already ran this week
     (async () => {
       try {
-        const t = getIdToken ? await getIdToken() : "";
+        const t = await getIdToken();
+        if (!t) return; // no token yet — skip cleanup, will retry next session
         const res = await fetch(BASE_URL + "/api/tripo/history/expired", {
           method: "DELETE",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + t },
@@ -366,11 +368,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
           const d = await res.json();
           if (d.deleted > 0) console.log(`[TripoPanel] Cleaned up ${d.deleted} expired history items`);
         }
+        // 401/403 = token not valid yet, silently skip
       } catch (e) {
-        console.warn("[TripoPanel] History cleanup failed:", e.message);
+        // Network error — non-critical, skip silently
       }
     })();
-  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId, getIdToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const leftWRef  = useRef(302);
   const rightWRef = useRef(220);
@@ -454,6 +457,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     if (!d.success) throw new Error(d.message);
     return d.imageToken;
   }, [getIdToken]);
+
+  const handleMultiImg = uploadImageFile;
+  const handleBatchImg = uploadImageFile;
 
   const pollTask = useCallback(async (taskId, pt, headers, onSuccess) => {
     let n = 0, prevProgress = 0, stuckSince = null;
@@ -892,127 +898,76 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   }, [dlItem, revokeBlobUrl]);
 
   return (
-    <>
-      <style>{CSS}</style>
-      <div style={{ display: "flex", height: "100%", overflow: "hidden", fontFamily: "'DM Sans',-apple-system,sans-serif", background: "var(--bg-base)" }}>
+    <div className="flex h-full bg-[#0a0a14] text-white overflow-hidden relative selection:bg-primary/30">
+        <style dangerouslySetInnerHTML={{ __html: CSS }} />
+        
+        {/* Cinematic Background Layer removed for 3D modeling focus */}
 
-        {/* ── NAV ── */}
-        <div style={{ width: 58, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", background: "var(--bg-panel)", borderRight: "1px solid var(--border)", paddingTop: 8, overflowY: "auto" }} className="tp-scroll">
-          {NAV.map(n => (
-            <button key={n.id} className={"tp-nav-btn" + (mode === n.id ? " active" : "")} onClick={() => { setMode(n.id); setErrorMsg(""); }}>
-              <div className="ico"><n.icon style={{ width: 17, height: 17, color: mode === n.id ? "#a5a0ff" : "#2d2d48" }} /></div>
-              <span className="lbl">{n.label}</span>
-              {n.sub && <ChevronDown style={{ width: 8, height: 8, color: mode === n.id ? "#4a4a68" : "#1a1a30", marginTop: -2 }} />}
-            </button>
-          ))}
-        </div>
-
-        {/* ── LEFT PANEL ── */}
-        <div style={{ width: leftOpen ? leftW : 0, minWidth: 0, flexShrink: 0, overflow: "hidden", transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)", display: "flex", flexDirection: "column", background: "var(--bg-panel)", borderRight: "1px solid var(--border)" }}>
-          <div style={{ width: leftW, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-            <div style={{ padding: "16px 18px 12px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: mode === "segment" ? 10 : 0 }}>
-                {mode === "generate"     && <Sparkles      style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "segment"      && <Scissors      style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "fill_parts"   && <Boxes         style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "retopo"       && <Grid3x3       style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "texture"      && <PaintBucket   style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "texture_edit" && <Wand2         style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                {mode === "animate"      && <PersonStanding style={{ width: 14, height: 14, color: "#6c63ff" }} />}
-                <span style={{ color: "var(--text-primary)", fontSize: 14, fontWeight: 700 }}>{modeTitle}</span>
-              </div>
-              {mode === "segment" && (
-                <div style={{ display: "flex", gap: 3 }}>
-                  {SEGMENT_SUBS.map(t => (
-                    <button key={t.id} className={"tp-sub-tab" + (segSub === t.id ? " on" : "")} onClick={() => setSegSub(t.id)}>{t.label}</button>
-                  ))}
-                </div>
-              )}
+        {/* ── LEFT: Tools ── */}
+        <div className="" style={{ width: leftOpen ? leftW : 0, minWidth: 0, flexShrink: 0, overflow: "hidden", transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)", display: "flex", flexDirection: "column", background: "rgba(3,0,10,0.2)", backdropFilter: "blur(60px)", borderRight: "1px solid var(--border)", position: "relative", zIndex: 10 }}>
+          <div className="pt-20 lg:pt-24" style={{ width: leftW, display: "flex", flex: 1, overflow: "hidden" }}>
+            {/* Narrow icon nav */}
+            <div style={{ width: 62, flexShrink: 0, borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", background: "rgba(0,0,0,0.2)" }}>
+              {NAV.map(n => {
+                const Icon = n.icon;
+                const isN = modelVer !== "P1-20260311" && !modelVer.startsWith("v3.");
+                const actsAsN = isN && (n.id === "segment" || n.id === "texture_edit" || n.id === "retopo");
+                return (
+                  <Tooltip key={n.id} text={n.label + (actsAsN ? " (Not supported by Model V1/V2)" : "")} side="right">
+                    <button onClick={() => !actsAsN && setMode(n.id)} className={"tp-nav-btn" + (mode === n.id ? " active" : "") + (actsAsN ? " model-na" : "")}>
+                      <div className="ico"><Icon style={{ width: 18, height: 18, color: mode === n.id ? "var(--accent-bright)" : "var(--text-muted)" }} /></div>
+                      <span className="lbl">{n.label}</span>
+                    </button>
+                  </Tooltip>
+                );
+              })}
             </div>
-
-            <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }} className="tp-scroll">
-              <div style={{ padding: "16px 18px" }}>
-                {mode === "generate" && (
-                  <GeneratePanel
-                    genTab={genTab} setGenTab={setGenTab}
-                    prompt={prompt} setPrompt={setPrompt}
-                    makeBetter={makeBetter} setMakeBetter={setMakeBetter}
-                    imgPrev={imgPrev} imgToken={imgToken}
-                    imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef}
-                    multiImages={multiImages} setMultiImages={setMultiImages}
-                    batchImages={batchImages} setBatchImages={setBatchImages}
-                    meshQ={meshQ} setMeshQ={setMeshQ}
-                    inParts={inParts} setInParts={setInParts}
-                    privacy={privacy} setPrivacy={setPrivacy}
-                    texOn={texOn} setTexOn={setTexOn}
-                    negPrompt={negPrompt} setNegPrompt={setNegPrompt}
-                    tPose={tPose} setTPose={setTPose}
-                    modelSeed={modelSeed} setModelSeed={setModelSeed}
-                    textureSeed={textureSeed} setTextureSeed={setTextureSeed}
-                    imageSeed={imageSeed} setImageSeed={setImageSeed}
-                    autoSize={autoSize} setAutoSize={setAutoSize}
-                    exportUv={exportUv} setExportUv={setExportUv}
-                    tex4K={tex4K} setTex4K={setTex4K}
-                    pbrOn={pbrOn} setPbrOn={setPbrOn}
-                    quadMesh={quadMesh} setQuadMesh={setQuadMesh}
-                    smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly}
-                    polycount={polycount} setPolycount={setPolycount}
-                    modelVer={modelVer} setModelVer={setModelVer}
-                    isRunning={isRunning} canGen={canGen}
-                    handleGen={handleGen} setErrorMsg={setErrorMsg}
-                    handleMultiImg={uploadImageFile}
-                    handleBatchImg={uploadImageFile}
-                    getIdToken={getIdToken}
-                    backendCaps={backendCaps}
-                  />
-                )}
-                {(mode === "segment" || mode === "fill_parts") && (
-                  <Segment segSub={mode === "fill_parts" ? "fill_parts" : segSub} activeTaskId={activeTaskId} isRiggedInput={isRiggedInput} />
-                )}
-                {mode === "retopo" && (
-                  <Retopo activeTaskId={activeTaskId} quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} isRiggedInput={isRiggedInput} />
-                )}
-                {(mode === "texture" || mode === "texture_edit") && (
-                  <Texture mode={mode} activeTaskId={activeTaskId} texInputTab={texInputTab} setTexInputTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt} imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} multiImages={multiImages} setMultiImages={setMultiImages} tex4K={tex4K} setTex4K={setTex4K} pbrOn={texPbr} setPbrOn={setTexPbr} texAlignment={texAlignment} setTexAlignment={setTexAlignment} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} />
-                )}
-                {mode === "animate" && (
-                  <Animate activeTaskId={activeTaskId} animId={animId} rigStep={rigStep} handleAutoRig={handleAutoRig} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} filtAnims={filtAnims} />
-                )}
-                {errorMsg && (
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "9px 12px", borderRadius: 10, background: "rgba(255,80,80,0.12)", border: "1px solid rgba(255,80,80,0.35)", marginTop: 12 }}>
-                    <AlertCircle style={{ width: 13, height: 13, color: "#f87171", flexShrink: 0, marginTop: 1 }} />
-                    <p style={{ color: "#ffb3b3", fontSize: 11, margin: 0, lineHeight: 1.55 }}>{errorMsg}</p>
-                  </div>
-                )}
-                <div style={{ height: 12 }} />
+            {/* Tool settings */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "rgba(255,255,255,0.01)" }}>
+              <div style={{ padding: "16px 16px 12px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 900, letterSpacing: "0.1em", textTransform: "uppercase", color: "#fff", display: "flex", alignItems: "center", gap: 8, fontStyle: "italic" }}>
+                   <Activity className="w-4 h-4 text-primary opacity-50" />
+                   {modeTitle}
+                </h3>
               </div>
-            </div>
-
-            <div style={{ padding: "12px 16px 16px", borderTop: "1px solid var(--border)", flexShrink: 0 }}>
+              <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px" }} className="tp-scroll">
+                {mode === "generate" && <GeneratePanel genTab={genTab} setGenTab={setGenTab} modelVer={modelVer} setModelVer={setModelVer} prompt={prompt} setPrompt={setPrompt} negPrompt={negPrompt} setNegPrompt={setNegPrompt} makeBetter={makeBetter} setMakeBetter={setMakeBetter} imgPrev={imgPrev} setImgPrev={setImgPrev} imgUploading={imgUploading} handleImg={handleImg} meshQ={meshQ} setMeshQ={setMeshQ} inParts={inParts} setInParts={setInParts} privacy={privacy} setPrivacy={setPrivacy} texOn={texOn} setTexOn={setTexOn} tex4K={tex4K} setTex4K={setTex4K} pbrOn={pbrOn} setPbrOn={setPbrOn} polycount={polycount} setPolycount={setPolycount} quadMesh={quadMesh} setQuadMesh={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} tPose={tPose} setTPose={setTPose} modelSeed={modelSeed} setModelSeed={setModelSeed} textureSeed={textureSeed} setTextureSeed={setTextureSeed} imageSeed={imageSeed} setImageSeed={setImageSeed} autoSize={autoSize} setAutoSize={setAutoSize} exportUv={exportUv} setExportUv={setExportUv} multiImages={multiImages} setMultiImages={setMultiImages} batchImages={batchImages} setBatchImages={setBatchImages} handleMultiImg={handleMultiImg} handleBatchImg={handleBatchImg} getIdToken={getIdToken} backendCaps={backendCaps} color={color} isRunning={isRunning} handleGen={handleGen} setErrorMsg={setErrorMsg} />}
+                {(mode === "segment" || mode === "fill_parts") && <Segment segSub={mode === "fill_parts" ? "fill_parts" : segSub} activeTaskId={activeTaskId} isRiggedInput={isRiggedInput} color={color} />}
+                {mode === "retopo"   && <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={color} />}
+                {mode === "texture"  && <Texture mode={mode} activeTaskId={activeTaskId} texInputTab={texInputTab} setTexInputTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt} imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} multiImages={multiImages} setMultiImages={setMultiImages} tex4K={tex4K} setTex4K={setTex4K} pbrOn={texPbr} setPbrOn={setTexPbr} texAlignment={texAlignment} setTexAlignment={setTexAlignment} color={color} />}
+                {mode === "texture_edit" && <Texture mode={mode} activeTaskId={activeTaskId} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} color={color} />}
+                {mode === "animate" && <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} handleAutoRig={handleAutoRig} color={color} />}
+              </div>
+              <div style={{ padding: "20px 16px 24px", borderTop: "1px solid var(--border)", background: "rgba(0,0,0,0.2)" }}>
               {isRunning ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div className="fade-up">
+                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <Loader2 style={{ width: 14, height: 14, color: "var(--accent-bright)" }} className="anim-spin" />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent-bright)", letterSpacing: "0.05em", textTransform: "uppercase" }}>{progress}% Complete</span>
+                    </div>
+                  </div>
                   <PBar value={progress} />
-                  {statusMsg && <p style={{ color: "var(--text-secondary)", fontSize: 11, margin: 0, textAlign: "center", fontFamily: "monospace", fontWeight: 500 }}>{statusMsg}</p>}
-                  <button onClick={handleStop} style={{ width: "100%", padding: "12px 0", borderRadius: 11, fontSize: 13, fontWeight: 600, color: "#fca5a5", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", border: "none", background: "rgba(239,68,68,0.09)", outline: "1.5px solid rgba(239,68,68,0.2)", fontFamily: "inherit" }}>
-                    <Square style={{ width: 12, height: 12 }} /> Stop
+                  <button className="tp-gen-btn" onClick={handleStop} style={{ height: 42, background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", color: "#ef4444", marginTop: 14, fontSize: 13 }}>
+                    Terminálás
                   </button>
                 </div>
               ) : (
                 <>
-                  <button className={"tp-gen-btn" + (canGen ? " go" : " no")} onClick={handleGen} disabled={!canGen}>
+                  <button className={"tp-gen-btn" + (canGen ? " go" : " no")} onClick={handleGen} disabled={!canGen} style={{ height: 58, borderRadius: 20 }}>
                     {genLabel}
                     {canGen && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 4, paddingLeft: 8, borderLeft: "1px solid rgba(0,0,0,0.2)" }}>
-                        <CoinIcon size={16} /><span style={{ fontSize: 14, fontWeight: 800 }}>{genCost}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 12, paddingLeft: 12, borderLeft: "1px solid rgba(255,255,255,0.2)" }}>
+                        <CoinIcon size={16} /><span style={{ fontSize: 16, fontWeight: 900 }}>{genCost}</span>
                       </div>
                     )}
                   </button>
                   {modelUrl && !isRunning && (
                     <button onClick={() => { setDlItem(null); setDlOpen(true); }}
-                      style={{ width: "100%", marginTop: 7, padding: "9px 0", borderRadius: 9, fontSize: 11, fontWeight: 600, color: "#4a4a68", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, cursor: "pointer", border: "1.5px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.025)", fontFamily: "inherit", transition: "all 0.14s" }}
-                      onMouseEnter={e => { e.currentTarget.style.color = "#8a8aaa"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = "#4a4a68"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}>
-                      <Download style={{ width: 11, height: 11 }} /> Download
+                      style={{ width: "100%", marginTop: 10, padding: "12px 0", borderRadius: 12, fontSize: 11, fontWeight: 800, color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, cursor: "pointer", border: "1px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.02)", fontFamily: "inherit", transition: "all 0.14s", textTransform: "uppercase", letterSpacing: "0.05em" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "#94a3b8"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)"; }}>
+                      <Download style={{ width: 13, height: 13 }} /> Export Engine
                     </button>
                   )}
                 </>
@@ -1020,6 +975,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
             </div>
           </div>
         </div>
+      </div>
 
         {/* Left handle */}
         <div className="tp-handle" onMouseDown={startDrag("left")}>
@@ -1028,77 +984,96 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
           </div>
         </div>
 
-        {/* ── CENTER ── */}
-        <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "var(--bg-base)", position: "relative" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", height: 40, flexShrink: 0, borderBottom: "1px solid var(--border)", background: "rgba(12,12,24,0.98)", gap: 12, overflowX: "auto" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-              {!leftOpen && <button onClick={() => setLeftOpen(true)} style={{ width: 24, height: 24, borderRadius: 6, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.05)", color: "#2d2d48", marginRight: 4 }}><ChevronRight style={{ width: 11, height: 11 }} /></button>}
-              <span style={{ color: "#1a1a30", fontSize: 9, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "monospace", marginRight: 3 }}>View</span>
+        {/* ── CENTER: Viewport ── */}
+        <main className="pt-20 lg:pt-24" style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "transparent", position: "relative", zIndex: 1, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", height: 48, flexShrink: 0, borderBottom: "1px solid var(--border)", background: "rgba(10,10,20,0.8)", backdropFilter: "blur(40px)", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              {!leftOpen && <button onClick={() => setLeftOpen(true)} style={{ width: 28, height: 28, borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.03)", color: "#fff", marginRight: 8 }}><ChevronRight style={{ width: 13, height: 13 }} /></button>}
+              <span style={{ color: "rgba(255,255,255,0.15)", fontSize: 10, fontWeight: 900, letterSpacing: "0.2em", textTransform: "uppercase", marginRight: 6 }}>View</span>
               {VIEW_MODES.map(v => (
                 <Tooltip key={v.id} text={v.tip} side="bottom">
-                  <button onClick={() => setViewMode(v.id)} style={{ padding: "3px 9px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer", border: "none", background: viewMode === v.id ? "rgba(108,99,255,0.18)" : "rgba(255,255,255,0.03)", color: viewMode === v.id ? "#a5a0ff" : "#2d2d48", outline: viewMode === v.id ? "1px solid rgba(108,99,255,0.38)" : "1px solid rgba(255,255,255,0.06)", whiteSpace: "nowrap", flexShrink: 0 }}>{v.label}</button>
+                  <button onClick={() => setViewMode(v.id)} style={{ padding: "5px 12px", borderRadius: "10px", fontSize: 10, fontWeight: 900, cursor: "pointer", border: "none", background: viewMode === v.id ? "rgba(139, 92, 246, 0.15)" : "transparent", color: viewMode === v.id ? "var(--accent-bright)" : "#475569", outline: viewMode === v.id ? "1px solid rgba(139, 92, 246, 0.3)" : "none", whiteSpace: "nowrap", flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.05em", transition: "all 0.2s" }}>{v.label}</button>
                 </Tooltip>
               ))}
               {modelUrl && <WireframeControl active={wireOv} onToggle={() => setWireOv(v => !v)} opacity={wireOp} onOpacityChange={setWireOp} color={wireC} onColorChange={setWireC} accentColor={color} />}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
               <BgColorPicker value={bgColor} onChange={setBgColor} />
-              <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.06)" }} />
+              <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.05)" }} />
               <LightingControls viewMode={viewMode} lightMode={lightMode} setLightMode={setLightMode} lightStrength={lStr} setLightStrength={setLStr} lightRotation={lRot} setLightRotation={setLRot} lightAutoRotate={lAutoR} setLightAutoRotate={setLAutoR} lightAutoRotateSpeed={lAutoS} setLightAutoRotateSpeed={setLAutoS} dramaticColor={dramC} setDramaticColor={setDramC} gridColor1={gc1} setGridColor1={setGc1} gridColor2={gc2} setGridColor2={setGc2} color={color} />
-              <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.06)" }} />
-              <IconBtn icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h6v6h-6z" /></svg>} tip="Grid" active={showGrid} color={color} onClick={() => setShowGrid(v => !v)} />
-              {!rightOpen && <button onClick={() => setRightOpen(true)} style={{ width: 24, height: 24, borderRadius: 6, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.04)", color: "#2d2d48" }}><ChevronLeft style={{ width: 11, height: 11 }} /></button>}
+              <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.05)" }} />
+              <IconBtn icon={<Grid3x3 className="w-4 h-4" />} tip="Grid" active={showGrid} color={color} onClick={() => setShowGrid(v => !v)} />
+              {!rightOpen && <button onClick={() => setRightOpen(true)} style={{ width: 28, height: 28, borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.03)", color: "#fff" }}><ChevronLeft style={{ width: 13, height: 13 }} /></button>}
             </div>
           </div>
 
           <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
             <ThreeViewer color={color} viewMode={viewMode} lightMode={lightMode} showGrid={showGrid} modelUrl={modelUrl} lightStrength={lStr} lightRotation={lRot} lightAutoRotate={lAutoR} lightAutoRotateSpeed={lAutoS} dramaticColor={dramC} wireframeOverlay={wireOv} wireOpacity={wireOp} wireHexColor={wireHex} autoSpin={autoSpin} bgColor={bgColor} gridColor1={gc1} gridColor2={gc2} onSpinStop={() => setAutoSpin(false)} onReady={s => { sceneRef.current = s; }} />
-            {(histLoad || (loadingId && !isRunning)) && (
-              <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(9,9,18,0.72)", backdropFilter: "blur(12px)" }}>
-                <Loader2 style={{ width: 22, height: 22, color: "#6c63ff", marginBottom: 10 }} className="anim-spin" />
-                <p style={{ color: "#22223a", fontSize: 10, margin: 0, fontFamily: "monospace" }}>{histLoad ? "Loading history…" : "Loading model…"}</p>
-              </div>
-            )}
-            {isRunning && (
-              <div style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(3,3,12,0.94)", backdropFilter: "blur(20px)", pointerEvents: "none" }}>
-                <div style={{ width: 72, height: 72, borderRadius: 20, marginBottom: 22, background: "rgba(108,99,255,0.1)", border: "1.5px solid rgba(108,99,255,0.22)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 40px rgba(108,99,255,0.16)" }}>
-                  <Sparkles style={{ width: 28, height: 28, color: "#8b7fff" }} />
-                </div>
-                <p style={{ color: "#e8e8f4", fontWeight: 700, fontSize: 15, margin: "0 0 6px" }}>{genLabel}…</p>
-                {statusMsg && <p style={{ color: "#2d2d48", fontSize: 11, margin: "0 0 14px", fontFamily: "monospace" }}>{statusMsg}</p>}
-                <div style={{ width: 220 }}><PBar value={progress} /></div>
-                <p style={{ color: "#6c63ff", fontSize: 13, fontWeight: 700, margin: "8px 0 0", fontFamily: "monospace", letterSpacing: "0.05em" }}>{progress}%</p>
-              </div>
-            )}
+            
+            {/* Loading / Status Overlays with vertical blending sync */}
+            <AnimatePresence>
+              {(histLoad || (loadingId && !isRunning)) && (
+                <motion.div 
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(3,0,10,0.4)", backdropFilter: "blur(30px)" }}
+                >
+                  <Loader2 style={{ width: 32, height: 32, color: "var(--accent)", marginBottom: 16 }} className="anim-spin" />
+                  <p style={{ color: "#fff", fontSize: 11, fontWeight: 900, margin: 0, textTransform: "uppercase", letterSpacing: "0.2em", fontStyle: "italic" }}>
+                    {histLoad ? "Synchronizing Archive" : "Fetching Neural Mesh"}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {isRunning && (
+                <motion.div 
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  style={{ position: "absolute", inset: 0, zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(3,0,10,0.6)", backdropFilter: "blur(40px)", pointerEvents: "none" }}
+                >
+                  <div style={{ width: 100, height: 100, borderRadius: 32, marginBottom: 28, background: "rgba(139, 92, 246, 0.1)", border: "1.5px solid rgba(139, 92, 246, 0.2)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 50px rgba(139, 92, 246, 0.2)" }}>
+                    <Sparkles style={{ width: 40, height: 40, color: "var(--accent-bright)", filter: "drop-shadow(0 0 10px rgba(139, 92, 246, 0.5))" }} className="animate-pulse" />
+                  </div>
+                  <h2 style={{ color: "#fff", fontWeight: 900, fontSize: 28, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "-0.02em", fontStyle: "italic" }}>3D Forge Active</h2>
+                  {statusMsg && <p style={{ color: "var(--accent-bright)", fontSize: 10, margin: "0 0 20px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.3em", opacity: 0.6 }}>{statusMsg}</p>}
+                  <div style={{ width: 280 }}><PBar value={progress} /></div>
+                  <p style={{ color: "#fff", fontSize: 16, fontWeight: 900, margin: "12px 0 0", fontFamily: "monospace", letterSpacing: "0.1em" }}>{progress}%</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {!isRunning && !modelUrl && !histLoad && !loadingId && (
-              <div style={{ position: "absolute", inset: 0, zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                <div style={{ width: 72, height: 72, borderRadius: 20, marginBottom: 18, background: "rgba(108,99,255,0.04)", border: "1px solid rgba(108,99,255,0.09)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Box style={{ width: 30, height: 30, color: "rgba(108,99,255,0.18)" }} />
+              <div style={{ position: "absolute", inset: 0, zIndex: 5, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                <div style={{ textAlign: "center", opacity: 0.2 }}>
+                   <div style={{ width: 120, height: 120, borderRadius: 40, marginBottom: 24, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
+                     <Box style={{ width: 48, height: 48, color: "#fff" }} />
+                   </div>
+                   <h3 style={{ color: "#fff", fontSize: 18, fontWeight: 900, margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.4em", fontStyle: "italic" }}>Forge Foundry</h3>
+                   <p style={{ color: "#fff", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.2em", opacity: 0.5 }}>Neural 3D Engine v4.0</p>
                 </div>
-                <p style={{ color: "var(--text-muted)", fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>Tripo3D Studio</p>
-                <p style={{ color: "#0e0e22", fontSize: 10, fontFamily: "monospace" }}>{genLabel}</p>
               </div>
             )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 14px", height: 40, flexShrink: 0, borderTop: "1px solid var(--border)", background: "rgba(12,12,24,0.98)", overflowX: "auto", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-              <span style={{ color: "#1a1a30", fontSize: 9, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", fontFamily: "monospace", marginRight: 2 }}>Camera</span>
-              <IconBtn icon={<RotateCcw />} tip="Reset" onClick={() => camP("reset")} />
-              <IconBtn icon={<Camera />}    tip="Front" onClick={() => camP("front")} />
-              <IconBtn icon={<Move3d />}    tip="Side"  onClick={() => camP("side")}  />
-              <IconBtn icon={<Layers />}    tip="Top"   onClick={() => camP("top")}   />
-              <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.06)", margin: "0 4px" }} />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", height: 48, flexShrink: 0, borderTop: "1px solid var(--border)", background: "rgba(3,0,10,0.6)", backdropFilter: "blur(40px)", overflowX: "auto", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span style={{ color: "rgba(255,255,255,0.15)", fontSize: 10, fontWeight: 900, letterSpacing: "0.2em", textTransform: "uppercase", marginRight: 6 }}>Camera</span>
+              <IconBtn icon={<RotateCcw className="w-4 h-4" />} tip="Reset" onClick={() => camP("reset")} />
+              <IconBtn icon={<Camera className="w-4 h-4" />}    tip="Front" onClick={() => camP("front")} />
+              <IconBtn icon={<Move3d className="w-4 h-4" />}    tip="Side"  onClick={() => camP("side")}  />
+              <IconBtn icon={<Layers className="w-4 h-4" />}    tip="Top"   onClick={() => camP("top")}   />
+              <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.05)", margin: "0 8px" }} />
               <button onClick={() => setAutoSpin(v => !v)}
-                style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 9px", borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: "pointer", border: "none", background: autoSpin ? "rgba(108,99,255,0.18)" : "rgba(255,255,255,0.03)", color: autoSpin ? "var(--accent-bright)" : "var(--text-muted)", outline: autoSpin ? "1px solid var(--border-accent)" : "1px solid var(--border)", fontFamily: "inherit" }}>
-                {autoSpin ? <Square style={{ width: 9, height: 9 }} /> : <Play style={{ width: 9, height: 9 }} />} Auto-spin
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 14px", borderRadius: 10, fontSize: 10, fontWeight: 900, cursor: "pointer", border: "none", background: autoSpin ? "rgba(139, 92, 246, 0.15)" : "transparent", color: autoSpin ? "var(--accent-bright)" : "#475569", outline: autoSpin ? "1px solid var(--border-accent)" : "1px solid var(--border)", textTransform: "uppercase", letterSpacing: "0.05em", transition: "all 0.2s" }}>
+                {autoSpin ? <Square style={{ width: 10, height: 10, fill: "currentColor" }} /> : <Play style={{ width: 10, height: 10, fill: "currentColor" }} />} Auto-spin
               </button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
               {modelUrl && (
                 <button onClick={() => { setDlItem(null); setDlOpen(true); }}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700, color: "#fff", background: "linear-gradient(135deg,var(--accent),var(--accent-bright))", border: "none", cursor: "pointer", boxShadow: "0 2px 18px var(--accent-glow)", fontFamily: "inherit" }}>
-                  <Download style={{ width: 11, height: 11 }} /> Download
+                  className="group"
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 20px", borderRadius: 12, fontSize: 11, fontWeight: 900, color: "#fff", background: "var(--accent)", border: "none", cursor: "pointer", boxShadow: "0 10px 40px rgba(139, 92, 246, 0.4)", textTransform: "uppercase", letterSpacing: "0.05em", transition: "all 0.3s" }}>
+                  <Download style={{ width: 13, height: 13 }} className="group-hover:-translate-y-0.5 transition-transform" /> Production Export
                 </button>
               )}
             </div>
@@ -1112,29 +1087,29 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
           </div>
         </div>
 
-        {/* ── RIGHT: History ── */}
-        <div style={{ width: rightOpen ? rightW : 0, minWidth: 0, flexShrink: 0, overflow: "hidden", transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)", display: "flex", flexDirection: "column", background: "var(--bg-panel)", borderLeft: "1px solid var(--border)" }}>
-          <div style={{ width: rightW, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-            <div style={{ padding: "12px 12px 10px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 9 }}>
-                <Clock style={{ width: 11, height: 11, color: "#2d2d48" }} />
-                <span style={{ color: "var(--text-secondary)", fontSize: 12, fontWeight: 700 }}>History</span>
-                <span style={{ marginLeft: "auto", fontSize: 9, fontWeight: 700, padding: "1px 7px", borderRadius: 99, background: "rgba(124,111,255,0.15)", color: "var(--accent-bright)", border: "1px solid var(--border-accent)", fontFamily: "monospace" }}>{history.length}{hasMore ? "+" : ""}</span>
+        {/* ── RIGHT: Archive ── */}
+        <div className="" style={{ width: rightOpen ? rightW : 0, minWidth: 0, flexShrink: 0, overflow: "hidden", transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)", display: "flex", flexDirection: "column", background: "rgba(3,0,10,0.2)", backdropFilter: "blur(60px)", borderLeft: "1px solid var(--border)", position: "relative", zIndex: 10 }}>
+          <div className="pt-20 lg:pt-24" style={{ width: rightW, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+            <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <Clock className="w-4 h-4 text-primary opacity-50" />
+                <span style={{ color: "#fff", fontSize: 12, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.1em", fontStyle: "italic" }}>Archive</span>
+                <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 900, padding: "2px 10px", borderRadius: 99, background: "rgba(139, 92, 246, 0.1)", color: "var(--accent-bright)", border: "1px solid var(--border-accent)", fontFamily: "monospace" }}>{history.length}{hasMore ? "+" : ""}</span>
               </div>
-              <input placeholder="Search…" value={histQ} onChange={e => setHistQ(e.target.value)} className="tp-input" style={{ fontSize: 11 }}
-                onFocus={e => e.target.style.borderColor = "rgba(108,99,255,0.45)"}
-                onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.09)"} />
+              <div className="relative">
+                 <input placeholder="Neural search..." value={histQ} onChange={e => setHistQ(e.target.value)} className="tp-input" style={{ fontSize: 11, paddingRight: 32, height: 40, borderRadius: 12, border: "1px solid var(--border)" }} />
+              </div>
             </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 4 }} className="tp-scroll">
-              {histLoad && <div style={{ display: "flex", justifyContent: "center", padding: 20 }}><Loader2 style={{ width: 14, height: 14, color: "#1e1e38" }} className="anim-spin" /></div>}
+            <div style={{ flex: 1, overflowY: "auto", padding: "12px 12px", display: "flex", flexDirection: "column", gap: 6 }} className="tp-scroll">
+              {histLoad && <div style={{ display: "flex", justifyContent: "center", padding: 32 }}><Loader2 style={{ width: 24, height: 24, color: "var(--accent)" }} className="anim-spin" /></div>}
               {!histLoad && filtHist.length === 0 && (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 130, gap: 8 }}>
-                  <Box style={{ width: 20, height: 20, color: "#111128" }} />
-                  <p style={{ color: "#14142a", fontSize: 10, margin: 0 }}>{histQ ? "No results" : "No saved models yet"}</p>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 200, gap: 12, opacity: 0.3 }}>
+                  <Box style={{ width: 32, height: 32, color: "#fff" }} />
+                  <p style={{ color: "#fff", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em" }}>{histQ ? "Zero matches" : "Empty Archive"}</p>
                 </div>
               )}
               {filtHist.map((item, idx) => (
-                <div key={item.id} style={{ animationDelay: (Math.min(idx, 4) * 0.04) + "s" }} className="fade-up">
+                <div key={item.id} style={{ animationDelay: (Math.min(idx, 6) * 0.04) + "s" }} className="fade-up">
                   <HistoryCard
                     item={item} isActive={activeH?.id === item.id} isLoading={loadingId === item.id}
                     disabled={loadingId !== null} onSelect={selHist} onReuse={reuse}
@@ -1148,30 +1123,58 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
                 </div>
               ))}
               {!histQ && hasMore && (
-                <button onClick={loadMore} disabled={moreLoad}
-                  style={{ width: "100%", padding: "8px 0", borderRadius: 8, fontSize: 9, fontWeight: 600, color: moreLoad ? "#1e1e38" : "#2d2d48", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", cursor: moreLoad ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, fontFamily: "monospace" }}>
-                  {moreLoad ? <><Loader2 style={{ width: 9, height: 9 }} className="anim-spin" />Loading…</> : <><ChevronDown style={{ width: 9, height: 9 }} />Load more</>}
+                <button 
+                  onClick={loadMore} 
+                  disabled={moreLoad}
+                  style={{ 
+                    width: "100%", 
+                    padding: "12px 0", 
+                    borderRadius: 12, 
+                    fontSize: 10, 
+                    fontWeight: 900, 
+                    color: "#94a3b8", 
+                    background: "rgba(255,255,255,0.02)", 
+                    border: "1px solid var(--border)", 
+                    cursor: moreLoad ? "not-allowed" : "pointer", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center", 
+                    gap: 7, 
+                    textTransform: "uppercase", 
+                    letterSpacing: "0.05em" 
+                  }}
+                >
+                  {moreLoad ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Loader2 style={{ width: 12, height: 12 }} className="anim-spin" />
+                      <span>Processing…</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <ChevronDown style={{ width: 12, height: 12 }} />
+                      <span>More Records</span>
+                    </div>
+                  )}
                 </button>
               )}
-              {!histQ && !hasMore && history.length > 0 && <p style={{ textAlign: "center", fontSize: 8, color: "#0e0e22", fontFamily: "monospace", padding: "6px 0" }}>{"— " + history.length + " models —"}</p>}
             </div>
             {history.length > 0 && (
-              <div style={{ padding: "6px 8px", borderTop: "1px solid rgba(255,255,255,0.04)", flexShrink: 0 }}>
+              <div style={{ padding: "12px", borderTop: "1px solid var(--border)", background: "rgba(0,0,0,0.1)" }}>
                 <button onClick={() => setClrModal(true)}
-                  style={{ width: "100%", padding: "6px 0", borderRadius: 7, fontSize: 9, fontWeight: 600, color: "#1e1e38", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, fontFamily: "inherit", transition: "all 0.13s" }}
-                  onMouseEnter={e => { e.currentTarget.style.color = "#f87171"; e.currentTarget.style.borderColor = "rgba(248,113,113,0.2)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = "#1e1e38"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)"; }}>
-                  <Trash2 style={{ width: 9, height: 9 }} /> Clear history
+                  className="group"
+                  style={{ width: "100%", padding: "10px 0", borderRadius: 12, fontSize: 10, fontWeight: 900, color: "#475569", background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, transition: "all 0.2s", textTransform: "uppercase", letterSpacing: "0.1em" }}
+                  onMouseEnter={e => { e.currentTarget.style.color = "#ef4444"; e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.2)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = "#475569"; e.currentTarget.style.borderColor = "var(--border)"; }}>
+                  <Trash2 style={{ width: 11, height: 11 }} className="group-hover:scale-110 transition-transform" /> Purge Records
                 </button>
               </div>
             )}
           </div>
         </div>
-      </div>
 
-      <ConfirmModal isOpen={delModal} onClose={() => { if (!deleting) { setDelModal(false); setToDel(null); } }} onConfirm={confirmDel} title="Delete model" message={"Delete \"" + ((toDel?.prompt?.slice(0, 60)) || "") + "…\"?"} confirmText="Delete" confirmColor="#ef4444" isDeleting={deleting} />
-      <ConfirmModal isOpen={clrModal} onClose={() => { if (!deleting) setClrModal(false); }} onConfirm={confirmClr} title="Clear history" message={"Delete all " + history.length + " Tripo models?"} confirmText="Clear all" confirmColor="#dc2626" isDeleting={deleting} />
-      <DownloadModal isOpen={dlOpen} onClose={handleDlClose} glbBlobUrl={dlItem ? dlItem.blobUrl : modelUrl} scene={sceneRef.current?.scene ?? sceneRef.current} filename={dlItem ? (dlItem.item?.prompt?.slice(0, 30) ?? ("tripo_" + Date.now())) : (activeH?.prompt?.slice(0, 30) ?? ("tripo_" + Date.now()))} color={color} />
-    </>
+        <ConfirmModal isOpen={delModal} onClose={() => { if (!deleting) { setDelModal(false); setToDel(null); } }} onConfirm={confirmDel} title="Delete model" message={"Delete \"" + ((toDel?.prompt?.slice(0, 60)) || "") + "…\"?"} confirmText="Delete" confirmColor="#ef4444" isDeleting={deleting} />
+        <ConfirmModal isOpen={clrModal} onClose={() => { if (!deleting) setClrModal(false); }} onConfirm={confirmClr} title="Clear history" message={"Delete all " + history.length + " Tripo models?"} confirmText="Clear all" confirmColor="#dc2626" isDeleting={deleting} />
+        <DownloadModal isOpen={dlOpen} onClose={handleDlClose} glbBlobUrl={dlItem ? dlItem.blobUrl : modelUrl} scene={sceneRef.current?.scene ?? sceneRef.current} filename={dlItem ? (dlItem.item?.prompt?.slice(0, 30) ?? ("tripo_" + Date.now())) : (activeH?.prompt?.slice(0, 30) ?? ("tripo_" + Date.now()))} color={color} />
+      </div>
   );
 }

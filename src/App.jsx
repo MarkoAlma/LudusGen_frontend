@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import Background from './components/Background';
-import Navbar from './components/Nav';
+import AppLayout from './components/layout/AppLayout';
+import PageTransition from './components/layout/PageTransition';
 import Home from './pages/Home';
-import Footer from './components/Footer';
 import LudusGenAdmin from './pages/Admin';
-import AuthPage from './pages/Login';
 import AuthModal from './pages/Login';
 import { useContext } from 'react';
 import { MyUserContext } from './context/MyUserProvider';
@@ -21,25 +19,15 @@ import { ProtectedRoute } from './ProtectedRoute';
 import AIChat from './ai_components/AiChat';
 import { auth } from './firebase/firebaseApp';
 import Forum from './pages/Forum';
+import ForumPost from './pages/ForumPost';
+import { AnimatePresence } from 'framer-motion';
 
 function App() {
   const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled} = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Forum has its own header/nav, so hide the global Navbar & Footer there
   const isForumRoute = location.pathname.startsWith('/forum');
-
-  useEffect(()=>{
-    console.log('====================================');
-    console.log("Változott", isAuthOpen);
-    console.log('====================================');
-  },[isAuthOpen])
-
-  const bezar = () => {
-    setIsAuthOpen(false);
-    setShowNavbar(true);
-  };
 
   useEffect(() => {
     if (isAuthOpen) {
@@ -47,9 +35,6 @@ function App() {
     } else {
       document.body.style.overflow = '';
     }
-    
-
-    // Cleanup when the component is unmounted or modal is closed
     return () => {
       document.body.style.overflow = '';
     };
@@ -67,32 +52,39 @@ function App() {
     }
   }, [location, navigate]);
 
+  const closeAuth = () => {
+    setIsAuthOpen(false);
+    setShowNavbar(true);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white relative">
-      <Background />
-      {!isForumRoute && <Navbar />}
-
-      <main>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/chat" element={<ProtectedRoute>
-            <AIChat user={user} getIdToken={() => auth.currentUser?.getIdToken(true)} />
-          </ProtectedRoute>} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/forum" element={<Forum />} />
-          {/* ÚJ: kategória/slug alapú route */}
-          <Route path="/forum/:category/:slug" element={<Forum />} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        </Routes>
-      </main>
+      <AppLayout>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<PageTransition><Home /></PageTransition>} />
+            <Route path="/chat" element={
+              <PageTransition>
+                <ProtectedRoute>
+                  <AIChat user={user} getIdToken={() => auth.currentUser?.getIdToken(true)} />
+                </ProtectedRoute>
+              </PageTransition>
+            } />
+            <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
+            <Route path="/verify-email" element={<PageTransition><VerifyEmail /></PageTransition>} />
+            <Route path="/forum" element={<PageTransition><Forum /></PageTransition>} />
+            <Route path="/forum/:category/:slug" element={<PageTransition><ForumPost /></PageTransition>} />
+            <Route path="/settings" element={
+              <PageTransition>
+                <ProtectedRoute><Settings /></ProtectedRoute>
+              </PageTransition>
+            } />
+          </Routes>
+        </AnimatePresence>
+      </AppLayout>
 
       <LudusGenAdmin />
-      <AuthModal
-        isOpen={isAuthOpen}
-        onClose={() => bezar()}
-      />
-      {!isForumRoute && <Footer />}
+      <AuthModal isOpen={isAuthOpen} onClose={closeAuth} />
 
       {msg && <MyToastify {...msg} />}
     </div>
