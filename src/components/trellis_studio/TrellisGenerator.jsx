@@ -17,7 +17,10 @@ export default function TrellisGenerator({ getIdToken, userId }) {
     history,
     activeItem, setActiveItem,
     handleGenerate,
-    handleStop
+    handleStop,
+    enhancing,
+    handleEnhance,
+    handleDechant
   } = useTrellisLogic(userId, getIdToken);
 
   const [leftOpen, setLeftOpen] = useState(true);
@@ -36,8 +39,8 @@ export default function TrellisGenerator({ getIdToken, userId }) {
             style={{ background: "rgba(3,0,10,0.2)", backdropFilter: "blur(60px)" }}
           >
             <div className="pt-20 lg:pt-24 h-full flex flex-col overflow-y-auto" style={{ width: 320 }}>
-              <TrellisControls 
-                prompt={prompt} 
+              <TrellisControls
+                prompt={prompt}
                 setPrompt={setPrompt}
                 selectedStyle={selectedStyle}
                 setSelectedStyle={setSelectedStyle}
@@ -45,6 +48,9 @@ export default function TrellisGenerator({ getIdToken, userId }) {
                 setParams={setParams}
                 onGenerate={handleGenerate}
                 isRunning={genStatus === 'pending'}
+                enhancing={enhancing}
+                onEnhance={handleEnhance}
+                onDechant={handleDechant}
               />
             </div>
           </motion.div>

@@ -74,7 +74,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
         animate={{ paddingRight: (isDesktop && historySidebarOpen) ? HISTORY_SIDEBAR_W : 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 260 }}
         className="flex-1 flex flex-col min-w-0 relative h-full z-10 px-0"
-        style={{ paddingTop: navHeight }}
       >
 
         {/* Header */}
@@ -83,12 +82,18 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
           setSidebarOpen={setSidebarOpen}
           setHistorySidebarOpen={() => setHistorySidebarOpen(true)}
           onConfigOpen={() => setConfigOpen(true)}
+          navHeight={navHeight}
+          historySidebarOpen={historySidebarOpen}
+          isDesktop={isDesktop}
         />
 
         {/* Scrollable message area */}
         <div className="flex-1 relative overflow-hidden">
           <div ref={chatScrollRef} className="h-full overflow-y-auto scrollbar-thin scroll-smooth w-full px-8 lg:px-12">
-            <div className="w-full py-8 flex flex-col space-y-4">
+            <div 
+              className="w-full pb-8 flex flex-col space-y-4" 
+              style={{ paddingTop: `calc(${Math.max(navHeight || 0, 60)}px + 8rem)` }}
+            >
               <MessageList
                 messages={messages}
                 loadingHistory={loadingHistory}
@@ -227,6 +232,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
         systemPrompt={systemPrompt}
         setSystemPrompt={setSystemPrompt}
         themeColor={themeColor}
+        navHeight={navHeight}
+        selectedModelId={selectedModel?.id}
       />
     </div>
   );

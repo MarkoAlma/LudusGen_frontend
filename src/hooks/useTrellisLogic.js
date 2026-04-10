@@ -1,11 +1,13 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { 
-  defaultParams, 
-  fetchGlbAsBlob, 
-  applyStylePrefix, 
+import {
+  defaultParams,
+  fetchGlbAsBlob,
+  applyStylePrefix,
   saveHistoryToFirestore,
-  loadHistoryPageFromFirestore
+  loadHistoryPageFromFirestore,
+  streamChat
 } from '../ai_components/trellis/utils';
+import { ENHANCE_SYSTEM, DECHANTER_SYSTEM } from '../ai_components/trellis/Constants';
 
 export function useTrellisLogic(userId, getIdToken) {
   const [prompt, setPrompt] = useState("");
@@ -86,6 +88,58 @@ export function useTrellisLogic(userId, getIdToken) {
 
   const handleStop = () => abortRef.current?.abort();
 
+  const handleEnhance = async () => {
+    if (!prompt.trim() || enhancing) return;
+    setEnhancing(true);
+    try {
+      const headers = await authHeaders();
+      const enhanced = await streamChat(
+        "http://localhost:3001/api/chat",
+        headers,
+        {
+          messages: [
+            { role: "system", content: ENHANCE_SYSTEM },
+            { role: "user", content: prompt.trim() }
+          ],
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 800,
+          temperature: 0.7
+        }
+      );
+      if (enhanced) setPrompt(enhanced.trim());
+    } catch (err) {
+      console.warn('Enhance failed:', err);
+    } finally {
+      setEnhancing(false);
+    }
+  };
+
+  const handleDechant = async () => {
+    if (!prompt.trim() || enhancing) return;
+    setEnhancing(true);
+    try {
+      const headers = await authHeaders();
+      const simplified = await streamChat(
+        "http://localhost:3001/api/chat",
+        headers,
+        {
+          messages: [
+            { role: "system", content: DECHANTER_SYSTEM },
+            { role: "user", content: prompt.trim() }
+          ],
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 400,
+          temperature: 0.3
+        }
+      );
+      if (simplified) setPrompt(simplified.trim());
+    } catch (err) {
+      console.warn('Dechant failed:', err);
+    } finally {
+      setEnhancing(false);
+    }
+  };
+
   return {
     prompt, setPrompt,
     genStatus, setGenStatus,
@@ -98,6 +152,8 @@ export function useTrellisLogic(userId, getIdToken) {
     historyLoading,
     activeItem, setActiveItem,
     handleGenerate,
-    handleStop
+    handleStop,
+    handleEnhance,
+    handleDechant
   };
 }

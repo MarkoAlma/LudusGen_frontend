@@ -1,8 +1,20 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wand2, X, ChevronDown, Zap, Sparkles } from 'lucide-react';
-import { MODEL_GROUPS, getModel } from '../../ai_components/models';
-import sidebarBg from '../../assets/sidebar-bg.png';
+import { MODEL_GROUPS, getModel, findModelGroup } from '../../ai_components/models';
+import bgChat from '../../assets/bg-chat.png';
+import bgCode from '../../assets/bg-code.png';
+import bgAudio from '../../assets/bg-audio.png';
+import bgImage from '../../assets/bg-image.png';
+import bg3d from '../../assets/bg-3d.png';
+
+const CATEGORY_BGS = {
+  chat: bgChat,
+  code: bgCode,
+  audio: bgAudio,
+  image: bgImage,
+  threed: bg3d
+};
 
 export default function AiStudioSidebar({
   selectedAI,
@@ -16,29 +28,50 @@ export default function AiStudioSidebar({
 }) {
   const selectedModel = getModel(selectedAI);
   const activeColor = selectedModel?.color || '#8b5cf6';
+  const currentGroupId = findModelGroup(selectedAI) || 'chat';
+  const currentBg = CATEGORY_BGS[currentGroupId] || bgChat;
 
   return (
     <div
       className="flex flex-col h-full relative z-[100] overflow-hidden border-r border-white/5"
       style={{
-        background: 'rgba(10,10,25,0.4)',
-        backdropFilter: 'blur(20px)',
+        background: 'rgba(0, 0, 2, 0.98)', /* Szinte teljesen fekete */
+        backdropFilter: 'blur(40px)',
       }}
     >
       {/* ── Ambient Background ── */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        {/* Subtle Background Image */}
-        <img 
-          src={sidebarBg} 
-          className="absolute inset-0 w-full h-full object-cover opacity-[0.03] mix-blend-soft-light transition-opacity duration-1000" 
-          alt="" 
+        {/* Dynamic Category Background */}
+        <AnimatePresence mode="popLayout">
+          <motion.img
+            key={currentBg}
+            src={currentBg}
+            initial={{ opacity: 0, scale: 1.05 }}
+            animate={{ opacity: 0.1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
+            className="absolute inset-0 w-full h-full object-cover mix-blend-soft-light"
+            alt=""
+          />
+        </AnimatePresence>
+
+        {/* Color Tint Overlay */}
+        <motion.div
+          className="absolute inset-0 transition-colors duration-1000"
+          animate={{ backgroundColor: activeColor }}
+          style={{
+            mixBlendMode: 'soft-light',
+            opacity: 0.04
+          }}
         />
+
+        {/* Accent Gradients */}
         <div
-          className="absolute -top-20 -left-20 w-64 h-64 opacity-[0.07] blur-[100px] transition-all duration-1000"
+          className="absolute -top-32 -left-32 w-96 h-96 opacity-[0.015] blur-[120px] transition-all duration-1000"
           style={{ background: `radial-gradient(circle, ${activeColor}, transparent)` }}
         />
-        <div className="absolute top-1/2 -right-32 w-48 h-48 bg-purple-900/10 blur-[80px] rounded-full" />
-        <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-[#0a0a19] to-transparent" />
+        <div className="absolute top-1/2 -right-40 w-64 h-64 bg-purple-900/03 blur-[100px] rounded-full" />
+        <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-[#000000] to-transparent opacity-80" />
       </div>
 
       {/* ── Header ─ */}
@@ -89,21 +122,18 @@ export default function AiStudioSidebar({
               {/* Group Header */}
               <button
                 onClick={() => toggleGroup(group.id)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-300 group ${
-                  isOpen
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-300 group ${isOpen
                     ? 'bg-white/[0.04] border border-white/10'
                     : 'hover:bg-white/[0.02] border border-transparent'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-all ${
-                    isOpen ? 'bg-white/[0.06] scale-100' : 'bg-transparent opacity-40 scale-90'
-                  }`}>
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-all ${isOpen ? 'bg-white/[0.06] scale-100' : 'bg-transparent opacity-40 scale-90'
+                    }`}>
                     {group.emoji}
                   </div>
-                  <span className={`text-[12px] font-black uppercase tracking-[0.15em] transition-colors ${
-                    isOpen ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'
-                  }`}>
+                  <span className={`text-[12px] font-black uppercase tracking-[0.15em] transition-colors ${isOpen ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'
+                    }`}>
                     {group.label}
                   </span>
                 </div>
