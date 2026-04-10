@@ -9,7 +9,6 @@ export default function PageTransition({ children }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-      style={{ willChange: 'transform, opacity' }}
       className="w-full flex-1 flex flex-col min-h-full basis-full"
     >
       {children}
