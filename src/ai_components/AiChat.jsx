@@ -114,6 +114,8 @@ export default function AIChat({ user, getIdToken }) {
     }
   };
 
+  const is3D = ["threed", "trellis", "tripo"].includes(selectedModel?.panelType);
+
   return (
     <div className="flex w-full h-full bg-[#0a0a0f] transition-all duration-300 overflow-hidden relative z-10 flex-1">
       <BackgroundFilters />

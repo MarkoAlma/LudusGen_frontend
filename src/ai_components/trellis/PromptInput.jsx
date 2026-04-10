@@ -115,10 +115,10 @@ function PromptInput({
   const borderColor = isOverLimit
     ? 'rgba(248,113,113,0.5)'
     : focused
-    ? `${color}60`
-    : hasContent
-    ? `${color}30`
-    : 'rgba(255,255,255,0.07)';
+      ? `${color}60`
+      : hasContent
+        ? `${color}30`
+        : 'rgba(255,255,255,0.07)';
 
   const glowShadow = focused && !isOverLimit
     ? `0 0 0 3px ${color}14, 0 2px 8px rgba(0,0,0,0.5)`
@@ -136,8 +136,8 @@ function PromptInput({
           background: disabled
             ? 'rgba(255,255,255,0.01)'
             : focused
-            ? 'rgba(255,255,255,0.035)'
-            : 'rgba(255,255,255,0.022)',
+              ? 'rgba(255,255,255,0.035)'
+              : 'rgba(255,255,255,0.022)',
           border: `1px solid ${borderColor}`,
           boxShadow: glowShadow,
           transition: 'all 0.22s cubic-bezier(0.4,0,0.2,1)',
@@ -270,8 +270,8 @@ function PromptInput({
                 color: isOverLimit
                   ? '#f87171'
                   : remaining < 100
-                  ? '#f59e0b'
-                  : 'rgba(255,255,255,0.22)',
+                    ? '#f59e0b'
+                    : 'rgba(255,255,255,0.22)',
                 minWidth: 28,
                 textAlign: 'right',
                 transition: 'color 0.2s',

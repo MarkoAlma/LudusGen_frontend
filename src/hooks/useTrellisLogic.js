@@ -5,9 +5,8 @@ import {
   applyStylePrefix,
   saveHistoryToFirestore,
   loadHistoryPageFromFirestore,
-  streamChat
 } from '../ai_components/trellis/utils';
-import { ENHANCE_SYSTEM, DECHANTER_SYSTEM } from '../ai_components/trellis/Constants';
+import { TRELLIS_ENHANCE_PROMPT, TRELLIS_SIMPLIFY_PROMPT } from '../ai_components/trellis/Constants';
 
 export function useTrellisLogic(userId, getIdToken) {
   const [prompt, setPrompt] = useState("");
@@ -17,12 +16,34 @@ export function useTrellisLogic(userId, getIdToken) {
   const [params, setParams] = useState(defaultParams);
   const [selectedStyle, setSelectedStyle] = useState("nostyle");
   const [enhancing, setEnhancing] = useState(false);
+  const [enhanceError, setEnhanceError] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [activeItem, setActiveItem] = useState(null);
   
   const abortRef = useRef(null);
-  const prevUrlRef = useRef(null);
+   const prevUrlRef = useRef(null);
+ 
+   // Custom Preset Persistence
+   const [customPreset, setCustomPreset] = useState(() => {
+     try {
+       const saved = localStorage.getItem('trellis_custom_preset');
+       return saved ? JSON.parse(saved) : null;
+     } catch (e) {
+       return null;
+     }
+   });
+ 
+   const handleSaveCustomPreset = useCallback((newParams) => {
+     const preset = {
+       slat_cfg_scale: newParams.slat_cfg_scale,
+       ss_cfg_scale: newParams.ss_cfg_scale,
+       slat_sampling_steps: newParams.slat_sampling_steps,
+       ss_sampling_steps: newParams.ss_sampling_steps,
+     };
+     localStorage.setItem('trellis_custom_preset', JSON.stringify(preset));
+     setCustomPreset(preset);
+   }, []);
 
   const authHeaders = useCallback(async () => {
     const token = getIdToken ? await getIdToken() : "";
@@ -91,24 +112,47 @@ export function useTrellisLogic(userId, getIdToken) {
   const handleEnhance = async () => {
     if (!prompt.trim() || enhancing) return;
     setEnhancing(true);
+    setEnhanceError(null);
     try {
       const headers = await authHeaders();
-      const enhanced = await streamChat(
-        "http://localhost:3001/api/chat",
+      const res = await fetch("http://localhost:3001/api/enhance", {
+        method: "POST",
         headers,
-        {
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          provider: "groq",
           messages: [
-            { role: "system", content: ENHANCE_SYSTEM },
+            { role: "system", content: TRELLIS_ENHANCE_PROMPT },
             { role: "user", content: prompt.trim() }
           ],
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 800,
-          temperature: 0.7
-        }
-      );
-      if (enhanced) setPrompt(enhanced.trim());
+          temperature: 0.4,
+          top_p: 0.9,
+          max_tokens: 10000
+        }),
+      });
+      if (!res.ok) {
+        let errMsg = `HTTP ${res.status}`;
+        try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+        throw new Error(errMsg);
+      }
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || "API hiba");
+      const raw = (json.content || "").trim();
+      const cleaned = raw
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/, "")
+        .trim();
+      try {
+        const parsed = JSON.parse(cleaned);
+        if (parsed?.prompt) setPrompt(parsed.prompt.trim());
+        else if (cleaned) setPrompt(cleaned);
+      } catch {
+        if (cleaned) setPrompt(cleaned);
+      }
     } catch (err) {
-      console.warn('Enhance failed:', err);
+      console.warn("Enhance failed:", err);
+      setEnhanceError(err.message || "Enhance sikertelen");
     } finally {
       setEnhancing(false);
     }
@@ -117,24 +161,36 @@ export function useTrellisLogic(userId, getIdToken) {
   const handleDechant = async () => {
     if (!prompt.trim() || enhancing) return;
     setEnhancing(true);
+    setEnhanceError(null);
     try {
       const headers = await authHeaders();
-      const simplified = await streamChat(
-        "http://localhost:3001/api/chat",
+      const res = await fetch("http://localhost:3001/api/enhance", {
+        method: "POST",
         headers,
-        {
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          provider: "groq",
           messages: [
-            { role: "system", content: DECHANTER_SYSTEM },
+            { role: "system", content: TRELLIS_SIMPLIFY_PROMPT },
             { role: "user", content: prompt.trim() }
           ],
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 400,
-          temperature: 0.3
-        }
-      );
-      if (simplified) setPrompt(simplified.trim());
+          temperature: 0.4,
+          top_p: 0.9,
+          max_tokens: 800
+        }),
+      });
+      if (!res.ok) {
+        let errMsg = `HTTP ${res.status}`;
+        try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+        throw new Error(errMsg);
+      }
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || "API hiba");
+      const raw = (json.content || "").trim();
+      if (raw) setPrompt(raw);
     } catch (err) {
-      console.warn('Dechant failed:', err);
+      console.warn("Dechant failed:", err);
+      setEnhanceError(err.message || "Simplify sikertelen");
     } finally {
       setEnhancing(false);
     }
@@ -148,12 +204,15 @@ export function useTrellisLogic(userId, getIdToken) {
     params, setParams,
     selectedStyle, setSelectedStyle,
     enhancing, setEnhancing,
+    enhanceError,
     history, setHistory,
     historyLoading,
     activeItem, setActiveItem,
     handleGenerate,
     handleStop,
     handleEnhance,
-    handleDechant
+    handleDechant,
+    customPreset,
+    handleSaveCustomPreset
   };
 }

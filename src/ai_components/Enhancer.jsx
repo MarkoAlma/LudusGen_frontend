@@ -94,10 +94,10 @@ function Enhancer({
     return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
   }, [getIdToken]);
 
-  const [enhancing,        setEnhancing]        = useState(false);
-  const [dechanting,       setDechanting]        = useState(false);
-  const [describingImages, setDescribingImages]  = useState(false);
-  const [streamError,      setStreamError]       = useState(null);
+  const [enhancing, setEnhancing] = useState(false);
+  const [dechanting, setDechanting] = useState(false);
+  const [describingImages, setDescribingImages] = useState(false);
+  const [streamError, setStreamError] = useState(null);
 
   const isBusy = enhancing || dechanting || describingImages;
 
@@ -113,11 +113,11 @@ function Enhancer({
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model:    'openai/gpt-oss-120b',
+        model: 'openai/gpt-oss-120b',
         provider: 'groq',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user',   content: userContent  },
+          { role: 'user', content: userContent },
         ],
         temperature,
         top_p,
@@ -127,7 +127,7 @@ function Enhancer({
 
     if (!res.ok) {
       let errMsg = `HTTP ${res.status}`;
-      try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+      try { const j = await res.json(); errMsg = j.message || errMsg; } catch { }
       throw new Error(errMsg);
     }
 
@@ -146,14 +146,14 @@ function Enhancer({
       method: 'POST',
       headers,
       body: JSON.stringify({
-        images:       images.map(img => img.dataUrl),
+        images: images.map(img => img.dataUrl),
         systemPrompt: gemmaVisionPrompt || GEMMA_IMAGE_DESCRIBE_PROMPT,
       }),
     });
 
     if (!res.ok) {
       let errMsg = `HTTP ${res.status}`;
-      try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+      try { const j = await res.json(); errMsg = j.message || errMsg; } catch { }
       throw new Error(errMsg);
     }
 
@@ -228,7 +228,7 @@ function Enhancer({
       }
 
       const raw = await callChat(enhancing_prompt, userContent, 0.4, 0.9, 10000);
-      const ok  = applyResult(raw);
+      const ok = applyResult(raw);
       if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
       else if (streamError?.startsWith('⚠️')) setStreamError(null); // sikeres → töröljük a warning-ot
     } catch (err) {
@@ -247,7 +247,7 @@ function Enhancer({
     setStreamError(null);
     try {
       const raw = await callChat(dechanting_prompt, value.trim(), 0.4, 0.9, 800);
-      const ok  = applyResult(raw);
+      const ok = applyResult(raw);
       if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
     } catch (err) {
       console.error('Dechance hiba:', err);
@@ -259,10 +259,10 @@ function Enhancer({
 
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef(null);
-  const remaining   = MAX_CHARS - value.length;
+  const remaining = MAX_CHARS - value.length;
   const isOverLimit = remaining < 0;
-  const hasContent  = value.trim().length > 0;
-  const hasImages   = inputImages.length > 0;
+  const hasContent = value.trim().length > 0;
+  const hasImages = inputImages.length > 0;
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -277,20 +277,20 @@ function Enhancer({
     }
   }, [disabled, value, isOverLimit, onSubmit]);
 
-  const simplifyDisabled = !hasContent || dechanting  || disabled;
-  const enhanceDisabled  = !hasContent || enhancing   || describingImages || disabled;
+  const simplifyDisabled = !hasContent || dechanting || disabled;
+  const enhanceDisabled = !hasContent || enhancing || describingImages || disabled;
 
   const borderColor = isOverLimit
     ? 'rgba(248,113,113,0.5)'
     : focused ? `${color}60`
-    : hasContent ? `${color}30`
-    : 'rgba(255,255,255,0.07)';
+      : hasContent ? `${color}30`
+        : 'rgba(255,255,255,0.07)';
 
   const glowShadow = focused && !isOverLimit
     ? `0 0 0 3px ${color}14, 0 2px 8px rgba(0,0,0,0.5)`
     : '0 1px 3px rgba(0,0,0,0.35)';
 
-  const fillPct  = Math.min(100, ((MAX_CHARS - remaining) / MAX_CHARS) * 100);
+  const fillPct = Math.min(100, ((MAX_CHARS - remaining) / MAX_CHARS) * 100);
   const barColor = isOverLimit ? '#f87171' : remaining < 100 ? '#f59e0b' : color;
 
   // Enhance gomb tooltip szövege
@@ -483,10 +483,10 @@ function Enhancer({
 function ActionButton({ onClick, disabled, loading, accentColor, icon, label, loadingLabel }) {
   const [hovered, setHovered] = useState(false);
 
-  const bg        = loading || hovered ? `rgba(${hexToRgb(accentColor)}, 0.14)` : `rgba(${hexToRgb(accentColor)}, 0.07)`;
-  const outline   = hovered && !disabled ? `1px solid rgba(${hexToRgb(accentColor)}, 0.38)` : `1px solid rgba(${hexToRgb(accentColor)}, 0.16)`;
+  const bg = loading || hovered ? `rgba(${hexToRgb(accentColor)}, 0.14)` : `rgba(${hexToRgb(accentColor)}, 0.07)`;
+  const outline = hovered && !disabled ? `1px solid rgba(${hexToRgb(accentColor)}, 0.38)` : `1px solid rgba(${hexToRgb(accentColor)}, 0.16)`;
   const textColor = disabled ? `rgba(${hexToRgb(accentColor)}, 0.3)` : accentColor;
-  const glow      = (loading || hovered) && !disabled ? `0 0 14px rgba(${hexToRgb(accentColor)}, 0.18)` : 'none';
+  const glow = (loading || hovered) && !disabled ? `0 0 14px rgba(${hexToRgb(accentColor)}, 0.18)` : 'none';
 
   return (
     <button
@@ -513,9 +513,9 @@ function ActionButton({ onClick, disabled, loading, accentColor, icon, label, lo
 }
 
 function hexToRgb(hex) {
-  const h    = hex.replace('#', '');
+  const h = hex.replace('#', '');
   const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
-  const n    = parseInt(full, 16);
+  const n = parseInt(full, 16);
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 

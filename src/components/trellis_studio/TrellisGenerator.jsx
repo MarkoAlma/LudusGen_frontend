@@ -19,8 +19,11 @@ export default function TrellisGenerator({ getIdToken, userId }) {
     handleGenerate,
     handleStop,
     enhancing,
+    enhanceError,
     handleEnhance,
-    handleDechant
+    handleDechant,
+    customPreset,
+    handleSaveCustomPreset
   } = useTrellisLogic(userId, getIdToken);
 
   const [leftOpen, setLeftOpen] = useState(true);
@@ -38,7 +41,7 @@ export default function TrellisGenerator({ getIdToken, userId }) {
             className="flex-shrink-0 relative z-10 border-r border-white/5"
             style={{ background: "rgba(3,0,10,0.2)", backdropFilter: "blur(60px)" }}
           >
-            <div className="pt-20 lg:pt-24 h-full flex flex-col overflow-y-auto" style={{ width: 320 }}>
+            <div className="pt-28 lg:pt-32 h-full flex flex-col overflow-y-auto" style={{ width: 320 }}>
               <TrellisControls
                 prompt={prompt}
                 setPrompt={setPrompt}
@@ -49,8 +52,11 @@ export default function TrellisGenerator({ getIdToken, userId }) {
                 onGenerate={handleGenerate}
                 isRunning={genStatus === 'pending'}
                 enhancing={enhancing}
+                enhanceError={enhanceError}
                 onEnhance={handleEnhance}
                 onDechant={handleDechant}
+                customPreset={customPreset}
+                handleSaveCustomPreset={handleSaveCustomPreset}
               />
             </div>
           </motion.div>
@@ -58,13 +64,13 @@ export default function TrellisGenerator({ getIdToken, userId }) {
       </AnimatePresence>
 
       {/* Main Content: Workspace */}
-      <div className="flex-1 min-w-0 flex flex-col relative z-[1]">
-        <TrellisWorkspace 
+      <div className="flex-1 min-w-0 flex flex-col relative z-[1] pt-28 lg:pt-32">
+        <TrellisWorkspace
           modelUrl={modelUrl}
           genStatus={genStatus}
           activeItem={activeItem}
-          onDownload={() => {}}
-          onCameraReset={() => {}}
+          onDownload={() => { }}
+          onCameraReset={() => { }}
         />
 
       </div>
@@ -80,7 +86,7 @@ export default function TrellisGenerator({ getIdToken, userId }) {
             style={{ background: "rgba(3,0,10,0.2)", backdropFilter: "blur(60px)" }}
           >
             <div className="pt-20 lg:pt-24 h-full flex flex-col overflow-y-auto" style={{ width: 280 }}>
-              <TrellisHistory 
+              <TrellisHistory
                 history={history}
                 activeItemId={activeItem?.id}
                 onSelectItem={(item) => {
@@ -88,8 +94,8 @@ export default function TrellisGenerator({ getIdToken, userId }) {
                   setModelUrl(item.model_url);
                   setGenStatus('succeeded');
                 }}
-                onDeleteItem={() => {}}
-                onClearHistory={() => {}}
+                onDeleteItem={() => { }}
+                onClearHistory={() => { }}
               />
             </div>
           </motion.div>

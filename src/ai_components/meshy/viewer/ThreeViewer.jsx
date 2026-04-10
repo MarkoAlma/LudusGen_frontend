@@ -44,8 +44,8 @@ export default function ThreeViewer({
     (async () => {
       const W = el.clientWidth || 640, H = el.clientHeight || 480;
 
-      const scene    = new THREE.Scene();
-      const camera   = new THREE.PerspectiveCamera(45, W / H, 0.01, 10000);
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(45, W / H, 0.01, 10000);
       const renderer = new THREE.WebGLRenderer({
         antialias: true,
         alpha: true,

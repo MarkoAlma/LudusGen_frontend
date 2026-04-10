@@ -57,12 +57,12 @@ export function setSunLightProps(sunLight, show, color, intensity) {
 export function setSceneBg(s, bgColor) {
   const { THREE, scene, renderer } = s;
   if (!THREE || !scene || !renderer) return;
-  const COLORS = { 
-    default: null, 
-    black: 0x010103, 
-    darkgray: 0x111118, 
-    grayish: 0x24242e,
-    white: 0xffffff 
+  const COLORS = {
+    default: null,
+    black: 0x050508,
+    darkgray: 0x0d0d14,
+    grayish: 0x1a1a24,
+    white: 0xeeeeee
   };
   const val = COLORS[bgColor] ?? null;
   if (val === null) { scene.background = null; renderer.setClearAlpha(0); }
@@ -132,7 +132,7 @@ export function applyViewMode(s, mode) {
   if (!THREE) return;
 
   if (!s._clayMats) s._clayMats = new Map();
-  if (!s._uvMats)   s._uvMats   = new Map();
+  if (!s._uvMats) s._uvMats = new Map();
 
   scene.traverse((node) => {
     // Ground: merged here — no second traverse needed
@@ -202,8 +202,8 @@ export function disposeModel(scene, model, origMaterials, wireCache, clayMats, u
   if (!model) return;
   const disposeMat = (mat) => {
     if (!mat) return;
-    ['map','normalMap','roughnessMap','metalnessMap','aoMap','emissiveMap',
-     'alphaMap','lightMap','bumpMap','displacementMap','envMap',
+    ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap',
+      'alphaMap', 'lightMap', 'bumpMap', 'displacementMap', 'envMap',
     ].forEach((slot) => { if (mat[slot]) mat[slot].dispose(); });
     mat.dispose();
   };
@@ -314,8 +314,8 @@ export function setCameraPreset(s, preset) {
   s.autoSpin = false;
   if (preset === "reset") { s.cam.theta = 0.4; s.cam.phi = Math.PI / 3; s.cam.panX = 0; s.cam.panY = 0; }
   if (preset === "front") { s.cam.theta = 0; s.cam.phi = Math.PI / 2; }
-  if (preset === "side")  { s.cam.theta = Math.PI / 2; s.cam.phi = Math.PI / 2; }
-  if (preset === "top")   { s.cam.theta = 0; s.cam.phi = 0.05; }
+  if (preset === "side") { s.cam.theta = Math.PI / 2; s.cam.phi = Math.PI / 2; }
+  if (preset === "top") { s.cam.theta = 0; s.cam.phi = 0.05; }
   syncCamera(s.camera, s.cam);
   s.markDirty?.();
 }
