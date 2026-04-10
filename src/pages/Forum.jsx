@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback, useContext } from "react";
+import { createPortal } from "react-dom";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageSquare, ChevronRight, ChevronDown,
   ThumbsUp, Eye, Clock, Pin, Flame, Sparkles, Trophy,
@@ -9,19 +11,19 @@ import {
   Shield, Lock, CheckCircle, RefreshCw, SlidersHorizontal,
   ArrowUp, Rss, Award, Tag, Globe, Heart, Smile,
   BarChart2, PenSquare, HelpCircle, Megaphone, AtSign,
-  Trash2, Edit3, Unlock, Home, Activity,
-  Code, Image, Music, Box,
+  Trash2, Edit3, Unlock, Home, Activity, Code, Image, Music, Box,
 } from "lucide-react";
 import ForumPost from "./ForumPost";
+import CreditTopup from "../components/CreditTopup";
 import { auth, db } from "../firebase/firebaseApp";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection, addDoc, getDocs, deleteDoc, doc, updateDoc,
+  collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc, arrayUnion, arrayRemove,
   query, orderBy, serverTimestamp, getDoc, onSnapshot, where, limit, Timestamp, writeBatch,
 } from "firebase/firestore";
 
 // ─── Admin UIDs ───────────────────────────────────────────────────
-const ADMIN_UIDS = [];
+const ADMIN_UIDS = ["T7fU9Zp3N5M9wz2G8xQ4L1rV6bY2"];
 
 // ─── DEBUG MODE ───────────────────────────────────────────────────
 const DEBUG = true;
@@ -118,23 +120,23 @@ const RECENT_ACTIVITY = [
 
 export const MOCK_POSTS = [
   {
-    id: 1, category: "chat", pinned: true, hot: true, locked: false, solved: false,
+    id: "mock_1", category: "chat", pinned: true, hot: true, locked: false, solved: false,
     title: "Claude vs GPT-4o — melyik a jobb kódoláshoz? [Összehasonlítás 2025]",
     preview: "Elvégeztem 50+ tesztet mindkét modellen. Az eredmények meglepőek: Claude jobban teljesít hosszú fájloknál, de GPT gyorsabb egyszerű snippeteknél...",
     content: `Elvégeztem **50+ tesztet** mindkét modellen, különböző kódolási feladatokon.`,
     author: "devmaster_hu", avatar: "D", avatarColor: "#7c3aed",
-    authorId: null,
+    authorId: "mock_user_1",
     time: "2 órája", views: 3241, likes: 187, comments: 64,
     tags: ["claude", "gpt-4o", "összehasonlítás", "kódolás"],
     readTime: 4, poll: null,
   },
   {
-    id: 2, category: "image", pinned: false, hot: true, locked: false, solved: false,
+    id: "mock_2", category: "image", pinned: false, hot: true, locked: false, solved: false,
     title: "Midjourney v7 vs FLUX — részletes prompt guide kezdőknek",
     preview: "Az új MJ v7 teljesen megváltoztatta a prompt struktúrát. Összeállítottam egy 20 pontos checklist-et...",
     content: `Az új **Midjourney v7** teljesen megváltoztatta a prompt struktúrát.`,
     author: "pixel_witch", avatar: "P", avatarColor: "#db2777",
-    authorId: null,
+    authorId: "mock_user_2",
     time: "5 órája", views: 5892, likes: 412, comments: 103,
     tags: ["midjourney", "flux", "prompt", "összehasonlítás"],
     readTime: 6, poll: {
@@ -148,45 +150,45 @@ export const MOCK_POSTS = [
     },
   },
   {
-    id: 3, category: "code", pinned: false, hot: false, locked: false, solved: true,
+    id: "mock_3", category: "code", pinned: false, hot: false, locked: false, solved: true,
     title: "Cursor AI beállítása React projekthez — teljes konfig + .cursorrules",
     preview: "Megosztom a .cursorrules fájlomat amit 3 hónap alatt finomítottam...",
     content: `Megosztom a **.cursorrules** fájlomat amit 3 hónap alatt finomítottam.`,
     author: "typescript_king", avatar: "T", avatarColor: "#34d399",
-    authorId: null,
+    authorId: "mock_user_3",
     time: "1 napja", views: 1876, likes: 234, comments: 47,
     tags: ["cursor", "react", "typescript", "tipp"],
     readTime: 3, poll: null,
   },
   {
-    id: 4, category: "audio", pinned: false, hot: false, locked: false, solved: false,
+    id: "mock_4", category: "audio", pinned: false, hot: false, locked: false, solved: false,
     title: "Suno v4 — prompting technikák amikkel profin szól a zene",
     preview: "A legtöbb ember rosszul használja a Suno-t. A kulcs nem a stílusban van, hanem a struktúra...",
     content: `A legtöbb ember rosszul használja a Suno-t.`,
     author: "beatmaker99", avatar: "B", avatarColor: "#ea580c",
-    authorId: null,
+    authorId: "mock_user_4",
     time: "3 napja", views: 987, likes: 89, comments: 31,
     tags: ["suno", "prompt", "zene", "tipp"],
     readTime: 5, poll: null,
   },
   {
-    id: 5, category: "threed", pinned: false, hot: true, locked: false, solved: false,
+    id: "mock_5", category: "threed", pinned: false, hot: true, locked: false, solved: false,
     title: "Meshy vs TripoSG — melyik generál jobb 3D modellt képből? [2025 teszt]",
     preview: "Teszteltem mindkét platformot ugyanazokkal a képekkel...",
     content: `Teszteltem mindkét platformot ugyanazokkal a referencia képekkel.`,
     author: "3d_builder", avatar: "3", avatarColor: "#0284c7",
-    authorId: null,
+    authorId: "mock_user_5",
     time: "1 hete", views: 2134, likes: 156, comments: 58,
     tags: ["meshy", "triposg", "3d", "összehasonlítás"],
     readTime: 4, poll: null,
   },
   {
-    id: 6, category: "chat", pinned: false, hot: false, locked: true, solved: false,
+    id: "mock_6", category: "chat", pinned: false, hot: false, locked: true, solved: false,
     title: "Hogyan írjak tökéletes system promptot? Bevált módszerek gyűjteménye",
     preview: "3 éve dolgozom prompt engineeringgel. Megosztom azokat a mintákat amik mindig működnek...",
     content: `3 éve dolgozom prompt engineeringgel. Ezek a minták mindig működnek.`,
     author: "prompt_guru", avatar: "G", avatarColor: "#a78bfa",
-    authorId: null,
+    authorId: "mock_user_6",
     time: "2 hete", views: 8754, likes: 921, comments: 203,
     tags: ["prompt-engineering", "tipp", "claude", "gpt-4o"],
     readTime: 8, poll: null,
@@ -235,16 +237,20 @@ const TagPill = ({ label, color, active, onClick, count }) => (
   </button>
 );
 
-// ─── Announcement banner ──────────────────────────────────────────
 const AnnouncementBanner = () => {
   const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
+  const announcements = [
+    { id: 1, text: "🚀 Új funkció: AI Fórum LIVE chat — hamarosan!", color: "#a78bfa" },
+    { id: 2, text: "📢 Pályázat: Legjobb AI prompt — 50.000 Ft díj!", color: "#fbbf24" },
+    { id: 3, text: "🧪 Beta tesztelők kerestetnek a 3D AI szekcióhoz", color: "#38bdf8" },
+  ];
   useEffect(() => {
-    const t = setInterval(() => setIdx(i => (i + 1) % ANNOUNCEMENTS.length), 4000);
+    const t = setInterval(() => setIdx(i => (i + 1) % announcements.length), 4000);
     return () => clearInterval(t);
-  }, []);
+  }, [announcements.length]);
   if (!visible) return null;
-  const ann = ANNOUNCEMENTS[idx];
+  const ann = announcements[idx];
   return (
     <div className="flex items-center justify-between px-4 py-2.5 rounded-xl mb-3 transition-all duration-500"
       style={{ background: `${ann.color}06`, border: `1px solid ${ann.color}12` }}>
@@ -254,7 +260,7 @@ const AnnouncementBanner = () => {
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <div className="flex gap-1">
-          {ANNOUNCEMENTS.map((_, i) => (
+          {announcements.map((_, i) => (
             <button key={i} onClick={() => setIdx(i)} className="cursor-pointer w-1 h-1 rounded-full transition-all"
               style={{ background: i === idx ? ann.color : "rgba(255,255,255,0.12)", transform: i === idx ? "scale(1.5)" : "scale(1)" }} />
           ))}
@@ -338,8 +344,7 @@ const PostCard = ({
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
   const isRead = viewedIds?.has(post.id);
-
-  const isOwn = !post.authorId || (!!currentUserId && currentUserId === post.authorId);
+  const isOwn = currentUserId && post.authorId === currentUserId;
   const canManage = isOwn || isAdmin;
 
   useEffect(() => {
@@ -354,11 +359,18 @@ const PostCard = ({
   }, [showMenu]);
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -3, scale: 1.015 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
       className="group cursor-pointer relative overflow-hidden"
       style={{
-        background: "#13111c",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "rgba(20, 18, 32, 0.85)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
         borderRadius: "1rem",
         padding: "1.25rem 1.35rem",
         marginBottom: "0.75rem",
@@ -366,12 +378,12 @@ const PostCard = ({
         transition: "border-color 0.25s, box-shadow 0.25s",
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.borderColor = `${cat.color}30`;
-        e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px ${cat.color}08`;
+        e.currentTarget.style.borderColor = `${cat.color}60`;
+        e.currentTarget.style.boxShadow = `0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px ${cat.color}30`;
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
-        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
+        e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.2)";
       }}
       onClick={onClick}
     >
@@ -400,12 +412,12 @@ const PostCard = ({
             <span className="text-gray-600 text-[0.68rem] ml-auto">{post.time}</span>
           </div>
 
-          <h3 className="text-lg font-bold text-white/90 leading-snug mb-1.5 group-hover:text-white transition-colors"
-            style={{ fontFamily: "'Instrument Serif', serif" }}>
+          <h3 className="text-xl font-extrabold text-white leading-snug mb-1.5 group-hover:text-white transition-colors"
+            style={{ fontFamily: "'Instrument Serif', serif", textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
             {post.title}
           </h3>
 
-          <p className="text-gray-500 text-sm leading-relaxed mb-3 line-clamp-2">
+          <p className="text-gray-400 text-sm leading-relaxed mb-3 line-clamp-2 font-medium">
             {post.preview || post.content?.slice(0, 160) || ""}
           </p>
 
@@ -491,7 +503,7 @@ const PostCard = ({
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -559,7 +571,7 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
     onClose();
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
       <div className="relative w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col"
@@ -700,14 +712,15 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
 // ─── Törlés megerősítő dialog ─────────────────────────────────────
 const ConfirmDialog = ({ isOpen, onConfirm, onCancel, message }) => {
   if (!isOpen) return null;
-  return (
+  return createPortal(
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10001 }}>
       <div className="absolute inset-0 bg-black/70" onClick={onCancel} />
       <div className="relative rounded-2xl p-6 max-w-sm w-full"
@@ -733,21 +746,24 @@ const ConfirmDialog = ({ isOpen, onConfirm, onCancel, message }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
 // ─── Kategória sidebar card ───────────────────────────────────────
 const CatSidebarCard = ({ cat, isActive, onClick }) => (
-  <button onClick={() => onClick(cat.id)} className="cursor-pointer w-full text-left transition-all duration-150 active:scale-[0.98]"
+  <motion.button whileHover={{ scale: 1.03, x: 5 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} onClick={() => onClick(cat.id)} className="cursor-pointer w-full text-left transition-all duration-150 active:scale-[0.98]"
     style={{
-      background: isActive ? `${cat.color}08` : "transparent",
-      border: `1px solid ${isActive ? cat.color + "18" : "rgba(255,255,255,0.04)"}`,
+      background: isActive ? `${cat.color}20` : "rgba(255,255,255,0.03)",
+      border: `1px solid ${isActive ? cat.color + "50" : "rgba(255,255,255,0.1)"}`,
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)",
       borderRadius: "0.75rem",
       padding: "0.625rem 0.875rem",
     }}
-    onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; } }}
-    onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = "transparent"; } }}>
+    onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; } }}
+    onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; } }}>
     <div className="flex items-center gap-2.5">
       <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-sm"
         style={{ background: `${cat.color}10`, color: cat.color }}>{cat.emoji}</div>
@@ -762,13 +778,13 @@ const CatSidebarCard = ({ cat, isActive, onClick }) => (
         </div>
       </div>
     </div>
-  </button>
+  </motion.button>
 );
 
 // ─── FŐ KOMPONENS ─────────────────────────────────────────────────
 export default function Forum() {
-  const { user: globalUser, logoutUser, setIsAuthOpen, setShowNavbar } = useContext(MyUserContext);
   const navigate = useNavigate();
+  const { user: globalUser } = useContext(MyUserContext);
   const [posts, setPosts] = useState(MOCK_POSTS);
   const [activeCategory, setActiveCategory] = useState("all");
   const [sortBy, setSortBy] = useState("hot");
@@ -776,14 +792,17 @@ export default function Forum() {
   const [newPostOpen, setNewPostOpen] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
   const [openPost, setOpenPost] = useState(null);
+  const [isInitializingRoute, setIsInitializingRoute] = useState(() => !!getPostInfoFromURL());
   const [bookmarks, setBookmarks] = useState(new Set());
   const [viewedIds, setViewedIds] = useState(new Set());
-  const [activeTagFilter, setActiveTagFilter] = useState(null);
+  const [activeTagFilters, setActiveTagFilters] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showOnlyBookmarks, setShowOnlyBookmarks] = useState(false);
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
-  const [filterLocked, setFilterLocked] = useState(false);
+  const [filterOwn, setFilterOwn] = useState(false);
+  const [filterFollowed, setFilterFollowed] = useState(false);
+  const [followingIds, setFollowingIds] = useState(new Set());
   const [filterSolved, setFilterSolved] = useState(false);
   const [filterPinned, setFilterPinned] = useState(false);
   const [filterHot, setFilterHot] = useState(false);
@@ -800,27 +819,33 @@ export default function Forum() {
   const accentColor = CATEGORIES.find(c => c.id === activeCategory)?.color || "#a78bfa";
   const activeQuickFiltersCount = [
     showOnlyBookmarks,
-    filterLocked,
+    filterOwn,
+    filterFollowed,
     filterSolved,
     filterPinned,
     filterHot,
-    !!activeTagFilter,
+    activeTagFilters.length > 0,
     activeCategory !== "all",
     !!search,
   ].filter(Boolean).length;
 
-  // ── Auth figyelés ────────────────────────────────────────────────
+  const handlePostClick = (post) => {
+    // Increment views via status toggle
+    toggleStatus(post.id, "views", (post.views || 0) + 1);
+    navigate(`/forum/${post.category}/${post.slug || post.id}`);
+  };
+
+  const handleEdit = (post) => {
+    setEditingPost(post);
+  };
+
+  // ── Auth state figyelés ──────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      dbg("Auth state changed:", user ? `uid=${user.uid}` : "null");
       setCurrentUser(user || null);
       setCurrentUserId(user?.uid || null);
-      if (user) {
-        const adminStatus = ADMIN_UIDS.includes(user.uid);
-        setIsAdmin(adminStatus);
-      } else {
-        setIsAdmin(false);
-      }
+      setIsAdmin(!!user && ADMIN_UIDS.includes(user.uid));
+      dbg("Auth state:", { uid: user?.uid, isAdmin: ADMIN_UIDS.includes(user?.uid) });
     });
     return unsub;
   }, []);
@@ -847,6 +872,39 @@ export default function Forum() {
   useEffect(() => { dbg("confirmDelete state:", confirmDelete); }, [confirmDelete]);
   useEffect(() => { dbg("editingPost state:", editingPost ? `id=${editingPost.id}` : "null"); }, [editingPost]);
 
+  useEffect(() => {
+    if (!currentUserId) {
+      setBookmarks(new Set());
+      setFollowingIds(new Set());
+      return;
+    }
+    
+    // Load Bookmarks
+    const loadBookmarks = async () => {
+      try {
+        const snap = await getDoc(doc(db, "forum_bookmarks", currentUserId));
+        if (snap.exists() && snap.data().postIds) {
+          setBookmarks(new Set(snap.data().postIds));
+        } else {
+          setBookmarks(new Set());
+        }
+      } catch (e) {
+        console.error("Hiba a könyvjelzők betöltésekor:", e);
+      }
+    };
+    loadBookmarks();
+
+    // Load Following
+    const qF = query(collection(db, "forum_follows"), where("followerId", "==", currentUserId));
+    const unsubF = onSnapshot(qF, (snap) => {
+      const ids = snap.docs.map(d => d.data().followedId);
+      setFollowingIds(new Set(ids));
+      dbg(`Following sync: ${ids.length} users`);
+    }, (err) => console.error("Following listener error:", err));
+
+    return () => unsubF();
+  }, [currentUserId]);
+
   // ── Poszt keresése ───────────────────────────────────────────────
   const findPost = useCallback((category, slug, postList) => {
     return (
@@ -856,7 +914,7 @@ export default function Forum() {
     );
   }, []);
 
-  // ── Firebase betöltés ────────────────────────────────────────────
+  // ── Firebase betöltés (Egyszeri betöltés) ────────────────────────
   useEffect(() => {
     const loadFirebasePosts = async () => {
       try {
@@ -872,28 +930,52 @@ export default function Forum() {
           };
         });
         dbg(`Firebase: ${fbPosts.length} poszt betöltve`);
-        if (fbPosts.length > 0) {
-          setPosts([...fbPosts, ...MOCK_POSTS]);
+        
+        // Összefésülés a mock adatokkal
+        const allPosts = [...fbPosts, ...MOCK_POSTS];
+        setPosts(allPosts);
+
+        // REFRESH FIX: Azonnal ellenőrizzük az URL-t a betöltött adatokkal
+        if (!initialSlugRef.current) {
+          const info = getPostInfoFromURL();
+          if (info) {
+            const found = findPost(info.category, info.slug, allPosts);
+            if (found) {
+              setOpenPost(found);
+              setViewedIds(prev => new Set([...prev, found.id]));
+            }
+          }
+          initialSlugRef.current = true;
+          setIsInitializingRoute(false);
         }
       } catch (e) {
         console.error("Firebase betöltési hiba:", e);
+        if (!initialSlugRef.current) {
+          initialSlugRef.current = true;
+          setIsInitializingRoute(false);
+        }
       }
     };
     loadFirebasePosts();
-  }, []);
+  }, [findPost]);
 
-  // ── URL routing ──────────────────────────────────────────────────
+  // ── URL routing (Popstate szinkronizáció) ───────────────────────
   useEffect(() => {
-    if (initialSlugRef.current) return;
-    const info = getPostInfoFromURL();
-    if (!info) { initialSlugRef.current = true; return; }
-    const found = findPost(info.category, info.slug, posts);
-    if (found) {
-      setOpenPost(found);
-      setViewedIds(prev => new Set([...prev, found.id]));
-      initialSlugRef.current = true;
-    }
-  }, [posts, findPost]);
+    const handleNavigation = () => {
+      const info = getPostInfoFromURL();
+      if (!info) {
+        if (openPost) setOpenPost(null);
+      } else {
+        const found = findPost(info.category, info.slug, posts);
+        if (found && (!openPost || openPost.id !== found.id)) {
+          setOpenPost(found);
+        }
+      }
+    };
+
+    window.addEventListener("popstate", handleNavigation);
+    return () => window.removeEventListener("popstate", handleNavigation);
+  }, [posts, findPost, openPost]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -924,11 +1006,61 @@ export default function Forum() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const toggleBookmark = id => setBookmarks(p => {
-    const n = new Set(p);
-    n.has(id) ? n.delete(id) : n.add(id);
-    return n;
-  });
+  const toggleFollow = async (followedId) => {
+    if (!currentUserId || !followedId || followedId === currentUserId) return;
+    
+    try {
+      const q = query(
+        collection(db, "forum_follows"),
+        where("followerId", "==", currentUserId),
+        where("followedId", "==", followedId)
+      );
+      const snap = await getDocs(q);
+      
+      if (!snap.empty) {
+        // Unfollow
+        const batch = writeBatch(db);
+        snap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        dbg("Unfollowed user:", followedId);
+      } else {
+        // Follow
+        await addDoc(collection(db, "forum_follows"), {
+          followerId: currentUserId,
+          followedId,
+          createdAt: serverTimestamp()
+        });
+        dbg("Followed user:", followedId);
+      }
+    } catch (e) {
+      console.error("Toggle follow error:", e);
+    }
+  };
+
+  const toggleBookmark = async (id) => {
+    const isBookmarked = bookmarks.has(id);
+    setBookmarks(p => {
+      const n = new Set(p);
+      isBookmarked ? n.delete(id) : n.add(id);
+      return n;
+    });
+
+    if (currentUserId) {
+      try {
+        const ref = doc(db, "forum_bookmarks", currentUserId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          await setDoc(ref, { postIds: [id] });
+        } else {
+          await updateDoc(ref, {
+            postIds: isBookmarked ? arrayRemove(id) : arrayUnion(id)
+          });
+        }
+      } catch(e) {
+        console.error("Hiba a könyvjelző mentésekor:", e);
+      }
+    }
+  };
 
   const handleOpenPost = (post) => {
     setViewedIds(p => new Set([...p, post.id]));
@@ -949,7 +1081,7 @@ export default function Forum() {
       if (!notif.read) {
         await updateDoc(doc(db, "forum_notifications", notif.id), { read: true });
       }
-      
+
       // Navigáció a bejegyzéshez
       if (notif.postId) {
         // Megkeressük a posztot az összes poszt között
@@ -1001,6 +1133,30 @@ export default function Forum() {
   };
 
   // ── Új / szerkesztett poszt mentése ─────────────────────────────
+  // ── Új poszt értesítés követőknek ─────────────────────────────
+  const notifyFollowersNewPost = async (authorId, authorName, postTitle, postId) => {
+    if (!authorId) return;
+    try {
+      const q = query(collection(db, "forum_follows"), where("followedId", "==", authorId));
+      const snap = await getDocs(q);
+      
+      const notifPromises = snap.docs.map(d => {
+        const followerId = d.data().followerId;
+        return createNotification(
+          followerId,
+          "system",
+          `${authorName} új témát indított: "${postTitle}"`,
+          postId
+        );
+      });
+      
+      await Promise.all(notifPromises);
+      dbg(`Follower notifications sent: ${snap.docs.length}`);
+    } catch (e) {
+      console.error("Notify followers error:", e);
+    }
+  };
+
   const handleNewPost = async (data, editId = null) => {
     dbg("handleNewPost:", { editId, title: data.title });
 
@@ -1071,6 +1227,9 @@ export default function Forum() {
     }
 
     setPosts(p => [{ ...postData, id: finalId }, ...p]);
+
+    // Értesítjük a követőket az új posztról
+    notifyFollowersNewPost(currentUserId, postData.author, postData.title, finalId);
   };
 
   // ── Poszt törlése ────────────────────────────────────────────────
@@ -1108,17 +1267,8 @@ export default function Forum() {
   const handleToggleField = async (postId, field, value) => {
     dbg("handleToggleField:", { postId, field, value });
     const postIdStr = String(postId);
-    const isFbPost = !postIdStr.startsWith("local_") && isNaN(Number(postIdStr));
 
-    if (isFbPost) {
-      try {
-        await updateDoc(doc(db, "forum_posts", postIdStr), { [field]: value });
-        dbg(`Firebase toggle OK: ${field}=${value}`);
-      } catch (e) {
-        console.error(`Firebase ${field} toggle hiba:`, e);
-      }
-    }
-
+    // 1. Optimista UI: azonnal frissítjük a lokális state-eket
     setPosts(p => p.map(post =>
       String(post.id) === postIdStr ? { ...post, [field]: value } : post
     ));
@@ -1126,14 +1276,31 @@ export default function Forum() {
     if (openPost && String(openPost.id) === postIdStr) {
       setOpenPost(prev => ({ ...prev, [field]: value }));
     }
+
+    // 2. Háttérben elküldjük a Firebase-nek
+    const isFbPost = !postIdStr.startsWith("local_") && 
+                     !postIdStr.startsWith("mock_") && 
+                     isNaN(Number(postIdStr));
+    
+    if (isFbPost) {
+      try {
+        await updateDoc(doc(db, "forum_posts", postIdStr), { [field]: value });
+        dbg(`Firebase mentés sikeres: ${field}=${value}`);
+      } catch (e) {
+        console.error(`!!! FIREBASE MENTÉSI HIBA. Ellenőrizd a szabályokat a Firebase konzolban!`, e);
+      }
+    } else {
+      dbg("Helyi/Mock poszt módosítva - a változás frissítés után elvész (nem Firebase poszt).");
+    }
   };
 
   // ── Szűrés + rendezés ────────────────────────────────────────────
   const filteredPosts = posts.filter(p => {
     if (showOnlyBookmarks && !bookmarks.has(p.id)) return false;
     if (activeCategory !== "all" && p.category !== activeCategory) return false;
-    if (activeTagFilter && !p.tags.includes(activeTagFilter)) return false;
-    if (filterLocked && !p.locked) return false;
+    if (activeTagFilters.length > 0 && !activeTagFilters.every(t => p.tags?.includes(t))) return false;
+    if (filterOwn && p.authorId !== currentUserId) return false;
+    if (filterFollowed && !followingIds.has(p.authorId)) return false;
     if (filterSolved && !p.solved) return false;
     if (filterPinned && !p.pinned) return false;
     if (filterHot && !p.hot) return false;
@@ -1152,9 +1319,10 @@ export default function Forum() {
 
   const resetFilters = () => {
     setActiveCategory("all");
-    setActiveTagFilter(null);
+    setActiveTagFilters([]);
     setShowOnlyBookmarks(false);
-    setFilterLocked(false);
+    setFilterOwn(false);
+    setFilterFollowed(false);
     setFilterSolved(false);
     setFilterPinned(false);
     setFilterHot(false);
@@ -1197,10 +1365,19 @@ export default function Forum() {
           setConfirmDelete(null);
         }}
       />
+
     </>
   );
 
   // ── Poszt nézet (early return — de a modálok most itt is benne vannak!) ──
+  if (isInitializingRoute) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white" style={{ backgroundColor: "#06050a" }}>
+        <div className="w-10 h-10 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   if (openPost) {
     return (
       <>
@@ -1211,6 +1388,10 @@ export default function Forum() {
           onOpenPost={handleOpenPost}
           currentUserId={currentUserId}
           isAdmin={isAdmin}
+          isBookmarked={bookmarks.has(openPost?.id)}
+          onBookmark={toggleBookmark}
+          isFollowing={followingIds.has(openPost?.authorId)}
+          onToggleFollow={toggleFollow}
           onDelete={(id, authorId) => {
             dbg("ForumPost onDelete:", { id, authorId });
             setConfirmDelete({ id, authorId });
@@ -1230,86 +1411,57 @@ export default function Forum() {
   return (
     <div className="min-h-screen relative overflow-x-hidden text-white"
       style={{
-        background: "#0c0a12",
+        backgroundColor: "#06050a",
         fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif"
       }}>
-      {/* Subtle top gradient accent */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full blur-[160px]" style={{ background: "rgba(139,92,246,0.04)" }} />
+      
+      {/* ── Playful CSS/Motion Background ── */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#040308]">
+        {/* Playful Floating Glows using framer-motion */}
+        <motion.div 
+          animate={{ x: [0, 80, -40, 0], y: [0, -60, 40, 0] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[10%] left-[10%] w-[45vw] h-[45vw] rounded-full blur-[130px] opacity-[0.25]"
+          style={{ background: "radial-gradient(circle, #8b5cf6, transparent 65%)" }}
+        />
+        <motion.div 
+          animate={{ x: [0, -100, 60, 0], y: [0, 80, -50, 0], scale: [1, 1.15, 0.9, 1] }}
+          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute bottom-[10%] right-[10%] w-[55vw] h-[55vw] rounded-full blur-[150px] opacity-[0.22]"
+          style={{ background: "radial-gradient(circle, #38bdf8, transparent 65%)" }}
+        />
+        <motion.div 
+          animate={{ x: [0, 60, -70, 0], y: [0, -30, 70, 0], scale: [1, 1.1, 0.85, 1] }}
+          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[40%] left-[40%] w-[40vw] h-[40vw] rounded-full blur-[110px] opacity-[0.18]"
+          style={{ background: "radial-gradient(circle, #f472b6, transparent 65%)" }}
+        />
+
+        {/* CSS animated playful grid */}
+        <div className="absolute inset-0 opacity-[0.12] animate-[pulse_10s_ease-in-out_infinite]"
+             style={{ 
+               backgroundImage: "radial-gradient(rgba(255,255,255,0.4) 1px, transparent 1px)", 
+               backgroundSize: "40px 40px",
+               maskImage: "radial-gradient(ellipse at center, black 0%, transparent 80%)",
+               WebkitMaskImage: "radial-gradient(ellipse at center, black 0%, transparent 80%)"
+             }} />
+
+        <div className="absolute inset-0 opacity-[0.08]"
+             style={{ 
+               backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", 
+               backgroundSize: "100px 100px",
+               maskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)",
+               WebkitMaskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)"
+             }} />
+
+        {/* Darkening overlay for contrast with content */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#040308]/10 via-[#040308]/60 to-[#040308] pointer-events-none" />
       </div>
 
-      {/* ══ TOP NAVBAR ══ */}
-      <nav className="relative z-50 max-w-[1200px] mx-auto mt-6 px-4">
-        <div className="flex items-center justify-between bg-[#13111c]/80 border border-white/5 rounded-2xl px-6 md:px-8 py-3">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(139,92,246,0.15)" }}>
-              <Sparkles className="w-4 h-4 text-purple-400" />
-            </div>
-            <span className="text-lg font-bold tracking-tight text-white/90">LudusGen</span>
-          </div>
-
-          <div className="hidden md:flex items-center gap-8">
-            {[{ key: "KEZDŐLAP", path: "/" }, { key: "AI STÚDIÓ", path: null }, { key: "KÖZÖSSÉG", path: null }].map((link) => (
-              <button
-                key={link.key}
-                onClick={() => link.path ? navigate(link.path) : null}
-                className={`text-[0.7rem] font-semibold tracking-wide cursor-pointer transition-colors ${link.key === "KÖZÖSSÉG" ? "text-purple-400" : "text-gray-500 hover:text-white/80"}`}
-              >
-                {link.key}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative" ref={userMenuRef}>
-            <button
-              onClick={() => {
-                if (!currentUserId) {
-                  setIsAuthOpen(true);
-                  setShowNavbar(false);
-                } else {
-                  setShowUserMenu(!showUserMenu);
-                }
-              }}
-              className="cursor-pointer w-9 h-9 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center hover:bg-white/8 transition-all overflow-hidden"
-            >
-              {currentUserId && globalUser?.profilePicture ? (
-                <img
-                  src={globalUser.profilePicture}
-                  alt="profile"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <User className="w-4 h-4 text-gray-500" />
-              )}
-            </button>
-
-            {showUserMenu && currentUserId && (
-              <div className="absolute right-0 top-full w-52 rounded-xl overflow-hidden mt-2"
-                style={{ zIndex: 100000, background: "#13111c", border: "1px solid rgba(255,255,255,0.07)", boxShadow: "0 16px 48px rgba(0,0,0,0.5)" }}>
-                <div className="px-4 py-3 border-b border-white/5">
-                  <p className="text-white/90 font-semibold text-sm truncate">{globalUser?.displayName || "Felhasználó"}</p>
-                  <p className="text-gray-600 text-[0.65rem] truncate">{currentUser?.email}</p>
-                </div>
-                <div className="p-1.5">
-                  <button className="cursor-pointer w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-all text-xs" onClick={() => { setShowUserMenu(false); navigate("/settings"); }}>
-                    <Settings className="w-4 h-4" /> Beállítások
-                  </button>
-                  <div className="h-px bg-white/5 my-1" />
-                  <button
-                    className="cursor-pointer w-full flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:bg-red-400/10 transition-all text-xs"
-                    onClick={() => { logoutUser(); setShowUserMenu(false); }}
-                  >
-                    <LogOut className="w-4 h-4" /> Kijelentkezés
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
+      <div className="relative z-10 w-full">
 
       {/* ══ SEARCH & ACTIONS ══ */}
-      <div className="relative z-10 max-w-[1200px] mx-auto px-4 mt-5 mb-6">
+      <div className="relative z-50 max-w-[1200px] mx-auto px-4 mt-5 mb-6">
         <div className="flex items-center gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
@@ -1409,7 +1561,7 @@ export default function Forum() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_1fr] gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div
                     className="rounded-xl p-3"
                     style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
@@ -1418,7 +1570,7 @@ export default function Forum() {
                       <Zap className="w-3 h-3" />
                       Gyorsszűrők
                     </div>
-                    <div className="flex flex-wrap gap-2.5">
+                    <div className="grid grid-cols-2 gap-2">
                       {[
                         {
                           key: "bookmarks",
@@ -1438,14 +1590,6 @@ export default function Forum() {
                           color: "#f59e0b",
                         },
                         {
-                          key: "hot",
-                          active: filterHot,
-                          onClick: () => setFilterHot(v => !v),
-                          label: "Felkapott",
-                          icon: Flame,
-                          color: "#fb923c",
-                        },
-                        {
                           key: "solved",
                           active: filterSolved,
                           onClick: () => setFilterSolved(v => !v),
@@ -1454,12 +1598,20 @@ export default function Forum() {
                           color: "#4ade80",
                         },
                         {
-                          key: "locked",
-                          active: filterLocked,
-                          onClick: () => setFilterLocked(v => !v),
-                          label: "Lezárt",
-                          icon: Lock,
-                          color: "#f87171",
+                          key: "own",
+                          active: filterOwn,
+                          onClick: () => setFilterOwn(v => !v),
+                          label: "Saját",
+                          icon: User,
+                          color: "#a855f7",
+                        },
+                        {
+                          key: "followed",
+                          active: filterFollowed,
+                          onClick: () => setFilterFollowed(v => !v),
+                          label: "Követett",
+                          icon: Rss,
+                          color: "#38bdf8",
                         },
                       ].map(item => {
                         const Icon = item.icon;
@@ -1519,7 +1671,7 @@ export default function Forum() {
                   </div>
                 </div>
 
-                {(activeTagFilter || activeCategory !== "all" || search) && (
+                {(activeTagFilters.length > 0 || activeCategory !== "all" || search) && (
                   <div
                     className="rounded-xl p-3"
                     style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
@@ -1528,17 +1680,18 @@ export default function Forum() {
                       Aktív szűrések
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {activeTagFilter && (
+                      {activeTagFilters.map(tag => (
                         <button
-                          onClick={() => setActiveTagFilter(null)}
+                          key={tag}
+                          onClick={() => setActiveTagFilters(prev => prev.filter(t => t !== tag))}
                           className="cursor-pointer flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
                           style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}20`, color: accentColor }}
                         >
                           <Tag className="w-3 h-3" />
-                          #{activeTagFilter}
+                          #{tag}
                           <X className="w-3 h-3" />
                         </button>
-                      )}
+                      ))}
                       {activeCategory !== "all" && (
                         <button
                           onClick={() => setActiveCategory("all")}
@@ -1595,7 +1748,7 @@ export default function Forum() {
                 currentUserId={currentUserId}
                 isAdmin={isAdmin}
                 onDelete={(id, authorId) => setConfirmDelete({ id, authorId })}
-                onEdit={(p) => setEditingPost(p)}
+                onEdit={handleEdit}
                 onToggle={handleToggleField}
               />
             ))}
@@ -1611,44 +1764,61 @@ export default function Forum() {
         {/* Right Column: Sidebar */}
         <div className="space-y-4">
           {/* Categories Widget */}
-          <div className="bg-[#13111c] border border-white/5 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-4">
+          <SurfaceCard style={{ padding: "1rem" }}>
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Hash className="w-3.5 h-3.5 text-purple-400" />
                 <span className="text-xs font-semibold text-white/80">Kategóriák</span>
               </div>
+              <div className="flex items-center gap-2 text-[0.65rem] text-gray-600">
+                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{totalOnline} aktív</span>
+                <span className="text-gray-700">·</span>
+                <span>{totalThreads.toLocaleString()} téma</span>
+              </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {CATEGORIES.map(cat => (
-                <button
+                <CatSidebarCard
                   key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={`w-full group flex items-start gap-3 p-3 rounded-lg transition-all ${activeCategory === cat.id ? "bg-white/5 border border-white/5" : "hover:bg-white/3 border border-transparent"}`}
-                >
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0" style={{ background: `${cat.color}10`, color: cat.color }}>
-                    {cat.emoji}
-                  </div>
-                  <div className="text-left flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-white/80">{cat.label}</span>
-                      <span className="text-[0.65rem] text-gray-600">{cat.threads}</span>
-                    </div>
-                    <p className="text-[0.6rem] text-gray-600 mt-0.5 line-clamp-1">{cat.description || "Összes téma böngészése"}</p>
-                  </div>
-                </button>
+                  cat={cat}
+                  isActive={activeCategory === cat.id}
+                  onClick={setActiveCategory}
+                />
               ))}
             </div>
-          </div>
+          </SurfaceCard>
+
+          {/* Tags Widget */}
+          <SurfaceCard style={{ padding: "1rem" }}>
+            <div className="flex items-center gap-2 mb-3">
+              <Tag className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-xs font-semibold text-white/80">Népszerű tagek</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_TAGS.map(tag => (
+                <TagPill
+                  key={tag.label}
+                  label={tag.label}
+                  color={tag.color}
+                  active={activeTagFilters.includes(tag.label)}
+                  onClick={() => setActiveTagFilters(prev => 
+                    prev.includes(tag.label) ? prev.filter(t => t !== tag.label) : [...prev, tag.label]
+                  )}
+                  count={tag.count}
+                />
+              ))}
+            </div>
+          </SurfaceCard>
 
           {/* Leaderboard Widget */}
-          <div className="bg-[#13111c] border border-white/5 rounded-xl p-4">
+          <SurfaceCard style={{ padding: "1rem" }}>
             <div className="flex items-center gap-2 mb-4">
               <Trophy className="w-3.5 h-3.5 text-amber-400" />
               <span className="text-xs font-semibold text-white/80">Top Rangsor</span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {LEADERBOARD.map((user, i) => (
                 <div key={user.name} className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: `${user.color}15`, color: user.color }}>
@@ -1661,10 +1831,10 @@ export default function Forum() {
                 </div>
               ))}
             </div>
-          </div>
+          </SurfaceCard>
 
           {/* Activity Widget */}
-          <div className="bg-[#13111c] border border-white/5 rounded-xl p-4">
+          <SurfaceCard style={{ padding: "1rem" }}>
             <div className="flex items-center gap-2 mb-4">
               <Activity className="w-3.5 h-3.5 text-orange-400" />
               <span className="text-xs font-semibold text-white/80">Aktivitás</span>
@@ -1687,9 +1857,10 @@ export default function Forum() {
                 </div>
               ))}
             </div>
-          </div>
+          </SurfaceCard>
         </div>
       </main>
+      </div>
 
       {sharedModals}
     </div>

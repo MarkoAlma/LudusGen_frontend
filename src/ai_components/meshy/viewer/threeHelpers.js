@@ -1,13 +1,6 @@
-// viewer/threeHelpers.js — Three.js utility functions (fully optimized)
-
-export function loadScript(src) {
-  return new Promise((res, rej) => {
-    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
-    const s = document.createElement("script");
-    s.src = src; s.onload = res; s.onerror = rej;
-    document.head.appendChild(s);
-  });
-}
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
 export const hexToInt = (h) => (h ? parseInt(h.replace("#", ""), 16) : null);
 
@@ -64,7 +57,13 @@ export function setSunLightProps(sunLight, show, color, intensity) {
 export function setSceneBg(s, bgColor) {
   const { THREE, scene, renderer } = s;
   if (!THREE || !scene || !renderer) return;
-  const COLORS = { default: null, black: 0x000000, darkgray: 0x111118, white: 0xffffff };
+  const COLORS = { 
+    default: null, 
+    black: 0x010103, 
+    darkgray: 0x111118, 
+    grayish: 0x24242e,
+    white: 0xffffff 
+  };
   const val = COLORS[bgColor] ?? null;
   if (val === null) { scene.background = null; renderer.setClearAlpha(0); }
   else { scene.background = new THREE.Color(val); renderer.setClearAlpha(1); }
@@ -232,12 +231,9 @@ export function disposeModel(scene, model, origMaterials, wireCache, clayMats, u
   scene.remove(model);
 }
 
-// ── loadGLB ───────────────────────────────────────────────────────────────────
-// FIX: applyViewMode was called TWICE — first before scene.add (model not in scene yet,
-//      traverse found nothing new), then after. Now called once, after scene.add.
 export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOverlay = false, wireOpacity = 0.22, wireHexColor = 0xffffff) {
   const { THREE, scene, placeholder } = s;
-  if (!THREE?.GLTFLoader) return;
+  if (!THREE) return;
   if (placeholder) placeholder.visible = false;
 
   if (s.model) {
@@ -246,44 +242,71 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     s.origMaterials.clear();
   }
 
-  new THREE.GLTFLoader().load(
-    url,
-    (gltf) => {
-      const model = gltf.scene;
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3()).length();
-      const scale = 3 / size;
-      model.scale.setScalar(scale);
+  const handleSuccess = (object) => {
+    const model = object.scene || object;
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3()).length();
+    const scale = 3 / size;
+    model.scale.setScalar(scale);
 
-      const center = box.getCenter(new THREE.Vector3());
-      model.position.x = -center.x * scale;
-      model.position.z = -center.z * scale;
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.x = -center.x * scale;
+    model.position.z = -center.z * scale;
 
-      const scaledBox = new THREE.Box3().setFromObject(model);
-      model.position.y = -1 - scaledBox.min.y;
+    const scaledBox = new THREE.Box3().setFromObject(model);
+    model.position.y = -1 - scaledBox.min.y;
 
-      model.traverse((n) => {
-        if (n.isMesh) {
-          if (n.geometry && !n.geometry.attributes.normal) n.geometry.computeVertexNormals();
-          s.origMaterials.set(n.uuid, n.material);
-        }
-      });
+    model.traverse((n) => {
+      if (n.isMesh) {
+        if (n.geometry && !n.geometry.attributes.normal) n.geometry.computeVertexNormals();
+        s.origMaterials.set(n.uuid, n.material);
+      }
+    });
 
-      scene.add(model);
-      s.model = model;
-      s.cam.radius = 5;
-      s.cam.panY = 0;
-      syncCamera(s.camera, s.cam);
+    scene.add(model);
+    s.model = model;
+    s.cam.radius = 5;
+    s.cam.panY = 0;
+    syncCamera(s.camera, s.cam);
 
-      // Single applyViewMode call, after model is in scene
-      applyViewMode(s, currentViewMode);
-      if (wireframeOverlay) applyWireframeOverlay(s, true, wireOpacity, wireHexColor);
-      s.autoSpin = autoSpin;
-      s.markDirty?.();
-    },
-    undefined,
-    (err) => console.error("GLB load error:", err),
-  );
+    applyViewMode(s, currentViewMode);
+    if (wireframeOverlay) applyWireframeOverlay(s, true, wireOpacity, wireHexColor);
+    s.autoSpin = autoSpin;
+    s.markDirty?.();
+  };
+
+  // Detect format by extension first
+  const ext = url.split('?')[0].split('.').pop().toLowerCase();
+  if (ext === 'fbx') {
+    new FBXLoader().load(url, handleSuccess, undefined, (err) => console.error("Model load error:", err));
+    return;
+  }
+  if (['glb', 'gltf'].includes(ext)) {
+    new GLTFLoader().load(url, handleSuccess, undefined, (err) => console.error("Model load error:", err));
+    return;
+  }
+
+  // Unknown extension or no extension (e.g. API URL) — fetch & sniff magic bytes
+  fetch(url)
+    .then((res) => res.arrayBuffer())
+    .then((buffer) => {
+      const header = new Uint8Array(buffer, 0, Math.min(20, buffer.byteLength));
+      const headerStr = String.fromCharCode(...header);
+      const isFBX = headerStr.startsWith('Kaydara');
+      // glTF binary starts with "glTF" magic at byte 0
+      // const isGLB = headerStr.startsWith('glTF');
+
+      if (isFBX) {
+        const loader = new FBXLoader();
+        const object = loader.parse(buffer, '');
+        handleSuccess(object);
+      } else {
+        // Default to GLTF
+        const loader = new GLTFLoader();
+        loader.parse(buffer, '', handleSuccess, (err) => console.error("Model load error:", err));
+      }
+    })
+    .catch((err) => console.error("Model fetch error:", err));
 }
 
 export function setCameraPreset(s, preset) {

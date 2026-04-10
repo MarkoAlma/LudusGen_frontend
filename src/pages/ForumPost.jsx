@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect, useContext, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase/firebaseApp";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   collection, addDoc, getDocs, deleteDoc, doc, updateDoc,
   query, orderBy, serverTimestamp, getDoc, onSnapshot, where, limit, Timestamp, writeBatch,
@@ -17,7 +19,6 @@ import {
   PenSquare, Shield, Search, Rss, Link, Unlock,
 } from "lucide-react";
 
-// ─── Kategória map ────────────────────────────────────────────────
 const CATEGORIES = {
   chat: { label: "Chat AI", emoji: "💬", color: "#a78bfa" },
   code: { label: "Code AI", emoji: "🧠", color: "#34d399" },
@@ -26,11 +27,28 @@ const CATEGORIES = {
   threed: { label: "3D AI", emoji: "🧊", color: "#38bdf8" },
 };
 
-// ─── Mock related posts ───────────────────────────────────────────
+const ADMIN_UIDS = ["T7fU9Zp3N5M9wz2G8xQ4L1rV6bY2"];
+
+// ─── Kapcsolódó témák fallback ─────────────────────────────────
 const RELATED_MOCK = [
-  { id: 101, title: "GPT-4o vs Gemini 2.5 Pro — melyik okosabb?", category: "chat", likes: 98, comments: 34 },
-  { id: 102, title: "Hogyan csökkentsük a Claude API költségeket 70%-kal?", category: "chat", likes: 145, comments: 51 },
-  { id: 103, title: "System prompt sablonok gyűjteménye 2025", category: "chat", likes: 312, comments: 87 },
+  {
+    id: "rm1", category: "chat",
+    title: "ChatGPT vs Claude: melyik a jobb asszisztens minden napra?",
+    likes: 89, comments: 24, time: "3 napja",
+    tags: ["gpt-4o", "claude"],
+  },
+  {
+    id: "rm2", category: "code",
+    title: "GitHub Copilot vs Cursor AI — 2025-ös összehasonlítás",
+    likes: 134, comments: 41, time: "5 napja",
+    tags: ["cursor", "copilot"],
+  },
+  {
+    id: "rm3", category: "image",
+    title: "Midjourney Sref kódok: stilus-konzisztenciát gyártás titka",
+    likes: 201, comments: 58, time: "1 hete",
+    tags: ["midjourney", "prompt"],
+  },
 ];
 
 // ─── Mock comments ────────────────────────────────────────────────
@@ -183,10 +201,31 @@ const GlassCard = ({ children, style = {}, className = "" }) => (
   }}>{children}</div>
 );
 
-// ─── Poll widget ──────────────────────────────────────────────────
-const PollWidget = ({ poll, color }) => {
-  const [voted, setVoted] = useState(null);
-  const total = poll.options.reduce((s, o) => s + o.votes, 0) + (voted ? 1 : 0);
+const PollWidget = ({ poll, color, currentUserId, onVote }) => {
+  const userVotes = poll.userVotes || {};
+  const myVote = currentUserId ? userVotes[currentUserId] : null;
+
+  const voteCounts = {};
+  poll.options.forEach(o => voteCounts[o.id] = o.votes || 0);
+  Object.values(userVotes).forEach(optId => {
+    voteCounts[optId] = (voteCounts[optId] || 0) + 1;
+  });
+
+  const total = Object.values(voteCounts).reduce((s, v) => s + v, 0);
+
+  const handleVote = (optId) => {
+    if (!currentUserId) return;
+    const newVotes = { ...userVotes };
+    if (newVotes[currentUserId] === optId) {
+      delete newVotes[currentUserId];
+    } else {
+      newVotes[currentUserId] = optId;
+    }
+    
+    // Parent handleToggleField is now completely zero-delay
+    onVote({ ...poll, userVotes: newVotes });
+  };
+
   return (
     <div className="my-4 p-4 rounded-2xl space-y-2" style={{ background: `${color}08`, border: `1px solid ${color}25` }}>
       <div className="flex items-center gap-2 mb-3">
@@ -194,28 +233,33 @@ const PollWidget = ({ poll, color }) => {
         <span className="text-white font-semibold text-sm">{poll.question}</span>
       </div>
       {poll.options.map(opt => {
-        const v = opt.votes + (voted === opt.id ? 1 : 0);
+        const v = voteCounts[opt.id] || 0;
         const pct = total > 0 ? Math.round((v / total) * 100) : 0;
-        const isWinner = v === Math.max(...poll.options.map(o => o.votes + (voted === o.id ? 1 : 0)));
+        const isWinner = v > 0 && v === Math.max(...Object.values(voteCounts));
+        
         return (
-          <button key={opt.id} onClick={() => !voted && setVoted(opt.id)}
+          <button key={opt.id} onClick={() => handleVote(opt.id)}
             className="cursor-pointer w-full text-left relative overflow-hidden rounded-xl transition-all active:scale-[0.99]"
-            style={{ border: `1px solid ${voted === opt.id ? color + "60" : "rgba(255,255,255,0.08)"}` }}
-            disabled={!!voted}>
+            style={{ border: `1px solid ${myVote === opt.id ? color + "60" : "rgba(255,255,255,0.08)"}` }}>
             <div className="absolute inset-0 transition-all duration-700 rounded-xl"
-              style={{ width: voted ? `${pct}%` : "0%", background: voted === opt.id ? `${color}30` : `${color}12`, transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)" }} />
+              style={{ width: myVote ? `${pct}%` : "0%", background: myVote === opt.id ? `${color}30` : `${color}12`, transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)" }} />
             <div className="relative flex items-center justify-between px-3 py-2.5">
               <span className="text-white text-sm flex items-center gap-2">
-                {voted === opt.id && <Check className="w-3.5 h-3.5" style={{ color }} />}
-                {isWinner && voted && voted !== opt.id && <span className="w-3.5 h-3.5" />}
-                {opt.label}
+                {myVote === opt.id && (
+                  <motion.span initial={{ scale: 0, opacity: 0, width: 0 }} animate={{ scale: 1, opacity: 1, width: "auto" }} className="flex-shrink-0">
+                    <Check className="w-3.5 h-3.5" style={{ color }} />
+                  </motion.span>
+                )}
+                <span className="truncate">{opt.label}</span>
               </span>
-              {voted && <span className="text-xs font-bold" style={{ color: voted === opt.id ? color : "#6b7280" }}>{pct}%</span>}
+              {myVote && <span className="text-xs font-bold" style={{ color: myVote === opt.id ? color : "#6b7280" }}>{pct}%</span>}
             </div>
           </button>
         );
       })}
-      <p className="text-gray-600 text-xs text-right">{total} szavazat{!voted && " · Szavazz!"}</p>
+      <p className="text-gray-600 text-xs text-right mt-3">
+        {myVote ? `${total} szavazat` : "Szavazz az eredmények megtekintéséhez!"}
+      </p>
     </div>
   );
 };
@@ -681,12 +725,15 @@ const PermalinkWidget = ({ category, slug, color }) => {
 };
 
 // ─── User Profile Modal ───────────────────────────────────────────
-const UserProfileModal = ({ isOpen, onClose, author, authorAvatar, authorAvatarUrl, authorColor, authorPosts = [], onOpenPost }) => {
+const UserProfileModal = ({ 
+  isOpen, onClose, author, authorId, authorAvatar, authorAvatarUrl, authorColor, 
+  authorPosts = [], onOpenPost, isFollowing, onToggleFollow, currentUserId 
+}) => {
   if (!isOpen) return null;
   const totalLikes = authorPosts.reduce((s, p) => s + (p.likes || 0), 0);
   const totalViews = authorPosts.reduce((s, p) => s + (p.views || 0), 0);
   const totalComments = authorPosts.reduce((s, p) => s + (p.comments || 0), 0);
-  return (
+  return createPortal(
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-2xl overflow-hidden flex flex-col"
@@ -704,11 +751,29 @@ const UserProfileModal = ({ isOpen, onClose, author, authorAvatar, authorAvatarU
             {authorAvatarUrl
               ? <img src={authorAvatarUrl} alt="avatar" className="w-14 h-14 rounded-2xl object-cover" />
               : <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-lg text-white"
-                  style={{ background: authorColor + "45", border: `1px solid ${authorColor}35` }}>{authorAvatar}</div>
+                style={{ background: authorColor + "45", border: `1px solid ${authorColor}35` }}>{authorAvatar}</div>
             }
-            <div>
-              <div className="text-white font-bold text-base" style={{ color: authorColor }}>{author}</div>
-              <div className="text-gray-500 text-xs">Fórum tag</div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-white font-bold text-base" style={{ color: authorColor }}>{author}</div>
+                  <div className="text-gray-500 text-xs">Fórum tag</div>
+                </div>
+                {currentUserId && authorId && currentUserId !== authorId && (
+                  <button
+                    onClick={() => onToggleFollow?.(authorId)}
+                    className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
+                    style={{ 
+                      background: isFollowing ? `${authorColor}20` : "rgba(255,255,255,0.04)", 
+                      color: isFollowing ? authorColor : "#9ca3af", 
+                      border: `1px solid ${isFollowing ? authorColor + "40" : "rgba(255,255,255,0.08)"}` 
+                    }}
+                  >
+                    <Rss className="w-3 h-3" />
+                    {isFollowing ? "Követed" : "Követés"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-4 gap-2">
@@ -762,14 +827,15 @@ const UserProfileModal = ({ isOpen, onClose, author, authorAvatar, authorAvatarU
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
 // ─── Törlés megerősítő dialog (lokális, poszt nézetben) ───────────
 const ConfirmDeleteModal = ({ isOpen, onConfirm, onCancel }) => {
   if (!isOpen) return null;
-  return (
+  return createPortal(
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10001 }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative rounded-2xl p-6 max-w-sm w-full"
@@ -795,7 +861,8 @@ const ConfirmDeleteModal = ({ isOpen, onConfirm, onCancel }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -808,16 +875,19 @@ export default function ForumPost({
   onOpenPost,
   currentUserId,
   isAdmin,
+  isBookmarked,
+  onBookmark,
   onDelete,
   onEdit,
   onToggle,
+  isFollowing: propIsFollowing,
+  onToggleFollow: propOnToggleFollow,
 }) {
   const [comments, setComments] = useState([]);
   const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post?.likes || 0);
-  const [bookmarked, setBookmarked] = useState(false);
-  const [following, setFollowing] = useState(false);
+  const [internalIsFollowing, setInternalIsFollowing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sortComments, setSortComments] = useState("top");
   const [commentSearch, setCommentSearch] = useState("");
@@ -832,8 +902,11 @@ export default function ForumPost({
 
   // JAVÍTÁS: jogosultság-számítás
   // Ha nincs authorId (mock poszt) → mindenki kezelheti; ha van → csak a saját uid
+  // Az isAdmin prop-ot kiegészítjük a helyi ADMIN_UIDS ellenőrzéssel is
+  const isLocalAdmin = !!currentUserId && ADMIN_UIDS.includes(currentUserId);
+  const effectiveIsAdmin = isAdmin || isLocalAdmin;
   const isOwn = !post?.authorId || (!!currentUserId && currentUserId === post?.authorId);
-  const canManage = isOwn || isAdmin;
+  const canManage = isOwn || effectiveIsAdmin;
 
   const relatedPosts = (allPosts.length > 1
     ? allPosts.filter(p => p.id !== post?.id && p.category === post?.category)
@@ -870,7 +943,51 @@ export default function ForumPost({
     }
   }, [currentUserId, post?.id, post?.category, post?.slug]);
 
-  // ── Firebase Figyelő ─────────────────────────────────────────────
+  const isFollowing = propOnToggleFollow ? propIsFollowing : internalIsFollowing;
+
+  // ── Following Sync (Fallback for direct URL access) ────────────────
+  useEffect(() => {
+    if (propOnToggleFollow || !currentUserId || !post?.authorId) return;
+    const q = query(
+      collection(db, "forum_follows"),
+      where("followerId", "==", currentUserId),
+      where("followedId", "==", post.authorId)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setInternalIsFollowing(!snap.empty);
+    });
+    return unsub;
+  }, [currentUserId, post?.authorId, propOnToggleFollow]);
+
+  const handleToggleFollow = async () => {
+    if (propOnToggleFollow) {
+      propOnToggleFollow(post.authorId);
+      return;
+    }
+    // Deep fallback logic
+    if (!currentUserId || !post?.authorId) return;
+    try {
+      const q = query(
+        collection(db, "forum_follows"),
+        where("followerId", "==", currentUserId),
+        where("followedId", "==", post.authorId)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const batch = writeBatch(db);
+        snap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      } else {
+        await addDoc(collection(db, "forum_follows"), {
+          followerId: currentUserId,
+          followedId: post.authorId,
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (e) {
+      console.error("Internal toggle follow error:", e);
+    }
+  };
   useEffect(() => {
     if (!post?.id) return;
 
@@ -900,14 +1017,14 @@ export default function ForumPost({
       }));
 
       console.log(`[ForumPost] ${assembled.length} fő hozzászólás betöltve (+ ${replies.length} válasz)`);
-      
+
       // Ha nincs még adat, és ez egy mock post id (szám), használjuk az inicialis mockokat
       if (assembled.length === 0 && (typeof post.id === 'number' || String(post.id).length < 5)) {
         setComments(INITIAL_COMMENTS);
       } else {
         setComments(assembled);
       }
-      
+
       setIsLoadingComments(false);
     }, (err) => {
       console.error("[ForumPost] Firebase hiba:", err);
@@ -1015,14 +1132,54 @@ export default function ForumPost({
     <div
       className="min-h-screen relative overflow-x-hidden text-white"
       style={{
-        background: "#0c0a12",
-        fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+        backgroundColor: "#06050a",
+        fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif"
       }}
     >
-      {/* Subtle top gradient accent */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full blur-[160px]" style={{ background: "rgba(139,92,246,0.04)" }} />
+      {/* ── Playful CSS/Motion Background ── */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#040308]">
+        {/* Playful Floating Glows using framer-motion */}
+        <motion.div 
+          animate={{ x: [0, 80, -40, 0], y: [0, -60, 40, 0] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[10%] left-[10%] w-[45vw] h-[45vw] rounded-full blur-[130px] opacity-[0.25]"
+          style={{ background: "radial-gradient(circle, #8b5cf6, transparent 65%)" }}
+        />
+        <motion.div 
+          animate={{ x: [0, -100, 60, 0], y: [0, 80, -50, 0], scale: [1, 1.15, 0.9, 1] }}
+          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute bottom-[10%] right-[10%] w-[55vw] h-[55vw] rounded-full blur-[150px] opacity-[0.22]"
+          style={{ background: "radial-gradient(circle, #38bdf8, transparent 65%)" }}
+        />
+        <motion.div 
+          animate={{ x: [0, 60, -70, 0], y: [0, -30, 70, 0], scale: [1, 1.1, 0.85, 1] }}
+          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-[40%] left-[40%] w-[40vw] h-[40vw] rounded-full blur-[110px] opacity-[0.18]"
+          style={{ background: "radial-gradient(circle, #f472b6, transparent 65%)" }}
+        />
+
+        {/* CSS animated playful grid */}
+        <div className="absolute inset-0 opacity-[0.12] animate-[pulse_10s_ease-in-out_infinite]"
+             style={{ 
+               backgroundImage: "radial-gradient(rgba(255,255,255,0.4) 1px, transparent 1px)", 
+               backgroundSize: "40px 40px",
+               maskImage: "radial-gradient(ellipse at center, black 0%, transparent 80%)",
+               WebkitMaskImage: "radial-gradient(ellipse at center, black 0%, transparent 80%)"
+             }} />
+
+        <div className="absolute inset-0 opacity-[0.08]"
+             style={{ 
+               backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", 
+               backgroundSize: "100px 100px",
+               maskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)",
+               WebkitMaskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)"
+             }} />
+
+        {/* Darkening overlay for contrast with content */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#040308]/10 via-[#040308]/60 to-[#040308] pointer-events-none" />
       </div>
+
+      <div className="relative z-10 w-full">
 
       <ReadingProgress color={color} />
       <ScrollToTop />
@@ -1032,11 +1189,15 @@ export default function ForumPost({
         isOpen={showProfile}
         onClose={() => setShowProfile(false)}
         author={post.author}
+        authorId={post.authorId}
         authorAvatar={post.avatar}
         authorAvatarUrl={post.avatarUrl}
         authorColor={post.avatarColor}
         authorPosts={allPosts.filter(p => p.author === post.author)}
         onOpenPost={onOpenPost}
+        isFollowing={isFollowing}
+        onToggleFollow={handleToggleFollow}
+        currentUserId={currentUserId}
       />
 
       {/* Törlés megerősítő (lokális) */}
@@ -1049,55 +1210,9 @@ export default function ForumPost({
         onCancel={() => setShowDeleteConfirm(false)}
       />
 
-      <nav className="relative z-50 max-w-[1200px] mx-auto mt-6 px-4">
-        <div className="flex items-center justify-between bg-[#13111c]/80 border border-white/5 rounded-2xl px-6 md:px-8 py-3">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(139,92,246,0.15)" }}>
-              <Sparkles className="w-4 h-4 text-purple-400" />
-            </div>
-            <span className="text-lg font-bold tracking-tight text-white/90">LudusGen</span>
-          </div>
-
-          <div className="hidden md:flex items-center gap-8">
-            {[{ key: "KEZDŐLAP", action: () => navigate("/") }, { key: "AI STÚDIÓ", action: null }, { key: "KÖZÖSSÉG", action: () => onBack?.() }].map((link) => (
-              <button
-                key={link.key}
-                onClick={() => {
-                  if (link.action) link.action();
-                }}
-                className={`text-[0.7rem] font-semibold tracking-wide cursor-pointer transition-colors ${link.key === "KÖZÖSSÉG" ? "text-purple-400" : "text-gray-500 hover:text-white/80"}`}
-              >
-                {link.key}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onBack}
-              className="cursor-pointer hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/5 text-gray-400 hover:text-white hover:bg-white/8 transition-all"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="text-xs font-medium">Vissza</span>
-            </button>
-            <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center overflow-hidden">
-              {globalUser?.profilePicture ? (
-                <img
-                  src={globalUser.profilePicture}
-                  alt="profile"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <User className="w-4 h-4 text-gray-500" />
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <div className="relative z-10 max-w-[1200px] mx-auto px-4 pt-6 pb-10">
+      <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }} className="relative z-10 max-w-[1200px] mx-auto px-4 pt-6 pb-10">
         {/* ── Breadcrumb ── */}
-        <GlassCard className="mb-4" style={{ background: "#13111c" }}>
+        <GlassCard className="mb-4" style={{ background: "rgba(20, 18, 32, 0.7)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.12)" }}>
           <div className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
             <button onClick={onBack} className="cursor-pointer flex items-center gap-1.5 text-gray-500 hover:text-white transition-colors group">
               <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
@@ -1114,12 +1229,11 @@ export default function ForumPost({
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px] xl:grid-cols-[minmax(0,1fr)_260px] gap-4">
           <div className="space-y-4">
-            <GlassCard style={{ border: `1px solid ${color}15` }}>
+            <GlassCard style={{ background: "rgba(20, 18, 32, 0.85)", backdropFilter: "blur(16px)", border: `1px solid ${color}40`, boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
               <div className="p-5 md:p-6">
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   {post.pinned && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.2)" }}><Pin className="w-2.5 h-2.5" />Kitűzve</span>}
                   {post.hot && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(251,113,33,0.12)", color: "#fb923c", border: "1px solid rgba(251,113,33,0.2)" }}><Flame className="w-2.5 h-2.5" />Felkapott</span>}
-                  {post.locked && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(239,68,68,0.10)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}><Lock className="w-2.5 h-2.5" />Lezárva</span>}
                   {post.solved && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}><CheckCircle className="w-2.5 h-2.5" />Megoldva</span>}
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: `${color}12`, color, border: `1px solid ${color}25` }}>{cat.emoji} {cat.label}</span>
                   <span className="ml-auto text-gray-600 text-xs flex items-center gap-1">
@@ -1127,9 +1241,9 @@ export default function ForumPost({
                   </span>
                 </div>
 
-                <h1 className="text-white font-bold text-xl md:text-2xl leading-tight mb-4">{post.title}</h1>
+                <h1 className="text-white font-extrabold text-3xl md:text-4xl leading-tight mb-5" style={{ textShadow: "0 3px 8px rgba(0,0,0,0.6)" }}>{post.title}</h1>
 
-                <div className="flex items-center gap-4 mb-6 py-4 border-y border-white/5">
+                <div className="flex items-center gap-4 mb-6 py-4 border-y border-white/10">
                   <div className="relative cursor-pointer group" onClick={() => setShowProfile(true)}>
                     {post.avatarUrl ? (
                       <img src={post.avatarUrl} alt="avatar" className="w-12 h-12 rounded-2xl object-cover ring-2 ring-white/5 group-hover:ring-[color:var(--accent)] transition-all" style={{ '--accent': color }} />
@@ -1155,14 +1269,14 @@ export default function ForumPost({
                   </div>
 
                   <div className="ml-auto flex items-center gap-1.5">
-                    <button onClick={() => setFollowing(v => !v)}
+                    <button onClick={handleToggleFollow}
                       className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
-                      style={{ background: following ? `${color}20` : "rgba(255,255,255,0.04)", color: following ? color : "#9ca3af", border: `1px solid ${following ? color + "40" : "rgba(255,255,255,0.08)"}` }}>
-                      <Rss className="w-3 h-3" />{following ? "Követed" : "Követés"}
+                      style={{ background: isFollowing ? `${color}20` : "rgba(255,255,255,0.04)", color: isFollowing ? color : "#9ca3af", border: `1px solid ${isFollowing ? color + "40" : "rgba(255,255,255,0.08)"}` }}>
+                      <Rss className="w-3 h-3" />{isFollowing ? "Követed" : "Követés"}
                     </button>
-                    <button onClick={() => setBookmarked(v => !v)} className="cursor-pointer p-2 rounded-xl transition-all hover:bg-white/8"
-                      style={{ color: bookmarked ? "#fbbf24" : "#6b7280" }}>
-                      <Bookmark className={`w-4 h-4 ${bookmarked ? "fill-current" : ""}`} />
+                    <button onClick={() => onBookmark?.(post?.id)} className="cursor-pointer p-2 rounded-xl transition-all hover:bg-white/8"
+                      style={{ color: isBookmarked ? "#fbbf24" : "#6b7280" }}>
+                      <Bookmark className={`w-4 h-4 ${isBookmarked ? "fill-current" : ""}`} />
                     </button>
                     <button onClick={handleShare} className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all hover:bg-white/8"
                       style={{ color: copied ? "#4ade80" : "#6b7280" }}>
@@ -1176,7 +1290,7 @@ export default function ForumPost({
                   {renderMd(post.content)}
                 </div>
 
-                {post.poll && <PollWidget poll={post.poll} color={color} />}
+                {post.poll && <PollWidget poll={post.poll} color={color} currentUserId={currentUserId} onVote={(newPoll) => onToggle?.(post.id, "poll", newPoll)} />}
 
                 <div className="flex gap-1.5 flex-wrap mb-5">
                   {post.tags?.map(t => (
@@ -1198,14 +1312,13 @@ export default function ForumPost({
                         <MessageSquare className="w-4 h-4" />{totalComments} hozzászólás
                       </div>
                     </div>
-                    <ReactionBar reactions={{ "🔥": 12, "⭐": 5 }} color={color} commentId="post" />
                   </div>
                   <HelpfulWidget color={color} />
                 </div>
               </div>
             </GlassCard>
 
-            {!post.locked && (
+            {!post.solved && (
               <GlassCard>
                 <div className="p-4 md:p-5">
                   <h3 className="text-white font-semibold text-sm flex items-center gap-2 mb-3">
@@ -1222,10 +1335,10 @@ export default function ForumPost({
               </GlassCard>
             )}
 
-            {post.locked && (
-              <div className="flex items-center gap-3 p-4 rounded-2xl" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
-                <Lock className="w-4 h-4 text-red-400 flex-shrink-0" />
-                <p className="text-red-300 text-sm">Ez a téma le van zárva. Nem lehet új hozzászólást írni.</p>
+            {post.solved && (
+              <div className="flex items-center gap-3 p-4 rounded-2xl" style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.2)" }}>
+                <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <p className="text-green-300 text-sm">Ez a téma meg lett oldva. Nem lehet új hozzászólást írni.</p>
               </div>
             )}
 
@@ -1318,6 +1431,15 @@ export default function ForumPost({
           <div className="space-y-3">
             <TableOfContents content={post.content} color={color} />
 
+            {/* Permalink */}
+            {post.slug && post.category && (
+              <PermalinkWidget
+                category={post.category}
+                slug={post.slug}
+                color={color}
+              />
+            )}
+
             <GlassCard>
               <div className="px-4 pt-4 pb-3">
                 <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3">Bejegyzés infó</h4>
@@ -1382,7 +1504,7 @@ export default function ForumPost({
               <GlassCard>
                 <div className="px-4 pt-4 pb-3">
                   <h4 className="text-gray-500 text-xs uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                    <Shield className="w-3 h-3" /> {isAdmin && !isOwn ? "Admin műveletek" : "Saját téma"}
+                    <Shield className="w-3 h-3" /> {effectiveIsAdmin && !isOwn ? "Admin műveletek" : "Saját téma"}
                   </h4>
                   <div className="space-y-0.5">
                     {isOwn && (
@@ -1400,17 +1522,7 @@ export default function ForumPost({
                         {post.solved ? "Megoldás visszavonása" : "Megoldottnak jelölés"}
                       </button>
                     )}
-                    {canManage && (
-                      <button onClick={() => onToggle?.(post.id, "locked", !post.locked)}
-                        className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
-                        style={{ color: post.locked ? "#60a5fa" : "#fb923c" }}>
-                        {post.locked
-                          ? <><Unlock className="w-3.5 h-3.5" /> Zárolás feloldása</>
-                          : <><Lock className="w-3.5 h-3.5" /> Téma zárolása</>
-                        }
-                      </button>
-                    )}
-                    {isAdmin && (
+                    {effectiveIsAdmin && (
                       <button onClick={() => onToggle?.(post.id, "pinned", !post.pinned)}
                         className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                         style={{ color: "#fbbf24" }}>
@@ -1418,7 +1530,7 @@ export default function ForumPost({
                         {post.pinned ? "Kitűzés eltávolítása" : "Kitűzés"}
                       </button>
                     )}
-                    {isAdmin && (
+                    {effectiveIsAdmin && (
                       <button onClick={() => onToggle?.(post.id, "hot", !post.hot)}
                         className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                         style={{ color: "#fb923c" }}>
@@ -1439,12 +1551,8 @@ export default function ForumPost({
             )}
           </div>
         </div>
+      </motion.div>
       </div>
-
-      <style>{`
-        @keyframes floatB { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(20px,-20px) scale(1.05)} 66%{transform:translate(-15px,15px) scale(0.95)} }
-        .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-      `}</style>
     </div>
   );
 }

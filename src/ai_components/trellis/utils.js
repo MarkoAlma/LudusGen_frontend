@@ -78,17 +78,12 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export async function fetchGlbAsBlob(modelUrl, getIdToken) {
   if (!modelUrl) return null;
-
-  // data URI — base64 fallback
   if (modelUrl.startsWith('data:')) return modelUrl;
 
-  // URL feloldás
   let fetchUrl = modelUrl;
   if (modelUrl.startsWith('/api/')) {
-    // BUG FIX: volt hardcoded http://localhost:3001 — production-ban törött
     fetchUrl = `${API_BASE}${modelUrl}`;
   } else if (modelUrl.includes('tripo3d.com') || modelUrl.includes('tripo3d.ai')) {
-    // FIX: tripo CDN CORS-blokkolt — ide tartozik a tripo-data.rg1.data.tripo3d.com is
     fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}`;
   } else if (
     modelUrl.startsWith('https://s3.') ||
@@ -98,17 +93,26 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken) {
     fetchUrl = `${API_BASE}/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
   }
 
-  let token = '';
-  try {
-    token = getIdToken ? await getIdToken() : '';
-  } catch (e) {
-    console.warn('fetchGlbAsBlob: getIdToken hiba:', e?.message ?? e);
+  const tryFetch = async (url) => {
+    let token = '';
+    try {
+      token = getIdToken ? await getIdToken() : '';
+    } catch (e) {
+      console.warn('fetchGlbAsBlob: getIdToken hiba:', e?.message ?? e);
+    }
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return fetch(url, { headers });
+  };
+
+  let r = await tryFetch(fetchUrl);
+
+  // Retry once if 401 or 502 (proxy might be refreshing the URL)
+  if (!r.ok && [401, 502].includes(r.status)) {
+    console.warn(`fetchGlbAsBlob: attempt 1 failed (${r.status}), retrying in 1s...`);
+    await new Promise(res => setTimeout(res, 1000));
+    r = await tryFetch(fetchUrl);
   }
-
-  const headers = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const r = await fetch(fetchUrl, { headers });
 
   if (!r.ok) {
     const body = await r.text().catch(() => '');
@@ -117,6 +121,57 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken) {
 
   const blob = await r.blob();
   return URL.createObjectURL(blob);
+}
+
+/**
+ * Fetch model as ArrayBuffer (for thumbnail generation).
+ * Returns { buffer: ArrayBuffer, blobUrl: string }
+ */
+export async function fetchModelData(modelUrl, getIdToken) {
+  if (!modelUrl) return null;
+  if (modelUrl.startsWith('data:')) return null;
+
+  let fetchUrl = modelUrl;
+  if (modelUrl.startsWith('/api/')) {
+    fetchUrl = `${API_BASE}${modelUrl}`;
+  } else if (modelUrl.includes('tripo3d.com') || modelUrl.includes('tripo3d.ai')) {
+    fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}`;
+  } else if (
+    modelUrl.startsWith('https://s3.') ||
+    modelUrl.includes('backblazeb2.com') ||
+    modelUrl.includes('b2cdn.com')
+  ) {
+    fetchUrl = `${API_BASE}/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
+  }
+
+  const tryFetch = async (url) => {
+    let token = '';
+    try {
+      token = getIdToken ? await getIdToken() : '';
+    } catch (e) {
+      console.warn('fetchModelData: getIdToken hiba:', e?.message ?? e);
+    }
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return fetch(url, { headers });
+  };
+
+  let r = await tryFetch(fetchUrl);
+
+  if (!r.ok && [401, 502].includes(r.status)) {
+    console.warn(`fetchModelData: attempt 1 failed (${r.status}), retrying in 1.2s...`);
+    await new Promise(res => setTimeout(res, 1200));
+    r = await tryFetch(fetchUrl);
+  }
+
+  if (!r.ok) {
+    throw new Error(`Model fetch failed: HTTP ${r.status} — ${fetchUrl}`);
+  }
+
+  const buffer = await r.arrayBuffer();
+  const blob = new Blob([buffer]);
+  const blobUrl = URL.createObjectURL(blob);
+  return { buffer, blobUrl };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
