@@ -102,6 +102,85 @@ const ANNOUNCEMENTS = [
   { id: 3, text: "🧪 Beta tesztelők kerestetnek a 3D AI szekcióhoz", color: "#38bdf8" },
 ];
 
+// ── Neural Flux Terminal Components ──────────────────────────
+const DataBeam = ({ path, delay = 0, duration = 3 }) => (
+  <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" style={{ zIndex: 0 }}>
+    <path d={path} fill="none" stroke="rgba(239, 68, 68, 0.05)" strokeWidth="1" />
+    <motion.path
+      d={path}
+      fill="none"
+      stroke="url(#beamGradient)"
+      strokeWidth="2"
+      strokeLinecap="round"
+      initial={{ pathLength: 0, opacity: 0 }}
+      animate={{
+        pathLength: [0, 0.2, 0],
+        pathOffset: [0, 1.2],
+        opacity: [0, 1, 0]
+      }}
+      transition={{
+        duration,
+        repeat: Infinity,
+        delay,
+        ease: "easeInOut"
+      }}
+    />
+    <defs>
+      <linearGradient id="beamGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="transparent" />
+        <stop offset="50%" stopColor="#ef4444" />
+        <stop offset="100%" stopColor="transparent" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
+const TechnicalHUD = () => (
+  <div className="absolute inset-0 pointer-events-none font-mono text-[0.6rem] text-[#ef4444]/30 uppercase tracking-widest p-6 select-none">
+    {/* Corner HUDs */}
+    <div className="absolute top-8 left-8 border-l border-t border-[#ef4444]/20 p-2">
+      <div>SYS_KERN: ACTIVE</div>
+      <div>NET_SYNC: 0x8ff42</div>
+    </div>
+    <div className="absolute top-8 right-8 border-r border-t border-[#ef4444]/20 p-2 text-right">
+      <div>FORGE_CORE_v7.4</div>
+      <div>SEC_LEVEL: ALPHA</div>
+    </div>
+    <div className="absolute bottom-8 left-8 border-l border-b border-[#ef4444]/20 p-2">
+      <div>COORD: 47.4979 N</div>
+      <div>19.0402 E</div>
+    </div>
+    <div className="absolute bottom-8 right-8 border-r border-b border-[#ef4444]/20 p-2 text-right">
+      <div>MEMORY_OK</div>
+      <div>NEURAL_LINK: STABLE</div>
+    </div>
+
+    {/* Center Scanline Effect */}
+    <motion.div
+      animate={{ y: ["-10vh", "110vh"] }}
+      transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+      className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[#ef4444]/20 to-transparent opacity-20"
+    />
+  </div>
+);
+
+const NeuralNetwork = () => {
+  const paths = [
+    "M-100,200 Q400,100 800,400 T1500,200",
+    "M200,-100 Q600,400 300,900",
+    "M1200,1000 Q800,600 1300,100",
+    "M-50,600 Q300,700 900,500 T1600,800",
+    "M500,-50 Q450,500 550,1100"
+  ];
+  return (
+    <>
+      {paths.map((p, i) => (
+        <DataBeam key={i} path={p} delay={i * 2} duration={5 + i} />
+      ))}
+    </>
+  );
+};
+
 const LEADERBOARD = [
   { name: "prompt_guru", points: 4821, badge: "🥇", color: "#fbbf24", posts: 234 },
   { name: "pixel_witch", points: 3214, badge: "🥈", color: "#94a3b8", posts: 189 },
@@ -364,144 +443,195 @@ const PostCard = ({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -3, scale: 1.015 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
-      className="group cursor-pointer relative overflow-hidden"
+      className="group cursor-pointer relative overflow-visible"
       style={{
-        background: "rgba(20, 18, 32, 0.85)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        border: "1px solid rgba(255,255,255,0.12)",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-        borderRadius: "1rem",
-        padding: "1.25rem 1.35rem",
-        marginBottom: "0.75rem",
+        background: "linear-gradient(145deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.3))",
+        backdropFilter: "blur(40px)",
+        WebkitBackdropFilter: "blur(40px)",
+        borderColor: `${cat.color}25`,
+        borderTop: `1px solid ${cat.color}40`,
+        borderLeft: `1px solid ${cat.color}30`,
+        borderRight: `1px solid ${cat.color}10`,
+        borderBottom: `1px solid ${cat.color}10`,
+        boxShadow: `0 20px 50px -10px rgba(0,0,0,0.8), 0 0 35px -10px ${cat.color}35, inset 0 1px 0 0 ${cat.color}20`,
+        borderRadius: "1.5rem",
+        padding: "1.5rem",
+        marginBottom: "1rem",
         zIndex: showMenu ? 50 : "auto",
-        transition: "border-color 0.25s, box-shadow 0.25s",
+        transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.borderColor = `${cat.color}60`;
-        e.currentTarget.style.boxShadow = `0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px ${cat.color}30`;
+        e.currentTarget.style.background = "linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.2))";
+        e.currentTarget.style.borderColor = `${cat.color}50`;
+        e.currentTarget.style.borderTop = `1px solid ${cat.color}70`;
+        e.currentTarget.style.borderLeft = `1px solid ${cat.color}60`;
+        e.currentTarget.style.boxShadow = `0 30px 60px -15px rgba(0,0,0,0.9), 0 0 50px -10px ${cat.color}50, inset 0 1px 0 0 ${cat.color}40`;
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
-        e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.2)";
+        e.currentTarget.style.background = "linear-gradient(145deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.3))";
+        e.currentTarget.style.borderColor = `${cat.color}25`;
+        e.currentTarget.style.borderTop = `1px solid ${cat.color}40`;
+        e.currentTarget.style.borderLeft = `1px solid ${cat.color}30`;
+        e.currentTarget.style.boxShadow = `0 20px 50px -10px rgba(0,0,0,0.8), 0 0 35px -10px ${cat.color}35, inset 0 1px 0 0 ${cat.color}20`;
       }}
       onClick={onClick}
     >
-      <div className="flex items-start gap-4">
-        <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105"
-          style={{ background: `${cat.color}12`, border: `1px solid ${cat.color}20` }}>
-          {cat.icon ? (
-            <cat.icon className="w-5 h-5" style={{ color: cat.color }} />
-          ) : (
-            <span className="text-xl">{cat.emoji}</span>
-          )}
+      <div className="flex items-start gap-5">
+
+        {/* Left Column (Icon + Decorative) */}
+        <div className="flex flex-col items-center mt-0.5 flex-shrink-0 self-stretch">
+          {/* Avatar Logo */}
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center relative z-10 transition-transform duration-300 group-hover:scale-105"
+            style={{
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.05)",
+              boxShadow: `inset 0 0 20px ${cat.color}10`
+            }}>
+            {cat.icon ? (
+              <cat.icon className="w-6 h-6 transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" style={{ color: cat.color }} />
+            ) : (
+              <span className="text-white/80 font-black italic text-xl uppercase transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" style={{ color: cat.color }}>
+                {cat.emoji || "U"}
+              </span>
+            )}
+          </div>
+
+          {/* Premium Tech Circuit Tracker */}
+          <div className="relative flex-1 w-full flex flex-col items-center mt-3 mb-1 min-h-[3.5rem] opacity-40 group-hover:opacity-100 transition-opacity duration-500">
+            {/* Background Track */}
+            <div className="absolute inset-y-0 w-px bg-gradient-to-b from-white/10 via-white/5 to-transparent" />
+
+            {/* Data Pulse Core */}
+            <div className="absolute top-2 w-[2px] h-10 rounded-full"
+              style={{
+                background: `linear-gradient(to bottom, transparent, ${cat.color}, transparent)`,
+                boxShadow: `0 0 12px ${cat.color}`
+              }} />
+
+            {/* Cyber Nodes */}
+            <div className="absolute top-4 w-2 h-2 rotate-45 border transition-all duration-300 group-hover:rotate-90 group-hover:scale-110"
+              style={{ borderColor: cat.color, background: 'rgba(0,0,0,0.8)' }} />
+            <div className="absolute top-8 w-1 h-1 rounded-full bg-white/50" />
+            <div className="absolute top-12 w-3 h-px opacity-70"
+              style={{ background: cat.color, boxShadow: `0 0 8px ${cat.color}` }} />
+          </div>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="text-[0.6rem] px-2 py-0.5 rounded-full font-semibold tracking-wide uppercase"
-              style={{ background: `${cat.color}10`, color: cat.color, border: `1px solid ${cat.color}18` }}>
+        {/* Main Content */}
+        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+
+          {/* Header: Cat Pill & Time */}
+          <div className="flex items-center justify-between">
+            <span className="text-[0.55rem] px-3 py-1 rounded-[1rem] font-black tracking-[0.25em] uppercase italic"
+              style={{ background: `${cat.color}15`, color: cat.color, border: `1px solid ${cat.color}25` }}>
               {cat.label}
             </span>
-            <div className="flex items-center gap-1 flex-shrink-0 text-[0.58rem] font-bold flex-wrap">
-              {post.pinned && <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/15">KITŰZVE</span>}
-              {post.hot && <span className="px-1.5 py-0.5 rounded-md bg-orange-500/10 text-orange-300 border border-orange-500/15">FELKAPOTT</span>}
-              {post.locked && <span className="px-1.5 py-0.5 rounded-md bg-red-500/10 text-red-300 border border-red-500/15">LEZÁRVA</span>}
-              {post.solved && <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/15">MEGOLDVA</span>}
-            </div>
-            <span className="text-gray-600 text-[0.68rem] ml-auto">{post.time}</span>
-          </div>
-
-          <h3 className="text-xl font-extrabold text-white leading-snug mb-1.5 group-hover:text-white transition-colors"
-            style={{ fontFamily: "'Instrument Serif', serif", textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
-            {post.title}
-          </h3>
-
-          <p className="text-gray-400 text-sm leading-relaxed mb-3 line-clamp-2 font-medium">
-            {post.preview || post.content?.slice(0, 160) || ""}
-          </p>
-
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {(post.tags || []).slice(0, 4).map(tag => (
-              <span key={tag} className="px-2 py-0.5 rounded-full text-[0.65rem] font-medium"
-                style={{ background: "rgba(255,255,255,0.03)", color: "#5a5470", border: "1px solid rgba(255,255,255,0.05)" }}>
-                #{tag}
+            <div className="flex items-center gap-2 text-[0.6rem] text-zinc-500 font-bold tracking-widest uppercase relative" ref={menuRef}>
+              <span className="flex items-center gap-1 opacity-70">
+                <Clock className="w-3 h-3" /> {post.time}
               </span>
-            ))}
-          </div>
+              <span className="opacity-30">•</span>
 
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4 text-gray-600 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md flex items-center justify-center font-bold text-[0.6rem] text-white/80"
-                  style={{ background: `${post.avatarColor || cat.color}25` }}>
-                  {post.avatar || post.author?.[0] || "U"}
-                </div>
-                <span className="text-gray-400 text-xs font-medium">{post.author}</span>
-              </div>
-              <span className="flex items-center gap-1"><MessageSquare className="w-3.5 h-3.5" />{post.comments}</span>
-              <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" />{post.views?.toLocaleString()}</span>
-              <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5" />{post.likes}</span>
-              <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{post.readTime || 1}p</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button onClick={e => { e.stopPropagation(); onBookmark(post.id); }}
-                className="cursor-pointer p-1.5 rounded-lg transition-all text-gray-600 hover:text-gray-300"
-                style={{ color: bookmarked ? "#fbbf24" : undefined }}>
-                <Bookmark className={`w-4 h-4 ${bookmarked ? "fill-current" : ""}`} />
+              {/* MORE / Menu Button */}
+              <button onClick={e => { e.stopPropagation(); setShowMenu(v => !v); }}
+                className="flex items-center gap-0.5 cursor-pointer hover:text-zinc-300 transition-colors">
+                TÖBB
               </button>
 
-              {canManage && (
-                <div className="relative" ref={menuRef} onClick={e => e.stopPropagation()}>
-                  <button onClick={e => { e.stopPropagation(); setShowMenu(v => !v); }}
-                    className="cursor-pointer p-1.5 rounded-lg transition-all text-gray-600 hover:text-gray-300">
-                    <MoreHorizontal className="w-4 h-4" />
+              {/* Dropdown Menu */}
+              {showMenu && (
+                <div className="absolute right-0 top-full mt-2 w-52 rounded-xl overflow-hidden shadow-2xl"
+                  onClick={e => e.stopPropagation()}
+                  style={{ zIndex: 9999, background: "#13111c", border: `1px solid ${cat.color}30`, boxShadow: `0 12px 40px rgba(0,0,0,0.8), 0 0 0 1px ${cat.color}15` }}>
+
+                  <button onClick={e => { e.stopPropagation(); onBookmark(post.id); setShowMenu(false); }}
+                    className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                    <Bookmark className={`w-3.5 h-3.5 ${bookmarked ? "text-amber-400 fill-current" : ""}`} /> {bookmarked ? "Könyvjelző törlése" : "Mentés"}
                   </button>
-                  {showMenu && (
-                    <div className="absolute right-0 bottom-full mb-2 w-52 rounded-xl overflow-hidden"
-                      style={{ zIndex: 9999, background: "#13111c", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 12px 40px rgba(0,0,0,0.6)" }}>
+
+                  {canManage && (
+                    <>
+                      <div className="border-t border-white/5 my-1" />
                       {isOwn && (
                         <>
                           <button onClick={e => { e.stopPropagation(); setShowMenu(false); onEdit(post); }}
                             className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
                             <Edit3 className="w-3.5 h-3.5 text-blue-400" /> Szerkesztés
                           </button>
-                          <button onClick={e => { e.stopPropagation(); setShowMenu(false); onToggle(post.id, "solved", !post.solved); }}
-                            className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                            <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> {post.solved ? "Megoldás visszavon" : "Megoldva jelöl"}
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); setShowMenu(false); onToggle(post.id, "locked", !post.locked); }}
-                            className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                            {post.locked ? <><Unlock className="w-3.5 h-3.5 text-blue-400" /> Zárolás feloldása</> : <><Lock className="w-3.5 h-3.5 text-orange-400" /> Téma zárolása</>}
-                          </button>
                         </>
                       )}
                       {isAdmin && (
                         <>
-                          <div className="border-t border-white/5 my-1" />
                           <button onClick={e => { e.stopPropagation(); setShowMenu(false); onToggle(post.id, "pinned", !post.pinned); }}
                             className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                            <Pin className="w-3.5 h-3.5 text-amber-400" /> {post.pinned ? "Eltávolítás a kitűzöttek közül" : "Kitűzés"}
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); setShowMenu(false); onToggle(post.id, "hot", !post.hot); }}
-                            className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-                            <Flame className="w-3.5 h-3.5 text-orange-400" /> {post.hot ? "Eltávolítás a trendingből" : "Trending jelölés"}
+                            <Pin className="w-3.5 h-3.5 text-amber-400" /> {post.pinned ? "Kitűzés levétele" : "Kitűzés"}
                           </button>
                         </>
                       )}
                       <div className="border-t border-white/5 my-1" />
                       <button onClick={e => { e.stopPropagation(); setShowMenu(false); onDelete(post.id, post.authorId); }}
                         className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-red-400 hover:bg-red-400/10 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" /> Téma törlése
+                        <Trash2 className="w-3.5 h-3.5" /> Törlés
                       </button>
-                    </div>
+                    </>
                   )}
                 </div>
               )}
             </div>
           </div>
+
+          {/* Title */}
+          <h3 className="text-lg font-black italic leading-tight truncate py-1 transition-all duration-300 group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]"
+            style={{ color: cat.color }}>
+            {post.title}
+          </h3>
+
+          {/* Preview text */}
+          <p className="text-zinc-400 text-[13px] font-medium leading-relaxed truncate mb-1">
+            {post.preview || post.content?.slice(0, 160) || "Olvasás megkezdése..."}
+          </p>
+
+          {/* Footer row */}
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+
+            <div className="flex items-center gap-5">
+              {/* Author Pill */}
+              <div className="flex items-center gap-2 rounded-lg pr-3 pl-1 py-1 transition-all"
+                style={{ background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)" }}>
+                {post.avatarUrl || post.authorPhotoUrl ? (
+                  <img src={post.avatarUrl || post.authorPhotoUrl} alt={post.author} className="w-5 h-5 rounded object-cover border border-white/10" />
+                ) : (
+                  <div className="w-5 h-5 rounded flex items-center justify-center font-black text-[0.6rem] uppercase"
+                    style={{ background: "rgba(0,0,0,0.4)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    {post.avatar || post.author?.[0] || "U"}
+                  </div>
+                )}
+                <span className="text-[0.6rem] font-black text-zinc-500 tracking-[0.2em] uppercase italic opacity-80">{post.author}</span>
+              </div>
+
+              {/* Stats */}
+              <div className="flex items-center gap-4 text-zinc-500 text-[0.7rem] font-bold">
+                <span className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><MessageSquare className="w-3.5 h-3.5" />{post.comments}</span>
+                <span className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><Heart className="w-3.5 h-3.5" />{post.likes}</span>
+                <span className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><Eye className="w-3.5 h-3.5" />{post.views?.toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Chevron Edge Button */}
+            <div className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+              style={{
+                background: `${cat.color}08`,
+                border: `1px solid ${cat.color}20`,
+                color: cat.color,
+                boxShadow: `0 0 15px ${cat.color}15`
+              }}>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+
+          </div>
+
         </div>
+
       </div>
     </motion.div>
   );
@@ -878,7 +1008,7 @@ export default function Forum() {
       setFollowingIds(new Set());
       return;
     }
-    
+
     // Load Bookmarks
     const loadBookmarks = async () => {
       try {
@@ -930,7 +1060,7 @@ export default function Forum() {
           };
         });
         dbg(`Firebase: ${fbPosts.length} poszt betöltve`);
-        
+
         // Összefésülés a mock adatokkal
         const allPosts = [...fbPosts, ...MOCK_POSTS];
         setPosts(allPosts);
@@ -1008,7 +1138,7 @@ export default function Forum() {
 
   const toggleFollow = async (followedId) => {
     if (!currentUserId || !followedId || followedId === currentUserId) return;
-    
+
     try {
       const q = query(
         collection(db, "forum_follows"),
@@ -1016,7 +1146,7 @@ export default function Forum() {
         where("followedId", "==", followedId)
       );
       const snap = await getDocs(q);
-      
+
       if (!snap.empty) {
         // Unfollow
         const batch = writeBatch(db);
@@ -1056,7 +1186,7 @@ export default function Forum() {
             postIds: isBookmarked ? arrayRemove(id) : arrayUnion(id)
           });
         }
-      } catch(e) {
+      } catch (e) {
         console.error("Hiba a könyvjelző mentésekor:", e);
       }
     }
@@ -1139,7 +1269,7 @@ export default function Forum() {
     try {
       const q = query(collection(db, "forum_follows"), where("followedId", "==", authorId));
       const snap = await getDocs(q);
-      
+
       const notifPromises = snap.docs.map(d => {
         const followerId = d.data().followerId;
         return createNotification(
@@ -1149,7 +1279,7 @@ export default function Forum() {
           postId
         );
       });
-      
+
       await Promise.all(notifPromises);
       dbg(`Follower notifications sent: ${snap.docs.length}`);
     } catch (e) {
@@ -1278,10 +1408,10 @@ export default function Forum() {
     }
 
     // 2. Háttérben elküldjük a Firebase-nek
-    const isFbPost = !postIdStr.startsWith("local_") && 
-                     !postIdStr.startsWith("mock_") && 
-                     isNaN(Number(postIdStr));
-    
+    const isFbPost = !postIdStr.startsWith("local_") &&
+      !postIdStr.startsWith("mock_") &&
+      isNaN(Number(postIdStr));
+
     if (isFbPost) {
       try {
         await updateDoc(doc(db, "forum_posts", postIdStr), { [field]: value });
@@ -1414,452 +1544,456 @@ export default function Forum() {
         backgroundColor: "#06050a",
         fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif"
       }}>
-      
-      {/* ── Playful CSS/Motion Background ── */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#040308]">
-        {/* Playful Floating Glows using framer-motion */}
-        <motion.div 
-          animate={{ x: [0, 80, -40, 0], y: [0, -60, 40, 0] }}
-          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[10%] left-[10%] w-[45vw] h-[45vw] rounded-full blur-[130px] opacity-[0.25]"
-          style={{ background: "radial-gradient(circle, #8b5cf6, transparent 65%)" }}
-        />
-        <motion.div 
-          animate={{ x: [0, -100, 60, 0], y: [0, 80, -50, 0], scale: [1, 1.15, 0.9, 1] }}
-          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute bottom-[10%] right-[10%] w-[55vw] h-[55vw] rounded-full blur-[150px] opacity-[0.22]"
-          style={{ background: "radial-gradient(circle, #38bdf8, transparent 65%)" }}
-        />
-        <motion.div 
-          animate={{ x: [0, 60, -70, 0], y: [0, -30, 70, 0], scale: [1, 1.1, 0.85, 1] }}
-          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[40%] left-[40%] w-[40vw] h-[40vw] rounded-full blur-[110px] opacity-[0.18]"
-          style={{ background: "radial-gradient(circle, #f472b6, transparent 65%)" }}
-        />
 
-        {/* CSS animated playful grid */}
-        <div className="absolute inset-0 opacity-[0.12] animate-[pulse_10s_ease-in-out_infinite]"
-             style={{ 
-               backgroundImage: "radial-gradient(rgba(255,255,255,0.4) 1px, transparent 1px)", 
-               backgroundSize: "40px 40px",
-               maskImage: "radial-gradient(ellipse at center, black 0%, transparent 80%)",
-               WebkitMaskImage: "radial-gradient(ellipse at center, black 0%, transparent 80%)"
-             }} />
+      {/* ── Premium High-Fidelity Background: Neural Flux Terminal ── */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#040101]">
 
-        <div className="absolute inset-0 opacity-[0.08]"
-             style={{ 
-               backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", 
-               backgroundSize: "100px 100px",
-               maskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)",
-               WebkitMaskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)"
-             }} />
+        {/* Layer 1: Atmospheric Depth Gradients */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#080202] via-transparent to-[#080202]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#080202]/95 via-transparent to-[#080202]/95" />
 
-        {/* Darkening overlay for contrast with content */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#040308]/10 via-[#040308]/60 to-[#040308] pointer-events-none" />
+        {/* Layer 2: Highly Blurred Original Texture */}
+        <div className="absolute inset-0 transform scale-105 opacity-15">
+          <img
+            src="/forum_bg.png"
+            alt=""
+            className="w-full h-full object-cover mix-blend-screen"
+            style={{ filter: "brightness(0.5) blur(40px)" }}
+          />
+        </div>
+
+        {/* Layer 3: Tech Grid & Matrix Pattern */}
+        <div className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: "radial-gradient(#ef4444 0.5px, transparent 0.5px)",
+            backgroundSize: "24px 24px"
+          }} />
+
+        {/* Layer 4: Neural Data Flow (Beams) */}
+        <NeuralNetwork />
+
+        {/* Layer 5: Technical HUD & Scanlines */}
+        <TechnicalHUD />
+
+        {/* Layer 6: Cinematic Ambient Glows */}
+        <div className="absolute top-[-20%] left-[-10%] w-[80vw] h-[80vh] rounded-full blur-[160px] opacity-[0.14]"
+          style={{ background: "radial-gradient(circle, #ef4444, transparent 70%)" }} />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[80vw] h-[80vh] rounded-full blur-[180px] opacity-[0.1]"
+          style={{ background: "radial-gradient(circle, #991b1b, transparent 70%)" }} />
+
+        {/* Layer 7: Premium Matte Noise & Vignette */}
+        <div className="absolute inset-0 opacity-[0.06] mix-blend-overlay pointer-events-none"
+          style={{
+            backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E')"
+          }} />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.6)_100%)]" />
       </div>
+
+
 
       <div className="relative z-10 w-full">
 
-      {/* ══ SEARCH & ACTIONS ══ */}
-      <div className="relative z-50 max-w-[1200px] mx-auto px-4 mt-5 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
-            <input
-              type="text"
-              placeholder="Keress a fórumon..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-[#13111c] border border-white/5 rounded-xl py-2.5 pl-11 pr-4 text-sm placeholder-gray-600 focus:outline-none focus:border-purple-500/20 transition-all"
-            />
-          </div>
-
-          <div className="relative" ref={notifRef}>
-            <button
-              onClick={() => setShowNotifs(!showNotifs)}
-              className="cursor-pointer p-2.5 rounded-xl bg-[#13111c] border border-white/5 text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all relative"
-            >
-              <Bell className="w-4 h-4" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-              )}
-            </button>
-            {showNotifs && (
-              <NotifDropdown
-                notifs={notifications}
-                onNotifClick={handleNotifClick}
-                onDeleteAll={deleteAllNotifications}
-                onDeleteOne={deleteNotification}
-                onClose={() => setShowNotifs(false)}
+        {/* ══ SEARCH & ACTIONS ══ */}
+        <div className="relative z-50 max-w-[1200px] mx-auto px-4 mt-5 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+              <input
+                type="text"
+                placeholder="Keress a fórumon..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-[#13111c] border border-white/5 rounded-xl py-2.5 pl-11 pr-4 text-sm placeholder-gray-600 focus:outline-none focus:border-purple-500/20 transition-all"
               />
-            )}
-          </div>
-
-          <button
-            onClick={() => setNewPostOpen(true)}
-            className="text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 hover:opacity-90 active:scale-[0.98]"
-            style={{ background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`, boxShadow: `0 4px 16px ${accentColor}20` }}
-          >
-            Új téma <Plus className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      <main className="relative z-10 max-w-[1200px] mx-auto px-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-6 pb-16">
-        {/* Left Column: Post List */}
-        <div>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(139,92,246,0.1)" }}>
-              <Hash className="w-4 h-4 text-purple-400" />
             </div>
-            <span className="text-sm font-semibold text-gray-500">Témák böngészése</span>
-          </div>
 
-          <div className="mb-5 space-y-3">
-            <div
-              className="rounded-xl border p-4"
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setShowNotifs(!showNotifs)}
+                className="cursor-pointer p-2.5 rounded-xl bg-[#13111c] border border-white/5 text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all relative"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+                )}
+              </button>
+              {showNotifs && (
+                <NotifDropdown
+                  notifs={notifications}
+                  onNotifClick={handleNotifClick}
+                  onDeleteAll={deleteAllNotifications}
+                  onDeleteOne={deleteNotification}
+                  onClose={() => setShowNotifs(false)}
+                />
+              )}
+            </div>
+
+            <button
+              onClick={() => setNewPostOpen(true)}
+              className="px-6 py-2.5 rounded-[1rem] text-[0.65rem] font-black uppercase tracking-[0.2em] italic transition-all flex items-center gap-2 hover:scale-105 active:scale-95 group/btn relative overflow-hidden"
               style={{
-                background: "#13111c",
-                borderColor: "rgba(255,255,255,0.06)",
+                background: `${accentColor}10`,
+                color: accentColor,
+                border: `1px solid ${accentColor}30`,
+                boxShadow: `inset 0 0 15px ${accentColor}10, 0 5px 25px ${accentColor}15`
               }}
             >
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="flex h-7 w-7 items-center justify-center rounded-lg"
-                        style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}18` }}
-                      >
-                        <SlidersHorizontal className="w-3.5 h-3.5" style={{ color: accentColor }} />
-                      </div>
-                      <div>
-                        <div className="text-[0.68rem] font-semibold text-white/80">
-                          Szűrők
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          {filteredPosts.length} találat • {activeQuickFiltersCount} aktív szűrő
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div
-                      className="rounded-lg px-2.5 py-1.5 text-xs font-medium"
-                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "#9a90a8" }}
-                    >
-                      {activeCategory === "all" ? "Összes kategória" : CATEGORIES.find(c => c.id === activeCategory)?.label}
-                    </div>
-                    <button
-                      onClick={resetFilters}
-                      className="cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all hover:bg-white/5"
-                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: activeQuickFiltersCount > 0 ? "#c4b5d8" : "#5a5470" }}
-                    >
-                      Szűrők törlése
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div
-                    className="rounded-xl p-3"
-                    style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
-                  >
-                    <div className="mb-2.5 flex items-center gap-2 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
-                      <Zap className="w-3 h-3" />
-                      Gyorsszűrők
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        {
-                          key: "bookmarks",
-                          active: showOnlyBookmarks,
-                          onClick: () => setShowOnlyBookmarks(v => !v),
-                          label: "Könyvjelző",
-                          icon: Bookmark,
-                          color: "#fbbf24",
-                          fill: true,
-                        },
-                        {
-                          key: "pinned",
-                          active: filterPinned,
-                          onClick: () => setFilterPinned(v => !v),
-                          label: "Kitűzött",
-                          icon: Pin,
-                          color: "#f59e0b",
-                        },
-                        {
-                          key: "solved",
-                          active: filterSolved,
-                          onClick: () => setFilterSolved(v => !v),
-                          label: "Megoldott",
-                          icon: CheckCircle,
-                          color: "#4ade80",
-                        },
-                        {
-                          key: "own",
-                          active: filterOwn,
-                          onClick: () => setFilterOwn(v => !v),
-                          label: "Saját",
-                          icon: User,
-                          color: "#a855f7",
-                        },
-                        {
-                          key: "followed",
-                          active: filterFollowed,
-                          onClick: () => setFilterFollowed(v => !v),
-                          label: "Követett",
-                          icon: Rss,
-                          color: "#38bdf8",
-                        },
-                      ].map(item => {
-                        const Icon = item.icon;
-                        return (
-                          <button
-                            key={item.key}
-                            onClick={item.onClick}
-                            className="cursor-pointer group flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all"
-                            style={{
-                              background: item.active ? `${item.color}10` : "transparent",
-                              border: `1px solid ${item.active ? `${item.color}25` : "rgba(255,255,255,0.05)"}`,
-                              color: item.active ? "#ffffff" : "#7a7490",
-                            }}
-                          >
-                            <Icon className={`w-3.5 h-3.5 ${item.fill && item.active ? "fill-current" : ""}`} style={{ color: item.color }} />
-                            <span>{item.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div
-                    className="rounded-xl p-3"
-                    style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
-                  >
-                    <div className="mb-2.5 flex items-center gap-2 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
-                      <TrendingUp className="w-3 h-3" />
-                      Rendezés
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { id: "hot", label: "Felkapott", icon: Flame, tone: "#fb923c" },
-                        { id: "top", label: "Legjobb", icon: Trophy, tone: "#a78bfa" },
-                        { id: "new", label: "Legújabb", icon: Clock, tone: "#38bdf8" },
-                        { id: "views", label: "Népszerű", icon: Eye, tone: "#34d399" },
-                      ].map(option => {
-                        const Icon = option.icon;
-                        const active = sortBy === option.id;
-                        return (
-                          <button
-                            key={option.id}
-                            onClick={() => setSortBy(option.id)}
-                            className="cursor-pointer flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all"
-                            style={{
-                              background: active ? `${option.tone}10` : "transparent",
-                              border: `1px solid ${active ? `${option.tone}25` : "rgba(255,255,255,0.05)"}`,
-                              color: active ? "#ffffff" : "#7a7490",
-                            }}
-                          >
-                            <Icon className="w-3.5 h-3.5" style={{ color: option.tone }} />
-                            <span>{option.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {(activeTagFilters.length > 0 || activeCategory !== "all" || search) && (
-                  <div
-                    className="rounded-xl p-3"
-                    style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
-                  >
-                    <div className="mb-2.5 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
-                      Aktív szűrések
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {activeTagFilters.map(tag => (
-                        <button
-                          key={tag}
-                          onClick={() => setActiveTagFilters(prev => prev.filter(t => t !== tag))}
-                          className="cursor-pointer flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-                          style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}20`, color: accentColor }}
-                        >
-                          <Tag className="w-3 h-3" />
-                          #{tag}
-                          <X className="w-3 h-3" />
-                        </button>
-                      ))}
-                      {activeCategory !== "all" && (
-                        <button
-                          onClick={() => setActiveCategory("all")}
-                          className="cursor-pointer flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-                          style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}20`, color: accentColor }}
-                        >
-                          <Hash className="w-3 h-3" />
-                          {CATEGORIES.find(c => c.id === activeCategory)?.label}
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                      {search && (
-                        <button
-                          onClick={() => setSearch("")}
-                          className="cursor-pointer flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
-                          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "#9a90a8" }}
-                        >
-                          <Search className="w-3 h-3" />
-                          {search}
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {filteredPosts.length === 0 && (
-              <div className="bg-[#13111c] border border-white/5 rounded-xl p-8 text-center">
-                <HelpCircle className="w-8 h-8 mx-auto mb-3 text-gray-700" />
-                <p className="text-white/80 font-medium mb-1">Nincs találat ezekre a szűrőkre</p>
-                <p className="text-sm text-gray-600 mb-4">Próbálj másik kategóriát, taget vagy gyorsszűrőt választani.</p>
-                <button
-                  onClick={resetFilters}
-                  className="cursor-pointer px-4 py-2 rounded-lg text-sm font-medium text-white transition-all"
-                  style={{ background: `linear-gradient(135deg, ${accentColor}, ${accentColor}99)` }}
-                >
-                  Összes szűrő törlése
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            {filteredPosts.map(post => (
-              <PostCard
-                key={post.id}
-                post={post}
-                onClick={() => handleOpenPost(post)}
-                bookmarked={bookmarks.has(post.id)}
-                onBookmark={toggleBookmark}
-                viewedIds={viewedIds}
-                currentUserId={currentUserId}
-                isAdmin={isAdmin}
-                onDelete={(id, authorId) => setConfirmDelete({ id, authorId })}
-                onEdit={handleEdit}
-                onToggle={handleToggleField}
-              />
-            ))}
-          </div>
-
-          <div className="flex justify-center mt-10">
-            <button className="bg-white/5 border border-white/5 text-gray-500 px-8 py-3 rounded-xl text-xs font-medium hover:bg-white/8 hover:text-gray-300 transition-all">
-              További témák betöltése
+              <div className="absolute inset-0 bg-white/20 opacity-0 group-hover/btn:opacity-10 transition-opacity" />
+              <span className="tracking-[0.25em]">Új Téma</span> <Plus className="w-4 h-4 text-white" />
             </button>
           </div>
         </div>
 
-        {/* Right Column: Sidebar */}
-        <div className="space-y-4">
-          {/* Categories Widget */}
-          <SurfaceCard style={{ padding: "1rem" }}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Hash className="w-3.5 h-3.5 text-purple-400" />
-                <span className="text-xs font-semibold text-white/80">Kategóriák</span>
-              </div>
-              <div className="flex items-center gap-2 text-[0.65rem] text-gray-600">
-                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{totalOnline} aktív</span>
-                <span className="text-gray-700">·</span>
-                <span>{totalThreads.toLocaleString()} téma</span>
-              </div>
-            </div>
+        <main className="relative z-10 max-w-[1200px] mx-auto px-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-6 pb-16">
+          {/* Left Column: Post List */}
+          <div>
 
-            <div className="space-y-1.5">
-              {CATEGORIES.map(cat => (
-                <CatSidebarCard
-                  key={cat.id}
-                  cat={cat}
-                  isActive={activeCategory === cat.id}
-                  onClick={setActiveCategory}
-                />
-              ))}
-            </div>
-          </SurfaceCard>
 
-          {/* Tags Widget */}
-          <SurfaceCard style={{ padding: "1rem" }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Tag className="w-3.5 h-3.5 text-purple-400" />
-              <span className="text-xs font-semibold text-white/80">Népszerű tagek</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {ALL_TAGS.map(tag => (
-                <TagPill
-                  key={tag.label}
-                  label={tag.label}
-                  color={tag.color}
-                  active={activeTagFilters.includes(tag.label)}
-                  onClick={() => setActiveTagFilters(prev => 
-                    prev.includes(tag.label) ? prev.filter(t => t !== tag.label) : [...prev, tag.label]
+            <div className="mb-5 space-y-3">
+              <div
+                className="rounded-xl border p-4"
+                style={{
+                  background: "#13111c",
+                  borderColor: "rgba(255,255,255,0.06)",
+                }}
+              >
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="flex h-7 w-7 items-center justify-center rounded-lg"
+                          style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}18` }}
+                        >
+                          <SlidersHorizontal className="w-3.5 h-3.5" style={{ color: accentColor }} />
+                        </div>
+                        <div>
+                          <div className="text-[0.68rem] font-semibold text-white/80">
+                            Szűrők
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            {filteredPosts.length} találat • {activeQuickFiltersCount} aktív szűrő
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div
+                        className="rounded-lg px-2.5 py-1.5 text-xs font-medium"
+                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "#9a90a8" }}
+                      >
+                        {activeCategory === "all" ? "Összes kategória" : CATEGORIES.find(c => c.id === activeCategory)?.label}
+                      </div>
+                      <button
+                        onClick={resetFilters}
+                        className="cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all hover:bg-white/5"
+                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: activeQuickFiltersCount > 0 ? "#c4b5d8" : "#5a5470" }}
+                      >
+                        Szűrők törlése
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div
+                      className="rounded-xl p-3"
+                      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+                    >
+                      <div className="mb-2.5 flex items-center gap-2 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
+                        <Zap className="w-3 h-3" />
+                        Gyorsszűrők
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          {
+                            key: "bookmarks",
+                            active: showOnlyBookmarks,
+                            onClick: () => setShowOnlyBookmarks(v => !v),
+                            label: "Könyvjelző",
+                            icon: Bookmark,
+                            color: "#fbbf24",
+                            fill: true,
+                          },
+                          {
+                            key: "pinned",
+                            active: filterPinned,
+                            onClick: () => setFilterPinned(v => !v),
+                            label: "Kitűzött",
+                            icon: Pin,
+                            color: "#f59e0b",
+                          },
+                          {
+                            key: "solved",
+                            active: filterSolved,
+                            onClick: () => setFilterSolved(v => !v),
+                            label: "Megoldott",
+                            icon: CheckCircle,
+                            color: "#4ade80",
+                          },
+                          {
+                            key: "own",
+                            active: filterOwn,
+                            onClick: () => setFilterOwn(v => !v),
+                            label: "Saját",
+                            icon: User,
+                            color: "#a855f7",
+                          },
+                          {
+                            key: "followed",
+                            active: filterFollowed,
+                            onClick: () => setFilterFollowed(v => !v),
+                            label: "Követett",
+                            icon: Rss,
+                            color: "#38bdf8",
+                          },
+                        ].map(item => {
+                          const Icon = item.icon;
+                          return (
+                            <button
+                              key={item.key}
+                              onClick={item.onClick}
+                              className="cursor-pointer group flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                              style={{
+                                background: item.active ? `${item.color}10` : "transparent",
+                                border: `1px solid ${item.active ? `${item.color}25` : "rgba(255,255,255,0.05)"}`,
+                                color: item.active ? "#ffffff" : "#7a7490",
+                              }}
+                            >
+                              <Icon className={`w-3.5 h-3.5 ${item.fill && item.active ? "fill-current" : ""}`} style={{ color: item.color }} />
+                              <span>{item.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div
+                      className="rounded-xl p-3"
+                      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+                    >
+                      <div className="mb-2.5 flex items-center gap-2 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
+                        <TrendingUp className="w-3 h-3" />
+                        Rendezés
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: "hot", label: "Felkapott", icon: Flame, tone: "#fb923c" },
+                          { id: "top", label: "Legjobb", icon: Trophy, tone: "#a78bfa" },
+                          { id: "new", label: "Legújabb", icon: Clock, tone: "#38bdf8" },
+                          { id: "views", label: "Népszerű", icon: Eye, tone: "#34d399" },
+                        ].map(option => {
+                          const Icon = option.icon;
+                          const active = sortBy === option.id;
+                          return (
+                            <button
+                              key={option.id}
+                              onClick={() => setSortBy(option.id)}
+                              className="cursor-pointer flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all"
+                              style={{
+                                background: active ? `${option.tone}10` : "transparent",
+                                border: `1px solid ${active ? `${option.tone}25` : "rgba(255,255,255,0.05)"}`,
+                                color: active ? "#ffffff" : "#7a7490",
+                              }}
+                            >
+                              <Icon className="w-3.5 h-3.5" style={{ color: option.tone }} />
+                              <span>{option.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {(activeTagFilters.length > 0 || activeCategory !== "all" || search) && (
+                    <div
+                      className="rounded-xl p-3"
+                      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+                    >
+                      <div className="mb-2.5 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
+                        Aktív szűrések
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {activeTagFilters.map(tag => (
+                          <button
+                            key={tag}
+                            onClick={() => setActiveTagFilters(prev => prev.filter(t => t !== tag))}
+                            className="cursor-pointer flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
+                            style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}20`, color: accentColor }}
+                          >
+                            <Tag className="w-3 h-3" />
+                            #{tag}
+                            <X className="w-3 h-3" />
+                          </button>
+                        ))}
+                        {activeCategory !== "all" && (
+                          <button
+                            onClick={() => setActiveCategory("all")}
+                            className="cursor-pointer flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
+                            style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}20`, color: accentColor }}
+                          >
+                            <Hash className="w-3 h-3" />
+                            {CATEGORIES.find(c => c.id === activeCategory)?.label}
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                        {search && (
+                          <button
+                            onClick={() => setSearch("")}
+                            className="cursor-pointer flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
+                            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "#9a90a8" }}
+                          >
+                            <Search className="w-3 h-3" />
+                            {search}
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   )}
-                  count={tag.count}
-                />
-              ))}
-            </div>
-          </SurfaceCard>
+                </div>
+              </div>
 
-          {/* Leaderboard Widget */}
-          <SurfaceCard style={{ padding: "1rem" }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Trophy className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-xs font-semibold text-white/80">Top Rangsor</span>
+              {filteredPosts.length === 0 && (
+                <div className="bg-[#13111c] border border-white/5 rounded-xl p-8 text-center">
+                  <HelpCircle className="w-8 h-8 mx-auto mb-3 text-gray-700" />
+                  <p className="text-white/80 font-medium mb-1">Nincs találat ezekre a szűrőkre</p>
+                  <p className="text-sm text-gray-600 mb-4">Próbálj másik kategóriát, taget vagy gyorsszűrőt választani.</p>
+                  <button
+                    onClick={resetFilters}
+                    className="cursor-pointer px-4 py-2 rounded-lg text-sm font-medium text-white transition-all"
+                    style={{ background: `linear-gradient(135deg, ${accentColor}, ${accentColor}99)` }}
+                  >
+                    Összes szűrő törlése
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
-              {LEADERBOARD.map((user, i) => (
-                <div key={user.name} className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: `${user.color}15`, color: user.color }}>
-                    {user.badge}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-white/80">{user.name}</div>
-                    <div className="text-[0.6rem] text-gray-600">{user.points.toLocaleString()} pont · {user.posts} poszt</div>
-                  </div>
-                </div>
+              {filteredPosts.map(post => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  onClick={() => handleOpenPost(post)}
+                  bookmarked={bookmarks.has(post.id)}
+                  onBookmark={toggleBookmark}
+                  viewedIds={viewedIds}
+                  currentUserId={currentUserId}
+                  isAdmin={isAdmin}
+                  onDelete={(id, authorId) => setConfirmDelete({ id, authorId })}
+                  onEdit={handleEdit}
+                  onToggle={handleToggleField}
+                />
               ))}
             </div>
-          </SurfaceCard>
 
-          {/* Activity Widget */}
-          <SurfaceCard style={{ padding: "1rem" }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Activity className="w-3.5 h-3.5 text-orange-400" />
-              <span className="text-xs font-semibold text-white/80">Aktivitás</span>
+            <div className="flex justify-center mt-10">
+              <button className="bg-white/5 border border-white/5 text-gray-500 px-8 py-3 rounded-xl text-xs font-medium hover:bg-white/8 hover:text-gray-300 transition-all">
+                További témák betöltése
+              </button>
             </div>
+          </div>
 
-            <div className="space-y-4 relative">
-              <div className="absolute left-[11px] top-2 bottom-2 w-px bg-white/5" />
-              {RECENT_ACTIVITY.slice(0, 3).map((a, i) => (
-                <div key={i} className="flex gap-3 relative z-10">
-                  <div className="w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#0c0a12", border: "2px solid #1a1129" }}>
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: a.color }} />
-                  </div>
-                  <div>
-                    <p className="text-[0.68rem] text-gray-500">
-                      <span className="font-medium text-white/80">{a.user}</span> {a.action}
-                    </p>
-                    <p className="text-xs font-medium text-white/70 mt-0.5">"{a.post}"</p>
-                    <span className="text-[0.6rem] text-gray-700 mt-0.5 block">{a.time}P</span>
-                  </div>
+          {/* Right Column: Sidebar */}
+          <div className="space-y-4">
+            {/* Categories Widget */}
+            <SurfaceCard style={{ padding: "1rem" }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Hash className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-xs font-semibold text-white/80">Kategóriák</span>
                 </div>
-              ))}
-            </div>
-          </SurfaceCard>
-        </div>
-      </main>
+                <div className="flex items-center gap-2 text-[0.65rem] text-gray-600">
+                  <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{totalOnline} aktív</span>
+                  <span className="text-gray-700">·</span>
+                  <span>{totalThreads.toLocaleString()} téma</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                {CATEGORIES.map(cat => (
+                  <CatSidebarCard
+                    key={cat.id}
+                    cat={cat}
+                    isActive={activeCategory === cat.id}
+                    onClick={setActiveCategory}
+                  />
+                ))}
+              </div>
+            </SurfaceCard>
+
+            {/* Tags Widget */}
+            <SurfaceCard style={{ padding: "1rem" }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Tag className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-xs font-semibold text-white/80">Népszerű tagek</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {ALL_TAGS.map(tag => (
+                  <TagPill
+                    key={tag.label}
+                    label={tag.label}
+                    color={tag.color}
+                    active={activeTagFilters.includes(tag.label)}
+                    onClick={() => setActiveTagFilters(prev =>
+                      prev.includes(tag.label) ? prev.filter(t => t !== tag.label) : [...prev, tag.label]
+                    )}
+                    count={tag.count}
+                  />
+                ))}
+              </div>
+            </SurfaceCard>
+
+            {/* Leaderboard Widget */}
+            <SurfaceCard style={{ padding: "1rem" }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-xs font-semibold text-white/80">Top Rangsor</span>
+              </div>
+
+              <div className="space-y-2">
+                {LEADERBOARD.map((user, i) => (
+                  <div key={user.name} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: `${user.color}15`, color: user.color }}>
+                      {user.badge}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-white/80">{user.name}</div>
+                      <div className="text-[0.6rem] text-gray-600">{user.points.toLocaleString()} pont · {user.posts} poszt</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SurfaceCard>
+
+            {/* Activity Widget */}
+            <SurfaceCard style={{ padding: "1rem" }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Activity className="w-3.5 h-3.5 text-orange-400" />
+                <span className="text-xs font-semibold text-white/80">Aktivitás</span>
+              </div>
+
+              <div className="space-y-4 relative">
+                <div className="absolute left-[11px] top-2 bottom-2 w-px bg-white/5" />
+                {RECENT_ACTIVITY.slice(0, 3).map((a, i) => (
+                  <div key={i} className="flex gap-3 relative z-10">
+                    <div className="w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#0c0a12", border: "2px solid #1a1129" }}>
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: a.color }} />
+                    </div>
+                    <div>
+                      <p className="text-[0.68rem] text-gray-500">
+                        <span className="font-medium text-white/80">{a.user}</span> {a.action}
+                      </p>
+                      <p className="text-xs font-medium text-white/70 mt-0.5">"{a.post}"</p>
+                      <span className="text-[0.6rem] text-gray-700 mt-0.5 block">{a.time}P</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SurfaceCard>
+          </div>
+        </main>
       </div>
 
       {sharedModals}

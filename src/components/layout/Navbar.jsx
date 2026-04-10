@@ -4,10 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, Menu, X, LogOut, Settings,
   ChevronDown, LayoutDashboard, MessageSquare,
-  Image as ImageIcon, Music, Box, Users, Home
+  Image as ImageIcon, Music, Box, Users, Home,
+  Zap, Plus, User as UserIcon
 } from 'lucide-react';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { tokens } from '../../styles/tokens';
+import CreditTopup from '../CreditTopup';
 import bgMobileMenu from '../../assets/bg-mobile-menu.png';
 
 export default function Navbar() {
@@ -15,6 +17,7 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [studioDropdownOpen, setStudioDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [showCreditTopup, setShowCreditTopup] = useState(false);
 
   const { setIsAuthOpen, showNavbar, user, logoutUser } = useContext(MyUserContext);
   const navigate = useNavigate();
@@ -166,35 +169,120 @@ export default function Navbar() {
             {/* Actions */}
             <div className="flex items-center gap-4">
               {user ? (
-                <div className="hidden md:block relative">
+                <div className="relative" style={{ isolation: "isolate" }}>
                   <button
-                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                    className="w-10 h-10 rounded-xl border border-white/10 p-0.5 hover:border-primary/50 transition-all overflow-hidden"
+                    id="user-menu-trigger"
+                    onClick={(e) => { e.stopPropagation(); setUserDropdownOpen(!userDropdownOpen); }}
+                    className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-2xl border border-white/10 hover:border-white/20 transition-all"
+                    style={{ background: "rgba(255,255,255,0.04)" }}
                   >
-                    <img src={user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`} alt="Avatar" className="w-full h-full object-cover rounded-[inherit]" />
+                    <div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0 bg-white/10">
+                      <img
+                        src={user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`}
+                        alt="profile"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="hidden sm:flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-[#b490f5]" />
+                      <span className="text-[13px] font-bold text-[#b490f5]">{(user.credits ?? 0).toLocaleString()}</span>
+                    </div>
+                    <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-200 ${userDropdownOpen ? "rotate-180" : ""}`} />
                   </button>
 
                   <AnimatePresence>
                     {userDropdownOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute top-full right-0 mt-2 w-64 glass-panel border border-white/10 rounded-2xl p-2 shadow-2xl"
-                      >
-                        <div className="p-4 border-b border-white/5 mb-2">
-                          <p className="text-xs font-black text-white uppercase tracking-widest truncate">{user.name || 'Developer'}</p>
-                          <p className="text-[10px] text-gray-500 truncate">{user.email}</p>
-                        </div>
-                        <button onClick={() => navigate('/settings')} className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-white/5 text-gray-400 hover:text-white transition-all">
-                          <Settings className="w-4 h-4" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Settings</span>
-                        </button>
-                        <button onClick={logoutUser} className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-red-500/10 text-red-500/80 hover:text-red-500 transition-all">
-                          <LogOut className="w-4 h-4" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Sign Out</span>
-                        </button>
-                      </motion.div>
+                      <>
+                        {/* Backdrop dismiss */}
+                        <div
+                          className="fixed inset-0"
+                          style={{ zIndex: 9998 }}
+                          onClick={() => setUserDropdownOpen(false)}
+                        />
+                        <motion.div
+                          initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                          transition={{ type: "spring", stiffness: 420, damping: 30 }}
+                          className="absolute right-0 top-[calc(100%+12px)]"
+                          style={{
+                            zIndex: 9999,
+                            width: 280,
+                            borderRadius: 18,
+                            background: "#16141c",
+                            border: "1px solid rgba(255,255,255,0.09)",
+                            boxShadow: "0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.07)",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {/* Profil fejlÃ©c */}
+                          <div className="flex items-center gap-3 px-4 py-4"
+                            style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                            <div className="w-11 h-11 rounded-[13px] overflow-hidden flex-shrink-0 bg-white/10">
+                              <img
+                                src={user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`}
+                                alt="profile"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-white text-[14px] truncate leading-tight">{user.name}</p>
+                              <p className="text-[#6b7280] text-[12px] truncate mt-0.5">{user.email}</p>
+                            </div>
+                          </div>
+
+                          {/* Kredit egyenleg */}
+                          <div className="px-4 py-3"
+                            style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                            <p className="text-[#6b7280] text-[10px] font-bold uppercase tracking-[0.12em] mb-2">Kredit egyenleg</p>
+                            <div className="flex items-center justify-between gap-2 px-3 py-3 rounded-2xl"
+                              style={{ background: "rgba(124,58,237,0.07)", border: "1px solid rgba(124,58,237,0.18)" }}>
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center"
+                                  style={{ background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.35)" }}>
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-[#c4b5fd]">
+                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <div className="text-white font-black text-[20px] leading-none">{(user.credits ?? 0).toLocaleString()}</div>
+                                  <div className="text-[#a78bfa] text-[11px] font-medium mt-0.5">kredit</div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => { setUserDropdownOpen(false); setShowCreditTopup(true); }}
+                                className="flex items-center gap-1 px-3 py-2 rounded-xl text-[12px] font-bold text-white transition-all hover:opacity-90 active:scale-95 flex-shrink-0"
+                                style={{ background: "linear-gradient(135deg, #9333ea, #ec4899)", boxShadow: "0 3px 12px rgba(147,51,234,0.4)" }}
+                              >
+                                <Plus className="w-3 h-3" /> FeltÃ¶ltÃ©s
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* MenÃ¼ gombok */}
+                          <div className="p-2">
+                            <button
+                              onClick={() => { setUserDropdownOpen(false); navigate("/settings"); }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#9ca3af] hover:text-white hover:bg-white/[0.06] transition-all text-[13px] font-medium"
+                            >
+                              <Settings className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> BeÃ¡llÃ­tÃ¡sok
+                            </button>
+                            <button
+                              onClick={() => { setUserDropdownOpen(false); navigate("/profile"); }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#9ca3af] hover:text-white hover:bg-white/[0.06] transition-all text-[13px] font-medium"
+                            >
+                              <UserIcon className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> Profilom
+                            </button>
+                            <div className="my-1 mx-3 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+                            <button
+                              onClick={logoutUser}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#f87171] hover:text-[#fca5a5] hover:bg-red-500/10 transition-all text-[13px] font-medium"
+                            >
+                              <LogOut className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> KijelentkezÃ©s
+                            </button>
+                          </div>
+                        </motion.div>
+                      </>
                     )}
                   </AnimatePresence>
                 </div>
@@ -420,7 +508,7 @@ export default function Navbar() {
 
               {/* Mobile Footer */}
               <div className="p-8 border-t border-white/5 bg-black/20 text-center">
-                <p className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.5em] italic">Neural Hub — Protocol v3.1</p>
+                <p className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.5em] italic">Neural Hub â€” Protocol v3.1</p>
                 <div className="flex items-center justify-center gap-4 mt-3 opacity-20">
                   <div className="w-1 h-1 rounded-full bg-zinc-700" />
                   <div className="w-1 h-1 rounded-full bg-zinc-700" />
@@ -431,6 +519,7 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
+      <CreditTopup isOpen={showCreditTopup} onClose={() => setShowCreditTopup(false)} />
     </header>
   );
 }
