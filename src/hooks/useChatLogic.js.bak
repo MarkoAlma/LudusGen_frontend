@@ -226,10 +226,9 @@ export function useChatLogic(selectedModel, userId, getIdToken) {
   return {
     messages, setMessages, input, setInput, isTyping, handleSend,
     systemPrompt, setSystemPrompt, temperature, setTemperature,
-    maxTokens, setMaxTokens, topP, setTopP,
+    maxTokens, setMaxTokens, topP, setTopP, 
     frequencyPenalty, setFrequencyPenalty, presencePenalty, setPresencePenalty,
     attachedImage, setAttachedImage,
     loadingHistory, conversations, chatScrollRef, textareaRef,
-    presets, activePresetId, applyPreset, onEnhance, onDechant,
   };
 }

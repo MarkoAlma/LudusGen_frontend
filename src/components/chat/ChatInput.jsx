@@ -169,16 +169,16 @@ export default function ChatInput({
 
 
           {/* Left actions */}
-          <div className="flex items-center gap-1 pb-1.5">
+          <div className="flex items-center gap-0.5 sm:gap-1 pb-1.5">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="p-2.5 rounded-2xl hover:bg-white/5 text-gray-500 hover:text-primary transition-all duration-500 group/icon"
+              className="p-2 sm:p-2.5 rounded-2xl hover:bg-white/5 text-gray-500 hover:text-primary transition-all duration-500 group/icon"
               title="Kép csatolása"
             >
-              <ImagePlus className="w-4.5 h-4.5 group-hover/icon:scale-110 transition-transform" />
+              <ImagePlus className="w-4 h-4 sm:w-4.5 sm:h-4.5 group-hover/icon:scale-110 transition-transform" />
             </button>
-            <button className="p-2.5 rounded-2xl hover:bg-white/5 text-gray-500 hover:text-white transition-all duration-500 group/icon" title="Hang bevitel">
-              <Mic className="w-4.5 h-4.5 group-hover/icon:scale-110 transition-transform" />
+            <button className="p-2 sm:p-2.5 rounded-2xl hover:bg-white/5 text-gray-500 hover:text-white transition-all duration-500 group/icon" title="Hang bevitel">
+              <Mic className="w-4 h-4 sm:w-4.5 sm:h-4.5 group-hover/icon:scale-110 transition-transform" />
             </button>
           </div>
 
@@ -211,7 +211,7 @@ export default function ChatInput({
               onClick={handleSendWithAnimation}
               disabled={!hasContent || isTyping}
               whileTap={(hasContent && !isTyping) ? { scale: 0.95 } : {}}
-              className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-700 relative overflow-hidden group/send ${
+              className={`w-11 h-11 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all duration-700 relative overflow-hidden group/send ${
                 hasContent && !isTyping
                   ? 'bg-primary text-white shadow-[0_10px_30px_rgba(138,43,226,0.3)] hover:shadow-[0_15px_40px_rgba(138,43,226,0.4)] hover:scale-105'
                   : 'bg-white/[0.04] text-gray-700 pointer-events-none'
@@ -249,7 +249,7 @@ export default function ChatInput({
         </div>
 
         {/* Footer hints — Station Log Labels */}
-        <div className="flex items-center justify-center gap-8 mt-6">
+        <div className="hidden sm:flex items-center justify-center gap-8 mt-6">
           <div className="flex items-center gap-3 group/hint cursor-default">
              <kbd className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-700 font-mono text-[9px] group-hover/hint:text-zinc-400 group-hover/hint:border-white/20 transition-all duration-700 italic font-black tracking-widest">ENTER</kbd>
              <span className="text-[9px] font-black text-zinc-900 uppercase tracking-[0.4em] group-hover/hint:text-zinc-600 transition-colors">Command_Submit</span>

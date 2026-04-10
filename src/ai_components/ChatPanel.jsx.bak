@@ -45,11 +45,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
     setPresencePenalty,
     systemPrompt,
     setSystemPrompt,
-    presets,
-    activePresetId,
-    applyPreset,
-    onEnhance,
-    onDechant,
   } = useChatLogic(selectedModel, userId, getIdToken);
 
   const [historySidebarOpen, setHistorySidebarOpen] = useState(true);
@@ -239,11 +234,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
         themeColor={themeColor}
         navHeight={navHeight}
         selectedModelId={selectedModel?.id}
-        presets={presets}
-        activePresetId={activePresetId}
-        applyPreset={applyPreset}
-        onEnhance={onEnhance}
-        onDechant={onDechant}
       />
     </div>
   );

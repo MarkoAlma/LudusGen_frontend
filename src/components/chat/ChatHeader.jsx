@@ -37,13 +37,13 @@ export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySi
 
   return (
     <motion.header 
-      className="absolute right-6 lg:right-12 z-40" 
+      className="absolute right-0 z-40" 
       style={{ top: `calc(${Math.max(navHeight || 0, 60)}px + 2rem)` }}
       initial={false}
       animate={{ x: (isDesktop && historySidebarOpen) ? -HISTORY_SIDEBAR_W : 0 }}
       transition={{ type: 'spring', damping: 28, stiffness: 260 }}
     >
-      <div className="flex items-center gap-4 p-2 pr-4 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/50">
+      <div className="flex items-center gap-4 p-2 pr-4 rounded-l-2xl rounded-r-none bg-black/40 backdrop-blur-xl border border-white/10 border-r-0 shadow-2xl shadow-black/50">
         <button
           onClick={() => setSidebarOpen(true)}
           className="xl:hidden p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300"
@@ -67,9 +67,9 @@ export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySi
         {/* Info */}
         <div className="flex flex-col justify-center">
           <div className="flex items-center gap-3">
-            <h2 className="text-sm font-black text-white italic tracking-widest leading-none">
-              {selectedModel?.name || "AI Chat"}
-            </h2>
+              <h2 className="text-sm font-black text-white italic tracking-widest leading-none max-w-[100px] sm:max-w-none truncate">
+                {selectedModel?.name || "AI Chat"}
+              </h2>
             <div className="flex items-center gap-1.5 hidden sm:flex">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-[8px] font-black text-emerald-500 uppercase tracking-[0.2em] italic">System_Live</span>

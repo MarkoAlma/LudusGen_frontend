@@ -53,7 +53,7 @@ export default function MessageList({ messages, loadingHistory, selectedModel, o
 
       {/* Empty state */}
       {isEmpty && (
-        <div className="flex flex-col items-center justify-center min-h-[400px] py-20 gap-8">
+        <div className="flex flex-col items-center justify-center min-h-[400px] py-10 sm:py-20 gap-6 sm:gap-8">
           {/* Icon with glow */}
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -116,7 +116,7 @@ export default function MessageList({ messages, loadingHistory, selectedModel, o
                   className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10 transition-all duration-500 group/chip"
                 >
                   <Icon className="w-4 h-4 text-gray-600 group-hover/chip:text-gray-400 transition-colors" />
-                  <span className="text-[12px] text-gray-500 group-hover/chip:text-gray-300 transition-colors whitespace-nowrap font-bold">
+                  <span className="text-[11px] sm:text-[12px] text-gray-500 group-hover/chip:text-gray-300 transition-colors break-words font-bold">
                     {chip.text}
                   </span>
                 </motion.button>

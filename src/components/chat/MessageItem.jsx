@@ -131,7 +131,7 @@ export default function MessageItem({ message, themeColor }) {
       </div>
 
       {/* Content column — each side max 47.5% of screen */}
-      <div className={`flex flex-col min-w-0 max-w-[47.5%] ${isAi ? 'items-start ml-4' : 'items-end mr-4'}`}>
+      <div className={`flex flex-col min-w-0 max-w-[80%] sm:max-w-[47.5%] ${isAi ? 'items-start ml-3 sm:ml-4' : 'items-end mr-3 sm:mr-4'}`}>
         {/* Meta: Name + Timestamp */}
         <div className={`flex items-center gap-3 mb-2 ${isAi ? '' : 'flex-row-reverse'}`}>
           <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40">
@@ -146,7 +146,7 @@ export default function MessageItem({ message, themeColor }) {
 
           {/* Message Bubble */}
           <div
-            className={`relative px-6 py-5 md:px-8 md:py-6 border transition-all duration-700 shadow-[0_20px_60px_rgba(0,0,0,0.6)] group-hover/msg:border-white/20 overflow-hidden ${isAi
+            className={`relative px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6 border transition-all duration-700 shadow-[0_20px_60px_rgba(0,0,0,0.6)] group-hover/msg:border-white/20 overflow-hidden ${isAi
                 ? 'bg-white/[0.04] border-white/10 rounded-2xl rounded-tl-none rounded-br-none'
                 : 'bg-white/[0.02] border-white/5 rounded-2xl rounded-tr-none'
               }`}
