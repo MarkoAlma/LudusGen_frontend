@@ -37,8 +37,7 @@ export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySi
 
   return (
     <motion.header 
-      className="absolute right-0 z-40" 
-      style={{ top: `calc(${Math.max(navHeight || 0, 60)}px + 2rem)` }}
+      className="absolute right-0 z-40 top-4" 
       initial={false}
       animate={{ x: (isDesktop && historySidebarOpen) ? -HISTORY_SIDEBAR_W : 0 }}
       transition={{ type: 'spring', damping: 28, stiffness: 260 }}

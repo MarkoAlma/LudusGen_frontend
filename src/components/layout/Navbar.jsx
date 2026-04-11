@@ -9,15 +9,13 @@ import {
 } from 'lucide-react';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { tokens } from '../../styles/tokens';
-import CreditTopup from '../CreditTopup';
+import UserProfileDropdown from './UserProfileDropdown';
 import bgMobileMenu from '../../assets/bg-mobile-menu.png';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [studioDropdownOpen, setStudioDropdownOpen] = useState(false);
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [showCreditTopup, setShowCreditTopup] = useState(false);
 
   const { setIsAuthOpen, showNavbar, user, logoutUser } = useContext(MyUserContext);
   const navigate = useNavigate();
@@ -81,7 +79,6 @@ export default function Navbar() {
   useEffect(() => {
     setMobileMenuOpen(false);
     setStudioDropdownOpen(false);
-    setUserDropdownOpen(false);
   }, [location.pathname]);
 
   // Close mobile menu on resize to desktop
@@ -103,6 +100,8 @@ export default function Navbar() {
   ];
 
   if (!showNavbar) return null;
+  // Don't show regular Navbar in AI studio. We'll render just the user dropdown manually there.
+  if (location.pathname.startsWith('/chat')) return null;
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-[110] transition-all duration-500`}>
@@ -168,134 +167,7 @@ export default function Navbar() {
 
             {/* Actions */}
             <div className="flex items-center gap-4">
-              {user ? (
-                <div className="relative" style={{ isolation: "isolate" }}>
-                  <button
-                    id="user-menu-trigger"
-                    onClick={(e) => { e.stopPropagation(); setUserDropdownOpen(!userDropdownOpen); }}
-                    className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-2xl border border-white/10 hover:border-white/20 transition-all"
-                    style={{ background: "rgba(255,255,255,0.04)" }}
-                  >
-                    <div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0 bg-white/10">
-                      <img
-                        src={user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`}
-                        alt="profile"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="hidden sm:flex items-center gap-1.5">
-                      <Zap className="w-3.5 h-3.5 text-[#b490f5]" />
-                      <span className="text-[13px] font-bold text-[#b490f5]">{(user.credits ?? 0).toLocaleString()}</span>
-                    </div>
-                    <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-200 ${userDropdownOpen ? "rotate-180" : ""}`} />
-                  </button>
-
-                  <AnimatePresence>
-                    {userDropdownOpen && (
-                      <>
-                        {/* Backdrop dismiss */}
-                        <div
-                          className="fixed inset-0"
-                          style={{ zIndex: 9998 }}
-                          onClick={() => setUserDropdownOpen(false)}
-                        />
-                        <motion.div
-                          initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                          transition={{ type: "spring", stiffness: 420, damping: 30 }}
-                          className="absolute right-0 top-[calc(100%+12px)]"
-                          style={{
-                            zIndex: 9999,
-                            width: 280,
-                            borderRadius: 18,
-                            background: "#16141c",
-                            border: "1px solid rgba(255,255,255,0.09)",
-                            boxShadow: "0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.07)",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {/* Profil fejlÃ©c */}
-                          <div className="flex items-center gap-3 px-4 py-4"
-                            style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                            <div className="w-11 h-11 rounded-[13px] overflow-hidden flex-shrink-0 bg-white/10">
-                              <img
-                                src={user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`}
-                                alt="profile"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-white text-[14px] truncate leading-tight">{user.name}</p>
-                              <p className="text-[#6b7280] text-[12px] truncate mt-0.5">{user.email}</p>
-                            </div>
-                          </div>
-
-                          {/* Kredit egyenleg */}
-                          <div className="px-4 py-3"
-                            style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                            <p className="text-[#6b7280] text-[10px] font-bold uppercase tracking-[0.12em] mb-2">Kredit egyenleg</p>
-                            <div className="flex items-center justify-between gap-2 px-3 py-3 rounded-2xl"
-                              style={{ background: "rgba(124,58,237,0.07)", border: "1px solid rgba(124,58,237,0.18)" }}>
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center"
-                                  style={{ background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.35)" }}>
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-[#c4b5fd]">
-                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                                  </svg>
-                                </div>
-                                <div>
-                                  <div className="text-white font-black text-[20px] leading-none">{(user.credits ?? 0).toLocaleString()}</div>
-                                  <div className="text-[#a78bfa] text-[11px] font-medium mt-0.5">kredit</div>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => { setUserDropdownOpen(false); setShowCreditTopup(true); }}
-                                className="flex items-center gap-1 px-3 py-2 rounded-xl text-[12px] font-bold text-white transition-all hover:opacity-90 active:scale-95 flex-shrink-0"
-                                style={{ background: "linear-gradient(135deg, #9333ea, #ec4899)", boxShadow: "0 3px 12px rgba(147,51,234,0.4)" }}
-                              >
-                                <Plus className="w-3 h-3" /> FeltÃ¶ltÃ©s
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* MenÃ¼ gombok */}
-                          <div className="p-2">
-                            <button
-                              onClick={() => { setUserDropdownOpen(false); navigate("/settings"); }}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#9ca3af] hover:text-white hover:bg-white/[0.06] transition-all text-[13px] font-medium"
-                            >
-                              <Settings className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> BeÃ¡llÃ­tÃ¡sok
-                            </button>
-                            <button
-                              onClick={() => { setUserDropdownOpen(false); navigate("/profile"); }}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#9ca3af] hover:text-white hover:bg-white/[0.06] transition-all text-[13px] font-medium"
-                            >
-                              <UserIcon className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> Profilom
-                            </button>
-                            <div className="my-1 mx-3 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-                            <button
-                              onClick={logoutUser}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#f87171] hover:text-[#fca5a5] hover:bg-red-500/10 transition-all text-[13px] font-medium"
-                            >
-                              <LogOut className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> KijelentkezÃ©s
-                            </button>
-                          </div>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ) : (
-                <div className="hidden md:block">
-                  <button
-                    onClick={() => setIsAuthOpen(true)}
-                    className="px-6 py-2 rounded-xl bg-white text-black text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/10"
-                  >
-                    Access Hub
-                  </button>
-                </div>
-              )}
+              <UserProfileDropdown />
 
               {/* Mobile Toggle */}
               <button
@@ -519,7 +391,6 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
-      <CreditTopup isOpen={showCreditTopup} onClose={() => setShowCreditTopup(false)} />
     </header>
   );
 }

@@ -1,7 +1,9 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wand2, X, ChevronDown, Zap, Sparkles } from 'lucide-react';
+import { Wand2, X, ChevronDown, Zap, Sparkles, Home } from 'lucide-react';
 import { MODEL_GROUPS, getModel, findModelGroup } from '../../ai_components/models';
+import UserProfileDropdown from '../layout/UserProfileDropdown';
 import bgChat from '../../assets/bg-chat.png';
 import bgCode from '../../assets/bg-code.png';
 import bgAudio from '../../assets/bg-audio.png';
@@ -76,38 +78,74 @@ export default function AiStudioSidebar({
 
       {/* ── Header ─ */}
       <div className="relative z-30 border-b border-white/5">
-        <div className="px-6 h-20 lg:h-24 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div
-                className="w-10 h-10 rounded-2xl flex items-center justify-center border transition-all duration-700"
-                style={{
-                  background: `linear-gradient(135deg, ${activeColor}15, ${activeColor}05)`,
-                  borderColor: `${activeColor}25`,
-                  color: activeColor,
-                  boxShadow: `0 0 20px ${activeColor}15, inset 0 1px 0 rgba(255,255,255,0.05)`
-                }}
-              >
-                <Wand2 className="w-5 h-5" />
+        <div className="px-5 py-5 flex flex-col gap-4">
+          
+          {/* Top Row: AI Workspace Branding */}
+          <div className="flex items-center justify-between z-20 relative">
+            <div className="flex items-center gap-3.5 pt-1">
+              <div className="relative">
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center border transition-all duration-700 relative z-10"
+                  style={{
+                    background: `linear-gradient(135deg, ${activeColor}15, ${activeColor}05)`,
+                    borderColor: `${activeColor}30`,
+                    color: activeColor,
+                    boxShadow: `0 8px 24px ${activeColor}10, inset 0 1px 0 rgba(255,255,255,0.1)`
+                  }}
+                >
+                  <Wand2 className="w-5 h-5 flex-shrink-0" />
+                </div>
+                <div
+                  className="absolute -inset-2 rounded-full opacity-20 blur-xl transition-all duration-700"
+                  style={{ background: activeColor }}
+                />
               </div>
-              <div
-                className="absolute -inset-1 rounded-2xl opacity-40 blur-md transition-all duration-700"
-                style={{ background: `radial-gradient(circle, ${activeColor}20, transparent)` }}
-              />
+              <div className="flex flex-col justify-center">
+                <p className="text-[8px] font-black uppercase tracking-[0.3em] italic mb-0.5" style={{ color: activeColor }}>
+                  Workspace
+                </p>
+                <h2 className="text-white font-black text-[13px] uppercase tracking-widest leading-none flex items-center gap-2">
+                  Intelligence
+                  <Sparkles className="w-3 h-3 text-primary" style={{ fill: `${activeColor}30` }} />
+                </h2>
+              </div>
             </div>
-            <div>
-              <h2 className="text-white font-black text-[10px] uppercase tracking-[0.35em] italic leading-none flex items-center gap-2">
-                Intelligence
-                <Sparkles className="w-3 h-3 text-primary/40" />
-              </h2>
-              <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest mt-1.5">Neural Hub</p>
-            </div>
+
+            {isMobile && (
+              <button 
+                onClick={() => setSidebarOpen(false)} 
+                className="flex-shrink-0 w-9 h-9 rounded-[10px] flex items-center justify-center border border-white/5 bg-white/[0.02] text-zinc-500 hover:text-white hover:bg-white/[0.05] transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
-          {isMobile && (
-            <button onClick={() => setSidebarOpen(false)} className="p-2 text-zinc-600 hover:text-white transition-colors rounded-xl hover:bg-white/5">
-              <X className="w-5 h-5" />
-            </button>
-          )}
+
+          {/* Super Premium Separator */}
+          <div className="relative flex items-center justify-center">
+            <div className="w-full h-px bg-white/5" />
+            <div className="absolute w-24 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent blur-[1px]" />
+          </div>
+
+          {/* Bottom Row: User & Platform Nav */}
+          <div className="flex items-center justify-between gap-3 relative z-10">
+             {/* Balance / Profile */}
+             <div className="flex-1 min-w-0">
+               <UserProfileDropdown />
+             </div>
+             
+             {/* Home Button (House Icon) */}
+             <Link 
+               to="/" 
+               className="flex-shrink-0 w-9 h-9 rounded-[10px] flex items-center justify-center relative overflow-hidden group border border-white/5 hover:border-white/20 transition-all duration-300"
+               style={{ background: 'rgba(255,255,255,0.02)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+             >
+               <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+               <Home className="w-[18px] h-[18px] text-zinc-500 group-hover:text-white transition-colors relative z-10" />
+               <div className="absolute bottom-0 inset-x-1 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500" />
+             </Link>
+          </div>
+
         </div>
       </div>
 

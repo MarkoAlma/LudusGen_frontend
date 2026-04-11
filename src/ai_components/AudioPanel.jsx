@@ -350,11 +350,11 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
 
       {/* Left: Configuration Panel matching ImageControls */}
       <div className="w-80 xl:w-96 h-full flex flex-col bg-[#0a0618]/30 backdrop-blur-[60px] relative border-r border-white/5 shadow-[20px_0_40px_rgba(0,0,0,0.3)] overflow-hidden z-20">
-        
+
         {/* Studio Identity Header */}
-        <div className="pt-20 lg:pt-24 border-b border-white/5 relative z-20 bg-white/[0.02] backdrop-blur-3xl">
+        <div className="pt-6 border-b border-white/5 relative z-20 bg-white/[0.02] backdrop-blur-3xl">
           <div className="h-16 px-6 flex items-center gap-4">
-            <div 
+            <div
               className="w-10 h-10 rounded-2xl flex items-center justify-center border shadow-lg"
               style={{ backgroundColor: `${color}15`, borderColor: `${color}30`, color }}
             >
@@ -383,9 +383,8 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`py-2 rounded-xl text-[9px] font-black tracking-wider transition-all border duration-300 uppercase ${
-                      activeTab === tab.id ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10 hover:text-zinc-500'
-                    }`}
+                    className={`py-2 rounded-xl text-[9px] font-black tracking-wider transition-all border duration-300 uppercase ${activeTab === tab.id ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10 hover:text-zinc-500'
+                      }`}
                     style={activeTab === tab.id ? {
                       backgroundColor: `${color}15`,
                       borderColor: `${color}40`,
@@ -421,8 +420,8 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
 
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 px-1 mb-2">
-                         <Settings2 className="w-3.5 h-3.5 text-zinc-600" />
-                         <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Core Parameters</span>
+                        <Settings2 className="w-3.5 h-3.5 text-zinc-600" />
+                        <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Core Parameters</span>
                       </div>
 
                       {isNvidiaRiva ? (
@@ -432,9 +431,8 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                             <div className="grid grid-cols-2 gap-2 mt-2">
                               {RIVA_LANGUAGES.map((lang) => (
                                 <button key={lang.code} onClick={() => setRivaLang(lang.code)}
-                                  className={`py-2 px-2 rounded-xl text-[9px] font-black transition-all border duration-300 uppercase ${
-                                    rivaLang === lang.code ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10 hover:text-zinc-500'
-                                  }`}
+                                  className={`py-2 px-2 rounded-xl text-[9px] font-black transition-all border duration-300 uppercase ${rivaLang === lang.code ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10 hover:text-zinc-500'
+                                    }`}
                                   style={rivaLang === lang.code ? { backgroundColor: `${color}15`, borderColor: `${color}40`, color: color } : {}}
                                 >
                                   {lang.label}
@@ -450,9 +448,8 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                                 const active = rivaVoiceName === voice.name;
                                 return (
                                   <button key={voice.name} onClick={() => setRivaVoiceName(voice.name)}
-                                    className={`p-2 rounded-xl text-left border transition-all duration-300 ${
-                                      active ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
-                                    }`}
+                                    className={`p-2 rounded-xl text-left border transition-all duration-300 ${active ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
+                                      }`}
                                     style={active ? { backgroundColor: `${color}15`, borderColor: `${color}40`, color: color } : {}}
                                   >
                                     <div className="flex items-center justify-between mb-0.5">
@@ -471,9 +468,8 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                               <div className="grid grid-cols-3 gap-2 mt-2">
                                 {rivaVoiceObj.emotions.map((em) => (
                                   <button key={em} onClick={() => setRivaEmotion(em)}
-                                    className={`py-1.5 px-2 rounded-xl text-[9px] font-black transition-all border block text-center truncate ${
-                                      rivaEmotion === em ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
-                                    }`}
+                                    className={`py-1.5 px-2 rounded-xl text-[9px] font-black transition-all border block text-center truncate ${rivaEmotion === em ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
+                                      }`}
                                     style={rivaEmotion === em ? { backgroundColor: `${color}15`, borderColor: `${color}40`, color: color } : {}}
                                   >
                                     {em}
@@ -490,9 +486,8 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                             <div className="grid grid-cols-2 gap-2 mt-2">
                               {TTS_VOICES.map((voice) => (
                                 <button key={voice.id} onClick={() => setSelectedVoice(voice.id)}
-                                  className={`p-2 rounded-xl text-left border transition-all duration-300 ${
-                                    selectedVoice === voice.id ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
-                                  }`}
+                                  className={`p-2 rounded-xl text-left border transition-all duration-300 ${selectedVoice === voice.id ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
+                                    }`}
                                   style={selectedVoice === voice.id ? { backgroundColor: `${color}15`, borderColor: `${color}40`, color: color } : {}}
                                 >
                                   <span className="text-[10px] font-black uppercase">{voice.label}</span>
@@ -501,14 +496,14 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                               ))}
                             </div>
                           </div>
-                      
+
                           <div className="space-y-3 pt-2">
                             <div className="flex justify-between items-center px-1">
                               <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Acoustic Speed</span>
                               <span className="text-[10px] font-black italic" style={{ color }}>{speed}x</span>
                             </div>
                             <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
-                              <div className="absolute h-full transition-all duration-300" style={{ width: `${(speed/4)*100}%`, backgroundColor: color }} />
+                              <div className="absolute h-full transition-all duration-300" style={{ width: `${(speed / 4) * 100}%`, backgroundColor: color }} />
                               <input type="range" min="0.25" max="4" step="0.05" value={speed} onChange={(e) => setSpeed(parseFloat(e.target.value))} className="absolute inset-0 w-full opacity-0 cursor-pointer z-10" />
                             </div>
                           </div>
@@ -518,9 +513,8 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                             <div className="grid grid-cols-4 gap-2 mt-2">
                               {TTS_FORMATS.map((fmt) => (
                                 <button key={fmt} onClick={() => setAudioFormat(fmt)}
-                                  className={`py-2 rounded-xl text-[9px] font-black transition-all border uppercase ${
-                                    audioFormat === fmt ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
-                                  }`}
+                                  className={`py-2 rounded-xl text-[9px] font-black transition-all border uppercase ${audioFormat === fmt ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
+                                    }`}
                                   style={audioFormat === fmt ? { backgroundColor: `${color}15`, borderColor: `${color}40`, color: color } : {}}
                                 >
                                   {fmt}
@@ -549,17 +543,16 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
 
                     <div className="space-y-3 pt-2">
                       <div className="flex items-center gap-2 px-1 mb-2">
-                         <Settings2 className="w-3.5 h-3.5 text-zinc-600" />
-                         <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Core Parameters</span>
+                        <Settings2 className="w-3.5 h-3.5 text-zinc-600" />
+                        <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Core Parameters</span>
                       </div>
 
                       <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic ml-1">Genre</span>
                       <div className="flex flex-wrap gap-2">
                         {MUSIC_GENRES.map((g) => (
                           <button key={g} onClick={() => setGenre(genre === g ? "" : g)}
-                            className={`px-3 py-1.5 rounded-full text-[9px] font-black transition-all border uppercase ${
-                              genre === g ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
-                            }`}
+                            className={`px-3 py-1.5 rounded-full text-[9px] font-black transition-all border uppercase ${genre === g ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
+                              }`}
                             style={genre === g ? { backgroundColor: `${color}15`, borderColor: `${color}40`, color: color } : {}}
                           >
                             {g}
@@ -572,9 +565,8 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                         <div className="flex flex-wrap gap-2 mt-2">
                           {MUSIC_MOODS.map((m) => (
                             <button key={m} onClick={() => setMood(mood === m ? "" : m)}
-                              className={`px-3 py-1.5 rounded-full text-[9px] font-black transition-all border uppercase ${
-                                mood === m ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
-                              }`}
+                              className={`px-3 py-1.5 rounded-full text-[9px] font-black transition-all border uppercase ${mood === m ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10'
+                                }`}
                               style={mood === m ? { backgroundColor: `${color}15`, borderColor: `${color}40`, color: color } : {}}
                             >
                               {m}
@@ -589,16 +581,15 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                           <span className="text-[10px] font-black italic" style={{ color }}>{duration}s</span>
                         </div>
                         <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
-                          <div className="absolute h-full transition-all duration-300" style={{ width: `${(duration/90)*100}%`, backgroundColor: color }} />
+                          <div className="absolute h-full transition-all duration-300" style={{ width: `${(duration / 90) * 100}%`, backgroundColor: color }} />
                           <input type="range" min="5" max="90" step="5" value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} className="absolute inset-0 w-full opacity-0 cursor-pointer z-10" />
                         </div>
                       </div>
 
                       {/* Instrumental Toggle */}
                       <button onClick={() => setInstrumental(!instrumental)}
-                        className={`mt-4 w-full flex items-center justify-between p-4 rounded-2xl border transition-all duration-500 group ${
-                          instrumental ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700'
-                        }`}
+                        className={`mt-4 w-full flex items-center justify-between p-4 rounded-2xl border transition-all duration-500 group ${instrumental ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700'
+                          }`}
                         style={instrumental ? { backgroundColor: `${color}08`, borderColor: `${color}20`, color: color } : {}}
                       >
                         <div className="flex items-center gap-3">
@@ -615,7 +606,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                     </div>
                   </>
                 )}
-                
+
                 {/* Save Preset inline */}
                 {presetSaveOpen ? (
                   <div className="flex gap-2">
@@ -623,7 +614,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                       placeholder="Preset Name..."
                       className="flex-1 bg-white/[0.02] border rounded-xl px-3 py-2 text-[11px] text-white focus:outline-none"
                       style={{ borderColor: `${color}40` }}
-                      autoFocus onKeyDown={(e) => e.key === "Enter" && savePreset()} 
+                      autoFocus onKeyDown={(e) => e.key === "Enter" && savePreset()}
                     />
                     <button onClick={savePreset} className="px-3 rounded-xl text-[10px] font-black uppercase" style={{ backgroundColor: color }}>Save</button>
                     <button onClick={() => setPresetSaveOpen(false)} className="px-2 rounded-xl bg-white/5"><X className="w-4 h-4 text-zinc-500" /></button>
@@ -640,8 +631,8 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
             {activeTab === "presets" && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 px-1 mb-2">
-                   <Bookmark className="w-3.5 h-3.5 text-zinc-600" />
-                   <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Saved Banks</span>
+                  <Bookmark className="w-3.5 h-3.5 text-zinc-600" />
+                  <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Saved Banks</span>
                 </div>
                 {presets.map((preset) => {
                   const isActive = activePresetId === preset.id;
@@ -676,8 +667,8 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
             {activeTab === "history" && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 px-1 mb-2">
-                   <History className="w-3.5 h-3.5 text-zinc-600" />
-                   <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Logs</span>
+                  <History className="w-3.5 h-3.5 text-zinc-600" />
+                  <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Logs</span>
                 </div>
                 {history.length === 0 ? (
                   <div className="flex flex-col items-center justify-center p-8 border border-white/5 border-dashed rounded-2xl bg-white/[0.01]">
@@ -700,14 +691,14 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                         <div className="flex flex-col gap-1">
                           <p className="text-white text-[10px] font-black truncate">{item.text || item.prompt}</p>
                           <div className="flex justify-between items-center opacity-60">
-                             <p className="text-[8px] font-bold uppercase tracking-widest">
-                               {item.type} {item.voiceName || item.voice || item.genre || ""}
-                             </p>
-                             {item.audioUrl && (
-                               <a href={item.audioUrl} download className="p-1 hover:text-white" onClick={(e) => e.stopPropagation()}>
-                                 <Download className="w-3 h-3" />
-                               </a>
-                             )}
+                            <p className="text-[8px] font-bold uppercase tracking-widest">
+                              {item.type} {item.voiceName || item.voice || item.genre || ""}
+                            </p>
+                            {item.audioUrl && (
+                              <a href={item.audioUrl} download className="p-1 hover:text-white" onClick={(e) => e.stopPropagation()}>
+                                <Download className="w-3 h-3" />
+                              </a>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -722,18 +713,18 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
           <div className="px-6 mb-6">
             {/* Current Model Status Card */}
             <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 relative overflow-hidden group">
-               <div className="relative z-10 flex items-center justify-between">
-                  <div className="min-w-0">
-                     <p className="text-[8px] font-black text-zinc-700 uppercase tracking-[0.2em] mb-1">Active Neural Unit</p>
-                     <h4 className="text-xs font-black text-white italic truncate pr-2">{selectedModel.name}</h4>
-                  </div>
-                  <div className="flex flex-shrink-0 items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/5 border border-emerald-500/10">
-                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                     <span className="text-[8px] font-black text-emerald-500 tracking-tighter uppercase italic">Ready</span>
-                  </div>
-               </div>
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-[8px] font-black text-zinc-700 uppercase tracking-[0.2em] mb-1">Active Neural Unit</p>
+                  <h4 className="text-xs font-black text-white italic truncate pr-2">{selectedModel.name}</h4>
+                </div>
+                <div className="flex flex-shrink-0 items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/5 border border-emerald-500/10">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[8px] font-black text-emerald-500 tracking-tighter uppercase italic">Ready</span>
+                </div>
+              </div>
             </div>
-            
+
             {error && (
               <div className="mt-4 p-3 rounded-xl flex items-center gap-2 border border-red-500/30 bg-red-500/10">
                 <XCircle className="w-4 h-4 text-red-500" />
@@ -750,7 +741,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
               onClick={handleGenerate}
               disabled={isGenerating || !(isTTS ? text : musicPrompt).trim()}
               className="w-full py-4 rounded-[1.2rem] font-black text-sm uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-20 disabled:grayscale shadow-2xl relative overflow-hidden group/btn"
-              style={{ 
+              style={{
                 backgroundColor: (isTTS ? text : musicPrompt).trim() ? color : '#ffffff',
                 color: (isTTS ? text : musicPrompt).trim() ? '#ffffff' : '#000000',
                 boxShadow: (isTTS ? text : musicPrompt).trim() ? `0 10px 30px ${color}30` : 'none'
@@ -777,7 +768,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
       {/* Center/Right: Generation Workspace */}
       <div className="flex-1 h-full relative overflow-hidden z-10 hidden lg:block">
         <div className="h-full w-full pt-10 flex flex-col items-center justify-center p-8 md:p-12 relative overflow-hidden bg-transparent">
-          
+
           <AnimatePresence mode="wait">
             {/* Generating State */}
             {isGenerating && (
@@ -790,19 +781,19 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                 className="flex flex-col items-center gap-8 relative z-10"
               >
                 <div className="relative w-64 h-64 flex items-center justify-center">
-                   <div className="absolute inset-0 rounded-[3rem] border border-white/5 bg-white/[0.01] backdrop-blur-xl shadow-2xl overflow-hidden" />
-                   <div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at center, ${color}, transparent 70%)` }} />
-                   <motion.div
-                      animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                      className="absolute inset-0 rounded-[3rem] border"
-                      style={{ borderColor: `${color}40`, boxShadow: `0 0 40px ${color}20` }}
-                   />
-                   <div className="relative z-10 text-white">
-                      <MiniWaveform color={color} isPlaying={true} />
-                   </div>
+                  <div className="absolute inset-0 rounded-[3rem] border border-white/5 bg-white/[0.01] backdrop-blur-xl shadow-2xl overflow-hidden" />
+                  <div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at center, ${color}, transparent 70%)` }} />
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                    className="absolute inset-0 rounded-[3rem] border"
+                    style={{ borderColor: `${color}40`, boxShadow: `0 0 40px ${color}20` }}
+                  />
+                  <div className="relative z-10 text-white">
+                    <MiniWaveform color={color} isPlaying={true} />
+                  </div>
                 </div>
-                
+
                 <div className="text-center space-y-4">
                   <h3 className="text-xl font-black text-white italic tracking-[0.4em] uppercase">Synthesizing Signal <span className="animate-pulse">_</span></h3>
                   <div className="flex flex-col items-center gap-2">
@@ -825,7 +816,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                 className="w-full max-w-2xl relative z-10"
               >
                 <div className="p-8 rounded-[2rem] border border-white/5 bg-white/[0.01] shadow-[0_20px_40px_rgba(0,0,0,0.5)] flex flex-col gap-8 backdrop-blur-xl">
-                  
+
                   {/* Action Header */}
                   <div className="flex justify-between items-start">
                     <div>
@@ -833,7 +824,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                       <h3 className="text-2xl font-black text-white uppercase tracking-wider">Audio Forged</h3>
                     </div>
                     <a href={audioUrl} download={`audio_${Date.now()}.${isNvidiaRiva ? "wav" : audioFormat}`}
-                       className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/5 hover:scale-105 active:scale-95 transition-all text-white">
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/5 hover:scale-105 active:scale-95 transition-all text-white">
                       <Download className="w-5 h-5" />
                     </a>
                   </div>
@@ -842,7 +833,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                   <div className="relative p-6 rounded-[1.5rem] bg-zinc-950/50 border border-white/5 shadow-inner overflow-hidden">
                     <div className="absolute inset-x-0 bottom-0 top-1/2 bg-gradient-to-t to-transparent" style={{ backgroundImage: `linear-gradient(to top, ${color}10, transparent)` }} />
                     <div className="flex items-center gap-6 relative z-10">
-                      
+
                       {/* Play Button */}
                       <button onClick={togglePlay}
                         className="w-16 h-16 rounded-[1.2rem] flex items-center justify-center hover:scale-110 active:scale-95 transition-all group shrink-0 relative overflow-hidden"
@@ -850,15 +841,15 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                         <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                         {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-1" />}
                       </button>
-                      
+
                       <div className="flex-1 flex items-center justify-center h-16">
-                         <MiniWaveform color={color} isPlaying={isPlaying} />
+                        <MiniWaveform color={color} isPlaying={isPlaying} />
                       </div>
                     </div>
                   </div>
 
                   <div className="text-center pt-2">
-                     <p className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.3em] italic">Neural Playback Node</p>
+                    <p className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.3em] italic">Neural Playback Node</p>
                   </div>
                 </div>
               </motion.div>
@@ -874,7 +865,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
                 className="flex flex-col items-center justify-center gap-6 relative z-10 opacity-30 cursor-default grayscale"
               >
                 <div className="w-24 h-24 rounded-3xl border border-white/10 flex items-center justify-center text-zinc-600 bg-white/[0.01]">
-                   {isTTS ? <Mic className="w-10 h-10" /> : <Music className="w-10 h-10" />}
+                  {isTTS ? <Mic className="w-10 h-10" /> : <Music className="w-10 h-10" />}
                 </div>
                 <div className="text-center">
                   <h4 className="text-sm font-black text-zinc-500 uppercase tracking-[0.4em] italic mb-2">Awaiting Parameters</h4>

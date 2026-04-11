@@ -11,6 +11,7 @@ import TripoPanel from "./tripo/TripoPanel";
 import { MyUserContext } from "../context/MyUserProvider";
 import AiStudioSidebar from "../components/chat/AiStudioSidebar";
 import BackgroundFilters from "../components/chat/BackgroundFilters";
+import UserProfileDropdown from "../components/layout/UserProfileDropdown";
 
 export default function AIChat({ user, getIdToken }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -119,6 +120,9 @@ export default function AIChat({ user, getIdToken }) {
   return (
     <div className="flex w-full h-full bg-[#0a0a0f] transition-all duration-300 overflow-hidden relative z-10 flex-1">
       <BackgroundFilters />
+      
+
+
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:block w-80 xl:w-96 h-full flex-shrink-0">
         <AiStudioSidebar

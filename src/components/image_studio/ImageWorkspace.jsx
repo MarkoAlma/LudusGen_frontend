@@ -16,7 +16,7 @@ export default function ImageWorkspace({ isGenerating, images, error, selectedMo
   };
 
   return (
-    <div className="h-full w-full pt-20 lg:pt-32 p-8 md:p-12 flex flex-col relative overflow-y-auto scrollbar-hide bg-transparent">
+    <div className="h-full w-full pt-8 p-8 md:p-12 flex flex-col relative overflow-y-auto scrollbar-hide bg-transparent">
       
       {/* Ambient Gradient Glow — Enhanced for cinematic depth */}
       <div 

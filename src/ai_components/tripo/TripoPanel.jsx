@@ -905,7 +905,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
 
       {/* ── LEFT: Tools ── */}
       <div className="" style={{ width: leftOpen ? leftW : 0, minWidth: 0, flexShrink: 0, overflow: "hidden", transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)", display: "flex", flexDirection: "column", background: "rgba(3,0,10,0.2)", backdropFilter: "blur(60px)", borderRight: "1px solid var(--border)", position: "relative", zIndex: 10 }}>
-        <div className="pt-28 lg:pt-32" style={{ width: leftW, display: "flex", flex: 1, overflow: "hidden" }}>
+        <div className="pt-0" style={{ width: leftW, display: "flex", flex: 1, overflow: "hidden" }}>
           {/* Narrow icon nav */}
           <div style={{ width: 62, flexShrink: 0, borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", background: "rgba(0,0,0,0.2)" }}>
             {NAV.map(n => {
@@ -985,7 +985,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
       </div>
 
       {/* ── CENTER: Viewport ── */}
-      <main className="pt-20 lg:pt-24" style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "transparent", position: "relative", zIndex: 1, overflow: "hidden" }}>
+      <main className="pt-0" style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", background: "transparent", position: "relative", zIndex: 1, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", height: 48, flexShrink: 0, borderBottom: "1px solid var(--border)", background: "rgba(10,10,20,0.8)", backdropFilter: "blur(40px)", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             {!leftOpen && <button onClick={() => setLeftOpen(true)} style={{ width: 28, height: 28, borderRadius: 8, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.03)", color: "#fff", marginRight: 8 }}><ChevronRight style={{ width: 13, height: 13 }} /></button>}
