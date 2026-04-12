@@ -30,6 +30,8 @@ const CATEGORIES = {
 
 const ADMIN_UIDS = ["T7fU9Zp3N5M9wz2G8xQ4L1rV6bY2"];
 
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
 // ─── Kapcsolódó témák fallback ─────────────────────────────────
 const RELATED_MOCK = [
   {
@@ -973,21 +975,38 @@ export default function ForumPost({
     comments: authorPosts.reduce((s, p) => s + (p.comments || 0), 0),
   };
 
-  // ── Szerző adatainak lekérése ────────────────────────────────────
+  // ── Szerző adatainak lekérése (Biztonságos API-n keresztül) ────────
   useEffect(() => {
     if (!post?.authorId || authorUserDoc) return;
     const fetchAuthor = async () => {
       try {
-        const uDoc = await getDoc(doc(db, "users", post.authorId));
-        if (uDoc.exists()) {
-          setAuthorUserDoc(uDoc.data());
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) return;
+
+        const response = await fetch(`${API_BASE}/api/get-public-profile/${post.authorId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            // Firestore-szerű adatstrukturát emulálunk a kompatibilitás miatt
+            const userData = {
+              ...result.user,
+              // Ha a backend nem Timestamp-et küld, konvertáljuk (szimpla dátum ként)
+              createdAt: result.user.createdAt
+            };
+            setAuthorUserDoc(userData);
+          }
         }
       } catch (e) {
-        console.error("Hiba a szerző adatainak lekérésekor:", e);
+        console.error("[ForumPost] Hiba a szerző adatainak lekérésekor (API):", e);
       }
     };
     fetchAuthor();
-  }, [post?.authorId]);
+  }, [post?.authorId, authorUserDoc]);
 
   const authorJoinedDate = useMemo(() => {
     let date = null;
@@ -1027,7 +1046,7 @@ export default function ForumPost({
   };
 
   // ── Értesítés létrehozása ──────────────────────────────────────────
-  const createNotification = useCallback(async (recipientId, type, text) => {
+  const createNotification = useCallback(async (recipientId, type, text, extraData = {}) => {
     if (!recipientId || recipientId === currentUserId) return; // ne értesítsd magad
     try {
       await addDoc(collection(db, "forum_notifications"), {
@@ -1036,12 +1055,13 @@ export default function ForumPost({
         text,
         read: false,
         createdAt: serverTimestamp(),
-        // Opcionálisan hozzátesszük a bejegyzés adatait a kattinthatósághoz
+        // Alapértelmezett navigációs adatok az aktuális poszthoz
         postId: post.id,
         category: post.category,
-        slug: post.slug
+        slug: post.slug,
+        ...extraData
       });
-      console.log("[ForumPost] Értesítés létrehozva:", { recipientId, type, text });
+      console.log("[ForumPost] Értesítés létrehozva:", { recipientId, type, text, ...extraData });
     } catch (e) {
       console.error("[ForumPost] Hiba az értesítés létrehozásakor:", e);
     }

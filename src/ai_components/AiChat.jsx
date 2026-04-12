@@ -11,7 +11,6 @@ import TripoPanel from "./tripo/TripoPanel";
 import { MyUserContext } from "../context/MyUserProvider";
 import AiStudioSidebar from "../components/chat/AiStudioSidebar";
 import BackgroundFilters from "../components/chat/BackgroundFilters";
-import UserProfileDropdown from "../components/layout/UserProfileDropdown";
 
 export default function AIChat({ user, getIdToken }) {
   const [searchParams, setSearchParams] = useSearchParams();

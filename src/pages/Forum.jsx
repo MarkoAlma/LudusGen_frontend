@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useContext, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { MyUserContext } from "../context/MyUserProvider";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageSquare, ChevronRight, ChevronDown,
@@ -917,6 +917,7 @@ const CatSidebarCard = ({ cat, isActive, onClick, threadCount }) => (
 // ─── FŐ KOMPONENS ─────────────────────────────────────────────────
 export default function Forum() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user: globalUser } = useContext(MyUserContext);
   const [posts, setPosts] = useState(MOCK_POSTS);
   const [activeCategory, setActiveCategory] = useState("all");
@@ -1122,43 +1123,30 @@ export default function Forum() {
     loadFirebasePosts();
   }, [findPost]);
 
-  // ── URL routing (Popstate szinkronizáció) ───────────────────────
+  // ── React Router location → openPost szinkronizáció ────────────
+  // Ez az egyetlen megbízható módszer: a React Router location.pathname
+  // változását figyeljük, és ennek alapján állítjuk be az openPost state-et.
+  // A handleOpenPost és handleBack is navigate()-et használ, így ez mindig
+  // lefut mind a Navbar Community linkre kattintásnál, mind a Vissza gomb,
+  // mind pedig a böngésző vissza/előre gombjainál.
   useEffect(() => {
-    const handleNavigation = () => {
-      const info = getPostInfoFromURL();
-      if (!info) {
-        if (openPost) setOpenPost(null);
-      } else {
-        const found = findPost(info.category, info.slug, posts);
-        if (found && (!openPost || openPost.id !== found.id)) {
+    const isPostRoute = /^\/forum\/([^/]+)\/(.+)/.exec(location.pathname);
+    if (!isPostRoute) {
+      // Nem poszt URL → zárjuk be a posztot
+      if (openPost) setOpenPost(null);
+    } else {
+      // Poszt URL → nyissuk meg a megfelelő posztot (ha még nincs nyitva)
+      const category = isPostRoute[1];
+      const slug = isPostRoute[2];
+      if (!openPost || openPost.slug !== slug) {
+        const found = findPost(category, slug, posts);
+        if (found) {
           setOpenPost(found);
+          setViewedIds(prev => new Set([...prev, found.id]));
         }
       }
-    };
-
-    window.addEventListener("popstate", handleNavigation);
-    return () => window.removeEventListener("popstate", handleNavigation);
-  }, [posts, findPost, openPost]);
-
-  useEffect(() => {
-    const handlePopState = () => {
-      const info = getPostInfoFromURL();
-      if (info) {
-        setPosts(currentPosts => {
-          const found = findPost(info.category, info.slug, currentPosts);
-          if (found) {
-            setOpenPost(found);
-            setViewedIds(prev => new Set([...prev, found.id]));
-          }
-          return currentPosts;
-        });
-      } else {
-        setOpenPost(null);
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [findPost]);
+    }
+  }, [location.pathname, posts, findPost]);
 
   useEffect(() => {
     const handler = e => {
@@ -1227,14 +1215,14 @@ export default function Forum() {
 
   const handleOpenPost = (post) => {
     setViewedIds(p => new Set([...p, post.id]));
-    setOpenPost(post);
-    pushPostURL(post.category, post.slug);
+    // navigate() használata pushState helyett, hogy a React Router
+    // location.pathname is frissüljön → a location useEffect zárja/nyitja a posztot
+    navigate(`/forum/${post.category}/${post.slug || post.id}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleBack = () => {
-    setOpenPost(null);
-    pushForumURL();
+    navigate("/forum");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -1247,14 +1235,34 @@ export default function Forum() {
 
       // Navigáció a bejegyzéshez
       if (notif.postId) {
-        // Megkeressük a posztot az összes poszt között
-        const postToOpen = posts.find(p => p.id === notif.postId);
+        // 1. Megpróbáljuk megkeresni a helyi állapotban
+        let postToOpen = posts.find(p => p.id === notif.postId);
+
+        // 2. Ha nincs meg (pl. most jött létre és nem frissült még a tábla), lekérjük a DB-ből
+        if (!postToOpen) {
+          dbg("[Forum] Notification post missing from state, fetching from DB:", notif.postId);
+          const pSnap = await getDoc(doc(db, "forum_posts", notif.postId));
+          if (pSnap.exists()) {
+            const data = pSnap.data();
+            postToOpen = {
+              ...data,
+              id: pSnap.id,
+              time: formatFirebaseTime(data.createdAt),
+              slug: data.slug || generateSlug(data.title || ""),
+            };
+            // Hozzáadjuk a listához, hogy később is meg legyen
+            setPosts(prev => [postToOpen, ...prev]);
+          }
+        }
+
         if (postToOpen) {
           handleOpenPost(postToOpen);
         } else {
-          // Ha nincs a betöltöttek között, próbáljuk meg lekérni (vagy legalább a slug alapján navigálni)
-          console.warn("[Forum] Notification linked post not found in local state:", notif.postId);
-          // Opcionálisan ide jöhet egy fetchDoc logic
+          console.warn("[Forum] Notification linked post not found even in DB:", notif.postId);
+          // Fallback: Ha van kategória és slug, próbáljunk oda navigálni hátha a route betölti
+          if (notif.category && notif.slug) {
+            pushPostURL(notif.category, notif.slug);
+          }
         }
       }
       setShowNotifs(false);
@@ -1281,7 +1289,7 @@ export default function Forum() {
   };
 
   // Értesítés létrehozás segédfüggvény
-  const createNotification = async (recipientId, type, text) => {
+  const createNotification = async (recipientId, type, text, extraData = {}) => {
     if (!recipientId || recipientId === currentUserId) return; // ne értesítsd magad
     try {
       await addDoc(collection(db, "forum_notifications"), {
@@ -1290,14 +1298,15 @@ export default function Forum() {
         text,
         read: false,
         createdAt: serverTimestamp(),
+        ...extraData
       });
-      dbg("Notification created:", { recipientId, type, text });
+      dbg("Notification created:", { recipientId, type, text, ...extraData });
     } catch (e) { console.error("Create notif error:", e); }
   };
 
   // ── Új / szerkesztett poszt mentése ─────────────────────────────
   // ── Új poszt értesítés követőknek ─────────────────────────────
-  const notifyFollowersNewPost = async (authorId, authorName, postTitle, postId) => {
+  const notifyFollowersNewPost = async (authorId, authorName, postTitle, postId, category, slug) => {
     if (!authorId) return;
     try {
       const q = query(collection(db, "forum_follows"), where("followedId", "==", authorId));
@@ -1309,7 +1318,7 @@ export default function Forum() {
           followerId,
           "system",
           `${authorName} új témát indított: "${postTitle}"`,
-          postId
+          { postId, category, slug }
         );
       });
 
@@ -1406,7 +1415,7 @@ export default function Forum() {
     setPosts(p => [{ ...postData, id: finalId }, ...p]);
 
     // Értesítjük a követőket az új posztról
-    notifyFollowersNewPost(currentUserId, postData.author, postData.title, finalId);
+    notifyFollowersNewPost(currentUserId, postData.author, postData.title, finalId, postData.category, postData.slug);
   };
 
   // ── Poszt törlése ────────────────────────────────────────────────
@@ -1502,15 +1511,15 @@ export default function Forum() {
     const updateState = (prevPosts) => {
       return prevPosts.map(p => {
         if (String(p.id) !== postIdStr) return p;
-        
+
         const isLiked = p.likedIds?.includes(currentUserId);
         isLikedNow = isLiked; // Ezt használjuk majd a Firebase híváshoz
-        
+
         const newLikes = isLiked ? Math.max(0, (p.likes || 0) - 1) : (p.likes || 0) + 1;
-        const newLikedIds = isLiked 
+        const newLikedIds = isLiked
           ? (p.likedIds || []).filter(id => id !== currentUserId)
           : [...(p.likedIds || []), currentUserId];
-          
+
         return { ...p, likes: newLikes, likedIds: newLikedIds };
       });
     };
@@ -1520,7 +1529,7 @@ export default function Forum() {
       if (!prev || String(prev.id) !== postIdStr) return prev;
       const isLiked = prev.likedIds?.includes(currentUserId);
       const newLikes = isLiked ? Math.max(0, (prev.likes || 0) - 1) : (prev.likes || 0) + 1;
-      const newLikedIds = isLiked 
+      const newLikedIds = isLiked
         ? (prev.likedIds || []).filter(id => id !== currentUserId)
         : [...(prev.likedIds || []), currentUserId];
       return { ...prev, likes: newLikes, likedIds: newLikedIds };

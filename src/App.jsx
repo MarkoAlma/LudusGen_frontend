@@ -22,7 +22,7 @@ import Forum from './pages/Forum';
 import { AnimatePresence } from 'framer-motion';
 
 function App() {
-  const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled} = useContext(MyUserContext);
+  const { showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled } = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -60,7 +60,8 @@ function App() {
     <div className="min-h-screen bg-black text-white relative">
       <AppLayout>
         <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
+          <Routes location={location} key={location.pathname.split('/')[1] || '/'}>
+
             <Route path="/" element={<PageTransition><Home /></PageTransition>} />
             <Route path="/chat" element={
               <PageTransition>

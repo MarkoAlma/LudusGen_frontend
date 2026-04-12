@@ -9,13 +9,13 @@ import {
 } from 'lucide-react';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { tokens } from '../../styles/tokens';
-import UserProfileDropdown from './UserProfileDropdown';
 import bgMobileMenu from '../../assets/bg-mobile-menu.png';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [studioDropdownOpen, setStudioDropdownOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   const { setIsAuthOpen, showNavbar, user, logoutUser } = useContext(MyUserContext);
   const navigate = useNavigate();
@@ -123,9 +123,15 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-1">
               <NavLink to="/" active={location.pathname === '/'}>Home</NavLink>
 
-              <div className="relative">
+              <div 
+                className="relative"
+                onMouseLeave={() => setStudioDropdownOpen(false)}
+              >
                 <button
-                  onClick={() => setStudioDropdownOpen(!studioDropdownOpen)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setStudioDropdownOpen(!studioDropdownOpen);
+                  }}
                   onMouseEnter={() => setStudioDropdownOpen(true)}
                   className={`flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-widest transition-all ${location.pathname.startsWith('/chat') ? 'text-primary' : 'text-gray-400 hover:text-white hover:bg-white/5'
                     }`}
@@ -139,24 +145,33 @@ export default function Navbar() {
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      onMouseLeave={() => setStudioDropdownOpen(false)}
-                      className="absolute top-full left-0 mt-2 w-56 glass-panel border border-white/10 rounded-2xl p-2 shadow-2xl"
+                      className="absolute top-full left-0 w-56 pt-3"
+                      style={{ zIndex: 120 }}
                     >
-                      {studioItems.map((item) => {
-                        const isActive = location.pathname.startsWith('/chat') && location.search === item.path.substring(item.path.indexOf('?'));
-                        return (
-                          <Link
-                            key={item.label}
-                            to={item.path}
-                            className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${isActive ? 'bg-primary/20 text-primary' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}
-                          >
-                            <div className={`p-1.5 rounded-lg transition-all ${isActive ? 'bg-primary/30 text-primary' : 'bg-white/5 group-hover:bg-primary/20 group-hover:text-primary'}`}>
-                              <item.icon className="w-4 h-4" />
-                            </div>
-                            <span className="text-xs font-black uppercase tracking-widest">{item.label}</span>
-                          </Link>
-                        )
-                      })}
+                      <div className="glass-panel border border-white/10 rounded-2xl p-2 shadow-2xl">
+                        {studioItems.map((item) => {
+                          const urlParams = new URLSearchParams(item.path.split('?')[1] || '');
+                          const targetTab = urlParams.get('tab');
+                          const currentParams = new URLSearchParams(location.search);
+                          const currentTab = currentParams.get('tab');
+                          
+                          const isActive = location.pathname.startsWith('/chat') && currentTab === targetTab;
+                          
+                          return (
+                            <Link
+                              key={item.label}
+                              to={item.path}
+                              onClick={() => setStudioDropdownOpen(false)}
+                              className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${isActive ? 'bg-primary/20 text-primary' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}
+                            >
+                              <div className={`p-1.5 rounded-lg transition-all ${isActive ? 'bg-primary/30 text-primary' : 'bg-white/5 group-hover:bg-primary/20 group-hover:text-primary'}`}>
+                                <item.icon className="w-4 h-4" />
+                              </div>
+                              <span className="text-xs font-black uppercase tracking-widest">{item.label}</span>
+                            </Link>
+                          )
+                        })}
+                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -296,8 +311,6 @@ export default function Navbar() {
                 </div>
               )}
 
-
-              <UserProfileDropdown />
 
               {/* Mobile Toggle */}
               <button

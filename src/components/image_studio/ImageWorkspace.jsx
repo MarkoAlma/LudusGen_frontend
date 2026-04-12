@@ -136,7 +136,8 @@ export default function ImageWorkspace({ isGenerating, images, error, selectedMo
                 </motion.div>
 
                 {/* Info Badge */}
-                <div className="absolute top-6 left-6 px-3 py-1.5 bg-zinc-950/40 backdrop-blur-md border border-white/5 rounded-lg text-[8px] font-black text-zinc-500 uppercase tracking-[0.3em] group-hover:text-white transition-colors">
+                <div className="absolute top-6 left-6 px-3 py-1.5 bg-zinc-950/40 backdrop-blur-md border border-white/5 rounded-lg text-[8px] font-black text-zinc-500 uppercase tracking-[0.3em] group-hover:text-white transition-colors flex items-center gap-2">
+                  <div className="w-1 h-1 rounded-full bg-primary animate-pulse" />
                   Forge Output #{idx + 1}
                 </div>
               </motion.div>

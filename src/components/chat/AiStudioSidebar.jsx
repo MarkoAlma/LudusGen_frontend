@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wand2, X, ChevronDown, Zap, Sparkles, Home } from 'lucide-react';
 import { MODEL_GROUPS, getModel, findModelGroup } from '../../ai_components/models';
-import UserProfileDropdown from '../layout/UserProfileDropdown';
 import bgChat from '../../assets/bg-chat.png';
 import bgCode from '../../assets/bg-code.png';
 import bgAudio from '../../assets/bg-audio.png';
@@ -130,9 +129,7 @@ export default function AiStudioSidebar({
           {/* Bottom Row: User & Platform Nav */}
           <div className="flex items-center justify-between gap-3 relative z-10">
              {/* Balance / Profile */}
-             <div className="flex-1 min-w-0">
-               <UserProfileDropdown />
-             </div>
+             
              
              {/* Home Button (House Icon) */}
              <Link 
