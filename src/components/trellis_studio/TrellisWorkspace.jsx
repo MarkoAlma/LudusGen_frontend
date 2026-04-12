@@ -1,10 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useRef, useContext } from 'react';
+import { motion, AnimatePresence, useTransform, useMotionValue } from 'framer-motion';
 import {
-  Box, Download, Camera, RotateCcw, Loader2, Sparkles,
-  Grid3x3, Move3d, Layers, Play, Square, ChevronRight
+  Box, Download, Camera, RotateCcw, Sparkles,
+  Grid3x3, Move3d, Layers, Play, Square,
+  PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen
 } from 'lucide-react';
 
+import { StudioLayoutContext } from '../shared/StudioLayout';
 import ThreeViewer from '../../ai_components/meshy/viewer/ThreeViewer';
 import { setCameraPreset } from '../../ai_components/meshy/viewer/threeHelpers';
 import { IconBtn, Tooltip } from '../../ai_components/meshy/ui/Primitives';
@@ -18,11 +20,18 @@ export default function TrellisWorkspace({
   genStatus,
   activeItem,
   onDownload,
-  onCameraReset
+  onCameraReset,
+  leftOffset = 0,
+  rightOffset = 0
 }) {
+
   const [viewMode, setViewMode] = useState("clay");
   const [showGrid, setShowGrid] = useState(true);
   const [bgColor, setBgColor] = useState("grayish");
+  const ctx = useContext(StudioLayoutContext);
+  const fallbackMV = useMotionValue(0);
+  const smoothL = ctx?.smoothL ?? fallbackMV;
+  const smoothR = ctx?.smoothR ?? fallbackMV;
 
   // HUD States (from Tripo style)
   const [lightMode, setLightMode] = useState("studio");
@@ -64,7 +73,10 @@ export default function TrellisWorkspace({
     <div className="relative h-full flex flex-col bg-[#0a0a0f] overflow-hidden">
 
       {/* ── TOP HUD: Integrated Control Bar ── */}
-      <div className="h-14 px-5 flex items-center justify-between border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-2xl z-40 relative">
+      <motion.div
+        style={{ paddingLeft: smoothL, paddingRight: smoothR }}
+        className="h-14 flex items-center justify-between border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-2xl z-40 relative px-8"
+      >
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mr-4 italic">View Orbit</span>
           {VIEW_MODES.map(v => (
@@ -116,28 +128,24 @@ export default function TrellisWorkspace({
             onClick={() => setShowGrid(!showGrid)}
           />
         </div>
-      </div>
+      </motion.div>
 
       {/* ── Main Viewport ── */}
       <div className="flex-1 relative overflow-hidden bg-[#050508]">
-        {/* Cinematic Backdrop Gradient */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] opacity-20"
             style={{ background: 'radial-gradient(circle, #3b82f630 0%, transparent 70%)' }} />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(15,15,35,1)_0%,rgba(5,5,10,1)_100%)]" />
         </div>
 
-        {/* Loading / Processing Overlay */}
         <AnimatePresence>
           {isPending && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 z-50 bg-[#0a0a0f]/90 backdrop-blur-3xl flex flex-col items-center justify-center text-center p-10"
             >
               <div className="relative group">
-                <div className="w-24 h-24 rounded-[2rem] bg-primary/10 border border-primary/20 flex items-center justify-center mb-10 shadow-[0_0_50px_rgba(139,92,246,0.2)] animate-pulse">
+                <div className="w-24 h-24 rounded-[2rem] bg-primary/10 border border-primary/20 flex items-center justify-center mb-10 shadow-primary-heavy animate-pulse">
                   <Sparkles className="w-10 h-10 text-primary" />
                 </div>
                 <motion.div
@@ -146,19 +154,16 @@ export default function TrellisWorkspace({
                   className="absolute -inset-4 rounded-full border border-dashed border-white/5"
                 />
               </div>
-
               <h2 className="text-3xl font-black text-white italic tracking-[0.2em] uppercase mb-4">Spatial Forge Active</h2>
               <p className="text-primary/60 max-w-sm font-bold text-[10px] uppercase tracking-[0.4em] leading-relaxed mb-8 opacity-80">Assembling neural voxels into high-fidelity mesh clusters</p>
-
               <div className="w-64">
-                <PBar value={45} /> {/* Sample value, usually managed by logic */}
+                <PBar value={45} />
                 <p className="text-[10px] font-mono text-zinc-600 mt-4 tracking-widest uppercase">Initializing Slat-Sampling v2.0</p>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Empty State */}
         {!modelUrl && !isPending && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-10 pointer-events-none">
             <div className="w-24 h-24 rounded-[2.5rem] bg-white/[0.01] border border-white/5 flex items-center justify-center mb-10">
@@ -169,7 +174,6 @@ export default function TrellisWorkspace({
           </div>
         )}
 
-        {/* 3D Viewer Instance */}
         <div className="absolute inset-0">
           <ThreeViewer
             modelUrl={modelUrl}
@@ -195,7 +199,10 @@ export default function TrellisWorkspace({
         </div>
 
         {/* ── BOTTOM HUD: Camera & Tools ── */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 z-40">
+        <motion.div
+          style={{ x: "-50%", left: useTransform([smoothL, smoothR], ([l, r]) => `calc(50% + ${(l - r) / 2}px)`) }}
+          className="absolute bottom-8 flex items-center gap-3 z-40"
+        >
           <div className="bg-[#0a0a0f]/60 backdrop-blur-3xl px-4 py-2.5 rounded-2xl border border-white/5 flex items-center gap-5 shadow-2xl">
             <div className="flex items-center gap-2 pr-4 border-r border-white/5">
               <IconBtn icon={<RotateCcw className="w-4 h-4" />} tip="Reset Camera" onClick={() => camP("reset")} />
@@ -208,7 +215,7 @@ export default function TrellisWorkspace({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setAutoSpin(!autoSpin)}
-              className={`flex items-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${autoSpin ? 'bg-primary text-white shadow-[0_0_25px_rgba(139,92,246,0.4)]' : 'bg-white/5 text-zinc-600 border border-white/5 hover:text-white'
+              className={`flex items-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${autoSpin ? 'bg-primary text-white shadow-primary-glow' : 'bg-white/5 text-zinc-600 border border-white/5 hover:text-white'
                 }`}
             >
               {autoSpin ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
@@ -227,25 +234,23 @@ export default function TrellisWorkspace({
               Production Export
             </motion.button>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Model Identifier Flag */}
         {activeItem && !isPending && (
           <div className="absolute top-20 left-10 flex items-center gap-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-emerald-glow" />
             <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] italic">Active Node: {activeItem.name || 'Nexus Alpha'}</p>
           </div>
         )}
       </div>
 
-      {/* Model Tech Info Banner (Bottom edge) */}
       {activeItem && !isPending && (
         <div className="h-10 bg-[#0a0a0f] border-t border-white/5 px-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-transparent opacity-50" />
-          <p className="relative z-10 text-[8px] font-black uppercase tracking-[0.4em] text-zinc-600 italic flex items-center gap-2">
+          <div className="relative z-10 text-[8px] font-black uppercase tracking-[0.4em] text-zinc-600 italic flex items-center gap-2">
             <div className="w-2 h-0.5 bg-primary/30" />
             Spatial Logic Stream v2.4.0
-          </p>
+          </div>
           <div className="flex items-center gap-8 relative z-10">
             <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest flex items-center gap-2">
               Neural Precision: <span className="text-emerald-500/60">Optimized</span>
@@ -260,4 +265,3 @@ export default function TrellisWorkspace({
     </div>
   );
 }
-

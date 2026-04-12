@@ -35,7 +35,7 @@ export const MODEL_VERSIONS = [
  * ─────────────────────────────────────────────────────────────────────── */
 export const MODEL_CAPS = {
   "P1-20260311": {
-    ultraMesh:    true,  texture:   true,  pbr:        true,  tex4K:       false,
+    ultraMesh:    true,  texture:   true,  pbr:        true,  tex4K:       true,
     multiview:    true,  batch:     true,  tPose:      true,  inParts:     true,
     negPrompt:    true,  smartLowPoly: true, quad:     true,
     autoSize:     true,  exportUv:  true,  makeBetter: true,
