@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useContext } from "react";
+import React, { useState, useRef, useEffect, useCallback, useContext, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +20,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import {
   collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc, arrayUnion, arrayRemove,
   query, orderBy, serverTimestamp, getDoc, onSnapshot, where, limit, Timestamp, writeBatch,
+  increment
 } from "firebase/firestore";
 
 // ─── Admin UIDs ───────────────────────────────────────────────────
@@ -60,41 +61,31 @@ const formatFirebaseTime = (timestamp) => {
 
 // ─── Adatok ───────────────────────────────────────────────────────
 const CATEGORIES = [
-  { id: "all", label: "Összes", emoji: "🌐", color: "#a78bfa", threads: 5241, online: 203, icon: Globe },
+  { id: "all", label: "Összes", emoji: "🌐", color: "#6366f1", icon: Globe },
   {
-    id: "chat", label: "Chat AI", emoji: "💬", color: "#a78bfa", threads: 1284, online: 47,
+    id: "chat", label: "Chat AI", emoji: "💬", color: "#a78bfa",
     description: "GPT, Claude, Gemini és egyéb chat modellek", icon: MessageSquare
   },
   {
-    id: "code", label: "Code AI", emoji: "🧠", color: "#34d399", threads: 893, online: 31,
+    id: "code", label: "Code AI", emoji: "🧠", color: "#34d399",
     description: "GitHub Copilot, Cursor, kód generálás és review", icon: Code
   },
   {
-    id: "image", label: "Kép AI", emoji: "🖼️", color: "#f472b6", threads: 2156, online: 89,
+    id: "image", label: "Kép AI", emoji: "🖼️", color: "#f472b6",
     description: "Midjourney, DALL·E, Stable Diffusion promptok", icon: Image
   },
   {
-    id: "audio", label: "Hang AI", emoji: "🎵", color: "#fb923c", threads: 567, online: 22,
+    id: "audio", label: "Hang AI", emoji: "🎵", color: "#fb923c",
     description: "Suno, Udio, ElevenLabs, hangklónozás", icon: Music
   },
   {
-    id: "threed", label: "3D AI", emoji: "🧊", color: "#38bdf8", threads: 341, online: 14,
+    id: "threed", label: "3D AI", emoji: "🧊", color: "#38bdf8",
     description: "Meshy, Tripo3D, TripoSG, szövegből/képből 3D", icon: Box
   },
 ];
 
-const ALL_TAGS = [
-  { label: "prompt-engineering", count: 342, color: "#a78bfa" },
-  { label: "claude", count: 289, color: "#a78bfa" },
-  { label: "midjourney", count: 256, color: "#f472b6" },
-  { label: "gpt-4o", count: 234, color: "#34d399" },
-  { label: "cursor", count: 198, color: "#34d399" },
-  { label: "suno", count: 167, color: "#fb923c" },
-  { label: "stable-diffusion", count: 145, color: "#f472b6" },
-  { label: "meshy", count: 112, color: "#38bdf8" },
-  { label: "összehasonlítás", count: 98, color: "#fbbf24" },
-  { label: "tipp", count: 87, color: "#4ade80" },
-];
+// Dynamic tags will be calculated inside the component
+
 
 const ANNOUNCEMENTS = [
   { id: 1, text: "🚀 Új funkció: AI Fórum LIVE chat — hamarosan!", color: "#a78bfa" },
@@ -102,10 +93,22 @@ const ANNOUNCEMENTS = [
   { id: 3, text: "🧪 Beta tesztelők kerestetnek a 3D AI szekcióhoz", color: "#38bdf8" },
 ];
 
+// ─── Hash-based Tag Colors ────────────────────────────────────────
+const TAG_PALETTE = ["#a78bfa", "#34d399", "#f472b6", "#fb923c", "#38bdf8", "#fbbf24", "#4ade80", "#a855f7", "#ec4899", "#8b5cf6"];
+const getTagColor = (label) => {
+  if (!label) return TAG_PALETTE[0];
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) {
+    hash = label.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
+};
+
+
 // ── Neural Flux Terminal Components ──────────────────────────
 const DataBeam = ({ path, delay = 0, duration = 3 }) => (
   <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" style={{ zIndex: 0 }}>
-    <path d={path} fill="none" stroke="rgba(239, 68, 68, 0.05)" strokeWidth="1" />
+    <path d={path} fill="none" stroke="rgba(124, 58, 237, 0.07)" strokeWidth="1" />
     <motion.path
       d={path}
       fill="none"
@@ -128,7 +131,7 @@ const DataBeam = ({ path, delay = 0, duration = 3 }) => (
     <defs>
       <linearGradient id="beamGradient" x1="0%" y1="0%" x2="100%" y2="0%">
         <stop offset="0%" stopColor="transparent" />
-        <stop offset="50%" stopColor="#ef4444" />
+        <stop offset="50%" stopColor="#7c3aed" />
         <stop offset="100%" stopColor="transparent" />
       </linearGradient>
     </defs>
@@ -136,21 +139,21 @@ const DataBeam = ({ path, delay = 0, duration = 3 }) => (
 );
 
 const TechnicalHUD = () => (
-  <div className="absolute inset-0 pointer-events-none font-mono text-[0.6rem] text-[#ef4444]/30 uppercase tracking-widest p-6 select-none">
+  <div className="absolute inset-0 pointer-events-none font-mono text-[0.6rem] text-[#7c3aed]/30 uppercase tracking-widest p-6 select-none">
     {/* Corner HUDs */}
-    <div className="absolute top-8 left-8 border-l border-t border-[#ef4444]/20 p-2">
+    <div className="absolute top-8 left-8 border-l border-t border-[#7c3aed]/20 p-2">
       <div>SYS_KERN: ACTIVE</div>
-      <div>NET_SYNC: 0x8ff42</div>
+      <div>NET_SYNC: 0x7c3ae</div>
     </div>
-    <div className="absolute top-8 right-8 border-r border-t border-[#ef4444]/20 p-2 text-right">
+    <div className="absolute top-8 right-8 border-r border-t border-[#7c3aed]/20 p-2 text-right">
       <div>FORGE_CORE_v7.4</div>
       <div>SEC_LEVEL: ALPHA</div>
     </div>
-    <div className="absolute bottom-8 left-8 border-l border-b border-[#ef4444]/20 p-2">
+    <div className="absolute bottom-8 left-8 border-l border-b border-[#7c3aed]/20 p-2">
       <div>COORD: 47.4979 N</div>
       <div>19.0402 E</div>
     </div>
-    <div className="absolute bottom-8 right-8 border-r border-b border-[#ef4444]/20 p-2 text-right">
+    <div className="absolute bottom-8 right-8 border-r border-b border-[#7c3aed]/20 p-2 text-right">
       <div>MEMORY_OK</div>
       <div>NEURAL_LINK: STABLE</div>
     </div>
@@ -159,35 +162,39 @@ const TechnicalHUD = () => (
     <motion.div
       animate={{ y: ["-10vh", "110vh"] }}
       transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-      className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[#ef4444]/20 to-transparent opacity-20"
+      className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[#7c3aed]/20 to-transparent opacity-20"
     />
   </div>
 );
 
 const NeuralNetwork = () => {
   const paths = [
+    // Bal oldal
     "M-100,200 Q400,100 800,400 T1500,200",
     "M200,-100 Q600,400 300,900",
-    "M1200,1000 Q800,600 1300,100",
     "M-50,600 Q300,700 900,500 T1600,800",
-    "M500,-50 Q450,500 550,1100"
+    "M500,-50 Q450,500 550,1100",
+    // Jobb oldal + teljes szélesség
+    "M1200,1000 Q800,600 1300,100",
+    "M1400,-100 Q1000,400 1600,800",
+    "M900,-50 Q1400,300 1800,600 T2000,400",
+    "M1500,100 Q1700,500 1300,900 T1800,1100",
+    "M800,800 Q1200,400 1600,200 T2200,500",
+    "M1600,50 Q1800,400 1400,700 T1900,1000",
+    // Középső + átlós irányok
+    "M-100,800 Q700,200 1400,700 T2200,300",
+    "M300,1100 Q900,500 1500,800",
   ];
   return (
     <>
       {paths.map((p, i) => (
-        <DataBeam key={i} path={p} delay={i * 2} duration={5 + i} />
+        <DataBeam key={i} path={p} delay={i * 1.5} duration={5 + (i % 6)} />
       ))}
     </>
   );
 };
 
-const LEADERBOARD = [
-  { name: "prompt_guru", points: 4821, badge: "🥇", color: "#fbbf24", posts: 234 },
-  { name: "pixel_witch", points: 3214, badge: "🥈", color: "#94a3b8", posts: 189 },
-  { name: "devmaster_hu", points: 2987, badge: "🥉", color: "#b45309", posts: 156 },
-  { name: "3d_builder", points: 1876, badge: "⭐", color: "#a78bfa", posts: 98 },
-  { name: "typescript_king", points: 1543, badge: "⭐", color: "#34d399", posts: 87 },
-];
+
 
 const RECENT_ACTIVITY = [
   { user: "pixel_witch", action: "hozzászólt", post: "Midjourney v7 guide", time: "2p", color: "#f472b6" },
@@ -871,7 +878,7 @@ const ConfirmDialog = ({ isOpen, onConfirm, onCancel, message }) => {
           </button>
           <button onClick={onConfirm}
             className="cursor-pointer flex-1 py-2 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}>
+            style={{ background: "linear-gradient(135deg, #7c3aed, #dc2626)" }}>
             Törlés
           </button>
         </div>
@@ -882,7 +889,7 @@ const ConfirmDialog = ({ isOpen, onConfirm, onCancel, message }) => {
 };
 
 // ─── Kategória sidebar card ───────────────────────────────────────
-const CatSidebarCard = ({ cat, isActive, onClick }) => (
+const CatSidebarCard = ({ cat, isActive, onClick, threadCount }) => (
   <motion.button whileHover={{ scale: 1.03, x: 5 }} transition={{ type: "spring", stiffness: 400, damping: 25 }} onClick={() => onClick(cat.id)} className="cursor-pointer w-full text-left transition-all duration-150 active:scale-[0.98]"
     style={{
       background: isActive ? `${cat.color}20` : "rgba(255,255,255,0.03)",
@@ -900,11 +907,7 @@ const CatSidebarCard = ({ cat, isActive, onClick }) => (
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1">
           <span className="text-white/80 font-medium text-[0.8rem]">{cat.label}</span>
-          <span className="text-gray-600 text-[0.7rem] font-medium">{cat.threads}</span>
-        </div>
-        <div className="flex items-center gap-1 mt-0.5">
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#4ade80" }} />
-          <span className="text-gray-600 text-[0.7rem]">{cat.online} aktív</span>
+          <span className="text-gray-600 text-[0.7rem] font-medium">{threadCount}</span>
         </div>
       </div>
     </div>
@@ -939,6 +942,36 @@ export default function Forum() {
   const [notifications, setNotifications] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+
+  // ─── Optimized Popular Tags (Firestore Aggregation) ──────────────
+  const [popularTags, setPopularTags] = useState([]);
+
+  useEffect(() => {
+    // Top 15 tag lekérése a statisztikai táblából
+    const q = query(
+      collection(db, "forum_tag_stats"),
+      orderBy("count", "desc"),
+      limit(15)
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const tags = snap.docs.map(d => ({
+        label: d.id,
+        count: d.data().count || 0,
+        color: getTagColor(d.id)
+      }));
+      setPopularTags(tags);
+    }, (err) => {
+      console.error("Hiba a tag statisztikák betöltésekor:", err);
+      // Fallback a meglévő posztokból való számításra ha üres a tábla (csak bootstrap idejére)
+      if (posts.length > 0 && popularTags.length === 0) {
+        // ... (elhagyható, ha már van adat a DB-ben)
+      }
+    });
+
+    return unsub;
+  }, []);
+
   const [isAdmin, setIsAdmin] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const notifRef = useRef(null);
@@ -1352,6 +1385,20 @@ export default function Forum() {
       });
       finalId = docRef.id;
       dbg("Firebase mentés OK:", docRef.id);
+
+      // ─── TAG STATS UPDATE ───────────────────────────────────────
+      if (postData.tags && postData.tags.length > 0) {
+        const batch = writeBatch(db);
+        postData.tags.forEach(tag => {
+          const cleanTag = tag.trim().toLowerCase();
+          if (cleanTag) {
+            const tagRef = doc(db, "forum_tag_stats", cleanTag);
+            batch.set(tagRef, { count: increment(1) }, { merge: true });
+          }
+        });
+        await batch.commit();
+        dbg("Tag statisztikák frissítve (increment)");
+      }
     } catch (e) {
       console.error("Firebase mentési hiba:", e);
     }
@@ -1374,8 +1421,28 @@ export default function Forum() {
 
     if (isFbPost) {
       try {
-        await deleteDoc(doc(db, "forum_posts", postIdStr));
-        dbg("Firebase törlés OK:", postIdStr);
+        // Poszt adatok lekérése a tagek miatt a törlés előtt
+        const postSnap = await getDoc(doc(db, "forum_posts", postIdStr));
+        if (postSnap.exists()) {
+          const postTags = postSnap.data().tags || [];
+
+          await deleteDoc(doc(db, "forum_posts", postIdStr));
+          dbg("Firebase törlés OK:", postIdStr);
+
+          // ─── TAG STATS UPDATE ─────────────────────────────────────
+          if (postTags.length > 0) {
+            const batch = writeBatch(db);
+            postTags.forEach(tag => {
+              const cleanTag = tag.trim().toLowerCase();
+              if (cleanTag) {
+                const tagRef = doc(db, "forum_tag_stats", cleanTag);
+                batch.set(tagRef, { count: increment(-1) }, { merge: true });
+              }
+            });
+            await batch.commit();
+            dbg("Tag statisztikák frissítve (decrement)");
+          }
+        }
       } catch (e) {
         console.error("Firebase törlési hiba:", e);
       }
@@ -1424,6 +1491,59 @@ export default function Forum() {
     }
   };
 
+  // ── Like kezelése ────────────────────────────────────────────────
+  const handleLikePost = useCallback(async (postId) => {
+    if (!currentUserId) return;
+    const postIdStr = String(postId);
+
+    let isLikedNow = false;
+
+    // 1. Állam frissítése belső updaterrel a konkurrencia miatt
+    const updateState = (prevPosts) => {
+      return prevPosts.map(p => {
+        if (String(p.id) !== postIdStr) return p;
+        
+        const isLiked = p.likedIds?.includes(currentUserId);
+        isLikedNow = isLiked; // Ezt használjuk majd a Firebase híváshoz
+        
+        const newLikes = isLiked ? Math.max(0, (p.likes || 0) - 1) : (p.likes || 0) + 1;
+        const newLikedIds = isLiked 
+          ? (p.likedIds || []).filter(id => id !== currentUserId)
+          : [...(p.likedIds || []), currentUserId];
+          
+        return { ...p, likes: newLikes, likedIds: newLikedIds };
+      });
+    };
+
+    setPosts(prev => updateState(prev));
+    setOpenPost(prev => {
+      if (!prev || String(prev.id) !== postIdStr) return prev;
+      const isLiked = prev.likedIds?.includes(currentUserId);
+      const newLikes = isLiked ? Math.max(0, (prev.likes || 0) - 1) : (prev.likes || 0) + 1;
+      const newLikedIds = isLiked 
+        ? (prev.likedIds || []).filter(id => id !== currentUserId)
+        : [...(prev.likedIds || []), currentUserId];
+      return { ...prev, likes: newLikes, likedIds: newLikedIds };
+    });
+
+    // 2. Firebase szinkronizáció
+    const isFbPost = !postIdStr.startsWith("local_") && !postIdStr.startsWith("mock_") && isNaN(Number(postIdStr));
+    if (isFbPost) {
+      try {
+        const postRef = doc(db, "forum_posts", postIdStr);
+        // Itt megint meg kell néznünk a pillanatnyi állapotot a Firebase-hez,
+        // de az optimista UI már lefutott. A backendnél az increment() és arrayUnion() atomi.
+        await updateDoc(postRef, {
+          likes: increment(isLikedNow ? -1 : 1),
+          likedIds: isLikedNow ? arrayRemove(currentUserId) : arrayUnion(currentUserId)
+        });
+      } catch (e) {
+        console.error("Hiba a kedvelés mentésekor:", e);
+      }
+    }
+  }, [currentUserId]);
+
+
   // ── Szűrés + rendezés ────────────────────────────────────────────
   const filteredPosts = posts.filter(p => {
     if (showOnlyBookmarks && !bookmarks.has(p.id)) return false;
@@ -1444,8 +1564,17 @@ export default function Forum() {
     return 0;
   });
 
-  const totalOnline = CATEGORIES.slice(1).reduce((s, c) => s + c.online, 0);
-  const totalThreads = CATEGORIES.slice(1).reduce((s, c) => s + c.threads, 0);
+  const categoryCounts = useMemo(() => {
+    const counts = {};
+    posts.forEach(p => {
+      if (p.category) {
+        counts[p.category] = (counts[p.category] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [posts]);
+
+  const totalThreads = posts.length;
 
   const resetFilters = () => {
     setActiveCategory("all");
@@ -1531,6 +1660,7 @@ export default function Forum() {
             setEditingPost(post);
           }}
           onToggle={handleToggleField}
+          onLike={handleLikePost}
         />
         {sharedModals}
       </>
@@ -1546,11 +1676,11 @@ export default function Forum() {
       }}>
 
       {/* ── Premium High-Fidelity Background: Neural Flux Terminal ── */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#040101]">
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#030108]">
 
         {/* Layer 1: Atmospheric Depth Gradients */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#080202] via-transparent to-[#080202]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#080202]/95 via-transparent to-[#080202]/95" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#060110] via-transparent to-[#060110]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#060110]/95 via-transparent to-[#060110]/95" />
 
         {/* Layer 2: Highly Blurred Original Texture */}
         <div className="absolute inset-0 transform scale-105 opacity-15">
@@ -1565,7 +1695,7 @@ export default function Forum() {
         {/* Layer 3: Tech Grid & Matrix Pattern */}
         <div className="absolute inset-0 opacity-[0.03]"
           style={{
-            backgroundImage: "radial-gradient(#ef4444 0.5px, transparent 0.5px)",
+            backgroundImage: "radial-gradient(#7c3aed 0.5px, transparent 0.5px)",
             backgroundSize: "24px 24px"
           }} />
 
@@ -1577,9 +1707,9 @@ export default function Forum() {
 
         {/* Layer 6: Cinematic Ambient Glows */}
         <div className="absolute top-[-20%] left-[-10%] w-[80vw] h-[80vh] rounded-full blur-[160px] opacity-[0.14]"
-          style={{ background: "radial-gradient(circle, #ef4444, transparent 70%)" }} />
+          style={{ background: "radial-gradient(circle, #7c3aed, transparent 70%)" }} />
         <div className="absolute bottom-[-20%] right-[-10%] w-[80vw] h-[80vh] rounded-full blur-[180px] opacity-[0.1]"
-          style={{ background: "radial-gradient(circle, #991b1b, transparent 70%)" }} />
+          style={{ background: "radial-gradient(circle, #4c1d95, transparent 70%)" }} />
 
         {/* Layer 7: Premium Matte Noise & Vignette */}
         <div className="absolute inset-0 opacity-[0.06] mix-blend-overlay pointer-events-none"
@@ -1905,8 +2035,6 @@ export default function Forum() {
                   <span className="text-xs font-semibold text-white/80">Kategóriák</span>
                 </div>
                 <div className="flex items-center gap-2 text-[0.65rem] text-gray-600">
-                  <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{totalOnline} aktív</span>
-                  <span className="text-gray-700">·</span>
                   <span>{totalThreads.toLocaleString()} téma</span>
                 </div>
               </div>
@@ -1918,6 +2046,7 @@ export default function Forum() {
                     cat={cat}
                     isActive={activeCategory === cat.id}
                     onClick={setActiveCategory}
+                    threadCount={cat.id === "all" ? posts.length : categoryCounts[cat.id] || 0}
                   />
                 ))}
               </div>
@@ -1930,42 +2059,25 @@ export default function Forum() {
                 <span className="text-xs font-semibold text-white/80">Népszerű tagek</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {ALL_TAGS.map(tag => (
+                {popularTags.map(tag => (
                   <TagPill
                     key={tag.label}
                     label={tag.label}
+                    count={tag.count}
                     color={tag.color}
                     active={activeTagFilters.includes(tag.label)}
                     onClick={() => setActiveTagFilters(prev =>
                       prev.includes(tag.label) ? prev.filter(t => t !== tag.label) : [...prev, tag.label]
                     )}
-                    count={tag.count}
                   />
                 ))}
+                {popularTags.length === 0 && (
+                  <p className="text-[0.65rem] text-gray-600 italic">Nincsenek elérhető tagek...</p>
+                )}
               </div>
             </SurfaceCard>
 
-            {/* Leaderboard Widget */}
-            <SurfaceCard style={{ padding: "1rem" }}>
-              <div className="flex items-center gap-2 mb-4">
-                <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-xs font-semibold text-white/80">Top Rangsor</span>
-              </div>
 
-              <div className="space-y-2">
-                {LEADERBOARD.map((user, i) => (
-                  <div key={user.name} className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold" style={{ background: `${user.color}15`, color: user.color }}>
-                      {user.badge}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-white/80">{user.name}</div>
-                      <div className="text-[0.6rem] text-gray-600">{user.points.toLocaleString()} pont · {user.posts} poszt</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </SurfaceCard>
 
             {/* Activity Widget */}
             <SurfaceCard style={{ padding: "1rem" }}>

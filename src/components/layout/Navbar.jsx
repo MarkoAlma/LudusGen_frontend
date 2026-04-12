@@ -254,7 +254,7 @@ export default function Navbar() {
                                 className="flex items-center gap-1 px-3 py-2 rounded-xl text-[12px] font-bold text-white transition-all hover:opacity-90 active:scale-95 flex-shrink-0"
                                 style={{ background: "linear-gradient(135deg, #9333ea, #ec4899)", boxShadow: "0 3px 12px rgba(147,51,234,0.4)" }}
                               >
-                                <Plus className="w-3 h-3" /> FeltÃ¶ltÃ©s
+                                <Plus className="w-3 h-3" /> Feltöltés
                               </button>
                             </div>
                           </div>
@@ -265,7 +265,7 @@ export default function Navbar() {
                               onClick={() => { setUserDropdownOpen(false); navigate("/settings"); }}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#9ca3af] hover:text-white hover:bg-white/[0.06] transition-all text-[13px] font-medium"
                             >
-                              <Settings className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> BeÃ¡llÃ­tÃ¡sok
+                              <Settings className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> Beállítások
                             </button>
                             <button
                               onClick={() => { setUserDropdownOpen(false); navigate("/profile"); }}
@@ -278,7 +278,7 @@ export default function Navbar() {
                               onClick={logoutUser}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#f87171] hover:text-[#fca5a5] hover:bg-red-500/10 transition-all text-[13px] font-medium"
                             >
-                              <LogOut className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> KijelentkezÃ©s
+                              <LogOut className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> Kijelentkezés
                             </button>
                           </div>
                         </motion.div>

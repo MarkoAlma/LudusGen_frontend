@@ -12,11 +12,7 @@ const CATEGORIES = [
   { id: "image", label: "Kép AI", emoji: "🖼️", color: "#f472b6", threads: 2156, online: 89, description: "Midjourney, DALL·E..." },
 ];
 
-const LEADERBOARD = [
-  { name: "prompt_guru", points: 4821, badge: "🥇", color: "#fbbf24", posts: 234 },
-  { name: "pixel_witch", points: 3214, badge: "🥈", color: "#94a3b8", posts: 189 },
-  { name: "devmaster_hu", points: 2987, badge: "🥉", color: "#b45309", posts: 156 },
-];
+
 
 const RECENT_ACTIVITY = [
   { user: "pixel_witch", action: "hozzászólt", post: "MJ v7 guide", time: "2p", color: "#f472b6" },
@@ -72,30 +68,7 @@ export default function ForumSidebar({ selectedCategory, setSelectedCategory }) 
         </div>
       </GlassPanel>
 
-      {/* Leaderboard Panel */}
-      <GlassPanel>
-        <h3 className="text-white font-black text-xs uppercase tracking-widest mb-6 flex items-center gap-2">
-           <Award className="w-3.5 h-3.5 text-yellow-500" /> Top Rangsor
-        </h3>
-        <div className="space-y-4">
-          {LEADERBOARD.map((user, i) => (
-            <div key={i} className="flex items-center justify-between group">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-sm group-hover:bg-white/10 transition-colors">
-                  {user.badge}
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-gray-300 group-hover:text-white transition-colors capitalize">{user.name}</p>
-                  <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">{user.points} XP · {user.posts} MÉRFÖLDKŐ</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button className="w-full mt-6 py-3 rounded-xl bg-white/5 text-[9px] font-black uppercase text-gray-600 hover:text-white transition-all border border-white/5 hover:border-white/10">
-           Ranglista megnyitása
-        </button>
-      </GlassPanel>
+
 
       {/* Recent Activity */}
       <GlassPanel>
