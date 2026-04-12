@@ -133,28 +133,6 @@ useEffect(() => {
     setUser((prevUser) => ({ ...prevUser, ...updatedData }));
   };
 
-  // Credit egyenleg frissítése a backend-ről
-  const refreshCredits = async () => {
-    if (!user?.uid) return;
-    try {
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser) return;
-      const token = await firebaseUser.getIdToken();
-      const response = await axios.get(
-        `${API_BASE}/api/get-user/${user.uid}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (response.data.success && response.data.user) {
-        setUser((prevUser) => ({
-          ...prevUser,
-          credits: response.data.user.credits ?? prevUser?.credits ?? 0,
-        }));
-      }
-    } catch (error) {
-      console.error("Error refreshing credits:", error);
-    }
-  };
-
   useEffect(() => {
     console.log("msg változott:", msg);
   }, [msg]);
@@ -352,7 +330,6 @@ useEffect(() => {
         loading2FA,
         resetPassword,
         refresh2FAStatus,
-        refreshCredits,
         loadUserFromFirestore,
         signInWithGoogle,
         authLoading,

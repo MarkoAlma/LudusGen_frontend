@@ -1,23 +1,19 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useTrellisLogic } from '../../hooks/useTrellisLogic';
 import TrellisControls from './TrellisControls';
 import TrellisWorkspace from './TrellisWorkspace';
-import TrellisHistory from './TrellisHistory';
-import { PanelLeft, PanelRight, Layout } from 'lucide-react';
+import Shared3DHistory from '../shared/Shared3DHistory';
+import StudioLayout from '../shared/StudioLayout';
 
 export default function TrellisGenerator({ getIdToken, userId }) {
   const {
     prompt, setPrompt,
     genStatus, setGenStatus,
-    errorMsg, setErrorMsg,
     modelUrl, setModelUrl,
     params, setParams,
     selectedStyle, setSelectedStyle,
-    history,
     activeItem, setActiveItem,
     handleGenerate,
-    handleStop,
     enhancing,
     enhanceError,
     handleEnhance,
@@ -28,79 +24,71 @@ export default function TrellisGenerator({ getIdToken, userId }) {
 
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [offsets, setOffsets] = useState({ left: 320, right: 280 });
+
+  const handleGenerateWrap = async () => {
+    await handleGenerate();
+    setRefreshTrigger(p => p + 1);
+  };
 
   return (
-    <div className="flex h-full overflow-hidden bg-transparent text-white relative">
-      {/* Left Sidebar: Controls */}
-      <AnimatePresence mode="popLayout">
-        {leftOpen && (
-          <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 320, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            className="flex-shrink-0 relative z-10 border-r border-white/5"
-            style={{ background: "rgba(3,0,10,0.2)", backdropFilter: "blur(60px)" }}
-          >
-            <div className="pt-0 h-full flex flex-col overflow-y-auto" style={{ width: 320 }}>
-              <TrellisControls
-                prompt={prompt}
-                setPrompt={setPrompt}
-                selectedStyle={selectedStyle}
-                setSelectedStyle={setSelectedStyle}
-                params={params}
-                setParams={setParams}
-                onGenerate={handleGenerate}
-                isRunning={genStatus === 'pending'}
-                enhancing={enhancing}
-                enhanceError={enhanceError}
-                onEnhance={handleEnhance}
-                onDechant={handleDechant}
-                customPreset={customPreset}
-                handleSaveCustomPreset={handleSaveCustomPreset}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content: Workspace */}
-      <div className="flex-1 min-w-0 flex flex-col relative z-[1]">
-        <TrellisWorkspace
-          modelUrl={modelUrl}
-          genStatus={genStatus}
-          activeItem={activeItem}
-          onDownload={() => { }}
-          onCameraReset={() => { }}
+    <StudioLayout
+      leftOpen={leftOpen}
+      setLeftOpen={setLeftOpen}
+      rightOpen={rightOpen}
+      setRightOpen={setRightOpen}
+      leftWidth={320}
+      rightWidth={280}
+      onOffsetChange={setOffsets}
+      leftSidebar={
+        <TrellisControls
+          prompt={prompt}
+          setPrompt={setPrompt}
+          selectedStyle={selectedStyle}
+          setSelectedStyle={setSelectedStyle}
+          params={params}
+          setParams={setParams}
+          onGenerate={handleGenerateWrap}
+          isRunning={genStatus === 'pending'}
+          enhancing={enhancing}
+          enhanceError={enhanceError}
+          onEnhance={handleEnhance}
+          onDechant={handleDechant}
+          customPreset={customPreset}
+          handleSaveCustomPreset={handleSaveCustomPreset}
         />
-
-      </div>
-
-      {/* Right Sidebar: History */}
-      <AnimatePresence mode="popLayout">
-        {rightOpen && (
-          <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 280, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            className="flex-shrink-0 relative z-10 border-l border-white/5"
-            style={{ background: "rgba(3,0,10,0.2)", backdropFilter: "blur(60px)" }}
-          >
-            <div className="pt-0 h-full flex flex-col overflow-y-auto" style={{ width: 280 }}>
-              <TrellisHistory
-                history={history}
-                activeItemId={activeItem?.id}
-                onSelectItem={(item) => {
-                  setActiveItem(item);
-                  setModelUrl(item.model_url);
-                  setGenStatus('succeeded');
-                }}
-                onDeleteItem={() => { }}
-                onClearHistory={() => { }}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      }
+      rightSidebar={
+        <Shared3DHistory
+          userId={userId}
+          getIdToken={getIdToken}
+          color="#60a5fa"
+          activeItemId={activeItem?.id}
+          refreshTrigger={refreshTrigger}
+          onSelect={(item) => {
+            setActiveItem(item);
+            setModelUrl(item.model_url);
+            setGenStatus('succeeded');
+          }}
+          onReuse={(item) => {
+            setPrompt(item.prompt);
+          }}
+          onDownload={() => { }}
+        />
+      }
+    >
+      <TrellisWorkspace
+        modelUrl={modelUrl}
+        genStatus={genStatus}
+        activeItem={activeItem}
+        onDownload={() => { }}
+        onCameraReset={() => { }}
+        leftOffset={offsets.left}
+        rightOffset={offsets.right}
+        leftWidth={320}
+        rightWidth={280}
+      />
+    </StudioLayout>
   );
 }

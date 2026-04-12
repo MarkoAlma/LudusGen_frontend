@@ -8,10 +8,16 @@
   --color-secondary: #00e5ff;
   --color-accent: #ff007f;
   --color-bg-base: #050505;
-  --color-bg-surface: rgba(25, 25, 30, 0.6);
-  --color-bg-glass: rgba(255, 255, 255, 0.03);
+  --color-bg-surface: rgba(25,25,30,0.6);
+  --color-bg-glass: rgba(255,255,255,0.03);
   --color-text-main: #ffffff;
   --color-text-dim: #a1a1aa;
+
+  --shadow-glass: 0 8px 32px rgba(0,0,0,0.3);
+  --shadow-primary-glow: 0 0 25px rgba(139,92,246,0.4);
+  --shadow-primary-heavy: 0 0 50px rgba(139,92,246,0.2);
+  --shadow-accent-bright: 0 0 20px rgba(139,92,246,0.3);
+  --shadow-emerald-glow: 0 0 10px rgba(16,185,129,0.5);
 }
 
 @layer base {
@@ -38,11 +44,11 @@
 
 @layer utilities {
   .glass-panel {
-    @apply bg-bg-surface backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-3xl shadow-[0_8px_32px_rgba(0, 0, 0, 0.3)];
+    @apply bg-bg-surface backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-3xl shadow-glass;
   }
 
   .text-glow {
-    text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+    text-shadow: 0 0 20px rgba(255,255,255,0.4);
   }
 
   .text-gradient {
@@ -112,6 +118,24 @@
     transition: filter 0.5s ease;
     /* Extra scale to prevent edge bleeding from distortion */
     transform: scale(1.15) !important;
+  }
+
+  /* Cinematic Sidebar Toggle Tab - High Fidelity Motion Style */
+  .tp-toggle-tab {
+    @apply fixed top-1/2 -translate-y-1/2 w-6 h-20 bg-[#0a0a0f]/80 backdrop-blur-2xl border border-white/10 flex items-center justify-center cursor-pointer z-50 transition-colors duration-300;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+
+  .tp-toggle-tab:hover {
+    @apply bg-primary/20 border-primary/30;
+  }
+
+  .tp-toggle-tab.left {
+    @apply rounded-r-2xl border-l-0;
+  }
+
+  .tp-toggle-tab.right {
+    @apply rounded-l-2xl border-r-0;
   }
 }
 

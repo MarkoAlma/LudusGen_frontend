@@ -1,7 +1,7 @@
 // trellis/Segment.jsx
 import React from "react";
 import {
-  Scissors, Boxes, Box, ChevronRight, HelpCircle, AlertTriangle,
+  Scissors, Boxes, Box, ChevronRight, HelpCircle, AlertTriangle, Check, Upload,
 } from "lucide-react";
 
 /*
@@ -39,34 +39,48 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput }) {
             </div>
           )}
 
-          <p style={{ color:"#c8c8e0",fontSize:13,fontWeight:500,lineHeight:1.6,margin:"0 0 20px" }}>
-            Select a model<br/>from the <span style={{ color:"#f5a623" }}>Assets</span> Panel on the<br/>right for <span style={{ color:"#a5a0ff" }}>Segmentation</span>
-          </p>
+          {activeTaskId ? (
+            /* ── Selected model — Ready state ── */
+            <div style={{ width:"100%" }}>
+              <div style={{ display:"flex",alignItems:"center",gap:8,padding:"10px 12px",borderRadius:10,background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.2)",marginBottom:14 }}>
+                <Check style={{ width:14,height:14,color:"#22c55e",flexShrink:0 }}/>
+                <span style={{ color:"#86efac",fontSize:12,fontWeight:700 }}>Ready to Segment</span>
+              </div>
+              <div style={{ padding:"8px 10px",borderRadius:9,background:"rgba(108,99,255,0.08)",border:"1px solid rgba(108,99,255,0.25)",marginBottom:10 }}>
+                <p style={{ color:"#a5a0ff",fontSize:11,fontWeight:600,margin:0 }}>Selected model</p>
+                <p style={{ color:"#2d2d48",fontSize:9,margin:"2px 0 0",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{activeTaskId}</p>
+              </div>
+              <div style={{ width:"100%",padding:"6px 9px",borderRadius:8,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",textAlign:"left" }}>
+                <p style={{ color:"#2d2d48",fontSize:9,margin:0,lineHeight:1.6 }}>
+                  Valid sources: text/image/multiview generation, imported models, retopo outputs.
+                </p>
+              </div>
+            </div>
+          ) : (
+            /* ── No model selected ── */
+            <>
+              <p style={{ color:"#c8c8e0",fontSize:13,fontWeight:500,lineHeight:1.6,margin:"0 0 20px" }}>
+                Select a model<br/>from the <span style={{ color:"#f5a623" }}>Archive</span> panel or<br/><span style={{ color:"#a5a0ff" }}>upload your own</span>
+              </p>
 
-          <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:24,opacity:0.7 }}>
-            <div style={{ width:90,height:90,borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center" }}>
-              <Scissors style={{ width:28,height:28,color:"#3a3a58" }}/>
-            </div>
-            <div style={{ width:20,height:20,borderRadius:"50%",background:"rgba(108,99,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-              <ChevronRight style={{ width:11,height:11,color:"#6c63ff" }}/>
-            </div>
-            <div style={{ width:90,height:90,borderRadius:10,background:"rgba(108,99,255,0.06)",border:"1px solid rgba(108,99,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center" }}>
-              <Scissors style={{ width:28,height:28,color:"#6c63ff",opacity:0.5 }}/>
-            </div>
-          </div>
+              <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:24,opacity:0.7 }}>
+                <div style={{ width:90,height:90,borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center" }}>
+                  <Scissors style={{ width:28,height:28,color:"#3a3a58" }}/>
+                </div>
+                <div style={{ width:20,height:20,borderRadius:"50%",background:"rgba(108,99,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                  <ChevronRight style={{ width:11,height:11,color:"#6c63ff" }}/>
+                </div>
+                <div style={{ width:90,height:90,borderRadius:10,background:"rgba(108,99,255,0.06)",border:"1px solid rgba(108,99,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center" }}>
+                  <Scissors style={{ width:28,height:28,color:"#6c63ff",opacity:0.5 }}/>
+                </div>
+              </div>
 
-          {/* Valid source note */}
-          <div style={{ width:"100%",padding:"6px 9px",borderRadius:8,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",textAlign:"left",marginBottom:activeTaskId ? 10 : 0 }}>
-            <p style={{ color:"#2d2d48",fontSize:9,margin:0,lineHeight:1.6 }}>
-              Valid sources: text/image/multiview generation, imported models, retopo outputs.
-            </p>
-          </div>
-
-          {activeTaskId && (
-            <div style={{ width:"100%",padding:"8px 10px",borderRadius:9,background:"rgba(108,99,255,0.08)",border:"1px solid rgba(108,99,255,0.25)",marginTop:8,textAlign:"left" }}>
-              <p style={{ color:"#a5a0ff",fontSize:11,fontWeight:600,margin:0 }}>Selected model</p>
-              <p style={{ color:"#2d2d48",fontSize:9,margin:"2px 0 0",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{activeTaskId}</p>
-            </div>
+              <div style={{ width:"100%",padding:"6px 9px",borderRadius:8,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",textAlign:"left",marginBottom:10 }}>
+                <p style={{ color:"#2d2d48",fontSize:9,margin:0,lineHeight:1.6 }}>
+                  Valid sources: text/image/multiview generation, imported models, retopo outputs.
+                </p>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -88,34 +102,48 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput }) {
             </div>
           )}
 
-          <p style={{ color:"#c8c8e0",fontSize:13,fontWeight:500,lineHeight:1.6,margin:"0 0 20px" }}>
-            Select a model<br/>from the <span style={{ color:"#f5a623" }}>Assets</span> Panel on<br/>the right for <span style={{ color:"#a5a0ff" }}>Part Completion</span>
-          </p>
+          {activeTaskId ? (
+            /* ── Selected model — Ready state ── */
+            <div style={{ width:"100%" }}>
+              <div style={{ display:"flex",alignItems:"center",gap:8,padding:"10px 12px",borderRadius:10,background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.2)",marginBottom:14 }}>
+                <Check style={{ width:14,height:14,color:"#22c55e",flexShrink:0 }}/>
+                <span style={{ color:"#86efac",fontSize:12,fontWeight:700 }}>Ready for Part Completion</span>
+              </div>
+              <div style={{ padding:"8px 10px",borderRadius:9,background:"rgba(108,99,255,0.08)",border:"1px solid rgba(108,99,255,0.25)",marginBottom:10 }}>
+                <p style={{ color:"#a5a0ff",fontSize:11,fontWeight:600,margin:0 }}>Selected model</p>
+                <p style={{ color:"#2d2d48",fontSize:9,margin:"2px 0 0",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{activeTaskId}</p>
+              </div>
+              <div style={{ width:"100%",padding:"6px 9px",borderRadius:8,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",textAlign:"left" }}>
+                <p style={{ color:"#2d2d48",fontSize:9,margin:0,lineHeight:1.6 }}>
+                  Source must be a segmented model (mesh_segmentation output).
+                </p>
+              </div>
+            </div>
+          ) : (
+            /* ── No model selected ── */
+            <>
+              <p style={{ color:"#c8c8e0",fontSize:13,fontWeight:500,lineHeight:1.6,margin:"0 0 20px" }}>
+                Select a segmented model<br/>from the <span style={{ color:"#f5a623" }}>Archive</span> panel or<br/><span style={{ color:"#a5a0ff" }}>upload your own</span>
+              </p>
 
-          <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:24,opacity:0.7 }}>
-            <div style={{ width:90,height:90,borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center" }}>
-              <Boxes style={{ width:28,height:28,color:"#3a3a58" }}/>
-            </div>
-            <div style={{ width:20,height:20,borderRadius:"50%",background:"rgba(108,99,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-              <ChevronRight style={{ width:11,height:11,color:"#6c63ff" }}/>
-            </div>
-            <div style={{ width:90,height:90,borderRadius:10,background:"rgba(108,99,255,0.06)",border:"1px solid rgba(108,99,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center" }}>
-              <Box style={{ width:28,height:28,color:"#6c63ff",opacity:0.5 }}/>
-            </div>
-          </div>
+              <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:24,opacity:0.7 }}>
+                <div style={{ width:90,height:90,borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center" }}>
+                  <Boxes style={{ width:28,height:28,color:"#3a3a58" }}/>
+                </div>
+                <div style={{ width:20,height:20,borderRadius:"50%",background:"rgba(108,99,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                  <ChevronRight style={{ width:11,height:11,color:"#6c63ff" }}/>
+                </div>
+                <div style={{ width:90,height:90,borderRadius:10,background:"rgba(108,99,255,0.06)",border:"1px solid rgba(108,99,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center" }}>
+                  <Box style={{ width:28,height:28,color:"#6c63ff",opacity:0.5 }}/>
+                </div>
+              </div>
 
-          {/* Source requirement note */}
-          <div style={{ width:"100%",padding:"6px 9px",borderRadius:8,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",textAlign:"left",marginBottom:activeTaskId ? 10 : 0 }}>
-            <p style={{ color:"#2d2d48",fontSize:9,margin:0,lineHeight:1.6 }}>
-              Source must be a segmented model (mesh_segmentation output).
-            </p>
-          </div>
-
-          {activeTaskId && (
-            <div style={{ width:"100%",padding:"8px 10px",borderRadius:9,background:"rgba(108,99,255,0.08)",border:"1px solid rgba(108,99,255,0.25)",marginBottom:10,textAlign:"left" }}>
-              <p style={{ color:"#a5a0ff",fontSize:11,fontWeight:600,margin:0 }}>Selected model</p>
-              <p style={{ color:"#2d2d48",fontSize:9,margin:"2px 0 0",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{activeTaskId}</p>
-            </div>
+              <div style={{ width:"100%",padding:"6px 9px",borderRadius:8,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",textAlign:"left",marginBottom:10 }}>
+                <p style={{ color:"#2d2d48",fontSize:9,margin:0,lineHeight:1.6 }}>
+                  Source must be a segmented model (mesh_segmentation output).
+                </p>
+              </div>
+            </>
           )}
 
           <button

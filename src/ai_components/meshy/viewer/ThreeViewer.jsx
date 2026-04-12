@@ -1,4 +1,6 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useCallback, useContext } from "react";
+import { useMotionValueEvent } from "framer-motion";
+import { StudioLayoutContext } from "../../../components/shared/StudioLayout";
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
@@ -12,6 +14,8 @@ import {
 export default function ThreeViewer({
   color, viewMode, lightMode, showGrid,
   modelUrl, onReady,
+  leftOffset = 0,
+  rightOffset = 0,
   lightStrength = 1,
   lightRotation = 0,
   lightAutoRotate = false,
@@ -250,6 +254,43 @@ export default function ThreeViewer({
     el.addEventListener('wheel', handler, { passive: false });
     return () => el.removeEventListener('wheel', handler);
   }, [onSpinStop]);
+
+  // Cinematic Re-centering logic
+  const ctx = useContext(StudioLayoutContext);
+  const smoothL = ctx?.smoothL;
+  const smoothR = ctx?.smoothR;
+
+  const updateCameraOffset = (l, r) => {
+    if (!S.current?.camera) return;
+    const cw = mountRef.current?.clientWidth;
+    const ch = mountRef.current?.clientHeight;
+    if (!cw || !ch) return;
+    
+    // Shift the projection matrix (not the camera position) to center the model
+    // in the visible area between the two sidebars.
+    const dx = (l - r) / 2;
+    S.current.camera.setViewOffset(cw, ch, -dx, 0, cw, ch);
+    S.current.camera.updateProjectionMatrix();
+    S.current.markDirty?.();
+  };
+
+  // Synchronize with motion values if they exist
+  useMotionValueEvent(smoothL || { get: () => leftOffset, on: () => {} }, "change", (latest) => {
+    updateCameraOffset(latest, smoothR?.get() || 0);
+  });
+  useMotionValueEvent(smoothR || { get: () => rightOffset, on: () => {} }, "change", (latest) => {
+    updateCameraOffset(smoothL?.get() || 0, latest);
+  });
+
+  // Initial sync and fallback for non-motion props
+  useEffect(() => {
+    if (smoothL && smoothR) {
+      updateCameraOffset(smoothL.get(), smoothR.get());
+    } else {
+      updateCameraOffset(leftOffset, rightOffset);
+    }
+  }, [leftOffset, rightOffset, smoothL, smoothR]);
+
 
   const onPointerDown = useCallback((e) => {
     e.currentTarget.setPointerCapture(e.pointerId);
