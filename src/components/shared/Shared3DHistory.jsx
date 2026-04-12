@@ -165,7 +165,7 @@ export default function Shared3DHistory({
   }, [history, histQ, activeTab]);
 
   return (
-    <div className="flex flex-col h-full w-full bg-white/[0.01]">
+    <div className="flex flex-col h-full w-full bg-[#060410]">
       <div style={{ padding: "12px 20px 16px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <History className="w-4 h-4 opacity-50" style={{ color: color }} />

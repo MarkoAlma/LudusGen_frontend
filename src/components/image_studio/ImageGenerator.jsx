@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings2 } from 'lucide-react';
+import { Settings2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import ImageControls from './ImageControls';
 import ImageWorkspace from './ImageWorkspace';
 import ImageStudioBG from '../../assets/image_studio_v2.png';
 import BackgroundFilters from '../chat/BackgroundFilters';
+import { useSidebarState } from '../../hooks/useSidebarState';
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const ENHANCING_PROMPT_EDIT = `
@@ -416,7 +417,8 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken }) {
   const [fluxSizeIdx, setFluxSizeIdx] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isOpen: sidebarOpen, setIsOpen: setSidebarOpen, isDesktop, toggle: toggleSidebar } =
+    useSidebarState('image_sidebar_open', true);
   const themeColor = selectedModel?.color || "#7c3aed";
 
   const provider = getProvider(selectedModel);
@@ -551,44 +553,80 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken }) {
         <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black via-black/20 to-transparent opacity-90" />
       </div>
 
-      {/* Mobile Toggle Button */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="fixed bottom-32 right-6 z-[60] lg:hidden w-16 h-16 rounded-full bg-primary text-white shadow-[0_20px_40px_rgba(138,43,226,0.3)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-primary/20"
-      >
-        <Settings2 className="w-7 h-7" />
-      </button>
+      {/* Mobile FAB */}
+      {!isDesktop && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed bottom-32 right-6 z-[60] lg:hidden w-16 h-16 rounded-full bg-primary text-white shadow-[0_20px_40px_rgba(138,43,226,0.3)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-primary/20"
+        >
+          <Settings2 className="w-7 h-7" />
+        </button>
+      )}
 
-      {/* Sidebar - Desktop & Mobile Drawer */}
-      <AnimatePresence>
-        {(sidebarOpen || (typeof window !== 'undefined' && window.innerWidth >= 1024)) && (
-          <>
-            {/* Backdrop for Mobile */}
-            <AnimatePresence>
-              {sidebarOpen && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setSidebarOpen(false)}
-                  className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] lg:hidden"
+      {/* Desktop Collapsible Sidebar */}
+      {isDesktop && (
+        <>
+          <motion.aside
+            initial={false}
+            animate={{ width: sidebarOpen ? 320 : 0 }}
+            transition={{ type: 'spring', damping: 30, stiffness: 220 }}
+            className="h-full flex-shrink-0 relative z-20 overflow-hidden"
+          >
+            <div className="w-[320px] xl:w-[384px] h-full overflow-hidden">
+              <div className="w-80 xl:w-96 h-full">
+                <ImageControls
+                  selectedModel={selectedModel}
+                  prompt={prompt} setPrompt={setPrompt}
+                  negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
+                  aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
+                  quality={quality} setQuality={setQuality}
+                  numImages={numImages} setNumImages={setNumImages}
+                  seed={seed} setSeed={setSeed}
+                  steps={steps} setSteps={setSteps}
+                  guidance={guidance} setGuidance={setGuidance}
+                  promptExtend={promptExtend} setPromptExtend={setPromptExtend}
+                  inputImages={inputImages} setInputImages={setInputImages}
+                  isGenerating={isGenerating}
+                  onGenerate={handleGenerate}
                 />
-              )}
-            </AnimatePresence>
+              </div>
+            </div>
+          </motion.aside>
 
+          <motion.button
+            initial={false}
+            animate={{ x: sidebarOpen ? 320 : 0 }}
+            transition={{ type: 'spring', damping: 30, stiffness: 220 }}
+            className="absolute left-[-1px] top-[35%] -translate-y-1/2 z-[110] flex items-center justify-center w-7 h-14 rounded-r-xl bg-[#0a0a0f]/80 backdrop-blur-2xl border border-white/10 border-l-0 hover:bg-white/10 transition-colors duration-200 text-zinc-500 hover:text-white shadow-2xl"
+            onClick={toggleSidebar}
+          >
+            <motion.div
+              animate={{ rotate: sidebarOpen ? 0 : 180 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 220 }}
+            >
+              {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+            </motion.div>
+          </motion.button>
+        </>
+      )}
+
+      {/* Mobile Overlay Drawer */}
+      <AnimatePresence>
+        {sidebarOpen && !isDesktop && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSidebarOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] lg:hidden"
+            />
             <motion.div
               initial={{ x: '-100%', opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: '-100%', opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`
-                fixed inset-y-0 left-0 z-[110] 
-                w-80 xl:w-96
-                lg:relative lg:z-0 h-full 
-                border-r border-white/5 
-                flex flex-col bg-[#03000a]/20 backdrop-blur-[60px] 
-                overflow-hidden
-              `}
+              transition={{ type: 'spring', damping: 30, stiffness: 220 }}
+              className="fixed inset-y-0 left-0 z-[110] w-80 xl:w-96 h-full lg:hidden border-r border-white/5 flex flex-col bg-[#03000a]/20 backdrop-blur-[60px] overflow-hidden"
             >
               <ImageControls
                 selectedModel={selectedModel}

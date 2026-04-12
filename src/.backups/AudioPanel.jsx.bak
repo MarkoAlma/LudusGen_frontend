@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   Music, Play, Pause, Download, Loader2, XCircle, Mic,
-  Bookmark, History, Volume2, X, Globe, Sparkles, Settings2, Activity, Zap, ActivitySquare, Speaker,
-  PanelLeftClose, PanelLeftOpen
+  Bookmark, History, Volume2, X, Globe, Sparkles, Settings2, Activity, Zap, ActivitySquare, Speaker
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { db } from "../firebase/firebaseApp";
@@ -11,7 +10,6 @@ import { DEFAULT_PRESETS } from "./models";
 
 import BackgroundFilters from '../components/chat/BackgroundFilters';
 import AudioEngineBg from '../assets/backgrounds/motif_audio_bg.png';
-import { useSidebarState } from '../hooks/useSidebarState';
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -209,9 +207,6 @@ export default function AudioPanel({ selectedModel, userId, getIdToken }) {
   const [activePresetId, setActivePresetId] = useState(isTTS ? "audio_natural" : "music_cinematic");
   const [presetSaveOpen, setPresetSaveOpen] = useState(false);
   const [newPresetName, setNewPresetName] = useState("");
-
-  const { isOpen: configOpen, setIsOpen: setConfigOpen, isDesktop, toggle: toggleConfigSidebar } =
-    useSidebarState('audio_sidebar_open', true);
 
   const audioRef = useRef(null);
   const color = selectedModel.color || "#10b981";

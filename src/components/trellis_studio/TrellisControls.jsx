@@ -124,11 +124,8 @@ export default function TrellisControls({
   };
 
   return (
-    <div className="h-full flex flex-col relative overflow-hidden"
+    <div className="h-full flex flex-col relative overflow-hidden bg-[#060410]"
       style={{
-        background: 'linear-gradient(180deg, rgba(10,8,20,0.88) 0%, rgba(6,4,16,0.94) 50%, rgba(8,6,18,0.90) 100%)',
-        backdropFilter: 'blur(30px) saturate(1.3)',
-        WebkitBackdropFilter: 'blur(30px) saturate(1.3)',
         borderRight: '1px solid rgba(255,255,255,0.05)',
         boxShadow: '0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
       }}

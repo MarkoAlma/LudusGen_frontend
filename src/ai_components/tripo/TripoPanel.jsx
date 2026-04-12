@@ -193,10 +193,15 @@ function PBar({ value }) {
 }
 
 /* ─── component ──────────────────────────────────────────────────────── */
-export default function TripoPanel({ selectedModel, getIdToken, userId }) {
+export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobalOpen }) {
   const color = selectedModel?.color || "#6c63ff";
   const { user, refreshCredits } = useContext(MyUserContext);
   const userCredits = user?.credits ?? 0;
+
+  // Master Sidebar Sync
+  useEffect(() => {
+    setLeftOpen(isGlobalOpen);
+  }, [isGlobalOpen]);
 
   // nav
   const [mode, setMode] = useState("generate");
@@ -283,6 +288,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
   // layout state (controlled by StudioLayout)
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(false);
+  const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
 
   // history
   const [history, setHistory] = useState([]);
@@ -888,139 +894,146 @@ export default function TripoPanel({ selectedModel, getIdToken, userId }) {
     <StudioLayout
       leftOpen={leftOpen}
       setLeftOpen={setLeftOpen}
+      leftSecondaryOpen={leftSecondaryOpen}
+      setLeftSecondaryOpen={setLeftSecondaryOpen}
       rightOpen={rightOpen}
       setRightOpen={setRightOpen}
-      leftWidth={302}
+      leftWidth={62}
+      leftSecondaryWidth={240}
       rightWidth={220}
       leftSidebar={
-        <div className="h-full flex flex-col bg-[#0a0a0f]/40 backdrop-blur-3xl">
-          <div className="flex flex-1 overflow-hidden">
-            {/* Narrow icon nav */}
-            <div className="w-[62px] flex-shrink-0 border-r border-white/5 flex flex-col bg-black/20">
-              {NAV.map(n => {
-                const Icon = n.icon;
-                const isN = modelVer !== "P1-20260311" && !modelVer.startsWith("v3.");
-                const actsAsN = isN && (n.id === "segment" || n.id === "texture_edit" || n.id === "retopo");
-                return (
-                  <Tooltip key={n.id} text={n.label + (actsAsN ? " (Not supported by Model V1/V2)" : "")} side="right">
-                    <button onClick={() => !actsAsN && setMode(n.id)} className={"tp-nav-btn" + (mode === n.id ? " active" : "") + (actsAsN ? " model-na" : "")}>
-                      <div className="ico"><Icon style={{ width: 18, height: 18, color: mode === n.id ? "var(--accent-bright)" : "var(--text-muted)" }} /></div>
-                      <span className="lbl">{n.label}</span>
-                    </button>
-                  </Tooltip>
-                );
-              })}
-            </div>
-            {/* Tool settings */}
-            <div className="flex-1 flex flex-col overflow-hidden bg-white/[0.01]">
-              <div className="p-4 py-3 border-b border-white/5 flex-shrink-0">
-                <h3 className="m-0 text-[13px] font-black tracking-widest uppercase text-white flex items-center gap-2 italic">
-                  <Activity className="w-4 h-4 text-primary opacity-50" />
-                  {modeTitle}
-                </h3>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 tp-scroll">
-                {mode === "generate" && <GeneratePanel genTab={genTab} setGenTab={setGenTab} modelVer={modelVer} setModelVer={setModelVer} prompt={prompt} setPrompt={setPrompt} negPrompt={negPrompt} setNegPrompt={setNegPrompt} makeBetter={makeBetter} setMakeBetter={setMakeBetter} imgPrev={imgPrev} setImgPrev={setImgPrev} imgUploading={imgUploading} handleImg={handleImg} meshQ={meshQ} setMeshQ={setMeshQ} inParts={inParts} setInParts={setInParts} privacy={privacy} setPrivacy={setPrivacy} texOn={texOn} setTexOn={setTexOn} tex4K={tex4K} setTex4K={setTex4K} pbrOn={pbrOn} setPbrOn={setPbrOn} polycount={polycount} setPolycount={setPolycount} quadMesh={quadMesh} setQuadMesh={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} tPose={tPose} setTPose={setTPose} modelSeed={modelSeed} setModelSeed={setModelSeed} textureSeed={textureSeed} setTextureSeed={setTextureSeed} imageSeed={imageSeed} setImageSeed={setImageSeed} autoSize={autoSize} setAutoSize={setAutoSize} exportUv={exportUv} setExportUv={setExportUv} multiImages={multiImages} setMultiImages={setMultiImages} batchImages={batchImages} setBatchImages={setBatchImages} handleMultiImg={handleMultiImg} handleBatchImg={handleBatchImg} getIdToken={getIdToken} backendCaps={backendCaps} color={color} isRunning={isRunning} handleGen={handleGen} setErrorMsg={setErrorMsg} />}
-                {(mode === "segment" || mode === "fill_parts") && <Segment segSub={mode === "fill_parts" ? "fill_parts" : segSub} activeTaskId={activeTaskId} isRiggedInput={isRiggedInput} color={color} />}
-                {mode === "retopo" && <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={color} />}
-                {mode === "texture" && <Texture mode={mode} activeTaskId={activeTaskId} texInputTab={texInputTab} setTexInputTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt} imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} multiImages={multiImages} setMultiImages={setMultiImages} tex4K={tex4K} setTex4K={setTex4K} pbrOn={texPbr} setPbrOn={setTexPbr} texAlignment={texAlignment} setTexAlignment={setTexAlignment} color={color} />}
-                {mode === "texture_edit" && <Texture mode={mode} activeTaskId={activeTaskId} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} color={color} />}
-                {mode === "animate" && <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} handleAutoRig={handleAutoRig} color={color} />}
-                {mode === "refine" && (
-                  <div>
-                    {activeTaskId && (
-                      <div className="p-2 px-3 rounded-lg bg-primary/10 border border-primary/25 mb-4">
-                        <p className="text-primary font-bold text-[11px] m-0">Selected model</p>
-                        <p className="text-[#2d2d48] text-[9px] mt-1 font-mono truncate">{activeTaskId}</p>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 mb-3 p-1.5 px-2 rounded bg-white/5 border border-white/10 font-mono text-[10px] text-primary italic">
-                      task: "refine_model"
-                    </div>
-                    <p className="text-zinc-500 text-[11px] leading-relaxed mb-4 italic">
-                      Enhance mesh quality, fix topology issues, and improve geometry detail. Uses Tripo refine_model (30 credits).
-                    </p>
-                    <input
-                      className="tp-input"
-                      placeholder="Or enter task ID manually..."
-                      value={refineId}
-                      onChange={e => setRefineId(e.target.value)}
-                    />
+        <div className="h-full flex flex-col bg-[#030308] border-r border-white/5">
+          {NAV.map(n => {
+            const Icon = n.icon;
+            const isN = modelVer !== "P1-20260311" && !modelVer.startsWith("v3.");
+            const actsAsN = isN && (n.id === "segment" || n.id === "texture_edit" || n.id === "retopo");
+            return (
+              <Tooltip key={n.id} text={n.label + (actsAsN ? " (Not supported by Model V1/V2)" : "")} side="right">
+                <button 
+                  onClick={() => {
+                    if (!actsAsN) {
+                      setMode(n.id);
+                      setLeftSecondaryOpen(true);
+                    }
+                  }} 
+                  className={"tp-nav-btn" + (mode === n.id ? " active" : "") + (actsAsN ? " model-na" : "")}
+                >
+                  <div className="ico"><Icon style={{ width: 18, height: 18, color: mode === n.id ? "var(--accent-bright)" : "var(--text-muted)" }} /></div>
+                  <span className="lbl">{n.label}</span>
+                </button>
+              </Tooltip>
+            );
+          })}
+        </div>
+      }
+      leftSecondarySidebar={
+        <div className="h-full flex flex-col overflow-hidden bg-[#060410]/60 backdrop-blur-3xl">
+          <div className="p-4 py-3 border-b border-white/5 flex-shrink-0">
+            <h3 className="m-0 text-[13px] font-black tracking-widest uppercase text-white flex items-center gap-2 italic">
+              <Activity className="w-4 h-4 text-primary opacity-50" />
+              {modeTitle}
+            </h3>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 tp-scroll">
+            {mode === "generate" && <GeneratePanel genTab={genTab} setGenTab={setGenTab} modelVer={modelVer} setModelVer={setModelVer} prompt={prompt} setPrompt={setPrompt} negPrompt={negPrompt} setNegPrompt={setNegPrompt} makeBetter={makeBetter} setMakeBetter={setMakeBetter} imgPrev={imgPrev} setImgPrev={setImgPrev} imgUploading={imgUploading} handleImg={handleImg} meshQ={meshQ} setMeshQ={setMeshQ} inParts={inParts} setInParts={setInParts} privacy={privacy} setPrivacy={setPrivacy} texOn={texOn} setTexOn={setTexOn} tex4K={tex4K} setTex4K={setTex4K} pbrOn={pbrOn} setPbrOn={setPbrOn} polycount={polycount} setPolycount={setPolycount} quadMesh={quadMesh} setQuadMesh={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} tPose={tPose} setTPose={setTPose} modelSeed={modelSeed} setModelSeed={setModelSeed} textureSeed={textureSeed} setTextureSeed={setTextureSeed} imageSeed={imageSeed} setImageSeed={setImageSeed} autoSize={autoSize} setAutoSize={setAutoSize} exportUv={exportUv} setExportUv={setExportUv} multiImages={multiImages} setMultiImages={setMultiImages} batchImages={batchImages} setBatchImages={setBatchImages} handleMultiImg={handleMultiImg} handleBatchImg={handleBatchImg} getIdToken={getIdToken} backendCaps={backendCaps} color={color} isRunning={isRunning} handleGen={handleGen} setErrorMsg={setErrorMsg} />}
+            {(mode === "segment" || mode === "fill_parts") && <Segment segSub={mode === "fill_parts" ? "fill_parts" : segSub} activeTaskId={activeTaskId} isRiggedInput={isRiggedInput} color={color} />}
+            {mode === "retopo" && <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={color} />}
+            {mode === "texture" && <Texture mode={mode} activeTaskId={activeTaskId} texInputTab={texInputTab} setTexInputTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt} imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} multiImages={multiImages} setMultiImages={setMultiImages} tex4K={tex4K} setTex4K={setTex4K} pbrOn={texPbr} setPbrOn={setTexPbr} texAlignment={texAlignment} setTexAlignment={setTexAlignment} color={color} />}
+            {mode === "texture_edit" && <Texture mode={mode} activeTaskId={activeTaskId} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} color={color} />}
+            {mode === "animate" && <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} handleAutoRig={handleAutoRig} color={color} />}
+            {mode === "refine" && (
+              <div>
+                {activeTaskId && (
+                  <div className="p-2 px-3 rounded-lg bg-primary/10 border border-primary/25 mb-4">
+                    <p className="text-primary font-bold text-[11px] m-0">Selected model</p>
+                    <p className="text-[#2d2d48] text-[9px] mt-1 font-mono truncate">{activeTaskId}</p>
                   </div>
                 )}
-                {mode === "stylize" && (
-                  <div>
-                    {activeTaskId && (
-                      <div className="p-2 px-3 rounded-lg bg-primary/10 border border-primary/25 mb-4">
-                        <p className="text-primary font-bold text-[11px] m-0">Selected model</p>
-                        <p className="text-[#2d2d48] text-[9px] mt-1 font-mono truncate">{activeTaskId}</p>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 mb-3 p-1.5 px-2 rounded bg-white/5 border border-white/10 font-mono text-[10px] text-primary italic">
-                      task: "stylize_model"
-                    </div>
-                    <div className="mb-4">
-                      <span className="text-zinc-500 text-[11px] font-black uppercase tracking-widest block mb-2 italic">Style Filter</span>
-                      <div className="grid grid-cols-2 gap-2">
-                        {["cartoon", "clay", "alien", "steampunk", "lego", "voxel", "voronoi", "minecraft", "gold", "ancient_bronze"].map(s => (
-                          <button
-                            key={s}
-                            onClick={() => setStylizeStyle(s)}
-                            className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${stylizeStyle === s ? 'bg-primary/20 text-white border border-primary/50' : 'bg-white/5 text-zinc-600 border border-white/5'}`}
-                          >
-                            {s.replace("_", " ")}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <input
-                      className="tp-input"
-                      placeholder="Or enter task ID manually..."
-                      value={stylizeId}
-                      onChange={e => setStylizeId(e.target.value)}
-                    />
+                <div className="flex items-center gap-2 mb-3 p-1.5 px-2 rounded bg-white/5 border border-white/10 font-mono text-[10px] text-primary italic">
+                  task: "refine_model"
+                </div>
+                <p className="text-zinc-500 text-[11px] leading-relaxed mb-4 italic">
+                  Enhance mesh quality, fix topology issues, and improve geometry detail. Uses Tripo refine_model (30 credits).
+                </p>
+                <input
+                  className="tp-input"
+                  placeholder="Or enter task ID manually..."
+                  value={refineId}
+                  onChange={e => setRefineId(e.target.value)}
+                />
+              </div>
+            )}
+            {mode === "stylize" && (
+              <div>
+                {activeTaskId && (
+                  <div className="p-2 px-3 rounded-lg bg-primary/10 border border-primary/25 mb-4">
+                    <p className="text-primary font-bold text-[11px] m-0">Selected model</p>
+                    <p className="text-[#2d2d48] text-[9px] mt-1 font-mono truncate">{activeTaskId}</p>
                   </div>
                 )}
-              </div>
-              <div className="p-4 py-6 border-t border-white/5 bg-black/20">
-                {isRunning ? (
-                  <div className="fade-up">
-                    <div className="flex flex-col items-center mb-4">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Loader2 className="w-4 h-4 text-primary anim-spin" />
-                        <span className="text-[11px] font-black text-primary uppercase tracking-[0.2em] italic">{progress}% Complete</span>
-                      </div>
-                      <PBar value={progress} />
-                    </div>
-                    <button className="w-full py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[11px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all" onClick={handleStop}>
-                      Terminálás
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <button className={"tp-gen-btn" + (canGen ? " go" : " no")} onClick={handleGen} disabled={!canGen} style={{ height: 58, borderRadius: 20 }}>
-                      {genLabel}
-                      {canGen && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 12, paddingLeft: 12, borderLeft: "1px solid rgba(255,255,255,0.2)" }}>
-                          <CoinIcon size={16} /><span style={{ fontSize: 16, fontWeight: 900 }}>{genCost}</span>
-                        </div>
-                      )}
-                    </button>
-                    {modelUrl && !isRunning && (
-                      <button onClick={() => { setDlItem(null); setDlOpen(true); }}
-                        className="w-full mt-3 py-3 rounded-xl bg-white/5 border border-white/5 text-zinc-500 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:text-white hover:border-white/10 transition-all">
-                        <Download className="w-4 h-4" /> Export Engine
+                <div className="flex items-center gap-2 mb-3 p-1.5 px-2 rounded bg-white/5 border border-white/10 font-mono text-[10px] text-primary italic">
+                  task: "stylize_model"
+                </div>
+                <div className="mb-4">
+                  <span className="text-zinc-500 text-[11px] font-black uppercase tracking-widest block mb-2 italic">Style Filter</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {["cartoon", "clay", "alien", "steampunk", "lego", "voxel", "voronoi", "minecraft", "gold", "ancient_bronze"].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setStylizeStyle(s)}
+                        className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${stylizeStyle === s ? 'bg-primary/20 text-white border border-primary/50' : 'bg-white/5 text-zinc-600 border border-white/5'}`}
+                      >
+                        {s.replace("_", " ")}
                       </button>
-                    )}
-                  </>
-                )}
+                    ))}
+                  </div>
+                </div>
+                <input
+                  className="tp-input"
+                  placeholder="Or enter task ID manually..."
+                  value={stylizeId}
+                  onChange={e => setStylizeId(e.target.value)}
+                />
               </div>
-            </div>
+            )}
+          </div>
+          <div className="p-4 py-6 border-t border-white/5 bg-black/20">
+            {isRunning ? (
+              <div className="fade-up">
+                <div className="flex flex-col items-center mb-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Loader2 className="w-4 h-4 text-primary anim-spin" />
+                    <span className="text-[11px] font-black text-primary uppercase tracking-[0.2em] italic">{progress}% Complete</span>
+                  </div>
+                  <PBar value={progress} />
+                </div>
+                <button className="w-full py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[11px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all" onClick={handleStop}>
+                  Terminálás
+                </button>
+              </div>
+            ) : (
+              <>
+                <button className={"tp-gen-btn" + (canGen ? " go" : " no")} onClick={handleGen} disabled={!canGen} style={{ height: 58, borderRadius: 20 }}>
+                  {genLabel}
+                  {canGen && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 12, paddingLeft: 12, borderLeft: "1px solid rgba(255,255,255,0.2)" }}>
+                      <CoinIcon size={16} /><span style={{ fontSize: 16, fontWeight: 900 }}>{genCost}</span>
+                    </div>
+                  )}
+                </button>
+                {modelUrl && !isRunning && (
+                  <button onClick={() => { setDlItem(null); setDlOpen(true); }}
+                    className="w-full mt-3 py-3 rounded-xl bg-white/5 border border-white/5 text-zinc-500 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:text-white hover:border-white/10 transition-all">
+                    <Download className="w-4 h-4" /> Export Engine
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
       }
       rightSidebar={
-        <div className="h-full flex flex-col bg-[#0a0a0f]/40 backdrop-blur-3xl pt-0">
+        <div className="h-full flex flex-col bg-[#060410] pt-0">
           <Shared3DHistory
             userId={userId}
             getIdToken={getIdToken}
@@ -1110,7 +1123,7 @@ function TripoWorkspaceWrapper({
       {/* top hud */}
       <motion.div
         style={{ paddingLeft: smoothL, paddingRight: smoothR }}
-        className="flex items-center justify-between h-12 flex-shrink-0 border-b border-white/5 bg-[#0a0a14]/80 backdrop-blur-3xl gap-4 relative z-40 px-5"
+        className="flex items-center justify-between h-12 flex-shrink-0 border-b border-white/5 bg-[#0a0a0f] gap-4 relative z-40 px-5"
       >
         <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto no-scrollbar">
           <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] italic mr-4">View Context</span>

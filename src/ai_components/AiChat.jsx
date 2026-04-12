@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useContext, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useSpring } from "framer-motion";
 import { ALL_MODELS, getModel, findModelGroup, findModelCat } from "./models";
 import ChatPanel from "./ChatPanel";
 import ImagePanel from "./ImagePanel";
@@ -12,10 +12,33 @@ import { MyUserContext } from "../context/MyUserProvider";
 import AiStudioSidebar from "../components/chat/AiStudioSidebar";
 import BackgroundFilters from "../components/chat/BackgroundFilters";
 
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+
 export default function AIChat({ user, getIdToken }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAI, setSelectedAI] = useState("claude_sonnet");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Desktop Sidebar Persistence & Motion
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('desktop_sidebar_open');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  
+  const smoothWidth = useSpring(desktopSidebarOpen ? 320 : 0, { damping: 38, stiffness: 180 });
+
+  useEffect(() => {
+    smoothWidth.set(desktopSidebarOpen ? 320 : 0);
+  }, [desktopSidebarOpen, smoothWidth]);
+
+  const toggleDesktopSidebar = useCallback(() => {
+    setDesktopSidebarOpen(prev => {
+      const next = !prev;
+      localStorage.setItem('desktop_sidebar_open', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const [openGroups, setOpenGroups] = useState(() => new Set(["chat"]));
   const [openCats, setOpenCats] = useState(() => new Set(["chat_anthropic"]));
   const { navHeight } = useContext(MyUserContext);
@@ -94,7 +117,8 @@ export default function AIChat({ user, getIdToken }) {
       selectedModel,
       userId: user?.uid,
       getIdToken,
-      setSidebarOpen
+      setSidebarOpen,
+      isGlobalOpen: desktopSidebarOpen // MASTER SYNC
     };
     switch (selectedModel.panelType) {
       case "chat":
@@ -119,21 +143,43 @@ export default function AIChat({ user, getIdToken }) {
   return (
     <div className="flex w-full h-full bg-[#0a0a0f] transition-all duration-300 overflow-hidden relative z-10 flex-1">
       <BackgroundFilters />
-      
+
 
 
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:block w-80 xl:w-96 h-full flex-shrink-0">
-        <AiStudioSidebar
-          selectedAI={selectedAI}
-          openGroups={openGroups}
-          openCats={openCats}
-          toggleGroup={toggleGroup}
-          toggleCat={toggleCat}
-          handleSelectModel={handleSelectModel}
-          setSidebarOpen={setSidebarOpen}
-        />
-      </aside>
+      <div className="hidden lg:block h-full flex-shrink-0 relative z-20">
+        <motion.aside 
+          style={{ width: smoothWidth }}
+          className="h-full overflow-hidden"
+        >
+          <div className="w-[320px] h-full overflow-hidden">
+            <AiStudioSidebar
+              selectedAI={selectedAI}
+              openGroups={openGroups}
+              openCats={openCats}
+              toggleGroup={toggleGroup}
+              toggleCat={toggleCat}
+              handleSelectModel={handleSelectModel}
+              setSidebarOpen={setSidebarOpen}
+            />
+          </div>
+        </motion.aside>
+
+        {/* Floating Toggle Button */}
+        <motion.button
+          initial={false}
+          style={{ x: smoothWidth }}
+          className="absolute left-[-1px] top-[8%] -translate-y-1/2 z-[110] flex items-center justify-center w-7 h-14 rounded-r-xl bg-[#0a0a0f]/80 backdrop-blur-2xl border border-white/10 border-l-0 hover:bg-white/10 transition-colors duration-200 text-zinc-500 hover:text-white shadow-2xl"
+          onClick={toggleDesktopSidebar}
+        >
+          <motion.div
+            animate={{ rotate: desktopSidebarOpen ? 0 : 180 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </motion.div>
+        </motion.button>
+      </div>
 
       {/* Sidebar - Mobile Overlay */}
       <AnimatePresence>

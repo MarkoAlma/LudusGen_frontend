@@ -5,7 +5,7 @@ import TrellisWorkspace from './TrellisWorkspace';
 import Shared3DHistory from '../shared/Shared3DHistory';
 import StudioLayout from '../shared/StudioLayout';
 
-export default function TrellisGenerator({ getIdToken, userId }) {
+export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen }) {
   const {
     prompt, setPrompt,
     genStatus, setGenStatus,
@@ -26,6 +26,11 @@ export default function TrellisGenerator({ getIdToken, userId }) {
   const [rightOpen, setRightOpen] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [offsets, setOffsets] = useState({ left: 320, right: 280 });
+
+  // Master Sidebar Sync
+  React.useEffect(() => {
+    setLeftOpen(isGlobalOpen);
+  }, [isGlobalOpen]);
 
   const handleGenerateWrap = async () => {
     await handleGenerate();
