@@ -94,7 +94,7 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          className="relative w-full max-w-2xl bg-[#0a0a14] border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh]"
+          className="relative w-full max-w-2xl bg-[#0a0a14] border border-white/10 rounded-2xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh]"
         >
           {/* Header */}
           <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">

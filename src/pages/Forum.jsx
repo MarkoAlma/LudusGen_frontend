@@ -139,21 +139,21 @@ const DataBeam = ({ path, delay = 0, duration = 3 }) => (
 );
 
 const TechnicalHUD = () => (
-  <div className="absolute inset-0 pointer-events-none font-mono text-[0.6rem] text-[#7c3aed]/30 uppercase tracking-widest p-6 select-none">
+  <div className="absolute inset-0 pointer-events-none font-mono text-[0.5rem] sm:text-[0.6rem] text-[#7c3aed]/30 uppercase tracking-widest p-3 sm:p-6 select-none">
     {/* Corner HUDs */}
-    <div className="absolute top-8 left-8 border-l border-t border-[#7c3aed]/20 p-2">
+    <div className="absolute top-4 sm:top-8 left-4 sm:left-8 border-l border-t border-[#7c3aed]/20 p-1.5 sm:p-2">
       <div>SYS_KERN: ACTIVE</div>
       <div>NET_SYNC: 0x7c3ae</div>
     </div>
-    <div className="absolute top-8 right-8 border-r border-t border-[#7c3aed]/20 p-2 text-right">
+    <div className="absolute top-4 sm:top-8 right-4 sm:right-8 border-r border-t border-[#7c3aed]/20 p-1.5 sm:p-2 text-right">
       <div>FORGE_CORE_v7.4</div>
       <div>SEC_LEVEL: ALPHA</div>
     </div>
-    <div className="absolute bottom-8 left-8 border-l border-b border-[#7c3aed]/20 p-2">
+    <div className="absolute bottom-4 sm:bottom-8 left-4 sm:left-8 border-l border-b border-[#7c3aed]/20 p-1.5 sm:p-2">
       <div>COORD: 47.4979 N</div>
       <div>19.0402 E</div>
     </div>
-    <div className="absolute bottom-8 right-8 border-r border-b border-[#7c3aed]/20 p-2 text-right">
+    <div className="absolute bottom-4 sm:bottom-8 right-4 sm:right-8 border-r border-b border-[#7c3aed]/20 p-1.5 sm:p-2 text-right">
       <div>MEMORY_OK</div>
       <div>NEURAL_LINK: STABLE</div>
     </div>
@@ -450,7 +450,7 @@ const PostCard = ({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -3, scale: 1.015 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
-      className="group cursor-pointer relative overflow-visible"
+      className="group cursor-pointer relative overflow-hidden sm:overflow-visible"
       style={{
         background: "linear-gradient(145deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.3))",
         backdropFilter: "blur(40px)",
@@ -462,8 +462,8 @@ const PostCard = ({
         borderBottom: `1px solid ${cat.color}10`,
         boxShadow: `0 20px 50px -10px rgba(0,0,0,0.8), 0 0 35px -10px ${cat.color}35, inset 0 1px 0 0 ${cat.color}20`,
         borderRadius: "1.5rem",
-        padding: "1.5rem",
-        marginBottom: "1rem",
+        padding: "1rem",
+        marginBottom: "0.75rem",
         zIndex: showMenu ? 50 : "auto",
         transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
@@ -483,28 +483,28 @@ const PostCard = ({
       }}
       onClick={onClick}
     >
-      <div className="flex items-start gap-5">
+      <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-5">
 
         {/* Left Column (Icon + Decorative) */}
         <div className="flex flex-col items-center mt-0.5 flex-shrink-0 self-stretch">
           {/* Avatar Logo */}
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center relative z-10 transition-transform duration-300 group-hover:scale-105"
+          <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center relative z-10 transition-transform duration-300 group-hover:scale-105"
             style={{
               background: "rgba(255,255,255,0.02)",
               border: "1px solid rgba(255,255,255,0.05)",
               boxShadow: `inset 0 0 20px ${cat.color}10`
             }}>
             {cat.icon ? (
-              <cat.icon className="w-6 h-6 transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" style={{ color: cat.color }} />
+              <cat.icon className="w-4 h-4 sm:w-6 sm:h-6 transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" style={{ color: cat.color }} />
             ) : (
-              <span className="text-white/80 font-black italic text-xl uppercase transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" style={{ color: cat.color }}>
+              <span className="text-white/80 font-black italic text-base sm:text-xl uppercase transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" style={{ color: cat.color }}>
                 {cat.emoji || "U"}
               </span>
             )}
           </div>
 
-          {/* Premium Tech Circuit Tracker */}
-          <div className="relative flex-1 w-full flex flex-col items-center mt-3 mb-1 min-h-[3.5rem] opacity-40 group-hover:opacity-100 transition-opacity duration-500">
+          {/* Premium Tech Circuit Tracker - hidden on mobile */}
+          <div className="relative flex-1 w-full flex flex-col items-center mt-3 mb-1 min-h-[3.5rem] opacity-40 group-hover:opacity-100 transition-opacity duration-500 hidden sm:flex">
             {/* Background Track */}
             <div className="absolute inset-y-0 w-px bg-gradient-to-b from-white/10 via-white/5 to-transparent" />
 
@@ -528,16 +528,16 @@ const PostCard = ({
         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
 
           {/* Header: Cat Pill & Time */}
-          <div className="flex items-center justify-between">
-            <span className="text-[0.55rem] px-3 py-1 rounded-[1rem] font-black tracking-[0.25em] uppercase italic"
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[0.55rem] px-2 py-0.5 sm:px-3 sm:py-1 rounded-[1rem] font-black tracking-[0.25em] uppercase italic whitespace-nowrap"
               style={{ background: `${cat.color}15`, color: cat.color, border: `1px solid ${cat.color}25` }}>
               {cat.label}
             </span>
-            <div className="flex items-center gap-2 text-[0.6rem] text-zinc-500 font-bold tracking-widest uppercase relative" ref={menuRef}>
+            <div className="flex items-center gap-1 sm:gap-2 text-[0.6rem] text-zinc-500 font-bold tracking-widest uppercase relative flex-shrink-0" ref={menuRef}>
               <span className="flex items-center gap-1 opacity-70">
                 <Clock className="w-3 h-3" /> {post.time}
               </span>
-              <span className="opacity-30">•</span>
+              <span className="opacity-30 hidden sm:inline">•</span>
 
               {/* MORE / Menu Button */}
               <button onClick={e => { e.stopPropagation(); setShowMenu(v => !v); }}
@@ -588,51 +588,51 @@ const PostCard = ({
           </div>
 
           {/* Title */}
-          <h3 className="text-lg font-black italic leading-tight truncate py-1 transition-all duration-300 group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]"
+          <h3 className="text-base sm:text-lg font-black italic leading-tight py-1 transition-all duration-300 group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] line-clamp-2"
             style={{ color: cat.color }}>
             {post.title}
           </h3>
 
           {/* Preview text */}
-          <p className="text-zinc-400 text-[13px] font-medium leading-relaxed truncate mb-1">
+          <p className="text-zinc-400 text-[12px] sm:text-[13px] font-medium leading-relaxed line-clamp-2 mb-1">
             {post.preview || post.content?.slice(0, 160) || "Olvasás megkezdése..."}
           </p>
 
           {/* Footer row */}
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5 flex-wrap gap-2">
 
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-2 sm:gap-5 flex-wrap">
               {/* Author Pill */}
-              <div className="flex items-center gap-2 rounded-lg pr-3 pl-1 py-1 transition-all"
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg pr-2 sm:pr-3 pl-1 py-1 transition-all"
                 style={{ background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)" }}>
                 {post.avatarUrl || post.authorPhotoUrl ? (
-                  <img src={post.avatarUrl || post.authorPhotoUrl} alt={post.author} className="w-5 h-5 rounded object-cover border border-white/10" />
+                  <img src={post.avatarUrl || post.authorPhotoUrl} alt={post.author} className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover border border-white/10" />
                 ) : (
-                  <div className="w-5 h-5 rounded flex items-center justify-center font-black text-[0.6rem] uppercase"
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 rounded flex items-center justify-center font-black text-[0.5rem] sm:text-[0.6rem] uppercase"
                     style={{ background: "rgba(0,0,0,0.4)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.05)" }}>
                     {post.avatar || post.author?.[0] || "U"}
                   </div>
                 )}
-                <span className="text-[0.6rem] font-black text-zinc-500 tracking-[0.2em] uppercase italic opacity-80">{post.author}</span>
+                <span className="text-[0.55rem] sm:text-[0.6rem] font-black text-zinc-500 tracking-[0.2em] uppercase italic opacity-80 truncate max-w-[80px] sm:max-w-none">{post.author}</span>
               </div>
 
               {/* Stats */}
-              <div className="flex items-center gap-4 text-zinc-500 text-[0.7rem] font-bold">
-                <span className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><MessageSquare className="w-3.5 h-3.5" />{post.comments}</span>
-                <span className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><Heart className="w-3.5 h-3.5" />{post.likes}</span>
-                <span className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><Eye className="w-3.5 h-3.5" />{post.views?.toLocaleString()}</span>
+              <div className="flex items-center gap-2 sm:gap-4 text-zinc-500 text-[0.65rem] sm:text-[0.7rem] font-bold">
+                <span className="flex items-center gap-1 sm:gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><MessageSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{post.comments}</span>
+                <span className="flex items-center gap-1 sm:gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><Heart className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{post.likes}</span>
+                <span className="flex items-center gap-1 sm:gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{post.views?.toLocaleString()}</span>
               </div>
             </div>
 
             {/* Chevron Edge Button */}
-            <div className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110"
               style={{
                 background: `${cat.color}08`,
                 border: `1px solid ${cat.color}20`,
                 color: cat.color,
                 boxShadow: `0 0 15px ${cat.color}15`
               }}>
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
 
           </div>
@@ -709,38 +709,38 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
   };
 
   return createPortal(
-    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
+    <div className="fixed inset-0 flex items-center justify-center p-3 sm:p-4" style={{ zIndex: 10000 }}>
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
       <div className="relative w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col"
         style={{ background: "#13111c", border: "1px solid rgba(255,255,255,0.08)", maxHeight: "92vh", boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 flex-shrink-0">
-          <h3 className="text-white/90 font-semibold flex items-center gap-2 text-sm"
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-white/5 flex-shrink-0">
+          <h3 className="text-white/90 font-semibold flex items-center gap-2 text-sm min-w-0"
             style={{ fontFamily: "'Instrument Serif', serif" }}>
             {isEditMode
-              ? <><Edit3 className="w-4 h-4" style={{ color: cat?.color }} /> Téma szerkesztése</>
-              : <><PenSquare className="w-4 h-4" style={{ color: cat?.color }} /> Új téma indítása</>
+              ? <><Edit3 className="w-4 h-4 flex-shrink-0" style={{ color: cat?.color }} /> <span className="truncate hidden sm:inline">Téma szerkesztése</span><span className="sm:hidden">Szerkesztés</span></>
+              : <><PenSquare className="w-4 h-4 flex-shrink-0" style={{ color: cat?.color }} /> <span className="truncate hidden sm:inline">Új téma indítása</span><span className="sm:hidden">Új téma</span></>
             }
           </h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button onClick={() => setPreview(v => !v)}
-              className="cursor-pointer text-xs px-3 py-1.5 rounded-lg transition-all"
+              className="cursor-pointer text-xs px-2 sm:px-3 py-1.5 rounded-lg transition-all"
               style={{ background: preview ? `${cat?.color}12` : "rgba(255,255,255,0.04)", color: preview ? cat?.color : "#5a5470", border: `1px solid ${preview ? cat?.color + "25" : "rgba(255,255,255,0.06)"}` }}>
-              {preview ? "Szerkesztés" : "Előnézet"}
+              {preview ? "Szerk." : "Előnézet"}
             </button>
             <button onClick={onClose} className="cursor-pointer p-1 rounded-lg text-gray-600 hover:text-white hover:bg-white/5 transition-all"><X className="w-4 h-4" /></button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-3 sm:py-4 space-y-4">
           <div>
             <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider block mb-2">Kategória *</label>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
               {CATEGORIES.filter(c => c.id !== "all").map(c => (
                 <button key={c.id} onClick={() => setSelectedCat(c.id)}
-                  className="cursor-pointer flex flex-col items-center gap-1 py-2.5 rounded-xl transition-all text-xs active:scale-95"
+                  className="cursor-pointer flex flex-col items-center gap-0.5 sm:gap-1 py-2 sm:py-2.5 rounded-xl transition-all text-xs active:scale-95"
                   style={{ background: selectedCat === c.id ? `${c.color}10` : "transparent", border: `1px solid ${selectedCat === c.id ? c.color + "30" : "rgba(255,255,255,0.06)"}`, color: selectedCat === c.id ? c.color : "#5a5470" }}>
-                  <span className="text-lg">{c.emoji}</span>
-                  <span className="font-medium leading-tight text-center">{c.label}</span>
+                  <span className="text-base sm:text-lg">{c.emoji}</span>
+                  <span className="font-medium leading-tight text-center text-[0.6rem] sm:text-xs">{c.label}</span>
                 </button>
               ))}
             </div>
@@ -943,6 +943,7 @@ export default function Forum() {
   const [notifications, setNotifications] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // ─── Optimized Popular Tags (Firestore Aggregation) ──────────────
   const [popularTags, setPopularTags] = useState([]);
@@ -1678,7 +1679,7 @@ export default function Forum() {
 
   // ── Fórum lista nézet ────────────────────────────────────────────
   return (
-    <div className="min-h-screen relative overflow-x-hidden text-white"
+    <div className="min-h-screen relative overflow-hidden text-white"
       style={{
         backgroundColor: "#06050a",
         fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif"
@@ -1730,74 +1731,84 @@ export default function Forum() {
 
 
 
-      <div className="relative z-10 w-full">
+      <div className="relative z-10 w-full overflow-x-hidden">
 
         {/* ══ SEARCH & ACTIONS ══ */}
-        <div className="relative z-50 max-w-[1200px] mx-auto px-4 mt-5 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
-              <input
-                type="text"
-                placeholder="Keress a fórumon..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-[#13111c] border border-white/5 rounded-xl py-2.5 pl-11 pr-4 text-sm placeholder-gray-600 focus:outline-none focus:border-purple-500/20 transition-all"
-              />
+        <div className="relative z-50 max-w-[1200px] mx-auto px-3 sm:px-4 mt-5 mb-6">
+          {/* Search bar — full width, own row */}
+          <div className="relative mb-3">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+            <input
+              type="text"
+              placeholder="Keress a fórumon..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-[#13111c] border border-white/5 rounded-xl py-3 pl-11 pr-4 text-sm placeholder-gray-600 focus:outline-none focus:border-purple-500/20 transition-all"
+            />
+          </div>
+
+          {/* Action buttons — separate row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <span className="font-medium">{posts.length} téma</span>
+              <span className="text-gray-700">·</span>
+              <span>{totalThreads.toLocaleString()} összesen</span>
             </div>
 
-            <div className="relative" ref={notifRef}>
-              <button
-                onClick={() => setShowNotifs(!showNotifs)}
-                className="cursor-pointer p-2.5 rounded-xl bg-[#13111c] border border-white/5 text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all relative"
-              >
-                <Bell className="w-4 h-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+            <div className="flex items-center gap-3">
+              <div className="relative" ref={notifRef}>
+                <button
+                  onClick={() => setShowNotifs(!showNotifs)}
+                  className="cursor-pointer p-2.5 rounded-xl bg-[#13111c] border border-white/5 text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all relative"
+                >
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+                  )}
+                </button>
+                {showNotifs && (
+                  <NotifDropdown
+                    notifs={notifications}
+                    onNotifClick={handleNotifClick}
+                    onDeleteAll={deleteAllNotifications}
+                    onDeleteOne={deleteNotification}
+                    onClose={() => setShowNotifs(false)}
+                  />
                 )}
-              </button>
-              {showNotifs && (
-                <NotifDropdown
-                  notifs={notifications}
-                  onNotifClick={handleNotifClick}
-                  onDeleteAll={deleteAllNotifications}
-                  onDeleteOne={deleteNotification}
-                  onClose={() => setShowNotifs(false)}
-                />
-              )}
-            </div>
+              </div>
 
-            <button
-              onClick={() => setNewPostOpen(true)}
-              className="px-6 py-2.5 rounded-[1rem] text-[0.65rem] font-black uppercase tracking-[0.2em] italic transition-all flex items-center gap-2 hover:scale-105 active:scale-95 group/btn relative overflow-hidden"
-              style={{
-                background: `${accentColor}10`,
-                color: accentColor,
-                border: `1px solid ${accentColor}30`,
-                boxShadow: `inset 0 0 15px ${accentColor}10, 0 5px 25px ${accentColor}15`
-              }}
-            >
-              <div className="absolute inset-0 bg-white/20 opacity-0 group-hover/btn:opacity-10 transition-opacity" />
-              <span className="tracking-[0.25em]">Új Téma</span> <Plus className="w-4 h-4 text-white" />
-            </button>
+              <button
+                onClick={() => setNewPostOpen(true)}
+                className="px-6 py-2.5 rounded-[1rem] text-[0.65rem] font-black uppercase tracking-[0.2em] italic transition-all flex items-center gap-2 hover:scale-105 active:scale-95 group/btn relative overflow-hidden"
+                style={{
+                  background: `${accentColor}10`,
+                  color: accentColor,
+                  border: `1px solid ${accentColor}30`,
+                  boxShadow: `inset 0 0 15px ${accentColor}10, 0 5px 25px ${accentColor}15`
+                }}
+              >
+                <div className="absolute inset-0 bg-white/20 opacity-0 group-hover/btn:opacity-10 transition-opacity" />
+                <span className="tracking-[0.25em]">Új Téma</span> <Plus className="w-4 h-4 text-white" />
+              </button>
+            </div>
           </div>
         </div>
 
-        <main className="relative z-10 max-w-[1200px] mx-auto px-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-6 pb-16">
+        <main className="relative z-10 max-w-[1200px] mx-auto px-3 sm:px-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-6 pb-16">
           {/* Left Column: Post List */}
           <div>
 
 
             <div className="mb-5 space-y-3">
               <div
-                className="rounded-xl border p-4"
+                className="rounded-xl border p-3 sm:p-4"
                 style={{
                   background: "#13111c",
                   borderColor: "rgba(255,255,255,0.06)",
                 }}
               >
                 <div className="space-y-4">
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <div
@@ -1834,7 +1845,7 @@ export default function Forum() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div
                       className="rounded-xl p-3"
                       style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
@@ -2034,8 +2045,8 @@ export default function Forum() {
             </div>
           </div>
 
-          {/* Right Column: Sidebar */}
-          <div className="space-y-4">
+          {/* Right Column: Sidebar - hidden on mobile, shown on lg+ */}
+          <div className="space-y-4 hidden lg:block">
             {/* Categories Widget */}
             <SurfaceCard style={{ padding: "1rem" }}>
               <div className="flex items-center justify-between mb-3">
@@ -2114,6 +2125,115 @@ export default function Forum() {
               </div>
             </SurfaceCard>
           </div>
+
+          {/* Mobile Sidebar Toggle Button */}
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="lg:hidden fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all hover:scale-110 active:scale-95"
+            style={{ background: "linear-gradient(135deg, #7c3aed, #4c1d95)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 8px 32px rgba(124,58,237,0.4)" }}
+          >
+            <SlidersHorizontal className="w-5 h-5" />
+          </button>
+
+          {/* Mobile Sidebar Overlay */}
+          <AnimatePresence>
+            {mobileSidebarOpen && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+                  onClick={() => setMobileSidebarOpen(false)}
+                />
+                <motion.div
+                  initial={{ x: "100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "100%" }}
+                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                  className="lg:hidden fixed right-0 top-0 bottom-0 z-50 w-80 max-w-[85vw] overflow-y-auto p-4"
+                  style={{ background: "#0a0814", borderLeft: "1px solid rgba(255,255,255,0.08)" }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-white font-bold text-sm">Szűrők és Kategóriák</h3>
+                    <button onClick={() => setMobileSidebarOpen(false)} className="p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    {/* Categories Widget (Mobile) */}
+                    <SurfaceCard style={{ padding: "1rem" }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Hash className="w-3.5 h-3.5 text-purple-400" />
+                          <span className="text-xs font-semibold text-white/80">Kategóriák</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        {CATEGORIES.map(cat => (
+                          <CatSidebarCard
+                            key={cat.id}
+                            cat={cat}
+                            isActive={activeCategory === cat.id}
+                            onClick={(id) => { setActiveCategory(id); setMobileSidebarOpen(false); }}
+                            threadCount={cat.id === "all" ? posts.length : categoryCounts[cat.id] || 0}
+                          />
+                        ))}
+                      </div>
+                    </SurfaceCard>
+
+                    {/* Tags Widget (Mobile) */}
+                    <SurfaceCard style={{ padding: "1rem" }}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Tag className="w-3.5 h-3.5 text-purple-400" />
+                        <span className="text-xs font-semibold text-white/80">Népszerű tagek</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {popularTags.map(tag => (
+                          <TagPill
+                            key={tag.label}
+                            label={tag.label}
+                            count={tag.count}
+                            color={tag.color}
+                            active={activeTagFilters.includes(tag.label)}
+                            onClick={() => setActiveTagFilters(prev =>
+                              prev.includes(tag.label) ? prev.filter(t => t !== tag.label) : [...prev, tag.label]
+                            )}
+                          />
+                        ))}
+                      </div>
+                    </SurfaceCard>
+
+                    {/* Activity (Mobile) */}
+                    <SurfaceCard style={{ padding: "1rem" }}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <Activity className="w-3.5 h-3.5 text-orange-400" />
+                        <span className="text-xs font-semibold text-white/80">Aktivitás</span>
+                      </div>
+                      <div className="space-y-4 relative">
+                        <div className="absolute left-[11px] top-2 bottom-2 w-px bg-white/5" />
+                        {RECENT_ACTIVITY.slice(0, 3).map((a, i) => (
+                          <div key={i} className="flex gap-3 relative z-10">
+                            <div className="w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#0c0a12", border: "2px solid #1a1129" }}>
+                              <div className="w-1.5 h-1.5 rounded-full" style={{ background: a.color }} />
+                            </div>
+                            <div>
+                              <p className="text-[0.68rem] text-gray-500">
+                                <span className="font-medium text-white/80">{a.user}</span> {a.action}
+                              </p>
+                              <p className="text-xs font-medium text-white/70 mt-0.5">"{a.post}"</p>
+                              <span className="text-[0.6rem] text-gray-700 mt-0.5 block">{a.time}P</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </SurfaceCard>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </main>
       </div>
 

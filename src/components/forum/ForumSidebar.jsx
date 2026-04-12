@@ -29,10 +29,10 @@ const GlassPanel = ({ children, className = "" }) => (
 
 export default function ForumSidebar({ selectedCategory, setSelectedCategory }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Categories Panel */}
       <GlassPanel>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
            <h3 className="text-white font-black text-xs uppercase tracking-widest flex items-center gap-2">
               <Rss className="w-3.5 h-3.5 text-primary" /> Kategóriák
            </h3>
@@ -43,15 +43,15 @@ export default function ForumSidebar({ selectedCategory, setSelectedCategory }) 
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`w-full flex flex-col p-3 rounded-2xl transition-all group ${
-                selectedCategory === cat.id 
-                ? 'bg-primary/10 border-primary/20 text-white' 
+              className={`w-full flex flex-col p-2.5 sm:p-3 rounded-xl sm:rounded-2xl transition-all group ${
+                selectedCategory === cat.id
+                ? 'bg-primary/10 border-primary/20 text-white'
                 : 'hover:bg-white/5 text-gray-400 border-transparent'
               } border`}
             >
               <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">{cat.emoji}</span>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="text-base sm:text-lg">{cat.emoji}</span>
                   <span className="text-xs font-bold">{cat.label}</span>
                 </div>
                 {selectedCategory === cat.id ? (
@@ -72,16 +72,16 @@ export default function ForumSidebar({ selectedCategory, setSelectedCategory }) 
 
       {/* Recent Activity */}
       <GlassPanel>
-        <h3 className="text-white font-black text-xs uppercase tracking-widest mb-6 flex items-center gap-2">
+        <h3 className="text-white font-black text-xs uppercase tracking-widest mb-4 sm:mb-6 flex items-center gap-2">
            <TrendingUp className="w-3.5 h-3.5 text-primary" /> Aktivitás
         </h3>
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {RECENT_ACTIVITY.map((act, i) => (
-             <div key={i} className="flex gap-3 text-[10px] border-b border-white/5 pb-4 last:border-0 last:pb-0">
+             <div key={i} className="flex gap-2 sm:gap-3 text-[10px] border-b border-white/5 pb-3 sm:pb-4 last:border-0 last:pb-0">
                 <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: act.color }} />
                 <div className="min-w-0">
                    <p className="text-gray-400 leading-relaxed">
-                      <span className="text-white font-black italic">{act.user}</span> {act.action} 
+                      <span className="text-white font-black italic">{act.user}</span> {act.action}
                       <span className="text-gray-200 block truncate">"{act.post}"</span>
                    </p>
                    <span className="text-gray-700 font-bold uppercase tracking-tighter flex items-center gap-1 mt-1">

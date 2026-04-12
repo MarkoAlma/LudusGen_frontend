@@ -227,20 +227,20 @@ const DataBeam = ({ path, delay = 0, duration = 3 }) => (
 );
 
 const TechnicalHUDFP = () => (
-  <div className="absolute inset-0 pointer-events-none font-mono text-[0.6rem] text-[#7c3aed]/30 uppercase tracking-widest p-6 select-none">
-    <div className="absolute top-8 left-8 border-l border-t border-[#7c3aed]/20 p-2">
+  <div className="absolute inset-0 pointer-events-none font-mono text-[0.5rem] sm:text-[0.6rem] text-[#7c3aed]/30 uppercase tracking-widest p-3 sm:p-6 select-none">
+    <div className="absolute top-4 sm:top-8 left-4 sm:left-8 border-l border-t border-[#7c3aed]/20 p-1.5 sm:p-2">
       <div>SYS_KERN: ACTIVE</div>
       <div>NET_SYNC: 0x8ff42</div>
     </div>
-    <div className="absolute top-8 right-8 border-r border-t border-[#7c3aed]/20 p-2 text-right">
+    <div className="absolute top-4 sm:top-8 right-4 sm:right-8 border-r border-t border-[#7c3aed]/20 p-1.5 sm:p-2 text-right">
       <div>FORGE_CORE_v7.4</div>
       <div>SEC_LEVEL: ALPHA</div>
     </div>
-    <div className="absolute bottom-8 left-8 border-l border-b border-[#7c3aed]/20 p-2">
+    <div className="absolute bottom-4 sm:bottom-8 left-4 sm:left-8 border-l border-b border-[#7c3aed]/20 p-1.5 sm:p-2">
       <div>COORD: 47.4979 N</div>
       <div>19.0402 E</div>
     </div>
-    <div className="absolute bottom-8 right-8 border-r border-b border-[#7c3aed]/20 p-2 text-right">
+    <div className="absolute bottom-4 sm:bottom-8 right-4 sm:right-8 border-r border-b border-[#7c3aed]/20 p-1.5 sm:p-2 text-right">
       <div>MEMORY_OK</div>
       <div>NEURAL_LINK: STABLE</div>
     </div>
@@ -510,12 +510,12 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
   };
 
   return (
-    <div id={`comment-${comment.id}`} className={isReply ? "ml-6 mt-2" : "mt-3"}>
+    <div id={`comment-${comment.id}`} className={isReply ? "ml-4 sm:ml-6 mt-2" : "mt-3"}>
       <div className="group transition-all duration-150 relative"
         style={{
           background: comment.pinned ? "#16132a" : isReply ? "#110f1a" : "#13111c",
           border: comment.pinned ? "1px solid rgba(167,139,250,0.2)" : `1px solid ${isReply ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.06)"}`,
-          borderRadius: "0.875rem", padding: isReply ? "0.75rem 0.875rem" : "1rem 1.125rem",
+          borderRadius: "0.875rem", padding: isReply ? "0.625rem 0.75rem" : "0.75rem 1rem",
           zIndex: showMenu ? 50 : "auto",
           position: "relative",
         }}>
@@ -528,16 +528,16 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
         )}
 
         <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2">
-            {comment.avatarUrl ? <img src={comment.avatarUrl} alt="avatar" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" /> : <div className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white flex-shrink-0"
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {comment.avatarUrl ? <img src={comment.avatarUrl} alt="avatar" className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg object-cover flex-shrink-0" /> : <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white flex-shrink-0"
               style={{ background: comment.avatarColor + "45", border: `1px solid ${comment.avatarColor}35` }}>
               {comment.avatar}
             </div>}
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-xs" style={{ color: comment.avatarColor }}>{comment.author}</span>
-                {comment.isOP && <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: `${color}20`, color, border: `1px solid ${color}35` }}>OP</span>}
-                {isOwn && !comment.isOP && <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af" }}>Te</span>}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-semibold text-xs truncate" style={{ color: comment.avatarColor }}>{comment.author}</span>
+                {comment.isOP && <span className="text-xs px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap" style={{ background: `${color}20`, color, border: `1px solid ${color}35` }}>OP</span>}
+                {isOwn && !comment.isOP && <span className="text-xs px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap" style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af" }}>Te</span>}
               </div>
               <div className="flex items-center gap-1 text-gray-600 text-xs">
                 <Clock className="w-2.5 h-2.5" />{comment.time}
@@ -572,7 +572,7 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
           </div>
         </div>
 
-        <div className="text-gray-300 text-sm leading-relaxed pl-9">
+        <div className="text-gray-300 text-sm leading-relaxed pl-8 sm:pl-9">
           {editing ? (
             <div>
               <textarea value={editedContent} onChange={e => setEditedContent(e.target.value)} rows={3}
@@ -591,13 +591,13 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
 
 
 
-        <div className="flex items-center gap-3 pl-9 mt-2.5">
+        <div className="flex items-center gap-2 sm:gap-3 pl-8 sm:pl-9 mt-2.5 flex-wrap">
           <button onClick={() => onLikeComment?.(comment.id)}
             className="cursor-pointer flex items-center gap-1.5 text-xs transition-all active:scale-90 px-2.5 py-1 rounded-lg"
-            style={{ 
-              background: liked ? `${color}15` : "rgba(255,255,255,0.03)", 
+            style={{
+              background: liked ? `${color}15` : "rgba(255,255,255,0.03)",
               border: `1px solid ${liked ? color + "40" : "rgba(255,255,255,0.06)"}`,
-              color: liked ? color : "#6b7280" 
+              color: liked ? color : "#6b7280"
             }}>
             <ThumbsUp className={`w-3.5 h-3.5 ${liked ? "fill-current" : ""}`} />
             <span className="font-bold">{Math.max(0, likeCount)}</span>
@@ -635,11 +635,11 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
       {!isReply && showReplies && comment.replies?.length > 0 && (
         <div className="space-y-2 mt-2">
           {comment.replies.map(reply => (
-            <CommentCard 
-              key={reply.id} 
-              comment={reply} 
-              color={color} 
-              isReply 
+            <CommentCard
+              key={reply.id}
+              comment={reply}
+              color={color}
+              isReply
               onLikeComment={onLikeComment}
               currentUserId={currentUserId}
             />
@@ -718,19 +718,21 @@ const HelpfulWidget = ({ color }) => {
   const [voted, setVoted] = useState(null);
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      <span className="text-gray-500 text-xs">Hasznos volt ez a bejegyzés?</span>
-      {["Igen 👍", "Nem 👎"].map((label, i) => (
-        <button key={label} onClick={() => setVoted(i)}
-          className="cursor-pointer px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95"
-          style={{
-            background: voted === i ? (i === 0 ? "rgba(74,222,128,0.2)" : "rgba(239,68,68,0.15)") : "rgba(255,255,255,0.04)",
-            border: `1px solid ${voted === i ? (i === 0 ? "rgba(74,222,128,0.4)" : "rgba(239,68,68,0.35)") : "rgba(255,255,255,0.08)"}`,
-            color: voted === i ? (i === 0 ? "#4ade80" : "#f87171") : "#9ca3af",
-          }}>
-          {voted === i ? <Check className="w-3 h-3 inline mr-1" /> : null}{label}
-        </button>
-      ))}
-      {voted !== null && <span className="text-green-400 text-xs">Köszönjük a visszajelzést!</span>}
+      <span className="text-gray-500 text-xs whitespace-nowrap">Hasznos volt ez a bejegyzés?</span>
+      <div className="flex items-center gap-2">
+        {["Igen 👍", "Nem 👎"].map((label, i) => (
+          <button key={label} onClick={() => setVoted(i)}
+            className="cursor-pointer px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95 whitespace-nowrap"
+            style={{
+              background: voted === i ? (i === 0 ? "rgba(74,222,128,0.2)" : "rgba(239,68,68,0.15)") : "rgba(255,255,255,0.04)",
+              border: `1px solid ${voted === i ? (i === 0 ? "rgba(74,222,128,0.4)" : "rgba(239,68,68,0.35)") : "rgba(255,255,255,0.08)"}`,
+              color: voted === i ? (i === 0 ? "#4ade80" : "#f87171") : "#9ca3af",
+            }}>
+            {voted === i ? <Check className="w-3 h-3 inline mr-1" /> : null}{label}
+          </button>
+        ))}
+      </div>
+      {voted !== null && <span className="text-green-400 text-xs whitespace-nowrap">Köszönjük!</span>}
     </div>
   );
 };
@@ -776,37 +778,37 @@ const UserProfileModal = ({
   const totalViews = authorPosts.reduce((s, p) => s + (p.views || 0), 0);
   const totalComments = authorPosts.reduce((s, p) => s + (p.comments || 0), 0);
   return createPortal(
-    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
+    <div className="fixed inset-0 flex items-center justify-center p-3 sm:p-4" style={{ zIndex: 10000 }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg rounded-2xl overflow-hidden flex flex-col"
-        style={{ background: "#13111c", border: `1px solid ${authorColor}30`, maxHeight: "85vh", boxShadow: `0 30px 80px rgba(0,0,0,0.8), 0 0 60px ${authorColor}12` }}>
+        style={{ background: "#13111c", border: `1px solid ${authorColor}30`, maxHeight: "90vh", boxShadow: `0 30px 80px rgba(0,0,0,0.8), 0 0 60px ${authorColor}12` }}>
         {/* Header */}
-        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between flex-shrink-0">
-          <h3 className="text-white font-bold text-sm flex items-center gap-2">
-            <User className="w-4 h-4" style={{ color: authorColor }} /> Felhasználó profil
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-white/5 flex items-center justify-between flex-shrink-0">
+          <h3 className="text-white font-bold text-sm flex items-center gap-2 min-w-0">
+            <User className="w-4 h-4 flex-shrink-0" style={{ color: authorColor }} /> <span className="truncate">Felhasználó profil</span>
           </h3>
-          <button onClick={onClose} className="cursor-pointer p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="cursor-pointer p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all flex-shrink-0"><X className="w-4 h-4" /></button>
         </div>
         {/* Profile info */}
-        <div className="px-5 py-4 border-b border-white/5">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-white/5">
           <div className="flex items-center gap-3 mb-4">
             {authorAvatarUrl
-              ? <img src={authorAvatarUrl} alt="avatar" className="w-14 h-14 rounded-2xl object-cover" />
-              : <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-lg text-white"
+              ? <img src={authorAvatarUrl} alt="avatar" className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl object-cover flex-shrink-0" />
+              : <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center font-bold text-base sm:text-lg text-white flex-shrink-0"
                 style={{ background: authorColor + "45", border: `1px solid ${authorColor}35` }}>{authorAvatar}</div>
             }
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-white font-bold text-base" style={{ color: authorColor }}>{author}</div>
-                  <div className="text-gray-500 text-[10px] uppercase font-bold tracking-widest mt-0.5">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-white font-bold text-sm sm:text-base truncate" style={{ color: authorColor }}>{author}</div>
+                  <div className="text-gray-500 text-[10px] uppercase font-bold tracking-widest mt-0.5 truncate">
                     Fórum tag - {authorJoinedDate}
                   </div>
                 </div>
                 {currentUserId && authorId && currentUserId !== authorId && (
                   <button
                     onClick={() => onToggleFollow?.(authorId)}
-                    className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90 mt-1"
+                    className="cursor-pointer flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90 flex-shrink-0"
                     style={{
                       background: isFollowing ? `${authorColor}20` : "rgba(255,255,255,0.04)",
                       color: isFollowing ? authorColor : "#9ca3af",
@@ -814,7 +816,8 @@ const UserProfileModal = ({
                     }}
                   >
                     <Rss className="w-3 h-3" />
-                    {isFollowing ? "Követed" : "Követés"}
+                    <span className="hidden sm:inline">{isFollowing ? "Követed" : "Követés"}</span>
+                    <span className="sm:hidden">{isFollowing ? "Követed" : "+"}</span>
                   </button>
                 )}
               </div>
@@ -851,7 +854,7 @@ const UserProfileModal = ({
                       {p.hot && <span className="text-xs px-1 py-0.5 rounded-full" style={{ background: "rgba(251,113,33,0.15)", color: "#fb923c", fontSize: "0.6rem" }}>🔥</span>}
                       <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: `${pc?.color || authorColor}15`, color: pc?.color || authorColor, fontSize: "0.65rem" }}>{pc?.emoji} {pc?.label}</span>
                     </div>
-                    <p className="text-white text-xs font-semibold leading-snug group-hover:text-purple-200 transition-colors">{p.title}</p>
+                    <p className="text-white text-xs font-semibold leading-snug group-hover:text-purple-200 transition-colors line-clamp-2">{p.title}</p>
                     <div className="flex items-center gap-3 mt-1.5 text-gray-600 text-xs">
                       <span className="flex items-center gap-0.5"><Heart className="w-2.5 h-2.5" />{p.likes}</span>
                       <span className="flex items-center gap-0.5"><MessageSquare className="w-2.5 h-2.5" />{p.comments}</span>
@@ -946,6 +949,7 @@ export default function ForumPost({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [authorUserDoc, setAuthorUserDoc] = useState(null);
+  const [mobilePostSidebarOpen, setMobilePostSidebarOpen] = useState(false);
 
 
   const { user: globalUser } = useContext(MyUserContext);
@@ -1260,7 +1264,7 @@ export default function ForumPost({
       if (!comm) return;
 
       const isLikedNow = comm.likedIds?.includes(currentUserId);
-      
+
       await updateDoc(commentRef, {
         likes: increment(isLikedNow ? -1 : 1),
         likedIds: isLikedNow ? arrayRemove(currentUserId) : arrayUnion(currentUserId)
@@ -1324,7 +1328,7 @@ export default function ForumPost({
 
   return (
     <div
-      className="min-h-screen relative overflow-x-hidden text-white"
+      className="min-h-screen relative overflow-hidden text-white"
       style={{
         backgroundColor: "#06050a",
         fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif"
@@ -1407,75 +1411,77 @@ export default function ForumPost({
           onCancel={() => setShowDeleteConfirm(false)}
         />
 
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }} className="relative z-10 max-w-[1200px] mx-auto px-4 pt-6 pb-10">
+        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }} className="relative z-10 max-w-[1200px] mx-auto px-3 sm:px-4 pt-4 sm:pt-6 pb-10 overflow-x-hidden">
           {/* ── Breadcrumb ── */}
-          <GlassCard className="mb-4" style={{ background: "rgba(20, 18, 32, 0.7)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.12)" }}>
-            <div className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
+          <GlassCard className="mb-3 sm:mb-4" style={{ background: "rgba(20, 18, 32, 0.7)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.12)" }}>
+            <div className="px-3 sm:px-4 py-2 sm:py-2.5 flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <button onClick={onBack} className="cursor-pointer flex items-center gap-1.5 text-gray-500 hover:text-white transition-colors group">
                 <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
                 <span className="text-xs font-medium">Fórum</span>
               </button>
-              <ChevronRight className="w-3 h-3 text-gray-700" />
-              <span className="text-xs px-2 py-0.5 rounded-md font-medium" style={{ color, background: `${color}10`, border: `1px solid ${color}18` }}>
+              <ChevronRight className="w-3 h-3 text-gray-700 flex-shrink-0" />
+              <span className="text-xs px-2 py-0.5 rounded-md font-medium whitespace-nowrap" style={{ color, background: `${color}10`, border: `1px solid ${color}18` }}>
                 {cat.emoji} {cat.label}
               </span>
-              <ChevronRight className="w-3 h-3 text-gray-700" />
-              <span className="text-gray-500 text-xs truncate max-w-full md:max-w-[400px]">{post.title}</span>
+              <ChevronRight className="w-3 h-3 text-gray-700 flex-shrink-0" />
+              <span className="text-gray-500 text-xs truncate max-w-[150px] sm:max-w-[400px]">{post.title}</span>
             </div>
           </GlassCard>
 
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px] xl:grid-cols-[minmax(0,1fr)_260px] gap-4">
             <div className="space-y-4">
               <GlassCard style={{ background: "rgba(20, 18, 32, 0.85)", backdropFilter: "blur(16px)", border: `1px solid ${color}40`, boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
-                <div className="p-5 md:p-6">
+                <div className="p-4 sm:p-6">
                   <div className="flex items-center gap-2 mb-3 flex-wrap">
-                    {post.pinned && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.2)" }}><Pin className="w-2.5 h-2.5" />Kitűzve</span>}
-                    {post.hot && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(251,113,33,0.12)", color: "#fb923c", border: "1px solid rgba(251,113,33,0.2)" }}><Flame className="w-2.5 h-2.5" />Felkapott</span>}
-                    {post.solved && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}><CheckCircle className="w-2.5 h-2.5" />Megoldva</span>}
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: `${color}12`, color, border: `1px solid ${color}25` }}>{cat.emoji} {cat.label}</span>
-                    <span className="ml-auto text-gray-600 text-xs flex items-center gap-1">
-                      <Clock className="w-2.5 h-2.5" />{post.readTime} perc olvasás
+                    <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
+                      {post.pinned && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.2)" }}><Pin className="w-2.5 h-2.5" />Kitűzve</span>}
+                      {post.hot && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap" style={{ background: "rgba(251,113,33,0.12)", color: "#fb923c", border: "1px solid rgba(251,113,33,0.2)" }}><Flame className="w-2.5 h-2.5" />Felkapott</span>}
+                      {post.solved && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap" style={{ background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}><CheckCircle className="w-2.5 h-2.5" />Megoldva</span>}
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap" style={{ background: `${color}12`, color, border: `1px solid ${color}25` }}>{cat.emoji} {cat.label}</span>
+                    </div>
+                    <span className="text-gray-600 text-xs flex items-center gap-1 flex-shrink-0">
+                      <Clock className="w-2.5 h-2.5" />{post.readTime} perc
                     </span>
                   </div>
 
-                  <h1 className="text-white font-extrabold text-3xl md:text-4xl leading-tight mb-5" style={{ textShadow: "0 3px 8px rgba(0,0,0,0.6)" }}>{post.title}</h1>
+                  <h1 className="text-white font-extrabold text-xl sm:text-3xl md:text-4xl leading-tight mb-4 sm:mb-5" style={{ textShadow: "0 3px 8px rgba(0,0,0,0.6)" }}>{post.title}</h1>
 
-                  <div className="flex items-center gap-4 mb-6 py-4 border-y border-white/10">
-                    <div className="relative cursor-pointer group" onClick={() => setShowProfile(true)}>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 mb-6 py-4 border-y border-white/10">
+                    <div className="relative cursor-pointer group flex-shrink-0" onClick={() => setShowProfile(true)}>
                       {post.avatarUrl ? (
-                        <img src={post.avatarUrl} alt="avatar" className="w-12 h-12 rounded-2xl object-cover ring-2 ring-white/5 group-hover:ring-[color:var(--accent)] transition-all" style={{ '--accent': color }} />
+                        <img src={post.avatarUrl} alt="avatar" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl object-cover ring-2 ring-white/5 group-hover:ring-[color:var(--accent)] transition-all" style={{ '--accent': color }} />
                       ) : (
-                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg text-white group-hover:scale-105 transition-all"
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center font-bold text-base sm:text-lg text-white group-hover:scale-105 transition-all"
                           style={{ background: `linear-gradient(135deg, ${post.avatarColor}45, ${post.avatarColor}25)`, border: `1px solid ${post.avatarColor}35` }}>
                           {post.avatar}
                         </div>
                       )}
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0a0118]" title="Elérhető" />
+                      <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-emerald-500 border-2 border-[#0a0118]" title="Elérhető" />
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-base text-white hover:underline cursor-pointer" onClick={() => setShowProfile(true)} style={{ color: post.avatarColor }}>{post.author}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-500 font-medium uppercase tracking-wider">Szerző</span>
+                    <div className="flex-1 min-w-0 w-full sm:w-auto">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="font-bold text-sm sm:text-base text-white hover:underline cursor-pointer truncate" onClick={() => setShowProfile(true)} style={{ color: post.avatarColor }}>{post.author}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-500 font-medium uppercase tracking-wider whitespace-nowrap">Szerző</span>
                       </div>
-                      <div className="flex items-center gap-3 text-gray-500 text-xs">
+                      <div className="flex items-center gap-2 sm:gap-3 text-gray-500 text-xs flex-wrap">
                         <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {post.time}</span>
                         <span className="w-1 h-1 rounded-full bg-gray-800" />
                         <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {post.views?.toLocaleString()} megtekintés</span>
                       </div>
                     </div>
 
-                    <div className="ml-auto flex items-center gap-1.5">
+                    <div className="flex sm:ml-auto items-center gap-1.5 flex-wrap w-full sm:w-auto">
                       <button onClick={handleToggleFollow}
-                        className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
+                        className="cursor-pointer flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
                         style={{ background: isFollowing ? `${color}20` : "rgba(255,255,255,0.04)", color: isFollowing ? color : "#9ca3af", border: `1px solid ${isFollowing ? color + "40" : "rgba(255,255,255,0.08)"}` }}>
-                        <Rss className="w-3 h-3" />{isFollowing ? "Követed" : "Követés"}
+                        <Rss className="w-3 h-3" /><span className="hidden sm:inline">{isFollowing ? "Követed" : "Követés"}</span><span className="sm:hidden">{isFollowing ? "Követed" : "+"}</span>
                       </button>
                       <button onClick={() => onBookmark?.(post?.id)} className="cursor-pointer p-2 rounded-xl transition-all hover:bg-white/8"
                         style={{ color: isBookmarked ? "#fbbf24" : "#6b7280" }}>
                         <Bookmark className={`w-4 h-4 ${isBookmarked ? "fill-current" : ""}`} />
                       </button>
-                      <button onClick={handleShare} className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all hover:bg-white/8"
+                      <button onClick={handleShare} className="cursor-pointer flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs transition-all hover:bg-white/8"
                         style={{ color: copied ? "#4ade80" : "#6b7280" }}>
                         {copied ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
                         <span className="hidden sm:inline">{copied ? "Másolva!" : "Megosztás"}</span>
@@ -1518,14 +1524,14 @@ export default function ForumPost({
 
               {!post.solved && (
                 <GlassCard>
-                  <div className="p-4 md:p-5">
+                  <div className="p-3 sm:p-5">
                     <h3 className="text-white font-semibold text-sm flex items-center gap-2 mb-3">
                       <Sparkles className="w-3.5 h-3.5" style={{ color }} /> Szólj hozzá
                     </h3>
-                    <div className="flex gap-3">
-                      {globalUser?.profilePicture ? <img src={globalUser.profilePicture} alt="avatar" className="w-8 h-8 rounded-xl object-cover flex-shrink-0 mt-0.5" /> : <div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white flex-shrink-0 mt-0.5"
+                    <div className="flex gap-2 sm:gap-3">
+                      {globalUser?.profilePicture ? <img src={globalUser.profilePicture} alt="avatar" className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl object-cover flex-shrink-0 mt-0.5" /> : <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white flex-shrink-0 mt-0.5"
                         style={{ background: `${color}40`, border: `1px solid ${color}35` }}>{(globalUser?.displayName?.[0] || globalUser?.email?.[0] || "É").toUpperCase()}</div>}
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <CommentEditor placeholder="Írd meg a véleményed..." onSubmit={handleAddComment} color={color} />
                       </div>
                     </div>
@@ -1546,12 +1552,12 @@ export default function ForumPost({
                     <MessageSquare className="w-3.5 h-3.5" style={{ color }} />
                     Hozzászólások ({totalComments})
                   </h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {showCommentSearch && (
                       <div className="relative">
                         <input value={commentSearch} onChange={e => setCommentSearch(e.target.value)}
-                          placeholder="Keresés a hozzászólásokban..."
-                          className="w-48 px-3 py-1.5 rounded-xl text-white text-xs placeholder-gray-600 focus:outline-none"
+                          placeholder="Keresés..."
+                          className="w-36 sm:w-48 px-3 py-1.5 rounded-xl text-white text-xs placeholder-gray-600 focus:outline-none"
                           style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${color}30` }} />
                         {commentSearch && <button onClick={() => setCommentSearch("")} className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 text-gray-600"><X className="w-3 h-3" /></button>}
                       </div>
@@ -1568,25 +1574,21 @@ export default function ForumPost({
                         { id: "new", label: "Legújabb" },
                       ].map(s => (
                         <button key={s.id} onClick={() => setSortComments(s.id)}
-
-
-
                           className="cursor-pointer px-2.5 py-1 rounded-md text-xs transition-all"
                           style={{ background: sortComments === s.id ? `${color}20` : "transparent", color: sortComments === s.id ? "white" : "#6b7280", fontWeight: sortComments === s.id ? 600 : 400 }}>
                           {s.label}
                         </button>
                       ))}
                     </div>
-
                   </div>
                 </div>
                 <div className="space-y-3">
                   {filteredComments.length > 0
                     ? filteredComments.map(c => (
-                      <CommentCard 
-                        key={c.id} 
-                        comment={c} 
-                        color={color} 
+                      <CommentCard
+                        key={c.id}
+                        comment={c}
+                        color={color}
                         onAddReply={handleAddReply}
                         onLikeComment={handleLikeComment}
                         currentUserId={currentUserId}
@@ -1636,7 +1638,7 @@ export default function ForumPost({
             </div>
 
             {/* ── SIDEBAR ── */}
-            <div className="space-y-3">
+            <div className="space-y-3 hidden lg:block">
               <TableOfContents content={post.content} color={color} />
 
               {/* Permalink */}
@@ -1753,6 +1755,152 @@ export default function ForumPost({
                 </GlassCard>
               )}
             </div>
+
+            {/* Mobile Post Sidebar Toggle */}
+            <button
+              onClick={() => setMobilePostSidebarOpen(true)}
+              className="lg:hidden fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all hover:scale-110 active:scale-95"
+              style={{ background: "linear-gradient(135deg, #7c3aed, #4c1d95)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 8px 32px rgba(124,58,237,0.4)" }}
+            >
+              <List className="w-5 h-5" />
+            </button>
+
+            {/* Mobile Post Sidebar Overlay */}
+            <AnimatePresence>
+              {mobilePostSidebarOpen && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+                    onClick={() => setMobilePostSidebarOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ x: "100%" }}
+                    animate={{ x: 0 }}
+                    exit={{ x: "100%" }}
+                    transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                    className="lg:hidden fixed right-0 top-0 bottom-0 z-50 w-80 max-w-[85vw] overflow-y-auto p-4"
+                    style={{ background: "#0a0814", borderLeft: "1px solid rgba(255,255,255,0.08)" }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-white font-bold text-sm">Téma infó</h3>
+                      <button onClick={() => setMobilePostSidebarOpen(false)} className="p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      <TableOfContents content={post.content} color={color} />
+                      {post.slug && post.category && (
+                        <PermalinkWidget category={post.category} slug={post.slug} color={color} />
+                      )}
+                      <GlassCard>
+                        <div className="px-4 pt-4 pb-3">
+                          <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3">Bejegyzés infó</h4>
+                          {[
+                            { label: "Szerző", value: post.author, color: post.avatarColor },
+                            { label: "Kategória", value: `${cat.emoji} ${cat.label}`, color },
+                            { label: "Közzétéve", value: post.time },
+                            { label: "Megtekintés", value: post.views?.toLocaleString() },
+                            { label: "Hozzászólások", value: totalComments },
+                            { label: "Kedvelések", value: Math.max(0, likeCount) },
+                            { label: "Olvasási idő", value: `${post.readTime} perc` },
+                          ].map(item => (
+                            <div key={item.label} className="flex justify-between items-center py-1.5 border-b border-white/5 last:border-0">
+                              <span className="text-gray-600 text-xs">{item.label}</span>
+                              <span className="text-xs font-semibold" style={{ color: item.color || "white" }}>{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </GlassCard>
+                      <GlassCard style={{ border: `1px solid ${post.avatarColor}20` }}>
+                        <div className="px-4 pt-4 pb-4">
+                          <div className="flex items-center gap-2.5 mb-3">
+                            {post.avatarUrl ? <img src={post.avatarUrl} alt="avatar" className="w-10 h-10 rounded-xl object-cover" /> : <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
+                              style={{ background: post.avatarColor + "45", border: `1px solid ${post.avatarColor}35` }}>{post.avatar}</div>}
+                            <div>
+                              <div className="text-white font-bold text-sm" style={{ color: post.avatarColor }}>{post.author}</div>
+                              <div className="text-gray-500 text-[10px] uppercase font-bold tracking-widest mt-0.5 whitespace-nowrap">
+                                Fórum tag - {authorJoinedDate}
+                              </div>
+                            </div>
+                          </div>
+                          <button onClick={() => setShowProfile(true)}
+                            className="cursor-pointer w-full py-2 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90"
+                            style={{ background: `linear-gradient(135deg, ${post.avatarColor}50, ${post.avatarColor}30)`, border: `1px solid ${post.avatarColor}40` }}>
+                            Profil megtekintése
+                          </button>
+                        </div>
+                      </GlassCard>
+                      {post.tags?.length > 0 && (
+                        <GlassCard>
+                          <div className="px-4 pt-4 pb-3">
+                            <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-2">Címkék</h4>
+                            <div className="flex gap-1.5 flex-wrap">
+                              {post.tags.map(t => (
+                                <span key={t} className="text-xs px-2 py-0.5 rounded-full font-medium"
+                                  style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}>#{t}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </GlassCard>
+                      )}
+                      {canManage && (
+                        <GlassCard>
+                          <div className="px-4 pt-4 pb-3">
+                            <h4 className="text-gray-500 text-xs uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                              <Shield className="w-3 h-3" /> {effectiveIsAdmin && !isOwn ? "Admin műveletek" : "Saját téma"}
+                            </h4>
+                            <div className="space-y-0.5">
+                              {isOwn && (
+                                <button onClick={() => onEdit?.(post)}
+                                  className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
+                                  style={{ color: "#60a5fa" }}>
+                                  <Edit3 className="w-3.5 h-3.5" /> Szerkesztés
+                                </button>
+                              )}
+                              {isOwn && (
+                                <button onClick={() => onToggle?.(post.id, "solved", !post.solved)}
+                                  className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
+                                  style={{ color: post.solved ? "#6b7280" : "#4ade80" }}>
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  {post.solved ? "Megoldás visszavonása" : "Megoldottnak jelölés"}
+                                </button>
+                              )}
+                              {effectiveIsAdmin && (
+                                <button onClick={() => onToggle?.(post.id, "pinned", !post.pinned)}
+                                  className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
+                                  style={{ color: "#fbbf24" }}>
+                                  <Pin className="w-3.5 h-3.5" />
+                                  {post.pinned ? "Kitűzés eltávolítása" : "Kitűzés"}
+                                </button>
+                              )}
+                              {effectiveIsAdmin && (
+                                <button onClick={() => onToggle?.(post.id, "hot", !post.hot)}
+                                  className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
+                                  style={{ color: "#fb923c" }}>
+                                  <Flame className="w-3.5 h-3.5" />
+                                  {post.hot ? "Felkapott eltávolítása" : "Felkapott jelölés"}
+                                </button>
+                              )}
+                              <div className="border-t border-white/5 mt-1 pt-1">
+                                <button onClick={() => onDelete?.(post.id, post.authorId)}
+                                  className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-red-400/10"
+                                  style={{ color: "#f87171" }}>
+                                  <Trash2 className="w-3.5 h-3.5" /> Téma törlése
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </GlassCard>
+                      )}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
       </div>
