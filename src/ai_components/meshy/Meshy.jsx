@@ -852,7 +852,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
         <div className="flex-1 flex overflow-hidden">
           {/* ════ LEFT PANEL — GENERATOR STATION ════ */}
           <aside className="w-80 flex-shrink-0 flex flex-col border-r border-white/5 bg-[#0a0a0f] relative z-20 shadow-[20px_0_40px_rgba(0,0,0,0.5)]">
-            <div className="pt-28 lg:pt-32 flex flex-col h-full overflow-hidden">
+            <div className="pt-0 flex flex-col h-full overflow-hidden">
 
               {/* Header - STATION SOLID HUD */}
               <div className="p-6 border-b border-white/5 bg-white/[0.01]">
@@ -1478,7 +1478,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
           {/* ════ RIGHT PANEL — STATION RECORDS ════ */}
           {rightOpen && (
             <aside className="w-72 flex-shrink-0 flex flex-col border-l border-white/5 bg-[#0a0a0f] relative z-20 shadow-[-20px_0_40px_rgba(0,0,0,0.5)]">
-              <div className="pt-20 lg:pt-24 flex flex-col h-full overflow-hidden">
+              <div className="pt-0 flex flex-col h-full overflow-hidden">
                 {/* Header - STATION SOLID HUD */}
                 <div className="p-6 border-b border-white/5 bg-white/[0.01]">
                   <div className="flex items-center justify-between mb-4">

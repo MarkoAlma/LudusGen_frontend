@@ -9,15 +9,13 @@ import {
 } from 'lucide-react';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { tokens } from '../../styles/tokens';
-import CreditTopup from '../CreditTopup';
+import UserProfileDropdown from './UserProfileDropdown';
 import bgMobileMenu from '../../assets/bg-mobile-menu.png';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [studioDropdownOpen, setStudioDropdownOpen] = useState(false);
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [showCreditTopup, setShowCreditTopup] = useState(false);
 
   const { setIsAuthOpen, showNavbar, user, logoutUser } = useContext(MyUserContext);
   const navigate = useNavigate();
@@ -81,7 +79,6 @@ export default function Navbar() {
   useEffect(() => {
     setMobileMenuOpen(false);
     setStudioDropdownOpen(false);
-    setUserDropdownOpen(false);
   }, [location.pathname]);
 
   // Close mobile menu on resize to desktop
@@ -103,6 +100,8 @@ export default function Navbar() {
   ];
 
   if (!showNavbar) return null;
+  // Don't show regular Navbar in AI studio. We'll render just the user dropdown manually there.
+  if (location.pathname.startsWith('/chat')) return null;
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-[110] transition-all duration-500`}>
@@ -296,6 +295,9 @@ export default function Navbar() {
                   </button>
                 </div>
               )}
+
+
+              <UserProfileDropdown />
 
               {/* Mobile Toggle */}
               <button
@@ -519,7 +521,6 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
-      <CreditTopup isOpen={showCreditTopup} onClose={() => setShowCreditTopup(false)} />
     </header>
   );
 }

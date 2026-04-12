@@ -19,28 +19,36 @@
     @apply bg-bg-base text-text-main font-body leading-relaxed antialiased selection:bg-primary/30 selection:text-white max-w-[100vw] overflow-x-hidden;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-heading tracking-tight;
   }
 
-  button, .cursor-pointer, [role="button"], a {
+  button,
+  .cursor-pointer,
+  [role="button"],
+  a {
     @apply cursor-pointer;
   }
 }
 
 @layer utilities {
   .glass-panel {
-    @apply bg-bg-surface backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.3)];
+    @apply bg-bg-surface backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-3xl shadow-[0_8px_32px_rgba(0, 0, 0, 0.3)];
   }
 
   .text-glow {
-    text-shadow: 0 0 20px rgba(255,255,255,0.4);
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
   }
 
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/60;
   }
-  
+
   .text-gradient-primary {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400;
   }
@@ -59,7 +67,10 @@
     pointer-events: none;
     background: #050505;
   }
-  .aurora-mesh::before, .aurora-mesh::after, .aurora-blob {
+
+  .aurora-mesh::before,
+  .aurora-mesh::after,
+  .aurora-blob {
     content: '';
     position: absolute;
     filter: blur(140px);
@@ -67,23 +78,32 @@
     opacity: 0.5;
     animation: aurora-flow 20s infinite alternate ease-in-out;
   }
+
   .aurora-mesh::before {
-    top: -20%; left: -10%;
-    width: 60vw; height: 60vh;
-    background: rgba(138,43,226,0.3);
+    top: -20%;
+    left: -10%;
+    width: 60vw;
+    height: 60vh;
+    background: rgba(138, 43, 226, 0.3);
     animation-delay: 0s;
   }
+
   .aurora-mesh::after {
-    bottom: -20%; right: -10%;
-    width: 70vw; height: 70vh;
-    background: rgba(0,229,255,0.2);
+    bottom: -20%;
+    right: -10%;
+    width: 70vw;
+    height: 70vh;
+    background: rgba(0, 229, 255, 0.2);
     animation-delay: -5s;
     animation-direction: alternate-reverse;
   }
+
   .aurora-blob {
-    top: 40%; left: 30%;
-    width: 50vw; height: 50vh;
-    background: rgba(255,0,127,0.15);
+    top: 40%;
+    left: 30%;
+    width: 50vw;
+    height: 50vh;
+    background: rgba(255, 0, 127, 0.15);
     animation-delay: -10s;
   }
 
@@ -96,23 +116,55 @@
 }
 
 @keyframes aurora-flow {
-  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-  50% { transform: translate(5%, 10%) scale(1.1) rotate(5deg); }
-  100% { transform: translate(-10%, -5%) scale(0.9) rotate(-5deg); }
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+
+  50% {
+    transform: translate(5%, 10%) scale(1.1) rotate(5deg);
+  }
+
+  100% {
+    transform: translate(-10%, -5%) scale(0.9) rotate(-5deg);
+  }
 }
 
 @keyframes ken-burns {
-  0% { transform: scale(1.1) translate(0, 0); }
-  100% { transform: scale(1.3) translate(-2%, -2%); }
+  0% {
+    transform: scale(1.1) translate(0, 0);
+  }
+
+  100% {
+    transform: scale(1.3) translate(-2%, -2%);
+  }
 }
 
 @keyframes grain {
-  0%, 100% { transform: translate(0, 0); }
-  10% { transform: translate(-5%, -10%); }
-  30% { transform: translate(3%, -15%); }
-  50% { transform: translate(12%, 9%); }
-  70% { transform: translate(-9%, 4%); }
-  90% { transform: translate(2%, 8%); }
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  10% {
+    transform: translate(-5%, -10%);
+  }
+
+  30% {
+    transform: translate(3%, -15%);
+  }
+
+  50% {
+    transform: translate(12%, 9%);
+  }
+
+  70% {
+    transform: translate(-9%, 4%);
+  }
+
+  90% {
+    transform: translate(2%, 8%);
+  }
 }
 
 .grain-overlay {
@@ -124,13 +176,16 @@
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 6px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }

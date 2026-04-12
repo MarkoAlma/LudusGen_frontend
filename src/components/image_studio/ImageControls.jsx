@@ -34,7 +34,7 @@ export default function ImageControls({
   return (
     <div className="flex flex-col h-full bg-[#0a0618]/30 backdrop-blur-[60px] relative border-r border-white/5 shadow-[20px_0_40px_rgba(0,0,0,0.3)] overflow-hidden">
       {/* Studio Identity Header */}
-      <div className="pt-20 lg:pt-24 border-b border-white/5 relative z-20 bg-white/[0.02] backdrop-blur-3xl">
+      <div className="pt-4 border-b border-white/5 relative z-20 bg-white/[0.02] backdrop-blur-3xl">
         <div className="h-16 px-6 flex items-center gap-4">
           <div 
             className="w-10 h-10 rounded-2xl flex items-center justify-center border shadow-lg"

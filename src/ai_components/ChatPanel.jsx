@@ -96,8 +96,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
         <div className="flex-1 relative overflow-hidden">
           <div ref={chatScrollRef} className="h-full overflow-y-auto scrollbar-thin scroll-smooth w-full px-3 sm:px-6 lg:px-12">
             <div 
-              className="w-full pb-8 flex flex-col space-y-4" 
-              style={{ paddingTop: `calc(${Math.max(navHeight || 0, 60)}px + 8rem)` }}
+              className="w-full pb-8 flex flex-col space-y-4 pt-24" 
             >
               <MessageList
                 messages={messages}

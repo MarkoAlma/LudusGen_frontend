@@ -41,7 +41,7 @@ export default function TrellisGenerator({ getIdToken, userId }) {
             className="flex-shrink-0 relative z-10 border-r border-white/5"
             style={{ background: "rgba(3,0,10,0.2)", backdropFilter: "blur(60px)" }}
           >
-            <div className="pt-28 lg:pt-32 h-full flex flex-col overflow-y-auto" style={{ width: 320 }}>
+            <div className="pt-0 h-full flex flex-col overflow-y-auto" style={{ width: 320 }}>
               <TrellisControls
                 prompt={prompt}
                 setPrompt={setPrompt}
@@ -64,7 +64,7 @@ export default function TrellisGenerator({ getIdToken, userId }) {
       </AnimatePresence>
 
       {/* Main Content: Workspace */}
-      <div className="flex-1 min-w-0 flex flex-col relative z-[1] pt-28 lg:pt-32">
+      <div className="flex-1 min-w-0 flex flex-col relative z-[1]">
         <TrellisWorkspace
           modelUrl={modelUrl}
           genStatus={genStatus}
@@ -85,7 +85,7 @@ export default function TrellisGenerator({ getIdToken, userId }) {
             className="flex-shrink-0 relative z-10 border-l border-white/5"
             style={{ background: "rgba(3,0,10,0.2)", backdropFilter: "blur(60px)" }}
           >
-            <div className="pt-20 lg:pt-24 h-full flex flex-col overflow-y-auto" style={{ width: 280 }}>
+            <div className="pt-0 h-full flex flex-col overflow-y-auto" style={{ width: 280 }}>
               <TrellisHistory
                 history={history}
                 activeItemId={activeItem?.id}
