@@ -877,31 +877,54 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
         rightWidth={320}
         onOffsetChange={setOffsets}
         leftSidebar={
-          <div className="h-full flex flex-col items-center pt-6 bg-[#030308] border-r border-white/5">
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-lg mb-8"
-              style={{ backgroundColor: `${color}15`, borderColor: `${color}30`, color }}
-              title="Forge Station"
-            >
-              <Sparkles className="w-6 h-6" />
-            </div>
+          <div className="h-full flex flex-col items-center pt-6 space-y-4">
+            {[
+              { id: 'model', label: 'MODEL', icon: <Sparkles className="w-5 h-5" />, color },
+              { id: 'segment', label: 'SEGMENT', icon: <Box className="w-5 h-5" />, color: '#94a3b8' },
+              { id: 'retopo', label: 'RETOPO', icon: <Layers className="w-5 h-5" />, color: '#94a3b8' },
+              { id: 'texture', label: 'TEXTURE', icon: <Paintbrush2 className="w-5 h-5" />, color: '#94a3b8' },
+              { id: 'edit', label: 'EDIT', icon: <Wand2 className="w-5 h-5" />, color: '#94a3b8' },
+              { id: 'refine', label: 'REFINE', icon: <RefreshCw className="w-5 h-5" />, color: '#94a3b8' },
+              { id: 'stylize', label: 'STYLIZE', icon: <Sparkles className="w-5 h-5" />, color: '#94a3b8' },
+              { id: 'animate', label: 'ANIMATE', icon: <PersonStanding className="w-5 h-5" />, color: '#94a3b8' },
+            ].map((tool, idx) => (
+              <button
+                key={tool.id}
+                className={`group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer ${idx === 0 ? 'mb-4' : ''}`}
+              >
+                <div 
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${
+                    idx === 0 
+                      ? "bg-white/5 border-white/10 shadow-xl" 
+                      : "bg-transparent border-transparent"
+                  }`}
+                  style={idx === 0 ? { borderColor: `${tool.color}40`, color: tool.color } : { color: '#52525b' }}
+                >
+                  {tool.icon}
+                </div>
+                <span className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 ${idx === 0 ? 'text-white' : 'text-zinc-700'}`}>
+                  {tool.label}
+                </span>
+              </button>
+            ))}
+            
+            <div className="flex-1" />
             
             <button
               onClick={() => setLeftSecondaryOpen(!leftSecondaryOpen)}
               className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${
                 leftSecondaryOpen 
-                  ? "bg-white/10 border-white/20 text-white shadow-lg shadow-white/5" 
+                  ? "bg-white/10 border-white/20 text-white shadow-lg" 
                   : "bg-transparent border-transparent text-zinc-600 hover:text-zinc-400"
               }`}
-              style={leftSecondaryOpen ? { borderColor: `${color}40`, color } : {}}
-              title="Meshy Generation Controls"
+              title="Toggle Panel"
             >
               <Settings className="w-5 h-5" />
             </button>
           </div>
         }
         leftSecondarySidebar={
-          <div className="h-full flex flex-col overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5 tp-scroll">
+          <div className="h-full flex flex-col overflow-hidden tp-scroll">
             <div className="p-6 border-b border-white/5 bg-white/[0.01]">
               <div className="flex bg-white/[0.02] border border-white/5 rounded-xl p-1 mb-2">
                 {[

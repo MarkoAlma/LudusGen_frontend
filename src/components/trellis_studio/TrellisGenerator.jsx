@@ -52,7 +52,7 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
       rightWidth={280}
       onOffsetChange={setOffsets}
       leftSidebar={
-        <div className="h-full flex flex-col items-center pt-6 bg-[#030308] border-r border-white/5">
+        <div className="h-full flex flex-col items-center pt-6">
           <div
             className="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-lg mb-8"
             style={{ backgroundColor: "#60a5fa15", borderColor: "#60a5fa30", color: "#60a5fa" }}
@@ -76,7 +76,7 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
         </div>
       }
       leftSecondarySidebar={
-        <div className="h-full overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
+        <div className="h-full overflow-hidden">
           <TrellisControls
             prompt={prompt}
             setPrompt={setPrompt}

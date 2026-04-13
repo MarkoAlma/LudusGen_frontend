@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 const CONTENT_MAX_W = 'max-w-3xl';
 const HISTORY_SIDEBAR_W = 288;
 
-export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySidebarOpen, onConfigOpen, navHeight, historySidebarOpen, isDesktop }) {
+export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySidebarOpen, onConfigOpen, navHeight, historySidebarOpen, isDesktop, sidebarCollapsed }) {
   const themeColor = selectedModel?.color || "#8b5cf6";
   const [latency, setLatency] = useState(12);
 
@@ -36,10 +36,13 @@ export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySi
   }, []);
 
   return (
-    <motion.header 
-      className="absolute right-0 z-40 top-4" 
+    <motion.header
+      className="absolute right-0 z-40 top-4"
       initial={false}
-      animate={{ x: (isDesktop && historySidebarOpen) ? -HISTORY_SIDEBAR_W : 0 }}
+      animate={{
+        marginLeft: sidebarCollapsed ? 0 : SIDEBAR_W,
+        marginRight: (isDesktop && historySidebarOpen) ? HISTORY_SIDEBAR_W : 0,
+      }}
       transition={{ type: 'spring', damping: 28, stiffness: 260 }}
     >
       <div className="flex items-center gap-4 p-2 pr-4 rounded-l-2xl rounded-r-none bg-black/40 backdrop-blur-xl border border-white/10 border-r-0 shadow-2xl shadow-black/50">

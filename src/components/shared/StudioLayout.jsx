@@ -51,7 +51,7 @@ export default function StudioLayout({
   const springConfig = { damping: 38, stiffness: 180, mass: 1 };
 
   // In overlay mode, sidebars float on top — layout doesn't shrink viewport
-  const layoutL1 = activeOverlay ? 0 : (leftOpen ? effectiveL1Width : 0);
+  const layoutL1 = activeOverlay ? 0 : (leftSecondaryOpen ? effectiveL1Width : 0);
   const layoutL2 = activeOverlay ? 0 : ((leftSecondaryOpen && leftSecondarySidebar) ? effectiveSecondaryWidth : 0);
   const layoutR = activeOverlay ? 0 : (rightOpen ? effectiveRWidth : 0);
 
@@ -63,8 +63,8 @@ export default function StudioLayout({
   const smoothL = useMotionValue(smoothL1.get() + smoothL2.get());
 
   useEffect(() => {
-    smoothL1.set(activeOverlay ? 0 : (leftOpen ? effectiveL1Width : 0));
-  }, [leftOpen, effectiveL1Width, activeOverlay, smoothL1]);
+    smoothL1.set(activeOverlay ? 0 : (leftSecondaryOpen ? effectiveL1Width : 0));
+  }, [leftSecondaryOpen, effectiveL1Width, activeOverlay, smoothL1]);
 
   useEffect(() => {
     smoothL2.set(activeOverlay ? 0 : ((leftSecondaryOpen && leftSecondarySidebar) ? effectiveSecondaryWidth : 0));
@@ -103,70 +103,89 @@ export default function StudioLayout({
           </div>
         </div>
 
-        {/* ── LEFT SIDEBAR STACK ── */}
+        {/* ── LEFT SIDEBAR STACK (UNIFIED) ── */}
         <div className="absolute left-0 top-0 h-full flex pointer-events-none z-[60]">
-          {/* Level 1: Main Sidebar */}
-          {(activeOverlay ? leftOpen : true) && (
+          {!activeOverlay ? (
             <motion.div
-              style={{ width: activeOverlay ? (leftOpen ? effectiveL1Width : 0) : smoothL1 }}
-              className={`h-full overflow-hidden pointer-events-auto ${activeOverlay ? 'fixed left-0 top-0 z-[100] bg-[#0a0a0f]/95 backdrop-blur-3xl border-r border-white/5 shadow-2xl' : ''}`}
+              style={{ width: smoothL }}
+              className="h-full flex overflow-hidden pointer-events-auto bg-[#0a0a0f]/40 backdrop-blur-3xl border-r border-white/5"
             >
-              <div style={{ width: effectiveL1Width, height: '100%', position: 'relative' }}>
-                {leftSidebar}
-                {isMobile && leftOpen && (
-                  <button onClick={() => setLeftOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors">
-                    <X className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          )}
+              {/* Level 1: Main Sidebar (Narrow Strip) */}
+              <motion.div
+                style={{ width: smoothL1 }}
+                className="h-full overflow-hidden flex-shrink-0"
+              >
+                <div style={{ width: effectiveL1Width, height: '100%' }}>
+                  {leftSidebar}
+                </div>
+              </motion.div>
 
-          {/* Level 2: Secondary Content */}
-          {activeOverlay ? (
-            <AnimatePresence>
-              {leftSecondaryOpen && leftSecondarySidebar && (
-                <>
-                  {/* Backdrop */}
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/60 z-[65] backdrop-blur-[2px]"
-                    onClick={() => setLeftSecondaryOpen?.(false)}
-                  />
-                  <motion.div
-                    initial={{ x: "-100%" }}
-                    animate={{ x: 0 }}
-                    exit={{ x: "-100%" }}
-                    transition={{ type: "spring", damping: 28, stiffness: 200 }}
-                    className="fixed top-0 h-full z-[70] border-r border-white/5 overflow-hidden bg-[#0a0a0f]/95 backdrop-blur-3xl pointer-events-auto shadow-2xl"
-                    style={{ 
-                      left: (isMobile || !leftOpen) ? 0 : effectiveL1Width, 
-                      width: isMobile ? effectiveSecondaryWidth : leftSecondaryWidth 
-                    }}
-                  >
-                    <div className="h-full relative">
-                      {leftSecondarySidebar}
-                      {isMobile && (
-                        <button onClick={() => setLeftSecondaryOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-[101]">
-                          <X className="w-5 h-5" />
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          ) : (
-            <motion.div
-              style={{ width: smoothL2 }}
-              className="h-full border-r border-white/5 overflow-hidden bg-[#0a0a0f]/60 backdrop-blur-3xl pointer-events-auto"
-            >
-              <div style={{ width: effectiveSecondaryWidth, height: '100%' }}>
-                {leftSecondarySidebar}
-              </div>
+              {/* Level 2: Secondary Content (Panel) */}
+              <motion.div
+                style={{ width: smoothL2 }}
+                className="h-full overflow-hidden flex-shrink-0 border-l border-white/5"
+              >
+                <div style={{ width: effectiveSecondaryWidth, height: '100%' }}>
+                  {leftSecondarySidebar}
+                </div>
+              </motion.div>
             </motion.div>
+          ) : (
+            <>
+              {/* Overlay Mode logic remains separate for mobility/depth */}
+              {leftOpen && (
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "-100%" }}
+                  style={{ width: effectiveL1Width }}
+                  className="fixed left-0 top-0 h-full z-[100] bg-[#0a0a0f]/95 backdrop-blur-3xl border-r border-white/5 shadow-2xl overflow-hidden pointer-events-auto"
+                >
+                  <div className="h-full relative">
+                    {leftSidebar}
+                    {isMobile && (
+                      <button onClick={() => setLeftOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors">
+                        <X className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              <AnimatePresence>
+                {leftSecondaryOpen && leftSecondarySidebar && (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 bg-black/60 z-[65] backdrop-blur-[2px]"
+                      onClick={() => setLeftSecondaryOpen?.(false)}
+                    />
+                    <motion.div
+                      initial={{ x: "-100%" }}
+                      animate={{ x: 0 }}
+                      exit={{ x: "-100%" }}
+                      transition={{ type: "spring", damping: 28, stiffness: 200 }}
+                      className="fixed top-0 h-full z-[70] border-r border-white/5 overflow-hidden bg-[#0a0a0f]/95 backdrop-blur-3xl pointer-events-auto shadow-2xl"
+                      style={{ 
+                        left: (isMobile || !leftOpen) ? 0 : effectiveL1Width, 
+                        width: isMobile ? effectiveSecondaryWidth : leftSecondaryWidth 
+                      }}
+                    >
+                      <div className="h-full relative">
+                        {leftSecondarySidebar}
+                        {isMobile && (
+                          <button onClick={() => setLeftSecondaryOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-[101]">
+                            <X className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </>
           )}
         </div>
 

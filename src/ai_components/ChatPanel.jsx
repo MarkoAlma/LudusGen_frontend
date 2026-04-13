@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { motion, AnimatePresence, useSpring } from 'framer-motion';
+import { PanelRightClose, PanelRightOpen, PanelLeftClose, PanelLeftOpen, Layout } from 'lucide-react';
 import { MyUserContext } from '../context/MyUserProvider';
 import { useChatLogic } from '../hooks/useChatLogic';
 import { findModelGroup } from './models';
@@ -15,8 +15,9 @@ import ChatAtmosphere from '../components/chat/ChatAtmosphere';
 // Shared layout constant — all content aligns to this max-width
 const CONTENT_MAX_W = 'max-w-3xl';
 const HISTORY_SIDEBAR_W = 288; // px, matches w-72
+const SIDEBAR_W = 320; // AiStudioSidebar width
 
-export default function ChatPanel({ selectedModel, userId, getIdToken, setSidebarOpen }) {
+export default function ChatPanel({ selectedModel, userId, getIdToken, setSidebarOpen, isGlobalOpen, toggleGlobalSidebar }) {
   const group = findModelGroup(selectedModel?.id);
   const themeColor = selectedModel?.color || "#8b5cf6";
   const { navHeight } = useContext(MyUserContext);
@@ -56,6 +57,18 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
   const [configOpen, setConfigOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(true);
 
+  // Master Sidebar Sync
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(!isGlobalOpen);
+  const smoothSidebarWidth = useSpring(isGlobalOpen ? SIDEBAR_W : 0, { damping: 38, stiffness: 180 });
+
+  useEffect(() => {
+    smoothSidebarWidth.set(isGlobalOpen ? SIDEBAR_W : 0);
+  }, [isGlobalOpen, smoothSidebarWidth]);
+
+  useEffect(() => {
+    setSidebarCollapsed(!isGlobalOpen);
+  }, [isGlobalOpen]);
+
   useEffect(() => {
     const checkSize = () => {
       const desktop = window.innerWidth >= 1280;
@@ -90,6 +103,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
           navHeight={navHeight}
           historySidebarOpen={historySidebarOpen}
           isDesktop={isDesktop}
+          sidebarCollapsed={sidebarCollapsed}
         />
 
         {/* Scrollable message area */}
@@ -125,6 +139,48 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
               textareaRef={textareaRef}
             />
         </div>
+      </motion.div>
+
+      {/* ── Left Sidebar Toggle Button ── */}
+      <motion.div
+        style={{ x: smoothSidebarWidth }}
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-[100]"
+      >
+        <AnimatePresence mode="wait">
+          {!sidebarCollapsed ? (
+            <motion.div
+              key="close-sidebar"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.15 }}
+            >
+              <button
+                onClick={toggleGlobalSidebar}
+                className="w-10 h-12 flex items-center justify-center rounded-r-xl bg-[#0a0a0f]/80 backdrop-blur-3xl border border-white/10 border-l-0 hover:bg-white/10 transition-colors duration-200 text-zinc-500 hover:text-white shadow-2xl"
+                title="Fold Workspace Strip"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="open-sidebar"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.15 }}
+            >
+              <button
+                onClick={toggleGlobalSidebar}
+                className="w-14 h-14 flex items-center justify-center rounded-2xl bg-[#0a0a0f]/80 backdrop-blur-3xl border border-white/10 hover:bg-white/10 transition-colors duration-200 text-zinc-500 hover:text-white shadow-2xl"
+                title="Expand All Panels"
+              >
+                <Layout className="w-5 h-5 translate-y-[1px]" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
 
       {/* ── History Toggle Button (Desktop) ── */}
