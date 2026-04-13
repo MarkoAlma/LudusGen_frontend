@@ -1,6 +1,6 @@
 import React, { useEffect, createContext } from 'react';
 import { motion, AnimatePresence, useSpring, useMotionValueEvent, useTransform, useMotionValue } from 'framer-motion';
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, ChevronLeft, Columns, Square, Layout, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, Layout, X } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 /**
@@ -281,11 +281,7 @@ export default function StudioLayout({
                         className="w-10 h-12 flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
                         title={leftOpen ? "Fold Workspace Strip" : "Expand Workspace Strip"}
                       >
-                        {leftSecondarySidebar ? (
-                           leftOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />
-                        ) : (
-                           <ChevronLeft className={`w-4 h-4 transition-transform duration-500 ${!leftOpen ? 'rotate-180' : ''}`} />
-                        )}
+                        <ChevronsLeft className={`w-4 h-4 transition-transform duration-500 ${!leftOpen ? 'rotate-180' : ''}`} />
                       </button>
                     )}
 
