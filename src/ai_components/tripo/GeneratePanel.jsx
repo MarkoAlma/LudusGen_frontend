@@ -19,13 +19,13 @@ const TABS_WITH_MAKE_BETTER = new Set(["image", "batch"]);
 
 /* ─── Model versions — real Tripo API strings ─────────────────────────── */
 export const MODEL_VERSIONS = [
-  { id: "P1-20260311",            label: "P1-20260311 (Latest Model)" },
-  { id: "v3.1-20260211",         label: "V3.1" },
-  { id: "v3.0-20250812",         label: "V3.0" },
-  { id: "v2.5-20250123",         label: "V2.5" },
-  { id: "Turbo-v1.0-20250506",   label: "Turbo V1.0" },
-  { id: "v2.0-20240919",         label: "V2.0" },
-  { id: "v1.4-20240625",         label: "V1.4 (Fastest Model)" },
+  { id: "P1-20260311", label: "P1-20260311 (Latest Model)" },
+  { id: "v3.1-20260211", label: "V3.1" },
+  { id: "v3.0-20250812", label: "V3.0" },
+  { id: "v2.5-20250123", label: "V2.5" },
+  { id: "Turbo-v1.0-20250506", label: "Turbo V1.0" },
+  { id: "v2.0-20240919", label: "V2.0" },
+  { id: "v1.4-20240625", label: "V1.4 (Fastest Model)" },
 ];
 
 /* ─── Per-model capability map ───────────────────────────────────────────
@@ -35,53 +35,53 @@ export const MODEL_VERSIONS = [
  * ─────────────────────────────────────────────────────────────────────── */
 export const MODEL_CAPS = {
   "P1-20260311": {
-    ultraMesh:    true,  texture:   true,  pbr:        true,  tex4K:       false,
-    multiview:    true,  batch:     true,  tPose:      true,  inParts:     true,
-    negPrompt:    true,  smartLowPoly: true, quad:     true,
-    autoSize:     true,  exportUv:  true,  makeBetter: true,
-    modelSeed:    true,  imageSeed: true,  textureSeed: true,
+    ultraMesh: true, texture: true, pbr: true, tex4K: false,
+    multiview: true, batch: true, tPose: true, inParts: true,
+    negPrompt: true, smartLowPoly: true, quad: true,
+    autoSize: true, exportUv: true, makeBetter: true,
+    modelSeed: true, imageSeed: true, textureSeed: true,
   },
   "v3.1-20260211": {
-    ultraMesh:    true,  texture:   true,  pbr:        true,  tex4K:       true,
-    multiview:    true,  batch:     true,  tPose:      true,  inParts:     true,
-    negPrompt:    true,  smartLowPoly: true, quad:     true,
-    autoSize:     true,  exportUv:  true,  makeBetter: true,
-    modelSeed:    true,  imageSeed: true,  textureSeed: true,
+    ultraMesh: true, texture: true, pbr: true, tex4K: true,
+    multiview: true, batch: true, tPose: true, inParts: true,
+    negPrompt: true, smartLowPoly: true, quad: true,
+    autoSize: true, exportUv: true, makeBetter: true,
+    modelSeed: true, imageSeed: true, textureSeed: true,
   },
   "v3.0-20250812": {
-    ultraMesh:    true,  texture:   true,  pbr:        true,  tex4K:       true,
-    multiview:    true,  batch:     true,  tPose:      true,  inParts:     true,
-    negPrompt:    true,  smartLowPoly: true, quad:     true,
-    autoSize:     true,  exportUv:  true,  makeBetter: true,
-    modelSeed:    true,  imageSeed: true,  textureSeed: true,
+    ultraMesh: true, texture: true, pbr: true, tex4K: true,
+    multiview: true, batch: true, tPose: true, inParts: true,
+    negPrompt: true, smartLowPoly: true, quad: true,
+    autoSize: true, exportUv: true, makeBetter: true,
+    modelSeed: true, imageSeed: true, textureSeed: true,
   },
   "v2.5-20250123": {
-    ultraMesh:    false, texture:   true,  pbr:        true,  tex4K:       true,
-    multiview:    true,  batch:     true,  tPose:      false, inParts:     true,
-    negPrompt:    true,  smartLowPoly: false, quad:    true,
-    autoSize:     true,  exportUv:  true,  makeBetter: true,
-    modelSeed:    true,  imageSeed: true,  textureSeed: true,
+    ultraMesh: false, texture: true, pbr: true, tex4K: true,
+    multiview: true, batch: true, tPose: false, inParts: true,
+    negPrompt: true, smartLowPoly: false, quad: true,
+    autoSize: true, exportUv: true, makeBetter: true,
+    modelSeed: true, imageSeed: true, textureSeed: true,
   },
   "Turbo-v1.0-20250506": {
-    ultraMesh:    false, texture:   false, pbr:        false, tex4K:       false,
-    multiview:    false, batch:     true,  tPose:      false, inParts:     false,
-    negPrompt:    false, smartLowPoly: false, quad:    false,
-    autoSize:     false, exportUv:  true,  makeBetter: true,
-    modelSeed:    true,  imageSeed: false, textureSeed: false,
+    ultraMesh: false, texture: false, pbr: false, tex4K: false,
+    multiview: false, batch: true, tPose: false, inParts: false,
+    negPrompt: false, smartLowPoly: false, quad: false,
+    autoSize: false, exportUv: true, makeBetter: true,
+    modelSeed: true, imageSeed: false, textureSeed: false,
   },
   "v2.0-20240919": {
-    ultraMesh:    false, texture:   true,  pbr:        true,  tex4K:       true,
-    multiview:    true,  batch:     true,  tPose:      false, inParts:     true,
-    negPrompt:    true,  smartLowPoly: false, quad:    true,
-    autoSize:     true,  exportUv:  true,  makeBetter: true,
-    modelSeed:    true,  imageSeed: true,  textureSeed: true,
+    ultraMesh: false, texture: true, pbr: true, tex4K: true,
+    multiview: true, batch: true, tPose: false, inParts: true,
+    negPrompt: true, smartLowPoly: false, quad: true,
+    autoSize: true, exportUv: true, makeBetter: true,
+    modelSeed: true, imageSeed: true, textureSeed: true,
   },
   "v1.4-20240625": {
-    ultraMesh:    false, texture:   true,  pbr:        false, tex4K:       false,
-    multiview:    false, batch:     false, tPose:      false, inParts:     false,
-    negPrompt:    false, smartLowPoly: false, quad:    false,
-    autoSize:     false, exportUv:  true,  makeBetter: true,
-    modelSeed:    false, imageSeed: false, textureSeed: false,
+    ultraMesh: false, texture: true, pbr: false, tex4K: false,
+    multiview: false, batch: false, tPose: false, inParts: false,
+    negPrompt: false, smartLowPoly: false, quad: false,
+    autoSize: false, exportUv: true, makeBetter: true,
+    modelSeed: false, imageSeed: false, textureSeed: false,
   },
 };
 
@@ -91,10 +91,10 @@ export function getModelCaps(modelVer) {
 
 /* ─── API face_limit constraints ─────────────────────────────────────── */
 export function getFaceLimitConfig(smartLowPoly, quad) {
-  if (smartLowPoly && quad)  return { min: 500,   max: 10_000,  step: 500,   defaultVal: 5_000,  allowAuto: false };
-  if (smartLowPoly && !quad) return { min: 1_000, max: 20_000,  step: 1_000, defaultVal: 8_000,  allowAuto: false };
-  if (!smartLowPoly && quad) return { min: 0,     max: 100_000, step: 1_000, defaultVal: 10_000, allowAuto: true  };
-  return                            { min: 0,     max: 500_000, step: 5_000, defaultVal: 0,      allowAuto: true  };
+  if (smartLowPoly && quad) return { min: 500, max: 10_000, step: 500, defaultVal: 5_000, allowAuto: false };
+  if (smartLowPoly && !quad) return { min: 1_000, max: 20_000, step: 1_000, defaultVal: 8_000, allowAuto: false };
+  if (!smartLowPoly && quad) return { min: 0, max: 100_000, step: 1_000, defaultVal: 10_000, allowAuto: true };
+  return { min: 0, max: 500_000, step: 5_000, defaultVal: 0, allowAuto: true };
 }
 
 /* ─── Model-NA wrapper ───────────────────────────────────────────────────
@@ -292,9 +292,9 @@ function TopoControls({
         </div>
         <p style={{ color: "#4a4a68", fontSize: 10, margin: "5px 0 0", lineHeight: 1.5 }}>
           {showAuto && "Auto — model adaptively determines optimal face count"}
-          {!showAuto && smartLowPoly && quad  && "Quad smart-low-poly: 500 – 10 000 faces (required)"}
+          {!showAuto && smartLowPoly && quad && "Quad smart-low-poly: 500 – 10 000 faces (required)"}
           {!showAuto && smartLowPoly && !quad && "Smart-low-poly: 1 000 – 20 000 faces (required)"}
-          {!showAuto && !smartLowPoly && quad  && "Quad: default 10 000 when unset"}
+          {!showAuto && !smartLowPoly && quad && "Quad: default 10 000 when unset"}
           {!showAuto && !smartLowPoly && !quad && `${localVal.toLocaleString()} faces`}
         </p>
         {quad && capsQuad && (
@@ -432,19 +432,19 @@ export default function GeneratePanel({
   /* ─── Auto-reset incompatible settings when model changes ─────────── */
   useEffect(() => {
     const c = getModelCaps(modelVer);
-    if (!c.multiview && genTab === "multi")    setGenTab("image");
-    if (!c.batch    && genTab === "batch")     setGenTab("image");
-    if (!c.tPose    && tPose)                  setTPose(false);
-    if (!c.negPrompt)                          setNegPrompt("");
-    if (!c.inParts  && inParts)                setInParts(false);
-    if (!c.smartLowPoly && smartLowPoly)       setSmartLowPoly(false);
-    if (!c.ultraMesh && meshQ === "ultra")     setMeshQ("standard");
-    if (!c.texture  && texOn)                  setTexOn(false);
-    if (!c.pbr      && pbrOn)                  setPbrOn(false);
-    if (!c.tex4K    && tex4K)                  setTex4K(false);
-    if (!c.quad     && quadMesh)               setQuadMesh(false);
-    if (!c.autoSize && autoSize)               setAutoSize(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!c.multiview && genTab === "multi") setGenTab("image");
+    if (!c.batch && genTab === "batch") setGenTab("image");
+    if (!c.tPose && tPose) setTPose(false);
+    if (!c.negPrompt) setNegPrompt("");
+    if (!c.inParts && inParts) setInParts(false);
+    if (!c.smartLowPoly && smartLowPoly) setSmartLowPoly(false);
+    if (!c.ultraMesh && meshQ === "ultra") setMeshQ("standard");
+    if (!c.texture && texOn) setTexOn(false);
+    if (!c.pbr && pbrOn) setPbrOn(false);
+    if (!c.tex4K && tex4K) setTex4K(false);
+    if (!c.quad && quadMesh) setQuadMesh(false);
+    if (!c.autoSize && autoSize) setAutoSize(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelVer]);
 
   /* ─── Batch file handler ──────────────────────────────────────────── */
@@ -461,7 +461,7 @@ export default function GeneratePanel({
         });
         handleBatchImg && handleBatchImg(f).then(token => {
           setBatchImages(prev => prev.map(i => i.file === f ? { ...i, token } : i));
-        }).catch(() => {});
+        }).catch(() => { });
       };
       r.readAsDataURL(f);
     });
@@ -514,7 +514,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
       {/* ── Tab bar ── */}
       <div style={{ display: "flex", gap: 3, padding: "3px", background: "rgba(255,255,255,0.06)", borderRadius: 11, marginBottom: 14 }}>
         {GEN_TABS.map(t => {
-          const tabCap   = { image: true, text: true, multi: caps.multiview, batch: caps.batch };
+          const tabCap = { image: true, text: true, multi: caps.multiview, batch: caps.batch };
           const disabled = !tabCap[t.id];
           return (
             <button
@@ -523,7 +523,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
               onClick={() => { if (!disabled) setGenTab(t.id); }}
               title={disabled ? `Not available with ${modelVer}` : t.tip}
               style={{
-                color:  genTab === t.id ? "#0a0a1a" : "#4a4a68",
+                color: genTab === t.id ? "#0a0a1a" : "#4a4a68",
                 cursor: disabled ? "not-allowed" : "pointer",
               }}
             >
@@ -545,7 +545,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
             getIdToken={getIdToken}
             enhancing_prompt={TRIPO_ENHANCE_PROMPT}
             dechanting_prompt={TRIPO_SIMPLIFY_PROMPT}
-            onBusyChange={() => {}}
+            onBusyChange={() => { }}
           />
 
           {/* T-Pose toggle */}
@@ -616,7 +616,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
                               if (updated[i]) updated[i] = { ...updated[i], token };
                               return updated;
                             });
-                          }).catch(() => {});
+                          }).catch(() => { });
                         };
                         r.readAsDataURL(f);
                       }
@@ -772,8 +772,8 @@ Respond ONLY with plain text, no JSON, no explanation.`;
             title={caps.ultraMesh ? "geometry_quality: detailed" : `Requires P1-20260311 or v3.x`}
             style={{
               background: meshQ === "ultra" && caps.ultraMesh ? "rgba(108,99,255,0.2)" : "rgba(255,255,255,0.05)",
-              color:      meshQ === "ultra" && caps.ultraMesh ? "#a5a0ff" : "#3d3d5a",
-              outline:    meshQ === "ultra" && caps.ultraMesh ? "1.5px solid rgba(108,99,255,0.4)" : "1.5px solid rgba(255,255,255,0.07)",
+              color: meshQ === "ultra" && caps.ultraMesh ? "#a5a0ff" : "#3d3d5a",
+              outline: meshQ === "ultra" && caps.ultraMesh ? "1.5px solid rgba(108,99,255,0.4)" : "1.5px solid rgba(255,255,255,0.07)",
               cursor: caps.ultraMesh ? "pointer" : "not-allowed",
             }}>
             <CoinIcon size={14} />Ultra
@@ -786,8 +786,8 @@ Respond ONLY with plain text, no JSON, no explanation.`;
           title="geometry_quality: standard"
           style={{
             background: meshQ === "standard" || !caps.ultraMesh ? "rgba(108,99,255,0.2)" : "rgba(255,255,255,0.05)",
-            color:      meshQ === "standard" || !caps.ultraMesh ? "#a5a0ff" : "#3d3d5a",
-            outline:    meshQ === "standard" || !caps.ultraMesh ? "1.5px solid rgba(108,99,255,0.4)" : "1.5px solid rgba(255,255,255,0.07)",
+            color: meshQ === "standard" || !caps.ultraMesh ? "#a5a0ff" : "#3d3d5a",
+            outline: meshQ === "standard" || !caps.ultraMesh ? "1.5px solid rgba(108,99,255,0.4)" : "1.5px solid rgba(255,255,255,0.07)",
           }}>
           Standard
         </button>

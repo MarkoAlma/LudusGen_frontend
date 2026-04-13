@@ -200,7 +200,7 @@ function PBar({ value }) {
 }
 
 /* ─── component ──────────────────────────────────────────────────────── */
-export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobalOpen }) {
+export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobalOpen, toggleGlobalSidebar }) {
   const color = selectedModel?.color || "#6c63ff";
   const { user, refreshCredits } = useContext(MyUserContext);
   const userCredits = user?.credits ?? 0;
@@ -893,7 +893,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   return (
     <StudioLayout
       leftOpen={leftOpen}
-      setLeftOpen={setLeftOpen}
+      setLeftOpen={toggleGlobalSidebar}
       leftSecondaryOpen={leftSecondaryOpen}
       setLeftSecondaryOpen={setLeftSecondaryOpen}
       rightOpen={rightOpen}
@@ -911,14 +911,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             const actsAsN = isN && (n.id === "segment" || n.id === "texture_edit" || n.id === "retopo");
             return (
               <Tooltip key={n.id} text={n.label + (actsAsN ? " (Not supported by Model V1/V2)" : "")} side="right">
-                <button 
+                <button
                   onClick={() => {
                     if (!actsAsN) {
                       setMode(n.id);
                       setLeftSecondaryOpen(true);
                       if (isMobile) setRightOpen(false);
                     }
-                  }} 
+                  }}
                   className={"tp-nav-btn" + (mode === n.id ? " active" : "") + (actsAsN ? " model-na" : "")}
                 >
                   <div className="ico"><Icon style={{ width: 18, height: 18, color: mode === n.id ? "var(--accent-bright)" : "var(--text-muted)" }} /></div>
@@ -1255,7 +1255,7 @@ function TripoWorkspaceWrapper({
       </motion.div>
 
       <DownloadModal isOpen={dlOpen} onClose={handleDlClose} glbBlobUrl={dlItem ? dlItem.blobUrl : modelUrl} scene={sceneRef.current?.scene ?? sceneRef.current} filename={dlItem ? (dlItem.item?.prompt?.slice(0, 30) ?? ("tripo_" + Date.now())) : (activeH?.prompt?.slice(0, 30) ?? ("tripo_" + Date.now()))} color={color} />
-      
+
       {/* ── FOOTER: Spatial Logic Stream ── */}
       {activeH && !isRunning && (
         <div className="h-10 bg-[#0a0a0f] border-t border-white/5 px-4 flex items-center justify-between relative overflow-hidden">

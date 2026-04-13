@@ -32,12 +32,12 @@ import { getFaceLimitConfig } from "./GeneratePanel";
  *  Note: "obj" and "stl" are NOT supported for rigged model inputs.
  * ─────────────────────────────────────────────────────────────────── */
 export const CONVERT_FORMATS = [
-  { id: "glb",  label: "GLB",  note: "Web / AR / engines"          },
-  { id: "fbx",  label: "FBX",  note: "Unity · Unreal · rigged"     },
-  { id: "obj",  label: "OBJ",  note: "DCC · static only"           },
-  { id: "stl",  label: "STL",  note: "3D print · static only"      },
-  { id: "3mf",  label: "3MF",  note: "3D print (modern)"           },
-  { id: "usdz", label: "USDZ", note: "Apple AR / iOS"              },
+  { id: "glb", label: "GLB", note: "Web / AR / engines" },
+  { id: "fbx", label: "FBX", note: "Unity · Unreal · rigged" },
+  { id: "obj", label: "OBJ", note: "DCC · static only" },
+  { id: "stl", label: "STL", note: "3D print · static only" },
+  { id: "3mf", label: "3MF", note: "3D print (modern)" },
+  { id: "usdz", label: "USDZ", note: "Apple AR / iOS" },
 ];
 
 /* Formats that cannot be used with rigged model inputs */
@@ -45,8 +45,8 @@ const RIGGED_UNSUPPORTED_FORMATS = new Set(["obj", "stl"]);
 
 function CoinIcon({ size = 15 }) {
   return (
-    <div style={{ width:size,height:size,borderRadius:"50%",background:"linear-gradient(135deg,#f5c518,#e09900)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-      <Zap style={{ width:size*0.56,height:size*0.56,color:"#0a0800" }}/>
+    <div style={{ width: size, height: size, borderRadius: "50%", background: "linear-gradient(135deg,#f5c518,#e09900)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <Zap style={{ width: size * 0.56, height: size * 0.56, color: "#0a0800" }} />
     </div>
   );
 }
@@ -100,48 +100,48 @@ export default function Retopo({
     <>
       {/* Selected model badge */}
       {activeTaskId && (
-        <div style={{ padding:"8px 10px",borderRadius:9,background:"rgba(108,99,255,0.08)",border:"1px solid rgba(108,99,255,0.25)",marginBottom:14 }}>
-          <p style={{ color:"#a5a0ff",fontSize:11,fontWeight:600,margin:0 }}>Selected model</p>
-          <p style={{ color:"#2d2d48",fontSize:9,margin:"2px 0 0",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>{activeTaskId}</p>
+        <div style={{ padding: "8px 10px", borderRadius: 9, background: "rgba(108,99,255,0.08)", border: "1px solid rgba(108,99,255,0.25)", marginBottom: 14 }}>
+          <p style={{ color: "#a5a0ff", fontSize: 11, fontWeight: 600, margin: 0 }}>Selected model</p>
+          <p style={{ color: "#2d2d48", fontSize: 9, margin: "2px 0 0", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeTaskId}</p>
         </div>
       )}
 
       {/* Rigged model warning */}
       {isRiggedInput && (
-        <div style={{ padding:"6px 9px",borderRadius:8,background:"rgba(245,197,24,0.06)",border:"1px solid rgba(245,197,24,0.15)",display:"flex",gap:6,marginBottom:12 }}>
-          <span style={{ color:"#f5c518",fontSize:9,marginTop:1,flexShrink:0 }}>⚠</span>
-          <p style={{ color:"#fcd34d",fontSize:10,margin:0,lineHeight:1.5 }}>
+        <div style={{ padding: "6px 9px", borderRadius: 8, background: "rgba(245,197,24,0.06)", border: "1px solid rgba(245,197,24,0.15)", display: "flex", gap: 6, marginBottom: 12 }}>
+          <span style={{ color: "#f5c518", fontSize: 9, marginTop: 1, flexShrink: 0 }}>⚠</span>
+          <p style={{ color: "#fcd34d", fontSize: 10, margin: 0, lineHeight: 1.5 }}>
             Rigged model: OBJ and STL export are not supported. Use GLB or FBX.
           </p>
         </div>
       )}
 
       {/* Task mode indicator */}
-      <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:10,padding:"6px 9px",borderRadius:8,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ width:7,height:7,borderRadius:"50%",background: smartLowPoly ? "#a5a0ff" : "#4a4a68",flexShrink:0 }}/>
-        <p style={{ color: smartLowPoly ? "#a5a0ff" : "#4a4a68",fontSize:10,margin:0,lineHeight:1.5,fontFamily:"monospace" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10, padding: "6px 9px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ width: 7, height: 7, borderRadius: "50%", background: smartLowPoly ? "#a5a0ff" : "#4a4a68", flexShrink: 0 }} />
+        <p style={{ color: smartLowPoly ? "#a5a0ff" : "#4a4a68", fontSize: 10, margin: 0, lineHeight: 1.5, fontFamily: "monospace" }}>
           {smartLowPoly ? 'task: "smart_low_poly"' : 'task: "convert_model"'}
         </p>
       </div>
 
       {/* ── Smart Low Poly toggle ── */}
       <div
-        style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",cursor:"pointer" }}
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", cursor: "pointer" }}
         onClick={() => handleSetSmartLowPoly(!smartLowPoly)}
       >
-        <div style={{ display:"flex",alignItems:"center",gap:7 }}>
-          <CoinIcon/>
-          <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>Smart Low Poly</span>
-          <span style={{ background:"linear-gradient(135deg,#c026d3,#a21caf)",color:"#fff",fontSize:9,fontWeight:800,padding:"1px 5px",borderRadius:4 }}>v2</span>
-          <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }}/>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <CoinIcon />
+          <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Smart Low Poly</span>
+          <span style={{ background: "linear-gradient(135deg,#c026d3,#a21caf)", color: "#fff", fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 4 }}>v2</span>
+          <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
         </div>
-        <div className={"tp-switch"+(smartLowPoly?" on":"")} style={{ background:smartLowPoly?"#4c8ef7":"rgba(255,255,255,0.12)" }}/>
+        <div className={"tp-switch" + (smartLowPoly ? " on" : "")} style={{ background: smartLowPoly ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
       </div>
 
       {smartLowPoly && (
-        <div style={{ padding:"6px 9px",borderRadius:8,background:"rgba(108,99,255,0.06)",border:"1px solid rgba(108,99,255,0.18)",display:"flex",gap:6,marginBottom:6 }}>
-          <HelpCircle style={{ width:11,height:11,color:"#a5a0ff",marginTop:1,flexShrink:0 }}/>
-          <p style={{ color:"#a5a0ff",fontSize:10,margin:0,lineHeight:1.5 }}>
+        <div style={{ padding: "6px 9px", borderRadius: 8, background: "rgba(108,99,255,0.06)", border: "1px solid rgba(108,99,255,0.18)", display: "flex", gap: 6, marginBottom: 6 }}>
+          <HelpCircle style={{ width: 11, height: 11, color: "#a5a0ff", marginTop: 1, flexShrink: 0 }} />
+          <p style={{ color: "#a5a0ff", fontSize: 10, margin: 0, lineHeight: 1.5 }}>
             {quad
               ? "Smart Low Poly + Quad: face limit required (500 – 10 000)"
               : "Smart Low Poly: face limit required (1 000 – 20 000)"}
@@ -151,20 +151,20 @@ export default function Retopo({
       )}
 
       {/* ── Topology ── */}
-      <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:6,marginTop:8 }}>
-        <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>Topology</span>
-        <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }}/>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, marginTop: 8 }}>
+        <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Topology</span>
+        <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
       </div>
-      <div style={{ display:"flex",gap:6,marginBottom:10 }}>
-        <button className={"tp-topo-btn"+(quad?" sel":"")} onClick={() => handleSetQuad(true)}>Quad</button>
-        <button className={"tp-topo-btn"+(!quad?" sel":"")} onClick={() => handleSetQuad(false)}>Triangle</button>
+      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+        <button className={"tp-topo-btn" + (quad ? " sel" : "")} onClick={() => handleSetQuad(true)}>Quad</button>
+        <button className={"tp-topo-btn" + (!quad ? " sel" : "")} onClick={() => handleSetQuad(false)}>Triangle</button>
       </div>
 
       {/* Quad warning */}
       {quad && (
-        <div style={{ padding:"6px 9px",borderRadius:8,background:"rgba(245,197,24,0.06)",border:"1px solid rgba(245,197,24,0.15)",display:"flex",gap:6,marginBottom:10 }}>
-          <span style={{ color:"#f5c518",fontSize:9,marginTop:1,flexShrink:0 }}>⚠</span>
-          <p style={{ color:"#fcd34d",fontSize:10,margin:0,lineHeight:1.5 }}>
+        <div style={{ padding: "6px 9px", borderRadius: 8, background: "rgba(245,197,24,0.06)", border: "1px solid rgba(245,197,24,0.15)", display: "flex", gap: 6, marginBottom: 10 }}>
+          <span style={{ color: "#f5c518", fontSize: 9, marginTop: 1, flexShrink: 0 }}>⚠</span>
+          <p style={{ color: "#fcd34d", fontSize: 10, margin: 0, lineHeight: 1.5 }}>
             Quad forces FBX output. {!smartLowPoly && "Default face limit: 10 000."}
           </p>
         </div>
@@ -172,34 +172,34 @@ export default function Retopo({
 
       {/* ── Output Format (convert_model mode only) ── */}
       {!smartLowPoly && setOutFormat && (
-        <div style={{ marginBottom:12, position:"relative" }}>
-          <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:8 }}>
-            <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>Output Format</span>
-            <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }}/>
+        <div style={{ marginBottom: 12, position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Output Format</span>
+            <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
           </div>
           <button
             disabled={quad}
             onClick={() => !quad && setFmtOpen(v => !v)}
             style={{
-              width:"100%",padding:"8px 12px",borderRadius:9,
-              background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",
-              display:"flex",alignItems:"center",justifyContent:"space-between",
+              width: "100%", padding: "8px 12px", borderRadius: 9,
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
               cursor: quad ? "not-allowed" : "pointer",
-              fontFamily:"inherit",opacity: quad ? 0.5 : 1,
+              fontFamily: "inherit", opacity: quad ? 0.5 : 1,
             }}
           >
-            <div style={{ display:"flex",alignItems:"center",gap:8 }}>
-              <span style={{ color:"#e8e8f4",fontSize:12,fontWeight:700,fontFamily:"monospace",width:36 }}>{quad ? "FBX" : selectedFmt.label}</span>
-              <span style={{ color:"#2d2d48",fontSize:11 }}>{quad ? "Forced by Quad" : selectedFmt.note}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: "#e8e8f4", fontSize: 12, fontWeight: 700, fontFamily: "monospace", width: 36 }}>{quad ? "FBX" : selectedFmt.label}</span>
+              <span style={{ color: "#2d2d48", fontSize: 11 }}>{quad ? "Forced by Quad" : selectedFmt.note}</span>
             </div>
-            {!quad && <ChevronDown style={{ width:12,height:12,color:"#2d2d48",transform: fmtOpen ? "rotate(180deg)" : "none",transition:"transform 0.2s" }}/>}
+            {!quad && <ChevronDown style={{ width: 12, height: 12, color: "#2d2d48", transform: fmtOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />}
           </button>
 
           {fmtOpen && !quad && (
             <div style={{
-              position:"absolute",left:0,right:0,bottom:"calc(100% + 4px)",zIndex:50,
-              background:"#131327",border:"1px solid rgba(255,255,255,0.1)",borderRadius:10,
-              overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,0.5)",
+              position: "absolute", left: 0, right: 0, bottom: "calc(100% + 4px)", zIndex: 50,
+              background: "#131327", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10,
+              overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
             }}>
               {CONVERT_FORMATS.map((f, i) => {
                 const unsupported = isRiggedInput && RIGGED_UNSUPPORTED_FORMATS.has(f.id);
@@ -209,18 +209,18 @@ export default function Retopo({
                     disabled={unsupported}
                     onClick={() => { if (!unsupported) { setOutFormat(f.id); setFmtOpen(false); } }}
                     style={{
-                      width:"100%",padding:"9px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",
+                      width: "100%", padding: "9px 14px", display: "flex", alignItems: "center", justifyContent: "space-between",
                       background: outFormat === f.id ? "rgba(108,99,255,0.15)" : "transparent",
-                      border:"none",borderBottom: i < CONVERT_FORMATS.length-1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                      border: "none", borderBottom: i < CONVERT_FORMATS.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
                       cursor: unsupported ? "not-allowed" : "pointer",
-                      fontFamily:"inherit",opacity: unsupported ? 0.3 : 1,
+                      fontFamily: "inherit", opacity: unsupported ? 0.3 : 1,
                     }}
                   >
-                    <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-                      <span style={{ color: outFormat===f.id ? "#a5a0ff" : "#c8c8e0",fontSize:12,fontWeight:700,fontFamily:"monospace",width:36 }}>{f.label}</span>
-                      <span style={{ color:"#2d2d48",fontSize:11 }}>{f.note}{unsupported ? " · not for rigged" : ""}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ color: outFormat === f.id ? "#a5a0ff" : "#c8c8e0", fontSize: 12, fontWeight: 700, fontFamily: "monospace", width: 36 }}>{f.label}</span>
+                      <span style={{ color: "#2d2d48", fontSize: 11 }}>{f.note}{unsupported ? " · not for rigged" : ""}</span>
                     </div>
-                    {outFormat === f.id && <span style={{ color:"#a5a0ff",fontSize:10 }}>✓</span>}
+                    {outFormat === f.id && <span style={{ color: "#a5a0ff", fontSize: 10 }}>✓</span>}
                   </button>
                 );
               })}
@@ -230,18 +230,18 @@ export default function Retopo({
       )}
 
       {/* ── Face Limit ── */}
-      <div style={{ marginTop:4 }}>
-        <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:8 }}>
-          <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>Face Limit</span>
-          <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }}/>
-          <span style={{ marginLeft:"auto",color:"#2d2d48",fontSize:9,fontFamily:"monospace" }}>
+      <div style={{ marginTop: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Face Limit</span>
+          <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+          <span style={{ marginLeft: "auto", color: "#2d2d48", fontSize: 9, fontFamily: "monospace" }}>
             {cfg.allowAuto
-              ? `Auto – ${(cfg.max/1000).toFixed(0)}k`
+              ? `Auto – ${(cfg.max / 1000).toFixed(0)}k`
               : `${cfg.min.toLocaleString()} – ${cfg.max.toLocaleString()} · required`}
           </span>
         </div>
 
-        <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input
             type="range"
             min={cfg.min} max={cfg.max} step={cfg.step}
@@ -249,7 +249,7 @@ export default function Retopo({
             onChange={e => setLocalVal(Number(e.target.value))}
             onMouseUp={e => commit(Number(e.target.value))}
             onTouchEnd={e => commit(Number(e.target.value))}
-            style={{ flex:1,accentColor:"#6c63ff" }}
+            style={{ flex: 1, accentColor: "#6c63ff" }}
           />
           <input
             type="number"
@@ -260,15 +260,17 @@ export default function Retopo({
               const v = parseInt(e.target.value, 10);
               commit(isNaN(v) ? cfg.min : v);
             }}
-            style={{ width:80,padding:"5px 8px",borderRadius:8,border:"1px solid rgba(255,255,255,0.12)",
-              background:"rgba(255,255,255,0.05)",color:"#c8c8e0",fontSize:12,fontFamily:"monospace",
-              outline:"none",textAlign:"center",boxSizing:"border-box" }}
+            style={{
+              width: 80, padding: "5px 8px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.05)", color: "#c8c8e0", fontSize: 12, fontFamily: "monospace",
+              outline: "none", textAlign: "center", boxSizing: "border-box"
+            }}
           />
         </div>
 
-        <p style={{ color:"#4a4a68",fontSize:10,margin:"5px 0 0",lineHeight:1.5 }}>
-          {showAuto                          && "Auto — adaptive, optimal face count determined by model"}
-          {!showAuto && smartLowPoly &&  quad && "Smart Low Poly + Quad: 500 – 10 000 (required)"}
+        <p style={{ color: "#4a4a68", fontSize: 10, margin: "5px 0 0", lineHeight: 1.5 }}>
+          {showAuto && "Auto — adaptive, optimal face count determined by model"}
+          {!showAuto && smartLowPoly && quad && "Smart Low Poly + Quad: 500 – 10 000 (required)"}
           {!showAuto && smartLowPoly && !quad && "Smart Low Poly: 1 000 – 20 000 (required)"}
           {!showAuto && !smartLowPoly && quad && "Quad: default 10 000 when unset"}
           {!showAuto && !smartLowPoly && !quad && `${localVal.toLocaleString()} faces`}
@@ -278,14 +280,14 @@ export default function Retopo({
       {/* ── Pivot to Center Bottom (convert_model only) ── */}
       {!smartLowPoly && setPivotToBottom && (
         <div
-          style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 0",cursor:"pointer",marginTop:4 }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", cursor: "pointer", marginTop: 4 }}
           onClick={() => setPivotToBottom(v => !v)}
         >
-          <div style={{ display:"flex",alignItems:"center",gap:7 }}>
-            <span style={{ color:"#c8c8e0",fontSize:13,fontWeight:500 }}>Pivot to Center Bottom</span>
-            <HelpCircle style={{ width:13,height:13,color:"#1e1e3a" }}/>
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Pivot to Center Bottom</span>
+            <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
           </div>
-          <div className={"tp-switch"+(pivotToBottom?" on":"")} style={{ background:pivotToBottom?"#4c8ef7":"rgba(255,255,255,0.12)" }}/>
+          <div className={"tp-switch" + (pivotToBottom ? " on" : "")} style={{ background: pivotToBottom ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
         </div>
       )}
     </>

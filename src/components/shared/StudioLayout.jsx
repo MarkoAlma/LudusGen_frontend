@@ -1,6 +1,7 @@
 import React, { useEffect, createContext } from 'react';
 import { motion, AnimatePresence, useSpring, useMotionValueEvent, useTransform, useMotionValue } from 'framer-motion';
-import { PanelLeftClose, PanelRightClose, ChevronLeft } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, ChevronLeft, Columns, Square, Layout, X } from 'lucide-react';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 /**
  * StudioLayoutContext
@@ -36,13 +37,23 @@ export default function StudioLayout({
   overlay = false,
   onRightToggle,
 }) {
+  // Breakpoints & Viewport Awareness
+  const isNarrow = useMediaQuery("(max-width: 1280px)");
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const activeOverlay = overlay || isNarrow;
+  
+  // Custom widths for Mobile Drawer behavior
+  const effectiveL1Width = isMobile ? (window.innerWidth - 32) : leftWidth;
+  const effectiveSecondaryWidth = isMobile ? (window.innerWidth - 32) : leftSecondaryWidth;
+  const effectiveRWidth = isMobile ? (window.innerWidth - 32) : rightWidth;
+
   // Cinematic Spring Configuration
   const springConfig = { damping: 38, stiffness: 180, mass: 1 };
 
   // In overlay mode, sidebars float on top — layout doesn't shrink viewport
-  const layoutL1 = overlay ? 0 : (leftOpen ? leftWidth : 0);
-  const layoutL2 = overlay ? 0 : ((leftOpen && leftSecondaryOpen && leftSecondarySidebar) ? leftSecondaryWidth : 0);
-  const layoutR = overlay ? 0 : (rightOpen ? rightWidth : 0);
+  const layoutL1 = activeOverlay ? 0 : (leftOpen ? effectiveL1Width : 0);
+  const layoutL2 = activeOverlay ? 0 : ((leftSecondaryOpen && leftSecondarySidebar) ? effectiveSecondaryWidth : 0);
+  const layoutR = activeOverlay ? 0 : (rightOpen ? effectiveRWidth : 0);
 
   const smoothL1 = useSpring(layoutL1, springConfig);
   const smoothL2 = useSpring(layoutL2, springConfig);
@@ -52,16 +63,16 @@ export default function StudioLayout({
   const smoothL = useMotionValue(smoothL1.get() + smoothL2.get());
 
   useEffect(() => {
-    smoothL1.set(overlay ? 0 : (leftOpen ? leftWidth : 0));
-  }, [leftOpen, leftWidth, overlay, smoothL1]);
+    smoothL1.set(activeOverlay ? 0 : (leftOpen ? effectiveL1Width : 0));
+  }, [leftOpen, effectiveL1Width, activeOverlay, smoothL1]);
 
   useEffect(() => {
-    smoothL2.set(overlay ? 0 : ((leftOpen && leftSecondaryOpen && leftSecondarySidebar) ? leftSecondaryWidth : 0));
-  }, [leftOpen, leftSecondaryOpen, leftSecondaryWidth, leftSecondarySidebar, overlay, smoothL2]);
+    smoothL2.set(activeOverlay ? 0 : ((leftSecondaryOpen && leftSecondarySidebar) ? effectiveSecondaryWidth : 0));
+  }, [leftSecondaryOpen, effectiveSecondaryWidth, leftSecondarySidebar, activeOverlay, smoothL2]);
 
   useEffect(() => {
-    smoothR.set(overlay ? 0 : (rightOpen ? rightWidth : 0));
-  }, [rightOpen, rightWidth, overlay, smoothR]);
+    smoothR.set(activeOverlay ? 0 : (rightOpen ? effectiveRWidth : 0));
+  }, [rightOpen, effectiveRWidth, activeOverlay, smoothR]);
 
   // Synchronize unified L
   useMotionValueEvent(smoothL1, "change", (v) => smoothL.set(v + smoothL2.get()));
@@ -95,26 +106,33 @@ export default function StudioLayout({
         {/* ── LEFT SIDEBAR STACK ── */}
         <div className="absolute left-0 top-0 h-full flex pointer-events-none z-[60]">
           {/* Level 1: Main Sidebar */}
-          <motion.div
-            style={{ width: overlay ? (leftOpen ? leftWidth : 0) : smoothL1 }}
-            className="h-full border-r border-white/5 overflow-hidden pointer-events-auto"
-          >
-            <div style={{ width: leftWidth, height: '100%' }}>
-              {leftSidebar}
-            </div>
-          </motion.div>
+          {(activeOverlay ? leftOpen : true) && (
+            <motion.div
+              style={{ width: activeOverlay ? (leftOpen ? effectiveL1Width : 0) : smoothL1 }}
+              className={`h-full overflow-hidden pointer-events-auto ${activeOverlay ? 'fixed left-0 top-0 z-[100] bg-[#0a0a0f]/95 backdrop-blur-3xl border-r border-white/5 shadow-2xl' : ''}`}
+            >
+              <div style={{ width: effectiveL1Width, height: '100%', position: 'relative' }}>
+                {leftSidebar}
+                {isMobile && leftOpen && (
+                  <button onClick={() => setLeftOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
 
           {/* Level 2: Secondary Content */}
-          {overlay ? (
+          {activeOverlay ? (
             <AnimatePresence>
-              {leftOpen && leftSecondaryOpen && leftSecondarySidebar && (
+              {leftSecondaryOpen && leftSecondarySidebar && (
                 <>
                   {/* Backdrop */}
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/50 z-[65]"
+                    className="fixed inset-0 bg-black/60 z-[65] backdrop-blur-[2px]"
                     onClick={() => setLeftSecondaryOpen?.(false)}
                   />
                   <motion.div
@@ -122,10 +140,20 @@ export default function StudioLayout({
                     animate={{ x: 0 }}
                     exit={{ x: "-100%" }}
                     transition={{ type: "spring", damping: 28, stiffness: 200 }}
-                    className="fixed top-0 h-full z-[70] border-r border-white/5 overflow-hidden bg-[#0a0a0f]/95 backdrop-blur-3xl pointer-events-auto"
-                    style={{ left: leftWidth, width: `calc(100vw - ${leftWidth}px)` }}
+                    className="fixed top-0 h-full z-[70] border-r border-white/5 overflow-hidden bg-[#0a0a0f]/95 backdrop-blur-3xl pointer-events-auto shadow-2xl"
+                    style={{ 
+                      left: (isMobile || !leftOpen) ? 0 : effectiveL1Width, 
+                      width: isMobile ? effectiveSecondaryWidth : leftSecondaryWidth 
+                    }}
                   >
-                    {leftSecondarySidebar}
+                    <div className="h-full relative">
+                      {leftSecondarySidebar}
+                      {isMobile && (
+                        <button onClick={() => setLeftSecondaryOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-[101]">
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
                   </motion.div>
                 </>
               )}
@@ -133,9 +161,9 @@ export default function StudioLayout({
           ) : (
             <motion.div
               style={{ width: smoothL2 }}
-              className="h-full border-r border-white/5 overflow-hidden bg-[#0a0a0f]/40 backdrop-blur-3xl pointer-events-auto"
+              className="h-full border-r border-white/5 overflow-hidden bg-[#0a0a0f]/60 backdrop-blur-3xl pointer-events-auto"
             >
-              <div style={{ width: leftSecondaryWidth, height: '100%' }}>
+              <div style={{ width: effectiveSecondaryWidth, height: '100%' }}>
                 {leftSecondarySidebar}
               </div>
             </motion.div>
@@ -143,16 +171,15 @@ export default function StudioLayout({
         </div>
 
         {/* ── RIGHT SIDEBAR ── */}
-        {overlay ? (
+        {activeOverlay ? (
           <AnimatePresence>
             {rightOpen && (
               <>
-                {/* Backdrop — only covers the right portion, not the left nav */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/50 z-[65]"
+                  className="fixed inset-0 bg-black/60 z-[65] backdrop-blur-[2px]"
                   onClick={() => setRightOpen(false)}
                 />
                 <motion.div
@@ -160,10 +187,17 @@ export default function StudioLayout({
                   animate={{ x: 0 }}
                   exit={{ x: "100%" }}
                   transition={{ type: "spring", damping: 28, stiffness: 200 }}
-                  className="fixed right-0 top-0 h-full z-[70] border-l border-white/5 overflow-hidden bg-[#0a0a0f]/95 backdrop-blur-3xl pointer-events-auto"
-                  style={{ width: `calc(100vw - ${leftWidth}px)` }}
+                  className="fixed right-0 top-0 h-full z-[70] border-l border-white/5 overflow-hidden bg-[#0a0a0f]/95 backdrop-blur-3xl pointer-events-auto shadow-2xl"
+                  style={{ width: isMobile ? effectiveRWidth : rightWidth }}
                 >
-                  {rightSidebar}
+                  <div className="h-full relative">
+                    {rightSidebar}
+                    {isMobile && (
+                      <button onClick={() => setRightOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-[101]">
+                        <X className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
                 </motion.div>
               </>
             )}
@@ -173,7 +207,7 @@ export default function StudioLayout({
             style={{ width: smoothR }}
             className="absolute right-0 top-0 h-full z-[60] border-l border-white/5 overflow-hidden"
           >
-            <div style={{ width: rightWidth, height: '100%' }}>
+            <div style={{ width: effectiveRWidth, height: '100%' }}>
               {rightSidebar}
             </div>
           </motion.div>
@@ -187,7 +221,7 @@ export default function StudioLayout({
           >
             <AnimatePresence mode="wait">
               {/* State 3: Everything closed — single expand-all button */}
-              {!leftOpen && (
+              {(!leftOpen && !leftSecondaryOpen) && (
                 <motion.div
                   key="expand-all"
                   initial={{ opacity: 0, scale: 0.8 }}
@@ -200,50 +234,37 @@ export default function StudioLayout({
                     className="w-14 h-14 flex items-center justify-center rounded-2xl bg-[#0a0a0f]/80 backdrop-blur-3xl border border-white/10 hover:bg-white/10 transition-colors duration-200 text-zinc-500 hover:text-white shadow-2xl"
                     title="Expand All Panels"
                   >
-                    <PanelLeftClose className="w-4 h-4 rotate-180" />
+                    <Layout className="w-5 h-5 translate-y-[1px]" />
                   </button>
                 </motion.div>
               )}
 
-              {/* States 1 & 2: Nav is open — 2-zone pill */}
-              {leftOpen && (
+              {/* Compound Unified Toggle (Master + Studio) */}
+              {(leftOpen || leftSecondaryOpen) && (
                 <motion.div
-                  key="two-zone"
+                  key="unified-toggle"
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
                   transition={{ duration: 0.15 }}
                 >
                   <div className="flex bg-[#0a0a0f]/80 backdrop-blur-3xl border border-white/10 border-l-0 rounded-r-2xl overflow-hidden shadow-2xl">
-                    {/* Zone 1: Toggle secondary panel only */}
+                    {/* Zone 1: Secondary Panel Toggle (Left) */}
                     <button
                       onClick={() => setLeftSecondaryOpen?.(!leftSecondaryOpen)}
-                      className="w-8 h-14 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition-colors duration-200"
-                      title={leftSecondaryOpen ? "Close Settings Panel" : "Open Settings Panel"}
+                      className="w-8 h-12 flex items-center justify-center text-zinc-600 hover:text-primary transition-colors duration-200"
+                      title={leftSecondaryOpen ? "Close Studio Panel" : "Open Studio Panel"}
                     >
-                      <motion.div
-                        animate={{ rotate: leftSecondaryOpen ? 0 : 180 }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </motion.div>
+                      <ChevronLeft className={`w-4 h-4 transition-transform duration-500 ${!leftSecondaryOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {/* Divider */}
-                    <div className="w-px h-6 bg-white/10 my-auto" />
-
-                    {/* Zone 2: Toggle nav (closes everything) */}
+                    {/* Zone 2: Close/Fold (Right - Ported from Sidebar Header) */}
                     <button
-                      onClick={() => setLeftOpen(false)}
-                      className="w-8 h-14 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition-colors duration-200"
-                      title="Collapse All Panels"
+                      onClick={() => setLeftOpen(!leftOpen)}
+                      className="w-10 h-12 flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all border-l border-white/5"
+                      title={leftOpen ? "Fold Workspace Strip" : "Expand Workspace Strip"}
                     >
-                      <motion.div
-                        animate={{ rotate: 0 }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                      >
-                        <PanelLeftClose className="w-4 h-4" />
-                      </motion.div>
+                      {leftOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
                     </button>
                   </div>
                 </motion.div>

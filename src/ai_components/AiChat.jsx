@@ -118,7 +118,8 @@ export default function AIChat({ user, getIdToken }) {
       userId: user?.uid,
       getIdToken,
       setSidebarOpen,
-      isGlobalOpen: desktopSidebarOpen // MASTER SYNC
+      isGlobalOpen: desktopSidebarOpen, // MASTER SYNC
+      toggleGlobalSidebar: toggleDesktopSidebar
     };
     switch (selectedModel.panelType) {
       case "chat":
@@ -165,20 +166,6 @@ export default function AIChat({ user, getIdToken }) {
           </div>
         </motion.aside>
 
-        {/* Floating Toggle Button */}
-        <motion.button
-          initial={false}
-          style={{ x: smoothWidth }}
-          className="absolute left-[-1px] top-[8%] -translate-y-1/2 z-[110] flex items-center justify-center w-7 h-14 rounded-r-xl bg-[#0a0a0f]/80 backdrop-blur-2xl border border-white/10 border-l-0 hover:bg-white/10 transition-colors duration-200 text-zinc-500 hover:text-white shadow-2xl"
-          onClick={toggleDesktopSidebar}
-        >
-          <motion.div
-            animate={{ rotate: desktopSidebarOpen ? 0 : 180 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          >
-            <PanelLeftClose className="w-4 h-4" />
-          </motion.div>
-        </motion.button>
       </div>
 
       {/* Sidebar - Mobile Overlay */}

@@ -53,11 +53,7 @@ export default function AiStudioSidebar({
 
   return (
     <div
-      className="flex flex-col h-full relative z-[100] overflow-hidden border-r border-white/5"
-      style={{
-        background: 'rgba(10,10,25,0.4)',
-        backdropFilter: 'blur(20px)',
-      }}
+      className="flex flex-col h-full relative z-[100] overflow-hidden bg-[#0a0a0f]/60 backdrop-blur-3xl"
     >
       {/* ── Ambient Background ── */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">

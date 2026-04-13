@@ -530,7 +530,7 @@ function WireframeControl({
   );
 }
 
-export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlobalOpen }) {
+export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlobalOpen, toggleGlobalSidebar }) {
   const color = selectedModel?.color || "#06b6d4";
 
   // ── Input & generation state ─────────────────────────────────────────────
@@ -574,6 +574,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
 
   // layout state (controlled by StudioLayout)
   const [leftOpen, setLeftOpen] = useState(true);
+  const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [offsets, setOffsets] = useState({ left: 320, right: 320 });
 
@@ -866,20 +867,42 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
 
       <StudioLayout
         leftOpen={leftOpen}
-        setLeftOpen={setLeftOpen}
+        setLeftOpen={toggleGlobalSidebar}
+        leftSecondaryOpen={leftSecondaryOpen}
+        setLeftSecondaryOpen={setLeftSecondaryOpen}
         rightOpen={rightOpen}
         setRightOpen={setRightOpen}
-        leftWidth={320}
+        leftWidth={72}
+        leftSecondaryWidth={320}
         rightWidth={320}
         onOffsetChange={setOffsets}
         leftSidebar={
-          <div className="pt-0 flex flex-col h-full overflow-hidden bg-[#060410]">
+          <div className="h-full flex flex-col items-center pt-6 bg-[#030308] border-r border-white/5">
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-lg mb-8"
+              style={{ backgroundColor: `${color}15`, borderColor: `${color}30`, color }}
+              title="Forge Station"
+            >
+              <Sparkles className="w-6 h-6" />
+            </div>
+            
+            <button
+              onClick={() => setLeftSecondaryOpen(!leftSecondaryOpen)}
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${
+                leftSecondaryOpen 
+                  ? "bg-white/10 border-white/20 text-white shadow-lg shadow-white/5" 
+                  : "bg-transparent border-transparent text-zinc-600 hover:text-zinc-400"
+              }`}
+              style={leftSecondaryOpen ? { borderColor: `${color}40`, color } : {}}
+              title="Meshy Generation Controls"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
+        }
+        leftSecondarySidebar={
+          <div className="h-full flex flex-col overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5 tp-scroll">
             <div className="p-6 border-b border-white/5 bg-white/[0.01]">
-              <div className="flex items-center gap-3 mb-5">
-                <Sparkles className="w-4 h-4" style={{ color }} />
-                <span className="text-white font-black text-[11px] uppercase tracking-[0.4em] italic leading-none">Forge Station</span>
-              </div>
-
               <div className="flex bg-white/[0.02] border border-white/5 rounded-xl p-1 mb-2">
                 {[
                   { id: "text", label: "Neural Prompt", icon: <Type className="w-3 h-3" /> },
