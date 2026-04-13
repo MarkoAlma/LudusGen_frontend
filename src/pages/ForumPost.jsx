@@ -713,6 +713,7 @@ const TableOfContents = ({ content, color }) => {
   );
 };
 
+
 // ─── Helpful widget ───────────────────────────────────────────────
 const HelpfulWidget = ({ color }) => {
   const [voted, setVoted] = useState(null);
