@@ -260,6 +260,8 @@ export default function ThreeViewer({
   const smoothL = ctx?.smoothL;
   const smoothR = ctx?.smoothR;
 
+  // Post-Cinematic Update: Centering is now handled by StudioLayout container padding.
+  // This avoids double-offsetting and ensures the 3D canvas is always perfectly sized to the visible gap.
   const updateCameraOffset = (l, r) => {
     if (!S.current?.camera) return;
     const canvas = S.current.renderer.domElement;
@@ -268,17 +270,8 @@ export default function ThreeViewer({
     const ch = canvas.clientHeight;
     if (!cw || !ch) return;
     
-    // In Overlay Mode, the canvas is full-screen.
-    // To center the model in the visible gap:
-    // Gap Width = FullWidth - l - r
-    // Gap Center = l + GapWidth / 2 = (l + FullWidth - r) / 2
-    // Screen Center = FullWidth / 2
-    // Desired Shift (dx) = Gap Center - Screen Center = (l - r) / 2
-    const dx = (l - r) / 2;
-    
-    // setViewOffset(fullW, fullH, xOffset, yOffset, width, height)
-    // We shift the sub-view by -dx to move the original center (model) to the right.
-    S.current.camera.setViewOffset(cw, ch, -dx, 0, cw, ch);
+    // Reset view offset to centered (full canvas)
+    S.current.camera.clearViewOffset();
     S.current.camera.updateProjectionMatrix();
     S.current.markDirty?.();
   };

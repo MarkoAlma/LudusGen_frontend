@@ -73,10 +73,7 @@ export default function TrellisWorkspace({
     <div className="relative h-full flex flex-col bg-[#0a0a0f] overflow-hidden">
 
       {/* ── TOP HUD: Integrated Control Bar ── */}
-      <motion.div
-        style={{ paddingLeft: smoothL, paddingRight: smoothR }}
-        className="h-14 flex items-center justify-between border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-2xl z-40 relative px-8"
-      >
+      <div className="h-14 flex items-center justify-between border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-2xl z-40 relative px-4 sm:px-6">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mr-4 italic">View Orbit</span>
           {VIEW_MODES.map(v => (
@@ -128,7 +125,7 @@ export default function TrellisWorkspace({
             onClick={() => setShowGrid(!showGrid)}
           />
         </div>
-      </motion.div>
+      </div>
 
       {/* ── Main Viewport ── */}
       <div className="flex-1 relative overflow-hidden bg-[#050508]">
@@ -199,10 +196,7 @@ export default function TrellisWorkspace({
         </div>
 
         {/* ── BOTTOM HUD: Camera & Tools ── */}
-        <motion.div
-          style={{ x: "-50%", left: useTransform([smoothL, smoothR], ([l, r]) => `calc(50% + ${(l - r) / 2}px)`) }}
-          className="absolute bottom-8 flex items-center gap-3 z-40"
-        >
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 z-40">
           <div className="bg-[#0a0a0f]/60 backdrop-blur-3xl px-4 py-2.5 rounded-2xl border border-white/5 flex items-center gap-5 shadow-2xl">
             <div className="flex items-center gap-2 pr-4 border-r border-white/5">
               <IconBtn icon={<RotateCcw className="w-4 h-4" />} tip="Reset Camera" onClick={() => camP("reset")} />
@@ -234,7 +228,7 @@ export default function TrellisWorkspace({
               Production Export
             </motion.button>
           </div>
-        </motion.div>
+        </div>
 
         {activeItem && !isPending && (
           <div className="absolute top-20 left-10 flex items-center gap-3">

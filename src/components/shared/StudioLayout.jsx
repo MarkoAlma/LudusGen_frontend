@@ -89,11 +89,8 @@ export default function StudioLayout({
           <div className="h-full w-full flex flex-col">
             {topHUD}
             <motion.div 
-              style={{ 
-                paddingLeft: smoothL, 
-                paddingRight: smoothR 
-              }}
-              className="flex-1 relative overflow-hidden"
+              style={{ paddingLeft: smoothL, paddingRight: smoothR }}
+              className="flex-1 relative overflow-hidden px-4 md:px-6 lg:px-10"
             >
               {children}
             </motion.div>
