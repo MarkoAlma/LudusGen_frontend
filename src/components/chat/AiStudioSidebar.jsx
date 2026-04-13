@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wand2, X, ChevronDown, Zap, Sparkles, Home } from 'lucide-react';
@@ -8,6 +8,8 @@ import bgCode from '../../assets/bg-code.png';
 import bgAudio from '../../assets/bg-audio.png';
 import bgImage from '../../assets/bg-image.png';
 import bg3d from '../../assets/bg-3d.png';
+import neuralCoin from '../../assets/neural-coin.png';
+import { MyUserContext } from '../../context/MyUserProvider';
 
 const CATEGORY_BGS = {
   chat: bgChat,
@@ -16,6 +18,22 @@ const CATEGORY_BGS = {
   image: bgImage,
   threed: bg3d
 };
+
+function CoinIcon({ size = 26 }) {
+  return (
+    <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: size, height: size }}>
+      {/* Dynamic Glow Background */}
+      <div className="absolute inset-0 rounded-full bg-primary/20 blur-[6px] animate-pulse" />
+      
+      {/* The Neural Coin Asset */}
+      <img 
+        src={neuralCoin} 
+        alt="Credits" 
+        className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_8px_rgba(139,92,246,0.3)]"
+      />
+    </div>
+  );
+}
 
 export default function AiStudioSidebar({
   selectedAI,
@@ -28,6 +46,7 @@ export default function AiStudioSidebar({
   isMobile
 }) {
   const selectedModel = getModel(selectedAI);
+  const { user } = useContext(MyUserContext);
   const activeColor = selectedModel?.color || '#8b5cf6';
   const currentGroupId = findModelGroup(selectedAI) || 'chat';
   const currentBg = CATEGORY_BGS[currentGroupId] || bgChat;
@@ -78,7 +97,7 @@ export default function AiStudioSidebar({
       {/* ── Header ─ */}
       <div className="relative z-30 border-b border-white/5">
         <div className="px-5 py-5 flex flex-col gap-4">
-          
+
           {/* Top Row: AI Workspace Branding */}
           <div className="flex items-center justify-between z-20 relative">
             <div className="flex items-center gap-3.5 pt-1">
@@ -111,8 +130,8 @@ export default function AiStudioSidebar({
             </div>
 
             {isMobile && (
-              <button 
-                onClick={() => setSidebarOpen(false)} 
+              <button
+                onClick={() => setSidebarOpen(false)}
                 className="flex-shrink-0 w-9 h-9 rounded-[10px] flex items-center justify-center border border-white/5 bg-white/[0.02] text-zinc-500 hover:text-white hover:bg-white/[0.05] transition-all"
               >
                 <X className="w-5 h-5" />
@@ -128,19 +147,36 @@ export default function AiStudioSidebar({
 
           {/* Bottom Row: User & Platform Nav */}
           <div className="flex items-center justify-between gap-3 relative z-10">
-             {/* Balance / Profile */}
-             
-             
-             {/* Home Button (House Icon) */}
-             <Link 
-               to="/" 
-               className="flex-shrink-0 w-9 h-9 rounded-[10px] flex items-center justify-center relative overflow-hidden group border border-white/5 hover:border-white/20 transition-all duration-300"
-               style={{ background: 'rgba(255,255,255,0.02)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-             >
-               <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-               <Home className="w-[18px] h-[18px] text-zinc-500 group-hover:text-white transition-colors relative z-10" />
-               <div className="absolute bottom-0 inset-x-1 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500" />
-             </Link>
+            {/* Balance / Profile */}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              className="flex-1 flex items-center justify-between px-3.5 py-2 rounded-[14px] bg-white/[0.03] border border-white/5 backdrop-blur-md relative overflow-hidden group/balance cursor-default"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover/balance:opacity-100 transition-opacity duration-500" />
+              <div className="flex items-center gap-2.5 relative z-10">
+                <CoinIcon size={18} />
+                <div className="flex flex-col">
+                  <span className="text-[11px] font-black text-white italic tracking-tighter leading-none">
+                    {(user?.credits ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-[7px] font-bold text-zinc-600 uppercase tracking-widest mt-0.5">Available</span>
+                </div>
+              </div>
+              <Link to="/pricing" className="relative z-10 p-1.5 rounded-lg bg-white/[0.04] text-zinc-500 hover:text-white hover:bg-primary/20 transition-all">
+                <Zap className="w-3 h-3" />
+              </Link>
+            </motion.div>
+
+            {/* Home Button (House Icon) */}
+            <Link
+              to="/"
+              className="flex-shrink-0 w-9 h-9 rounded-[10px] flex items-center justify-center relative overflow-hidden group border border-white/5 hover:border-white/20 transition-all duration-300"
+              style={{ background: 'rgba(255,255,255,0.02)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Home className="w-[18px] h-[18px] text-zinc-500 group-hover:text-white transition-colors relative z-10" />
+              <div className="absolute bottom-0 inset-x-1 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500" />
+            </Link>
           </div>
 
         </div>
@@ -158,8 +194,8 @@ export default function AiStudioSidebar({
               <button
                 onClick={() => toggleGroup(group.id)}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-300 group ${isOpen
-                    ? 'bg-white/[0.04] border border-white/10'
-                    : 'hover:bg-white/[0.02] border border-transparent'
+                  ? 'bg-white/[0.04] border border-white/10'
+                  : 'hover:bg-white/[0.02] border border-transparent'
                   }`}
               >
                 <div className="flex items-center gap-3">

@@ -31,6 +31,7 @@ import Texture from "./Texture";
 import Animate from "./Animate";
 import { motion, AnimatePresence, animate } from "framer-motion";
 import { MyUserContext } from "../../context/MyUserProvider";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
 import toast from "react-hot-toast";
 
 /* ─── constants ─────────────────────────────────────────────────────── */
@@ -101,6 +102,12 @@ const CSS = `
   .tp-nav-btn:not(.active) .lbl { color:var(--text-muted); }
   .tp-nav-btn:not(.active):hover .lbl { color:var(--text-secondary); }
   .tp-nav-btn.active::before { content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:26px;background:linear-gradient(180deg,var(--accent-bright),var(--accent));border-radius:0 4px 4px 0;box-shadow:0 0 8px var(--accent-glow); }
+  /* Mobile: hide labels in narrow primary nav */
+  @media (max-width: 640px) {
+    .tp-nav-btn .lbl { display: none; }
+    .tp-nav-btn .ico { width: 32px; height: 32px; }
+    .tp-nav-btn { padding: 8px 0; }
+  }
   .tp-switch { width:36px;height:20px;border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;cursor:pointer; }
   .tp-switch::after { content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.4); }
   .tp-switch.on::after { transform:translateX(16px); }
@@ -197,6 +204,16 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const color = selectedModel?.color || "#6c63ff";
   const { user, refreshCredits } = useContext(MyUserContext);
   const userCredits = user?.credits ?? 0;
+
+  // ── responsive breakpoints ──────────────────────────────────────────
+  const isMobile = useMediaQuery("(max-width: 640px)");
+  const isTablet = useMediaQuery("(max-width: 1024px)");
+
+  // Responsive sidebar widths
+  const leftW = isMobile ? 48 : isTablet ? 52 : 62;
+  // On mobile, secondary and right sidebars are full-width overlays
+  const leftSecondaryW = isMobile ? Math.min(window.innerWidth - 48, 320) : isTablet ? 220 : 240;
+  const rightW = isMobile ? Math.min(window.innerWidth - 48, 320) : isTablet ? 220 : 220;
 
   // Master Sidebar Sync
   useEffect(() => {
@@ -320,7 +337,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const sceneRef = useRef(null);
   const pollAb = useRef(null);
   const prevUrl = useRef(null);
-  const dragRef = useRef(null);
   const fileRef = useRef(null);
   const currentTaskId = useRef(null);
   const currentRequestId = useRef(null);
@@ -380,9 +396,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     })();
   }, [userId, getIdToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const leftWRef = useRef(302);
-  const rightWRef = useRef(220);
-
   const wireHex = useMemo(() => parseInt(wireC.replace("#", ""), 16), [wireC]);
 
   const isRiggedInput = useMemo(() => {
@@ -418,26 +431,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const t = getIdToken ? await getIdToken() : "";
     return { "Content-Type": "application/json", Authorization: "Bearer " + t };
   }, [getIdToken]);
-
-  const startDrag = useCallback((side) => (e) => {
-    e.preventDefault();
-    const startW = side === "left" ? leftWRef.current : rightWRef.current;
-    dragRef.current = { side, startX: e.clientX, startW };
-    const mv = (ev) => {
-      if (!dragRef.current) return;
-      const { side: s, startX, startW: sw } = dragRef.current;
-      const dx = ev.clientX - startX;
-      if (s === "left") {
-        const nw = Math.max(260, Math.min(400, sw + dx));
-        leftWRef.current = nw; setLeftW(nw);
-      } else {
-        const nw = Math.max(180, Math.min(320, sw - dx));
-        rightWRef.current = nw; setRightW(nw);
-      }
-    };
-    const up = () => { dragRef.current = null; document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); };
-    document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
-  }, []);
 
   const handleImg = useCallback(async (file) => {
     if (!file) return;
@@ -845,7 +838,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const selHist = useCallback(async (item) => {
     if (histAbort.current) histAbort.current.cancelled = true;
     const t = { cancelled: false }; histAbort.current = t;
-    setLoadingId(item.id); setActiveH(item); setGenStatus(item.status);
+    setLoadingId(item.id); setSelHistId(item.id); setGenStatus(item.status);
     if (item.model_url) {
       try {
         const b = await fetchProxy(item.model_url);
@@ -890,6 +883,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     setDlOpen(false); setDlItem(null);
   }, [dlItem, revokeBlobUrl]);
 
+  const handleRightToggle = useCallback(() => {
+    if (!rightOpen && isMobile) {
+      setLeftSecondaryOpen(false);
+    }
+    setRightOpen(v => !v);
+  }, [rightOpen, isMobile, setLeftSecondaryOpen]);
+
   return (
     <StudioLayout
       leftOpen={leftOpen}
@@ -898,9 +898,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setLeftSecondaryOpen={setLeftSecondaryOpen}
       rightOpen={rightOpen}
       setRightOpen={setRightOpen}
-      leftWidth={62}
-      leftSecondaryWidth={240}
-      rightWidth={220}
+      onRightToggle={handleRightToggle}
+      leftWidth={leftW}
+      leftSecondaryWidth={leftSecondaryW}
+      rightWidth={rightW}
+      overlay={isMobile}
       leftSidebar={
         <div className="h-full flex flex-col bg-[#030308] border-r border-white/5">
           {NAV.map(n => {
@@ -914,6 +916,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                     if (!actsAsN) {
                       setMode(n.id);
                       setLeftSecondaryOpen(true);
+                      if (isMobile) setRightOpen(false);
                     }
                   }} 
                   className={"tp-nav-btn" + (mode === n.id ? " active" : "") + (actsAsN ? " model-na" : "")}
@@ -1123,28 +1126,28 @@ function TripoWorkspaceWrapper({
       {/* top hud */}
       <motion.div
         style={{ paddingLeft: smoothL, paddingRight: smoothR }}
-        className="flex items-center justify-between h-12 flex-shrink-0 border-b border-white/5 bg-[#0a0a0f] gap-4 relative z-40 px-5"
+        className="flex items-center justify-between h-12 flex-shrink-0 border-b border-white/5 bg-[#0a0a0f] gap-2 relative z-40 px-3 overflow-hidden"
       >
-        <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto no-scrollbar">
-          <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] italic mr-4">View Context</span>
+        <div className="flex items-center gap-1.5 flex-shrink-0 overflow-x-auto no-scrollbar min-w-0">
+          <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] italic mr-2 hidden sm:inline">View Context</span>
           {VIEW_MODES.map(v => (
             <Tooltip key={v.id} text={v.tip} side="bottom">
               <button
                 onClick={() => setViewMode(v.id)}
-                className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === v.id ? 'bg-primary/20 text-white border border-primary/30 shadow-primary-glow' : 'text-zinc-600 hover:text-zinc-400'}`}
+                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${viewMode === v.id ? 'bg-primary/20 text-white border border-primary/30 shadow-primary-glow' : 'text-zinc-600 hover:text-zinc-400'}`}
               >
                 {v.label}
               </button>
             </Tooltip>
           ))}
-          <div className="w-px h-5 bg-white/5 mx-2" />
+          <div className="w-px h-5 bg-white/5 mx-1 hidden sm:block" />
           {modelUrl && <WireframeControl active={wireOv} onToggle={() => setWireOv(v => !v)} opacity={wireOp} onOpacityChange={setWireOp} color={wireC} onColorChange={setWireC} accentColor={color} />}
         </div>
-        <div className="flex items-center gap-6 flex-shrink-0">
+        <div className="flex items-center gap-3 flex-shrink-0 overflow-x-auto no-scrollbar min-w-0">
           <BgColorPicker value={bgColor} onChange={setBgColor} />
-          <div className="w-px h-5 bg-white/5" />
+          <div className="w-px h-5 bg-white/5 hidden sm:block" />
           <LightingControls viewMode={viewMode} lightMode={lightMode} setLightMode={setLightMode} lightStrength={lStr} setLightStrength={setLStr} lightRotation={lRot} setLightRotation={setLRot} lightAutoRotate={lAutoR} setLightAutoRotate={setLAutoR} lightAutoRotateSpeed={lAutoS} setLightAutoRotateSpeed={setLAutoS} dramaticColor={dramC} setDramaticColor={setDramC} gridColor1={gc1} setGridColor1={setGc1} gridColor2={gc2} setGridColor2={setGc2} color={color} />
-          <div className="w-px h-5 bg-white/5" />
+          <div className="w-px h-5 bg-white/5 hidden sm:block" />
           <IconBtn icon={<Grid3x3 className="w-4 h-4" />} tip="Grid" active={showGrid} color={color} onClick={() => setShowGrid(v => !v)} />
         </div>
       </motion.div>
@@ -1220,32 +1223,32 @@ function TripoWorkspaceWrapper({
       {/* bottom hud */}
       <motion.div
         style={{ paddingLeft: smoothL, paddingRight: smoothR }}
-        className="h-14 flex items-center justify-between flex-shrink-0 border-t border-white/5 bg-[#0a0a14]/60 backdrop-blur-3xl relative z-40 px-5"
+        className="h-14 flex items-center justify-between flex-shrink-0 border-t border-white/5 bg-[#0a0a14]/60 backdrop-blur-3xl relative z-40 px-3 overflow-x-auto gap-2"
       >
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] italic mr-4">Orbital Controls</span>
-          <div className="flex items-center gap-2 p-1.5 px-3 rounded-2xl bg-white/5 border border-white/5">
+        <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
+          <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] italic mr-2 hidden sm:inline">Orbital Controls</span>
+          <div className="flex items-center gap-1.5 p-1.5 px-2 rounded-2xl bg-white/5 border border-white/5">
             <IconBtn icon={<RotateCcw className="w-4 h-4" />} tip="C-Reset" onClick={() => camP("reset")} />
             <IconBtn icon={<Camera className="w-4 h-4" />} tip="Front" onClick={() => camP("front")} />
             <IconBtn icon={<Move3d className="w-4 h-4" />} tip="Side" onClick={() => camP("side")} />
             <IconBtn icon={<Layers className="w-4 h-4" />} tip="Top" onClick={() => camP("top")} />
           </div>
-          <div className="w-px h-5 bg-white/5 mx-2" />
+          <div className="w-px h-5 bg-white/5 mx-1 hidden sm:block" />
           <button
             onClick={() => setAutoSpin(v => !v)}
-            className={`flex items-center gap-2.5 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${autoSpin ? 'bg-primary text-white shadow-primary-glow' : 'bg-white/5 text-zinc-600 border border-white/5 hover:text-zinc-400'}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${autoSpin ? 'bg-primary text-white shadow-primary-glow' : 'bg-white/5 text-zinc-600 border border-white/5 hover:text-zinc-400'}`}
           >
             {autoSpin ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-            {autoSpin ? "Spin Active" : "Start Spinner"}
+            <span className="hidden sm:inline">{autoSpin ? "Spin Active" : "Start Spinner"}</span>
           </button>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 flex-shrink-0">
           {modelUrl && (
             <button
               onClick={() => { setDlItem(null); setDlOpen(true); }}
-              className="flex items-center gap-3 px-6 py-2.5 rounded-xl bg-primary text-white text-[11px] font-black uppercase tracking-widest shadow-primary-heavy hover:scale-105 active:scale-95 transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-[11px] font-black uppercase tracking-widest shadow-primary-heavy hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
             >
-              <Download className="w-4 h-4" /> Production Export
+              <Download className="w-4 h-4" /> <span className="hidden sm:inline">Production Export</span><span className="sm:hidden">Export</span>
             </button>
           )}
         </div>
@@ -1255,19 +1258,20 @@ function TripoWorkspaceWrapper({
       
       {/* ── FOOTER: Spatial Logic Stream ── */}
       {activeH && !isRunning && (
-        <div className="h-10 bg-[#0a0a0f] border-t border-white/5 px-6 flex items-center justify-between relative overflow-hidden">
+        <div className="h-10 bg-[#0a0a0f] border-t border-white/5 px-4 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-transparent opacity-50" />
           <div className="relative z-10 text-[8px] font-black uppercase tracking-[0.4em] text-zinc-600 italic flex items-center gap-2">
             <div className="w-2 h-0.5 bg-primary/30" />
-            Spatial Logic Stream v2.4.0
+            <span className="hidden sm:inline">Spatial Logic Stream v2.4.0</span>
+            <span className="sm:hidden">SLS v2.4</span>
           </div>
-          <div className="flex items-center gap-8 relative z-10">
+          <div className="flex items-center gap-3 sm:gap-8 relative z-10">
             <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest flex items-center gap-2">
-              Neural Precision: <span className="text-emerald-500/60">Optimized</span>
+              <span className="hidden sm:inline">Neural Precision:</span><span className="sm:hidden">NP:</span> <span className="text-emerald-500/60">Optimized</span>
             </span>
-            <div className="w-[1px] h-3 bg-white/5" />
+            <div className="w-[1px] h-3 bg-white/5 hidden sm:block" />
             <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">
-              Latency: <span className="text-zinc-500">14ms</span>
+              <span className="hidden sm:inline">Latency:</span><span className="sm:hidden">L:</span> <span className="text-zinc-500">14ms</span>
             </span>
           </div>
         </div>

@@ -90,7 +90,7 @@ export default function ThreeViewer({
       scene.add(lightGroup);
       const sunLight = createSunLight(THREE, scene);
 
-      const cam = { theta: 0.4, phi: Math.PI / 3, radius: 6, panX: 0, panY: 0 };
+      const cam = { theta: 0.4, phi: Math.PI / 3, radius: 8, panX: 0, panY: 0 };
       syncCamera(camera, cam);
 
       // ── DEMAND-BASED RENDERING ──────────────────────────────────────────────
