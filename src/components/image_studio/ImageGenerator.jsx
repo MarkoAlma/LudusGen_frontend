@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings2 } from 'lucide-react';
+import { Settings2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import ImageControls from './ImageControls';
 import ImageWorkspace from './ImageWorkspace';
 import ImageStudioBG from '../../assets/image_studio_v2.png';
 import BackgroundFilters from '../chat/BackgroundFilters';
+import StudioLayout from '../shared/StudioLayout';
+import { useSidebarState } from '../../hooks/useSidebarState';
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const ENHANCING_PROMPT_EDIT = `
@@ -398,7 +400,7 @@ const getNvidiaType = (apiId = "") => {
   return "other";
 };
 
-export default function ImageGenerator({ selectedModel, userId, getIdToken }) {
+export default function ImageGenerator({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState([]);
   const [error, setError] = useState(null);
@@ -416,7 +418,14 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken }) {
   const [fluxSizeIdx, setFluxSizeIdx] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(false);
+  const [offsets, setOffsets] = useState({ left: 320, right: 0 });
+
+  // Master Sidebar Sync
+  useEffect(() => {
+    setLeftOpen(isGlobalOpen);
+  }, [isGlobalOpen]);
   const themeColor = selectedModel?.color || "#7c3aed";
 
   const provider = getProvider(selectedModel);
@@ -515,123 +524,120 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken }) {
     }
   };
 
+  const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
+
   return (
-    <div className="flex h-full bg-[#03000a] text-white overflow-hidden relative selection:bg-primary/30">
-      <BackgroundFilters />
+    <StudioLayout
+      leftOpen={leftOpen}
+      setLeftOpen={toggleGlobalSidebar}
+      leftSecondaryOpen={leftSecondaryOpen}
+      setLeftSecondaryOpen={setLeftSecondaryOpen}
+      rightOpen={rightOpen}
+      setRightOpen={setRightOpen}
+      leftWidth={72}
+      leftSecondaryWidth={320}
+      onOffsetChange={setOffsets}
+      leftSidebar={
+        <div className="h-full flex flex-col items-center pt-6 bg-[#030308] border-r border-white/5">
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-lg mb-8"
+            style={{ backgroundColor: `${themeColor}15`, borderColor: `${themeColor}30`, color: themeColor }}
+            title="Image Studio"
+          >
+            <Sparkles className="w-6 h-6" />
+          </div>
+          
+          <button
+            onClick={() => setLeftSecondaryOpen(!leftSecondaryOpen)}
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${
+              leftSecondaryOpen 
+                ? "bg-white/10 border-white/20 text-white shadow-lg shadow-white/5" 
+                : "bg-transparent border-transparent text-zinc-600 hover:text-zinc-400"
+            }`}
+            style={leftSecondaryOpen ? { borderColor: `${themeColor}40`, color: themeColor } : {}}
+            title="Image Generation Controls"
+          >
+            <Settings2 className="w-5 h-5" />
+          </button>
+        </div>
+      }
+      leftSecondarySidebar={
+        <div className="h-full overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
+          <ImageControls
+            selectedModel={selectedModel}
+            prompt={prompt} setPrompt={setPrompt}
+            negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
+            aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
+            quality={quality} setQuality={setQuality}
+            numImages={numImages} setNumImages={setNumImages}
+            seed={seed} setSeed={setSeed}
+            steps={steps} setSteps={setSteps}
+            guidance={guidance} setGuidance={setGuidance}
+            promptExtend={promptExtend} setPromptExtend={setPromptExtend}
+            inputImages={inputImages} setInputImages={setInputImages}
+            isGenerating={isGenerating}
+            onGenerate={handleGenerate}
+            fluxSizeIdx={fluxSizeIdx}
+            setFluxSizeIdx={setFluxSizeIdx}
+            showAdvanced={showAdvanced}
+            setShowAdvanced={setShowAdvanced}
+            isEnhancerBusy={isEnhancerBusy}
+            setIsEnhancerBusy={setIsEnhancerBusy}
+            enhancingPrompt={selectedModel.needsInputImage ? ENHANCING_PROMPT_EDIT : ENHANCING_PROMPT_IMAGE}
+            dehancingPrompt={selectedModel.needsInputImage ? DEHANCING_PROMPT_EDIT : DEHANCING_PROMPT_IMAGE}
+            gemmaVisionPrompt={GEMMA_VISION_PROMPT}
+            ASPECT_RATIO_LIST={ASPECT_RATIO_LIST}
+            QUALITY_PRESETS={QUALITY_PRESETS}
+            FLUX_SIZES={FLUX_SIZES}
+            getIdToken={getIdToken}
+          />
+        </div>
+      }
+    >
+      <div className="h-full w-full relative overflow-hidden flex flex-col">
+        <BackgroundFilters />
 
-      {/* Cinematic Background Layer — Enhanced High-Fidelity Look */}
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        {/* Base Image with Liquid Wave Distortion & Ken Burns Effect */}
-        <div className="absolute inset-0 liquid-wave opacity-60 scale-110 animate-[ken-burns_60s_infinite_alternate_ease-in-out]">
-          <img src={ImageStudioBG} alt="bg" className="w-full h-full object-cover saturate-[1.2] brightness-[0.8]" />
+        {/* Cinematic Background Layer — Enhanced High-Fidelity Look */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          {/* Base Image with Liquid Wave Distortion & Ken Burns Effect */}
+          <div className="absolute inset-0 liquid-wave opacity-60 scale-110 animate-[ken-burns_60s_infinite_alternate_ease-in-out]">
+            <img src={ImageStudioBG} alt="bg" className="w-full h-full object-cover saturate-[1.2] brightness-[0.8]" />
+          </div>
+
+          {/* Adaptive Aurora Glow Mesh */}
+          <div className="absolute inset-0 opacity-40 mix-blend-screen">
+            <div
+              className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[120px] animate-[aurora-flow_25s_infinite_alternate_ease-in-out]"
+              style={{ background: `${themeColor}20` }}
+            />
+            <div
+              className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] rounded-full blur-[140px] animate-[aurora-flow_30s_infinite_alternate_reverse_ease-in-out]"
+              style={{ background: `${themeColor}15` }}
+            />
+          </div>
+
+          {/* Animated Film Grain / Noise Overlay */}
+          <div
+            className="absolute inset-0 opacity-[0.06] mix-blend-overlay pointer-events-none grain-overlay"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}
+          />
+
+          {/* Deep Vignettes & Gradients */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#03000a]/80 via-transparent to-[#03000a]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#03000a]/60 via-transparent to-[#03000a]/60" />
+          <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-black via-black/20 to-transparent opacity-90" />
+          <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black via-black/20 to-transparent opacity-90" />
         </div>
 
-        {/* Adaptive Aurora Glow Mesh */}
-        <div className="absolute inset-0 opacity-40 mix-blend-screen">
-          <div
-            className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[120px] animate-[aurora-flow_25s_infinite_alternate_ease-in-out]"
-            style={{ background: `${themeColor}20` }}
-          />
-          <div
-            className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] rounded-full blur-[140px] animate-[aurora-flow_30s_infinite_alternate_reverse_ease-in-out]"
-            style={{ background: `${themeColor}15` }}
+        <div className="flex-1 relative z-10 overflow-hidden">
+          <ImageWorkspace
+            isGenerating={isGenerating}
+            images={generatedImages}
+            error={error}
+            selectedModel={selectedModel}
           />
         </div>
-
-        {/* Animated Film Grain / Noise Overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.06] mix-blend-overlay pointer-events-none grain-overlay"
-          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}
-        />
-
-        {/* Deep Vignettes & Gradients */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#03000a]/80 via-transparent to-[#03000a]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#03000a]/60 via-transparent to-[#03000a]/60" />
-        <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-black via-black/20 to-transparent opacity-90" />
-        <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black via-black/20 to-transparent opacity-90" />
       </div>
-
-      {/* Mobile Toggle Button */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="fixed bottom-32 right-6 z-[60] lg:hidden w-16 h-16 rounded-full bg-primary text-white shadow-[0_20px_40px_rgba(138,43,226,0.3)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-primary/20"
-      >
-        <Settings2 className="w-7 h-7" />
-      </button>
-
-      {/* Sidebar - Desktop & Mobile Drawer */}
-      <AnimatePresence>
-        {(sidebarOpen || (typeof window !== 'undefined' && window.innerWidth >= 1024)) && (
-          <>
-            {/* Backdrop for Mobile */}
-            <AnimatePresence>
-              {sidebarOpen && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setSidebarOpen(false)}
-                  className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] lg:hidden"
-                />
-              )}
-            </AnimatePresence>
-
-            <motion.div
-              initial={{ x: '-100%', opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '-100%', opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`
-                fixed inset-y-0 left-0 z-[110] 
-                w-80 xl:w-96
-                lg:relative lg:z-0 h-full 
-                border-r border-white/5 
-                flex flex-col bg-[#03000a]/20 backdrop-blur-[60px] 
-                overflow-hidden
-              `}
-            >
-              <ImageControls
-                selectedModel={selectedModel}
-                prompt={prompt} setPrompt={setPrompt}
-                negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
-                aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
-                quality={quality} setQuality={setQuality}
-                numImages={numImages} setNumImages={setNumImages}
-                seed={seed} setSeed={setSeed}
-                steps={steps} setSteps={setSteps}
-                guidance={guidance} setGuidance={setGuidance}
-                promptExtend={promptExtend} setPromptExtend={setPromptExtend}
-                inputImages={inputImages} setInputImages={setInputImages}
-                isGenerating={isGenerating}
-                onGenerate={handleGenerate}
-                fluxSizeIdx={fluxSizeIdx}
-                setFluxSizeIdx={setFluxSizeIdx}
-                showAdvanced={showAdvanced}
-                setShowAdvanced={setShowAdvanced}
-                isEnhancerBusy={isEnhancerBusy}
-                setIsEnhancerBusy={setIsEnhancerBusy}
-                enhancingPrompt={selectedModel.needsInputImage ? ENHANCING_PROMPT_EDIT : ENHANCING_PROMPT_IMAGE}
-                dehancingPrompt={selectedModel.needsInputImage ? DEHANCING_PROMPT_EDIT : DEHANCING_PROMPT_IMAGE}
-                gemmaVisionPrompt={GEMMA_VISION_PROMPT}
-                ASPECT_RATIO_LIST={ASPECT_RATIO_LIST}
-                QUALITY_PRESETS={QUALITY_PRESETS}
-                FLUX_SIZES={FLUX_SIZES}
-                getIdToken={getIdToken}
-              />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Center/Right: Generation Workspace */}
-      <div className="flex-1 h-full relative overflow-hidden z-10">
-        <ImageWorkspace
-          isGenerating={isGenerating}
-          images={generatedImages}
-          error={error}
-          selectedModel={selectedModel}
-        />
-      </div>
-    </div>
+    </StudioLayout>
   );
 }

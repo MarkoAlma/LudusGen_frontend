@@ -164,16 +164,11 @@ export default function LightingControls({
 
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 999,
-          width: 240, borderRadius: 14, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto',
+          position: 'fixed', top: 'auto', bottom: 16, right: 16, left: 'auto', zIndex: 999,
+          width: 'min(240px, calc(100vw - 32px))', borderRadius: 14, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto',
           background: '#0f0f23', border: '1px solid rgba(255,255,255,0.12)',
           boxShadow: '0 16px 48px rgba(0,0,0,0.6)', padding: 14,
         }}>
-          <div style={{
-            position: 'absolute', top: -6, right: 10, width: 12, height: 12,
-            background: '#0f0f23', border: '1px solid rgba(255,255,255,0.12)',
-            borderBottom: 'none', borderRight: 'none', transform: 'rotate(45deg)',
-          }} />
 
           {/* ── Scene Lighting ── */}
           {sceneLightingActive ? (

@@ -265,7 +265,7 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
 
     scene.add(model);
     s.model = model;
-    s.cam.radius = 5;
+    s.cam.radius = 7;
     s.cam.panY = 0;
     syncCamera(s.camera, s.cam);
 
