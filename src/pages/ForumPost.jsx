@@ -709,6 +709,7 @@ const TableOfContents = ({ content, color }) => {
           ))}
         </div>
       </div>
+
     </GlassCard>
   );
 };
