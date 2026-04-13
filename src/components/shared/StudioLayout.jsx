@@ -29,6 +29,7 @@ export default function StudioLayout({
   rightWidth = 280,
   leftOpen = true,
   leftSecondaryOpen = true,
+  leftSecondaryClosedWidth = 0, // NEW: Allows persistent 'Icon Strips'
   setLeftOpen,
   setLeftSecondaryOpen,
   rightOpen = true,
@@ -47,38 +48,29 @@ export default function StudioLayout({
   const effectiveSecondaryWidth = isMobile ? (window.innerWidth - 32) : leftSecondaryWidth;
   const effectiveRWidth = isMobile ? (window.innerWidth - 32) : rightWidth;
 
-  // Cinematic Spring Configuration
-  const springConfig = { damping: 38, stiffness: 180, mass: 1 };
+  // Cinematic Spring Configuration - Tuned for Snappy Responsiveness
+  const springConfig = { damping: 24, stiffness: 260, mass: 0.6 };
 
-  // In overlay mode, sidebars float on top — layout doesn't shrink viewport
-  const layoutL1 = activeOverlay ? 0 : (leftSecondaryOpen ? effectiveL1Width : 0);
-  const layoutL2 = activeOverlay ? 0 : ((leftSecondaryOpen && leftSecondarySidebar) ? effectiveSecondaryWidth : 0);
-  const layoutR = activeOverlay ? 0 : (rightOpen ? effectiveRWidth : 0);
+  // Logic Refinement: L1 (Master) should be independent of L2 (Secondary)
+  // Logic Refinement: L2 (Secondary) can collapse to a 'ClosedWidth' (e.g. 72px for Icons)
+  const targetL1 = activeOverlay ? 0 : (leftOpen ? effectiveL1Width : 0);
+  const targetL2 = (activeOverlay || !leftSecondarySidebar) ? 0 : (leftSecondaryOpen ? effectiveSecondaryWidth : leftSecondaryClosedWidth);
+  const targetR = (activeOverlay || !rightSidebar) ? 0 : (rightOpen ? effectiveRWidth : 0);
 
-  const smoothL1 = useSpring(layoutL1, springConfig);
-  const smoothL2 = useSpring(layoutL2, springConfig);
-  const smoothR = useSpring(layoutR, springConfig);
+  // High-Performance Springs: Directly tracking target values
+  const smoothL1 = useSpring(targetL1, springConfig);
+  const smoothL2 = useSpring(targetL2, springConfig);
+  const smoothR = useSpring(targetR, springConfig);
 
-  // Unified L MotionValue for children/HUDs
-  const smoothL = useMotionValue(smoothL1.get() + smoothL2.get());
+  // Sync springs to target changes
+  useEffect(() => { smoothL1.set(targetL1); }, [targetL1, smoothL1]);
+  useEffect(() => { smoothL2.set(targetL2); }, [targetL2, smoothL2]);
+  useEffect(() => { smoothR.set(targetR); }, [targetR, smoothR]);
 
-  useEffect(() => {
-    smoothL1.set(activeOverlay ? 0 : (leftSecondaryOpen ? effectiveL1Width : 0));
-  }, [leftSecondaryOpen, effectiveL1Width, activeOverlay, smoothL1]);
+  // Unified L MotionValue: Derived via useTransform for perfect synchronization
+  const smoothL = useTransform([smoothL1, smoothL2], ([v1, v2]) => v1 + v2);
 
-  useEffect(() => {
-    smoothL2.set(activeOverlay ? 0 : ((leftSecondaryOpen && leftSecondarySidebar) ? effectiveSecondaryWidth : 0));
-  }, [leftSecondaryOpen, effectiveSecondaryWidth, leftSecondarySidebar, activeOverlay, smoothL2]);
-
-  useEffect(() => {
-    smoothR.set(activeOverlay ? 0 : (rightOpen ? effectiveRWidth : 0));
-  }, [rightOpen, effectiveRWidth, activeOverlay, smoothR]);
-
-  // Synchronize unified L
-  useMotionValueEvent(smoothL1, "change", (v) => smoothL.set(v + smoothL2.get()));
-  useMotionValueEvent(smoothL2, "change", (v) => smoothL.set(smoothL1.get() + v));
-
-  // Backwards compatibility for components not yet using Context
+  // Backwards compatibility & HUD Offset Tracking
   useMotionValueEvent(smoothL, "change", (latest) => {
     onOffsetChange?.({ left: latest, right: smoothR.get() });
   });
@@ -96,9 +88,15 @@ export default function StudioLayout({
         <div className="absolute inset-0 z-0 overflow-hidden">
           <div className="h-full w-full flex flex-col">
             {topHUD}
-            <div className="flex-1 relative overflow-hidden">
+            <motion.div 
+              style={{ 
+                paddingLeft: smoothL, 
+                paddingRight: smoothR 
+              }}
+              className="flex-1 relative overflow-hidden"
+            >
               {children}
-            </div>
+            </motion.div>
             {bottomHUD}
           </div>
         </div>
@@ -111,24 +109,28 @@ export default function StudioLayout({
               className="h-full flex overflow-hidden pointer-events-auto bg-[#0a0a0f]/40 backdrop-blur-3xl border-r border-white/5"
             >
               {/* Level 1: Main Sidebar (Narrow Strip) */}
-              <motion.div
-                style={{ width: smoothL1 }}
-                className="h-full overflow-hidden flex-shrink-0"
-              >
-                <div style={{ width: effectiveL1Width, height: '100%' }}>
-                  {leftSidebar}
-                </div>
-              </motion.div>
+              {leftSidebar && (
+                <motion.div
+                  style={{ width: smoothL1 }}
+                  className="h-full overflow-hidden flex-shrink-0"
+                >
+                  <div style={{ width: effectiveL1Width, height: '100%' }}>
+                    {leftSidebar}
+                  </div>
+                </motion.div>
+              )}
 
               {/* Level 2: Secondary Content (Panel) */}
-              <motion.div
-                style={{ width: smoothL2 }}
-                className="h-full overflow-hidden flex-shrink-0 border-l border-white/5"
-              >
-                <div style={{ width: effectiveSecondaryWidth, height: '100%' }}>
-                  {leftSecondarySidebar}
-                </div>
-              </motion.div>
+              {leftSecondarySidebar && (
+                <motion.div
+                  style={{ width: smoothL2 }}
+                  className={`h-full overflow-hidden flex-shrink-0 ${leftOpen ? 'border-l border-white/5' : ''}`}
+                >
+                  <div style={{ width: effectiveSecondaryWidth, height: '100%' }}>
+                    {leftSecondarySidebar}
+                  </div>
+                </motion.div>
+              )}
             </motion.div>
           ) : (
             <>
@@ -232,15 +234,15 @@ export default function StudioLayout({
           </motion.div>
         )}
 
-        {/* ── LEFT TOGGLE BUTTON (2-ZONE) ── */}
-        {setLeftOpen && (
+        {/* ── LEFT TOGGLE BUTTON (2-ZONE) — Desktop only ── */}
+        {setLeftOpen && !isMobile && (
           <motion.div
             style={{ x: smoothL }}
             className="absolute left-0 top-1/2 -translate-y-1/2 z-[100]"
           >
-            <AnimatePresence mode="wait">
+            <AnimatePresence>
               {/* State 3: Everything closed — single expand-all button */}
-              {(!leftOpen && !leftSecondaryOpen) && (
+              {(!leftOpen && (!leftSecondarySidebar || !leftSecondaryOpen)) && (
                 <motion.div
                   key="expand-all"
                   initial={{ opacity: 0, scale: 0.8 }}
@@ -253,13 +255,17 @@ export default function StudioLayout({
                     className="w-14 h-14 flex items-center justify-center rounded-2xl bg-[#0a0a0f]/80 backdrop-blur-3xl border border-white/10 hover:bg-white/10 transition-colors duration-200 text-zinc-500 hover:text-white shadow-2xl"
                     title="Expand All Panels"
                   >
-                    <Layout className="w-5 h-5 translate-y-[1px]" />
+                    {leftSecondarySidebar ? (
+                      <Layout className="w-5 h-5 translate-y-[1px]" />
+                    ) : (
+                      <ChevronLeft className="w-5 h-5 rotate-180" />
+                    )}
                   </button>
                 </motion.div>
               )}
 
               {/* Compound Unified Toggle (Master + Studio) */}
-              {(leftOpen || leftSecondaryOpen) && (
+              {(leftOpen || (leftSecondarySidebar && leftSecondaryOpen)) && (
                 <motion.div
                   key="unified-toggle"
                   initial={{ opacity: 0, scale: 0.8 }}
@@ -268,23 +274,31 @@ export default function StudioLayout({
                   transition={{ duration: 0.15 }}
                 >
                   <div className="flex bg-[#0a0a0f]/80 backdrop-blur-3xl border border-white/10 border-l-0 rounded-r-2xl overflow-hidden shadow-2xl">
-                    {/* Zone 1: Secondary Panel Toggle (Left) */}
-                    <button
-                      onClick={() => setLeftSecondaryOpen?.(!leftSecondaryOpen)}
-                      className="w-8 h-12 flex items-center justify-center text-zinc-600 hover:text-primary transition-colors duration-200"
-                      title={leftSecondaryOpen ? "Close Studio Panel" : "Open Studio Panel"}
-                    >
-                      <ChevronLeft className={`w-4 h-4 transition-transform duration-500 ${!leftSecondaryOpen ? 'rotate-180' : ''}`} />
-                    </button>
+                    {/* Zone 1: Global Sidebar Toggle (Left - closer to L1) */}
+                    {leftSidebar && (
+                      <button
+                        onClick={() => setLeftOpen(!leftOpen)}
+                        className="w-10 h-12 flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+                        title={leftOpen ? "Fold Workspace Strip" : "Expand Workspace Strip"}
+                      >
+                        {leftSecondarySidebar ? (
+                           leftOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />
+                        ) : (
+                           <ChevronLeft className={`w-4 h-4 transition-transform duration-500 ${!leftOpen ? 'rotate-180' : ''}`} />
+                        )}
+                      </button>
+                    )}
 
-                    {/* Zone 2: Close/Fold (Right - Ported from Sidebar Header) */}
-                    <button
-                      onClick={() => setLeftOpen(!leftOpen)}
-                      className="w-10 h-12 flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all border-l border-white/5"
-                      title={leftOpen ? "Fold Workspace Strip" : "Expand Workspace Strip"}
-                    >
-                      {leftOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
-                    </button>
+                    {/* Zone 2: Secondary Panel Toggle (Right - closer to Content) */}
+                    {leftSecondarySidebar && (
+                      <button
+                        onClick={() => setLeftSecondaryOpen?.(!leftSecondaryOpen)}
+                        className={`w-8 h-12 flex items-center justify-center text-zinc-600 hover:text-primary transition-colors duration-200 ${leftSidebar ? 'border-l border-white/5' : ''}`}
+                        title={leftSecondaryOpen ? "Close Studio Panel" : "Open Studio Panel"}
+                      >
+                        <ChevronLeft className={`w-4 h-4 transition-transform duration-500 ${!leftSecondaryOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -292,7 +306,7 @@ export default function StudioLayout({
           </motion.div>
         )}
 
-        {setRightOpen && (
+        {setRightOpen && !isMobile && (
           <motion.button
             initial={false}
             style={{ x: rightToggleX }}

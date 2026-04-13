@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Settings2, PanelLeftClose, PanelLeftOpen, Sparkles, Layers, Box } from 'lucide-react';
 import ImageControls from './ImageControls';
 import ImageWorkspace from './ImageWorkspace';
 import ImageStudioBG from '../../assets/image_studio_v2.png';
@@ -400,7 +400,7 @@ const getNvidiaType = (apiId = "") => {
   return "other";
 };
 
-export default function ImageGenerator({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar }) {
+export default function ImageGenerator({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState([]);
   const [error, setError] = useState(null);
@@ -481,7 +481,6 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken, isGl
 
     setIsGenerating(true);
     setError(null);
-    setSidebarOpen(false);
 
     try {
       const token = await getIdToken();
@@ -524,8 +523,6 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken, isGl
     }
   };
 
-  const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
-
   return (
     <StudioLayout
       leftOpen={leftOpen}
@@ -534,82 +531,75 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken, isGl
       setLeftSecondaryOpen={setLeftSecondaryOpen}
       rightOpen={rightOpen}
       setRightOpen={setRightOpen}
-      leftWidth={72}
-      leftSecondaryWidth={320}
+      leftWidth={320}
+      leftSecondaryWidth={392}
       onOffsetChange={setOffsets}
-      leftSidebar={
-        <div className="h-full flex flex-col items-center pt-6 space-y-4">
-          {[
-            { id: 'generate', label: 'GENERATE', icon: <Sparkles className="w-5 h-5" />, color: themeColor },
-            { id: 'control', label: 'CONTROL', icon: <Settings className="w-5 h-5" />, color: '#94a3b8' },
-            { id: 'style', label: 'STYLE', icon: <Layers className="w-5 h-5" />, color: '#94a3b8' },
-            { id: 'upscale', label: 'UPSCALE', icon: <Box className="w-5 h-5" />, color: '#94a3b8' },
-          ].map((tool, idx) => (
-            <button
-              key={tool.id}
-              className={`group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer ${idx === 0 ? 'mb-4' : ''}`}
-            >
-              <div 
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${
-                  idx === 0 
-                    ? "bg-white/5 border-white/10 shadow-xl" 
-                    : "bg-transparent border-transparent"
-                }`}
-                style={idx === 0 ? { borderColor: `${tool.color}40`, color: tool.color } : { color: '#52525b' }}
-              >
-                {tool.icon}
-              </div>
-              <span className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 ${idx === 0 ? 'text-white' : 'text-zinc-700'}`}>
-                {tool.label}
-              </span>
-            </button>
-          ))}
-
-          <div className="flex-1" />
-
-          <button
-            onClick={() => setLeftSecondaryOpen(!leftSecondaryOpen)}
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${
-              leftSecondaryOpen 
-                ? "bg-white/10 border-white/20 text-white shadow-lg" 
-                : "bg-transparent border-transparent text-zinc-600 hover:text-zinc-400"
-            }`}
-            title="Toggle Panel"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-        </div>
-      }
+      leftSidebar={globalSidebar}
       leftSecondarySidebar={
-        <div className="h-full overflow-hidden">
-          <ImageControls
-            selectedModel={selectedModel}
-            prompt={prompt} setPrompt={setPrompt}
-            negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
-            aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
-            quality={quality} setQuality={setQuality}
-            numImages={numImages} setNumImages={setNumImages}
-            seed={seed} setSeed={setSeed}
-            steps={steps} setSteps={setSteps}
-            guidance={guidance} setGuidance={setGuidance}
-            promptExtend={promptExtend} setPromptExtend={setPromptExtend}
-            inputImages={inputImages} setInputImages={setInputImages}
-            isGenerating={isGenerating}
-            onGenerate={handleGenerate}
-            fluxSizeIdx={fluxSizeIdx}
-            setFluxSizeIdx={setFluxSizeIdx}
-            showAdvanced={showAdvanced}
-            setShowAdvanced={setShowAdvanced}
-            isEnhancerBusy={isEnhancerBusy}
-            setIsEnhancerBusy={setIsEnhancerBusy}
-            enhancingPrompt={selectedModel.needsInputImage ? ENHANCING_PROMPT_EDIT : ENHANCING_PROMPT_IMAGE}
-            dehancingPrompt={selectedModel.needsInputImage ? DEHANCING_PROMPT_EDIT : DEHANCING_PROMPT_IMAGE}
-            gemmaVisionPrompt={GEMMA_VISION_PROMPT}
-            ASPECT_RATIO_LIST={ASPECT_RATIO_LIST}
-            QUALITY_PRESETS={QUALITY_PRESETS}
-            FLUX_SIZES={FLUX_SIZES}
-            getIdToken={getIdToken}
-          />
+        <div className="h-full flex flex-row overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
+          {/* Tool Strip (72px) */}
+          <div className="w-[72px] h-full flex flex-col items-center pt-6 space-y-4 border-r border-white/5 bg-[#030308]">
+            {[
+              { id: 'generate', label: 'GENERATE', icon: <Sparkles className="w-5 h-5" />, color: themeColor },
+              { id: 'control', label: 'CONTROL', icon: <Settings2 className="w-5 h-5" />, color: '#94a3b8' },
+              { id: 'style', label: 'STYLE', icon: <Layers className="w-5 h-5" />, color: '#94a3b8' },
+              { id: 'upscale', label: 'UPSCALE', icon: <Box className="w-5 h-5" />, color: '#94a3b8' },
+            ].map((tool, idx) => (
+              <button
+                key={tool.id}
+                className={`group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer ${idx === 0 ? 'mb-4' : ''}`}
+              >
+                <div
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${idx === 0
+                      ? "bg-white/5 border-white/10 shadow-xl"
+                      : "bg-transparent border-transparent"
+                    }`}
+                  style={idx === 0 ? { borderColor: `${tool.color}40`, color: tool.color } : { color: '#52525b' }}
+                >
+                  {tool.icon}
+                </div>
+                <span className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 ${idx === 0 ? 'text-white' : 'text-zinc-700'}`}>
+                  {tool.label}
+                </span>
+              </button>
+            ))}
+
+            <div className="flex-1" />
+
+
+          </div>
+
+          {/* Controls Area (320px) */}
+          <div className="flex-1 h-full overflow-hidden">
+            <ImageControls
+              selectedModel={selectedModel}
+              prompt={prompt} setPrompt={setPrompt}
+              negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
+              aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
+              quality={quality} setQuality={setQuality}
+              numImages={numImages} setNumImages={setNumImages}
+              seed={seed} setSeed={setSeed}
+              steps={steps} setSteps={setSteps}
+              guidance={guidance} setGuidance={setGuidance}
+              promptExtend={promptExtend} setPromptExtend={setPromptExtend}
+              inputImages={inputImages} setInputImages={setInputImages}
+              isGenerating={isGenerating}
+              onGenerate={handleGenerate}
+              fluxSizeIdx={fluxSizeIdx}
+              setFluxSizeIdx={setFluxSizeIdx}
+              showAdvanced={showAdvanced}
+              setShowAdvanced={setShowAdvanced}
+              isEnhancerBusy={isEnhancerBusy}
+              setIsEnhancerBusy={setIsEnhancerBusy}
+              enhancingPrompt={selectedModel.needsInputImage ? ENHANCING_PROMPT_EDIT : ENHANCING_PROMPT_IMAGE}
+              dehancingPrompt={selectedModel.needsInputImage ? DEHANCING_PROMPT_EDIT : DEHANCING_PROMPT_IMAGE}
+              gemmaVisionPrompt={GEMMA_VISION_PROMPT}
+              ASPECT_RATIO_LIST={ASPECT_RATIO_LIST}
+              QUALITY_PRESETS={QUALITY_PRESETS}
+              FLUX_SIZES={FLUX_SIZES}
+              getIdToken={getIdToken}
+            />
+          </div>
         </div>
       }
     >

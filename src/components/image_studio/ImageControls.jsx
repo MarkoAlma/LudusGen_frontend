@@ -129,7 +129,7 @@ export default function ImageControls({
             <div className="grid grid-cols-2 gap-2">
               {inputImages.map((img, idx) => (
                 <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-white/5 group shadow-lg">
-                  <img src={img.dataUrl} className="w-full h-full object-cover" alt="ref" />
+                  <img src={img.dataUrl || null} className="w-full h-full object-cover" alt="ref" />
                   <button 
                     onClick={() => setInputImages(p => p.filter((_, i) => i !== idx))}
                     className="absolute inset-0 bg-red-600/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
