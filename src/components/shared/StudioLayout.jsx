@@ -241,31 +241,8 @@ export default function StudioLayout({
             className="absolute left-0 top-1/2 -translate-y-1/2 z-[100]"
           >
             <AnimatePresence>
-              {/* State 3: Everything closed — single expand-all button */}
-              {(!leftOpen && (!leftSecondarySidebar || !leftSecondaryOpen)) && (
-                <motion.div
-                  key="expand-all"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <button
-                    onClick={() => { setLeftOpen(true); setLeftSecondaryOpen?.(true); }}
-                    className="w-14 h-14 flex items-center justify-center rounded-2xl bg-[#0a0a0f]/80 backdrop-blur-3xl border border-white/10 hover:bg-white/10 transition-colors duration-200 text-zinc-500 hover:text-white shadow-2xl"
-                    title="Expand All Panels"
-                  >
-                    {leftSecondarySidebar ? (
-                      <Layout className="w-5 h-5 translate-y-[1px]" />
-                    ) : (
-                      <ChevronLeft className="w-5 h-5 rotate-180" />
-                    )}
-                  </button>
-                </motion.div>
-              )}
-
-              {/* Compound Unified Toggle (Master + Studio) */}
-              {(leftOpen || (leftSecondarySidebar && leftSecondaryOpen)) && (
+              {/* Persistent Unified Toggle (Master + Studio) */}
+              {(leftSidebar || leftSecondarySidebar) && (
                 <motion.div
                   key="unified-toggle"
                   initial={{ opacity: 0, scale: 0.8 }}
