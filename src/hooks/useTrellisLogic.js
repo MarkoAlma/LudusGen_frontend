@@ -7,6 +7,7 @@ import {
   loadHistoryPageFromFirestore,
 } from '../ai_components/trellis/utils';
 import { TRELLIS_ENHANCE_PROMPT, TRELLIS_SIMPLIFY_PROMPT } from '../ai_components/trellis/Constants';
+import { API_BASE } from '../api/client';
 
 export function useTrellisLogic(userId, getIdToken) {
   const [prompt, setPrompt] = useState("");
@@ -64,7 +65,7 @@ export function useTrellisLogic(userId, getIdToken) {
         ? Math.floor(Math.random() * 2147483647)
         : Math.max(0, Math.floor(Number(params.seed) || 0));
 
-      const res = await fetch("http://localhost:3001/api/trellis", {
+      const res = await fetch(`${API_BASE}/api/trellis`, {
         method: "POST", 
         headers, 
         signal: controller.signal,
@@ -115,7 +116,7 @@ export function useTrellisLogic(userId, getIdToken) {
     setEnhanceError(null);
     try {
       const headers = await authHeaders();
-      const res = await fetch("http://localhost:3001/api/enhance", {
+      const res = await fetch(`${API_BASE}/api/enhance`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -164,7 +165,7 @@ export function useTrellisLogic(userId, getIdToken) {
     setEnhanceError(null);
     try {
       const headers = await authHeaders();
-      const res = await fetch("http://localhost:3001/api/enhance", {
+      const res = await fetch(`${API_BASE}/api/enhance`, {
         method: "POST",
         headers,
         body: JSON.stringify({

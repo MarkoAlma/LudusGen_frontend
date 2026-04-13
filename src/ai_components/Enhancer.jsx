@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Loader2, Zap, Wand2, AlertCircle, Eye } from 'lucide-react';
+import { API_BASE, authHeaders } from '../api/client';
 
 function Tooltip({ text, children, side = 'top' }) {
   const [show, setShow] = useState(false);
@@ -109,7 +110,7 @@ function Enhancer({
   const callChat = useCallback(async (systemPrompt, userContent, temperature, top_p, max_tokens) => {
     const headers = await authHeaders();
 
-    const res = await fetch('http://localhost:3001/api/enhance', {
+    const res = await fetch(`${API_BASE}/api/enhance`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -142,7 +143,7 @@ function Enhancer({
   const callVisionDescribe = useCallback(async (images) => {
     const headers = await authHeaders();
 
-    const res = await fetch('http://localhost:3001/api/vision-describe', {
+    const res = await fetch(`${API_BASE}/api/vision-describe`, {
       method: 'POST',
       headers,
       body: JSON.stringify({

@@ -86,7 +86,7 @@ export default function AIChat({ user, getIdToken }) {
         next.set("tab", tab);
         next.set("model", modelId);
         return next;
-      }, { replace: true });
+      });
     }
 
     const gId = findModelGroup(modelId);

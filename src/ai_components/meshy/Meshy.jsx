@@ -59,7 +59,7 @@ import {
 const PROMPT_MAX = 600;
 const LS_KEY = "meshy_panel_history_v1";
 const POLL_MS = 2500;
-const API_BASE = "/api/meshy";
+const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/meshy`;
 
 // ── localStorage helpers ───────────────────────────────────────────────────
 const loadHistory = () => {

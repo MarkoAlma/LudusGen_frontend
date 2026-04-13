@@ -134,11 +134,17 @@ useEffect(() => {
   };
 
   // Credit egyenleg frissítése a backend-ről
+  // Reuses the already-fetched user data from loadUserFromFirestore to avoid duplicate API calls.
+  // Only makes a fresh call if the user data is stale or missing.
   const refreshCredits = async () => {
     if (!user?.uid) return;
     try {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) return;
+      // If we already have credits from the last loadUserFromFirestore call, reuse them
+      if (user.credits !== undefined && user.credits !== null) {
+        return; // credits already fresh from auth state listener
+      }
       const token = await firebaseUser.getIdToken();
       const response = await axios.get(
         `${API_BASE}/api/get-user/${user.uid}`,
