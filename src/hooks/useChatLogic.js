@@ -5,7 +5,7 @@ import {
   serverTimestamp, deleteDoc, doc, setDoc, getDoc, onSnapshot,
   writeBatch,
 } from "firebase/firestore";
-import { DEFAULT_PRESETS } from "../ai_components/models";
+import { DEFAULT_PRESETS, ALL_MODELS } from "../ai_components/models";
 import { API_BASE } from "../api/client";
 
 // Legacy model IDs for migration

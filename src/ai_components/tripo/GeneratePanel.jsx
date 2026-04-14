@@ -403,7 +403,7 @@ export default function GeneratePanel({
   genTab, setGenTab,
   prompt, setPrompt,
   makeBetter, setMakeBetter,
-  imgPrev, imgToken, imgUploading, handleImg, fileRef,
+  imgPrev, setImgPrev, imgToken, setImgToken, imgUploading, handleImg, fileRef, setImgFile,
   multiImages, setMultiImages,
   batchImages, setBatchImages,
   meshQ, setMeshQ,
@@ -743,7 +743,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
                   <Check style={{ width: 12, height: 12, color: "#fff" }} />
                 </div>
               )}
-              <button onClick={e => e.stopPropagation()}
+              <button onClick={e => { e.stopPropagation(); setImgPrev(null); setImgToken(null); setImgFile(null); if (fileRef?.current) fileRef.current.value = ""; }}
                 style={{ position: "absolute", top: 8, right: 8, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.65)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
                 <X style={{ width: 11, height: 11 }} />
               </button>

@@ -443,10 +443,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       case "texture_edit": return !!(editId.trim() || activeTaskId);
       case "refine": return !!(refineId.trim() || activeTaskId);
       case "stylize": return !!(stylizeId.trim() || activeTaskId);
-      case "animate": return !!(riggedId && selAnim);
+      case "animate": return !!(riggedId || activeTaskId) && !!selAnim;
       default: return false;
     }
-  }, [isRunning, mode, genTab, prompt, imgToken, batchImages, segId, fillId, retopoId, activeTaskId, texInputTab, texPrompt, multiImages, editId, texId, refineId, stylizeId]);
+  }, [isRunning, mode, genTab, prompt, imgToken, batchImages, segId, fillId, retopoId, activeTaskId, texInputTab, texPrompt, multiImages, editId, texId, refineId, stylizeId, riggedId, selAnim]);
 
 
 
@@ -780,7 +780,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         case "texture_edit": body = { type: "texture_edit", original_model_task_id: (editId.trim() || srcId), ...(brushPrompt.trim() && { prompt: brushPrompt.trim() }), creativity_strength: creativity }; break;
         case "refine": body = { type: "refine_model", original_model_task_id: (refineId.trim() || srcId) }; break;
         case "stylize": body = { type: "stylize_model", original_model_task_id: (stylizeId.trim() || srcId), style: stylizeStyle }; break;
-        case "animate": body = { type: "animate_retarget", original_model_task_id: riggedId, animation: animSlug, out_format: "glb" }; break;
+        case "animate": body = { type: "animate_retarget", original_model_task_id: (riggedId || srcId), animation: animSlug, out_format: "glb" }; break;
         default: return;
       }
 
@@ -827,7 +827,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setErrorMsg(e.message ?? "Network error");
       refreshCredits?.();
     }
-  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, modelUrl, pollTask, fetchProxy, revokeBlobUrl, saveHist, activeTaskId, refreshCredits, userCredits, genCost]);
+  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, modelUrl, pollTask, fetchProxy, revokeBlobUrl, saveHist, activeTaskId, refreshCredits, userCredits, genCost, refineId, stylizeId, stylizeStyle]);
 
   const handleAutoRig = useCallback(async () => {
     if (!activeTaskId && !animId) return;
@@ -878,6 +878,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (histAbort.current) histAbort.current.cancelled = true;
     const t = { cancelled: false }; histAbort.current = t;
     setLoadingId(item.id); setSelHistId(item.id); setGenStatus(item.status);
+    // Populate ALL mode-specific IDs so segment/retopo/texture/etc. work immediately
+    if (item?.taskId) {
+      setSegId(item.taskId); setFillId(item.taskId); setRetopoId(item.taskId);
+      setTexId(item.taskId); setAnimId(item.taskId); setEditId(item.taskId);
+      setRefineId(item.taskId); setStylizeId(item.taskId);
+    }
     if (item.model_url) {
       try {
         const b = await fetchProxy(item.model_url);
@@ -893,7 +899,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   const reuse = useCallback((item) => {
     if (item?.prompt) setPrompt(item.prompt);
-    if (item?.taskId) { setSegId(item.taskId); setFillId(item.taskId); setRetopoId(item.taskId); setTexId(item.taskId); setAnimId(item.taskId); setEditId(item.taskId); }
+    if (item?.taskId) {
+      setSegId(item.taskId); setFillId(item.taskId); setRetopoId(item.taskId);
+      setTexId(item.taskId); setAnimId(item.taskId); setEditId(item.taskId);
+      setRefineId(item.taskId); setStylizeId(item.taskId);
+    }
     setErrorMsg("");
   }, []);
 
@@ -980,7 +990,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               </h3>
             </div>
             <div className="flex-1 overflow-y-auto p-4 tp-scroll">
-              {mode === "generate" && <GeneratePanel genTab={genTab} setGenTab={setGenTab} modelVer={modelVer} setModelVer={setModelVer} prompt={prompt} setPrompt={setPrompt} negPrompt={negPrompt} setNegPrompt={setNegPrompt} makeBetter={makeBetter} setMakeBetter={setMakeBetter} imgPrev={imgPrev} setImgPrev={setImgPrev} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} imgToken={imgToken} meshQ={meshQ} setMeshQ={setMeshQ} inParts={inParts} setInParts={setInParts} privacy={privacy} setPrivacy={setPrivacy} texOn={texOn} setTexOn={setTexOn} tex4K={tex4K} setTex4K={setTex4K} pbrOn={pbrOn} setPbrOn={setPbrOn} polycount={polycount} setPolycount={setPolycount} quadMesh={quadMesh} setQuadMesh={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} tPose={tPose} setTPose={setTPose} modelSeed={modelSeed} setModelSeed={setModelSeed} textureSeed={textureSeed} setTextureSeed={setTextureSeed} imageSeed={imageSeed} setImageSeed={setImageSeed} autoSize={autoSize} setAutoSize={setAutoSize} exportUv={exportUv} setExportUv={setExportUv} multiImages={multiImages} setMultiImages={setMultiImages} batchImages={batchImages} setBatchImages={setBatchImages} handleMultiImg={handleMultiImg} handleBatchImg={handleBatchImg} getIdToken={getIdToken} backendCaps={backendCaps} color={color} isRunning={isRunning} handleGen={handleGen} setErrorMsg={setErrorMsg} activeStyles={activeStyle} onStyleToggle={handleStyleToggle} />}
+              {mode === "generate" && <GeneratePanel genTab={genTab} setGenTab={setGenTab} modelVer={modelVer} setModelVer={setModelVer} prompt={prompt} setPrompt={setPrompt} negPrompt={negPrompt} setNegPrompt={setNegPrompt} makeBetter={makeBetter} setMakeBetter={setMakeBetter} imgPrev={imgPrev} setImgPrev={setImgPrev} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} imgToken={imgToken} setImgToken={setImgToken} setImgFile={setImgFile} meshQ={meshQ} setMeshQ={setMeshQ} inParts={inParts} setInParts={setInParts} privacy={privacy} setPrivacy={setPrivacy} texOn={texOn} setTexOn={setTexOn} tex4K={tex4K} setTex4K={setTex4K} pbrOn={pbrOn} setPbrOn={setPbrOn} polycount={polycount} setPolycount={setPolycount} quadMesh={quadMesh} setQuadMesh={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} tPose={tPose} setTPose={setTPose} modelSeed={modelSeed} setModelSeed={setModelSeed} textureSeed={textureSeed} setTextureSeed={setTextureSeed} imageSeed={imageSeed} setImageSeed={setImageSeed} autoSize={autoSize} setAutoSize={setAutoSize} exportUv={exportUv} setExportUv={setExportUv} multiImages={multiImages} setMultiImages={setMultiImages} batchImages={batchImages} setBatchImages={setBatchImages} handleMultiImg={handleMultiImg} handleBatchImg={handleBatchImg} getIdToken={getIdToken} backendCaps={backendCaps} color={color} isRunning={isRunning} handleGen={handleGen} setErrorMsg={setErrorMsg} activeStyles={activeStyle} onStyleToggle={handleStyleToggle} />}
               {(mode === "segment" || mode === "fill_parts") && <Segment segSub={mode === "fill_parts" ? "fill_parts" : segSub} activeTaskId={activeTaskId} isRiggedInput={isRiggedInput} color={color} />}
               {mode === "retopo" && <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={color} />}
               {mode === "texture" && <Texture mode={mode} activeTaskId={activeTaskId} texInputTab={texInputTab} setTexInputTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt} imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} multiImages={multiImages} setMultiImages={setMultiImages} tex4K={tex4K} setTex4K={setTex4K} pbrOn={texPbr} setPbrOn={setTexPbr} texAlignment={texAlignment} setTexAlignment={setTexAlignment} color={color} />}
