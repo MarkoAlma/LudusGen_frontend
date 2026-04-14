@@ -36,11 +36,11 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
   // ── Firestore refs — model-independent ────────────────────────────
   const getSessionRef = useCallback((sessionId) =>
     doc(db, "conversations", userId, "sessions", sessionId),
-  [userId]);
+    [userId]);
 
   const getMessagesRef = useCallback((sessionId) =>
     collection(db, "conversations", userId, "sessions", sessionId, "messages"),
-  [userId]);
+    [userId]);
 
   // ── Load History — model-independent with legacy fallback ─────────
   const loadConversationList = useCallback(async () => {
@@ -74,6 +74,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
       setConversations(convs.slice(0, 50));
     } catch (e) { console.error(e); }
   }, [userId]);
+
 
   const getCurrentSessionId = useCallback(() => {
     let sid = sessionStorage.getItem("chat_session_current");
@@ -285,7 +286,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
               const parsed = JSON.parse(data);
               accumulated += parsed.delta || "";
               setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: accumulated } : m));
-            } catch (e) {}
+            } catch (e) { }
           }
         }
       }
