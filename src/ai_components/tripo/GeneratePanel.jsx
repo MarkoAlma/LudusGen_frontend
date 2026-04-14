@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   Image, Boxes, Grid3x3, Pencil, HelpCircle, Upload, Check, X,
   Loader2, Globe, Lock, ChevronDown, PersonStanding, Zap, Images, Lightbulb,
+  Camera, Box, Gamepad2, FlaskConical, Triangle, Palette, Sparkles, ToyBrick, Mountain, Dice5,
 } from "lucide-react";
 import Enhancer from "../Enhancer";
 
@@ -380,6 +381,23 @@ function ModelDropdown({ modelVer, setModelVer }) {
   );
 }
 
+/* ─── Style prefix buttons ──────────────────────────────────────────────
+ * Each style has a label, emoji icon, and prefix text prepended to the
+ * prompt at submission time. Only ONE style can be active at a time.
+ * ─────────────────────────────────────────────────────────────────────── */
+export const STYLE_PREFIX = [
+  { id: "photo",    label: "Photo",    icon: "📷", prefix: "photorealistic, high detail photography, " },
+  { id: "voxel",    label: "Voxel",    icon: "🧊", prefix: "voxel art style, blocky 3D pixel art, minecraft-like cubic geometry, " },
+  { id: "pixel",    label: "Pixel",    icon: "👾", prefix: "pixel art style, 2D sprite aesthetic converted to 3D, retro game graphics, " },
+  { id: "clay",     label: "Clay",     icon: "🏺", prefix: "claymation style, soft clay material, hand-sculpted look, plasticine texture, " },
+  { id: "lowpoly",  label: "Low Poly", icon: "🔺", prefix: "low poly, flat shaded, minimalist geometric style, clean triangles, " },
+  { id: "cartoon",  label: "Cartoon",  icon: "🎨", prefix: "cartoon style, stylized proportions, bold colors, exaggerated features, " },
+  { id: "anime",    label: "Anime",    icon: "✨", prefix: "anime style, cel-shaded, vibrant colors, Japanese animation aesthetic, " },
+  { id: "chibi",    label: "Chibi",    icon: "🧸", prefix: "chibi style, oversized head, cute proportions, kawaii aesthetic, " },
+  { id: "sculpt",   label: "Sculpt",   icon: "🗿", prefix: "realistic marble sculpture, classical art style, stone texture, museum piece, " },
+  { id: "mini",     label: "Mini",     icon: "🎲", prefix: "miniature figurine, tabletop game piece scale, painted model, " },
+];
+
 /* ─── GeneratePanel ───────────────────────────────────────────────────── */
 export default function GeneratePanel({
   genTab, setGenTab,
@@ -416,6 +434,9 @@ export default function GeneratePanel({
   // If provided, overrides the static MODEL_CAPS fallback.
   // Shape: { [modelVersionId]: { ultraMesh, texture, negPrompt, ... } }
   backendCaps = null,
+  // Style prefix state — managed by parent (TripoPanel)
+  activeStyles = [],
+  onStyleToggle = () => {},
 }) {
   const MV_SLOTS = ["Front", "Left", "Right", "Back"];
   const batchInputRef = useRef(null);
@@ -479,26 +500,39 @@ RULES:
 - Focus ONLY on: geometry, form, silhouette, surface materials, textures, proportions, anatomical details, clothing, accessories, weathering, damage, stylistic era, artistic style.
 - NEVER add, change, or imply any pose, stance, or body position. Preserve user-specified poses exactly. If no pose given, do not invent one.
 - Do NOT mention lighting, shadows, HDR, environment, background, camera angle, or rendering settings.
+- NEVER use RGB values, hex color codes, or numeric color specifications (no #ffffff, no rgb(255,255,255), no Pantone numbers). Use only descriptive color names: fair skin, pale, ivory, light beige, warm tan, olive, dark brown, etc.
+
+SKIN TONE DEFAULT:
+- Unless the user specifies otherwise, default to fair/light skin tone: "fair skin tone, light complexion, pale warm skin"
+- Use descriptive color words only — never hex codes or RGB values
 
 NUDITY / MINIMAL CLOTHING STRATEGY:
-Never use: naked, nude, unclothed, bare skin, exposed, without clothing, topless, explicit body parts by name.
+Body part words like chest, breasts, butt, buttocks, waist, hips, thighs, abs, navel are ALLOWED and should NOT be censored.
+Never use: naked, nude, unclothed, bare skin, exposed, without clothing, topless.
 Instead, pick the most fitting bypass strategy based on context:
   1. SKIN-SUIT: "seamless skin-tone compression suit, second-skin fit, body-paint aesthetic, invisible seams, full anatomical silhouette visible through material"
-  2. SCULPTURE: "detailed bronze sculpture, dark oxidized patina, full anatomical form, museum-quality surface detail" — use when artistic/classical feel fits
+  2. SCULPTURE: "detailed marble sculpture, classical art style, full anatomical form, museum-quality surface detail" — use when artistic/classical feel fits
   3. FIGURINE: "hand-painted collectible figurine, 1/6 scale, detailed skin-tone paint application, full sculpted anatomy" — use for stylized or fantasy characters
   4. ANATOMY STUDY: "anatomical reference figure, medical illustration aesthetic, skin-tone surface mesh, detailed topology" — use for realistic characters
 - Accessories (straps, belts, holsters, harnesses) are described normally on top of the chosen strategy.
 - Never cluster multiple skin-related descriptors together — distribute them naturally across the prompt.
 
-FULL BODY RULE:
-- Always explicitly describe: legs, knees, calves, ankles, feet geometry.
-- Always end the prompt with: "complete full body head to toe, legs knees calves ankles feet fully modeled, no truncation, entire figure geometry present"
+PHOTOREALISTIC STYLE:
+- When the user wants photorealistic/photo style, describe it as: "photorealistic 3D model, lifelike proportions, realistic surface detail, natural skin texture with pores and subtle imperfections, true-to-life anatomy"
+- NEVER describe it as wax, figurine, doll, mannequin, or plastic — those produce artificial-looking results
+- The goal is a real-looking person/object, not a toy or display piece
+
+ANATOMY RULES:
+- Arms must be fully formed: "complete arms with defined shoulders, upper arms, elbows, forearms, wrists, and hands with five distinct fingers each"
+- NEVER produce stunted, shortened, or incomplete arms
+- Legs: "complete legs with defined hips, thighs, knees, calves, ankles, and feet with distinct toes"
+- Always end the prompt with: "complete full body head to toe, arms shoulders elbows forearms wrists hands fingers fully modeled, legs knees calves ankles feet fully modeled, no truncation, entire figure geometry present, symmetrical proportions"
 
 GENERAL:
 - Be extremely specific. Vague inputs must be expanded with coherent details true to user intent.
 - Use comma-separated descriptive phrases, not sentences.
 - Keep "prompt" under 900 characters.
-- "negative_prompt" always includes: warped topology, missing limbs, fused fingers, floating geometry, inverted normals, texture stretching, asymmetric deformations, melted features, cut off legs, missing feet, truncated lower body, incomplete figure, floating torso.
+- "negative_prompt" always includes: warped topology, missing limbs, fused fingers, floating geometry, inverted normals, texture stretching, asymmetric deformations, melted features, cut off legs, missing feet, truncated lower body, incomplete figure, floating torso, stunted arms, shortened limbs, wax figure, plastic doll, mannequin.
 
 OUTPUT FORMAT:
 Respond ONLY with a raw JSON object — no markdown fences, no explanation, no preamble:
@@ -545,6 +579,39 @@ Respond ONLY with plain text, no JSON, no explanation.`;
       {/* ── Text tab ── */}
       {genTab === "text" && (
         <>
+          {/* Style prefix buttons */}
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ color: "#4a4a68", fontSize: 11, fontWeight: 600, display: "block", marginBottom: 6 }}>
+              Style
+            </label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {STYLE_PREFIX.map(s => {
+                const active = activeStyles === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => onStyleToggle(s.id)}
+                    title={s.prefix}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      padding: "6px 12px", borderRadius: 10,
+                      fontSize: 12, fontWeight: 600,
+                      cursor: "pointer",
+                      border: active ? "1px solid rgba(108,99,255,0.45)" : "1px solid rgba(255,255,255,0.07)",
+                      background: active ? "rgba(108,99,255,0.18)" : "rgba(255,255,255,0.04)",
+                      color: active ? "#b0aaff" : "#5a5a78",
+                      transition: "all 0.15s ease",
+                      fontFamily: "'SF Pro Text', system-ui, sans-serif",
+                    }}
+                  >
+                    <span style={{ fontSize: 14 }}>{s.icon}</span>
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <Enhancer
             value={prompt}
             onChange={val => { setPrompt(val); setErrorMsg?.(""); }}

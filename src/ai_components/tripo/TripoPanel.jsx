@@ -24,7 +24,7 @@ import Shared3DHistory from "../../components/shared/Shared3DHistory";
 import { getAnimById, ANIMATION_LIBRARY, ANIM_CATEGORIES } from "./animationlibrary";
 import { persistGen, loadPersistedGen, updatePersistedProgress, clearPersistedGen } from "./useGenerationPersist";
 
-import GeneratePanel, { MODEL_VERSIONS } from "./GeneratePanel";
+import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX } from "./GeneratePanel";
 import Segment from "./Segment";
 import Retopo from "./Retopo";
 import Texture from "./Texture";
@@ -276,6 +276,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [imageSeed, setImageSeed] = useState(null);
   const [autoSize, setAutoSize] = useState(false);
   const [exportUv, setExportUv] = useState(true);
+
+  // Style prefix — only one active at a time
+  const [activeStyle, setActiveStyle] = useState("");
+  const handleStyleToggle = useCallback((id) => {
+    setActiveStyle(prev => prev === id ? "" : id);
+  }, []);
 
   // task id inputs
   const [segId, setSegId] = useState("");
@@ -654,12 +660,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       const effectiveModel = (genTab === "text" && modelVer === "P1-20260311")
         ? "v3.1-20260211" : modelVer;
       const _isModern = effectiveModel === "P1-20260311" || effectiveModel.startsWith("v3.");
+      // Build style prefix for text_to_model
+      const styleObj = STYLE_PREFIX.find(s => s.id === activeStyle);
+      const stylePrefix = (genTab === "text" && styleObj) ? styleObj.prefix : "";
       switch (mode) {
         case "generate":
           if (genTab === "text") {
             const isUltra = meshQ === "ultra" && _isModern;
             body = {
-              type: "text_to_model", prompt: prompt.trim(), model_version: effectiveModel,
+              type: "text_to_model", prompt: stylePrefix + prompt.trim(), model_version: effectiveModel,
               ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
               ...(tPose && { t_pose: true }),
               ...(texOn && { texture: true }),
@@ -678,19 +687,21 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             };
           } else if (genTab === "multi") {
             const isUltra = meshQ === "ultra" && _isModern;
+            const isP1 = effectiveModel === "P1-20260311";
             body = {
               type: "multiview_to_model",
               files: multiImages.map(i => ({ type: "png", file_token: i.token })),
-              model_version: modelVer,
-              ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
+              model_version: effectiveModel,
+              ...(negPrompt.trim() && !isP1 && { negative_prompt: negPrompt.trim() }),
               ...(texOn && { texture: true }),
               ...(pbrOn && { pbr: true }),
               ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
-              ...(isUltra && { geometry_quality: "detailed" }),
+              ...(!isP1 && isUltra && { geometry_quality: "detailed" }),
               ...(polycount > 0 && { face_limit: polycount }),
-              ...(quadMesh && { quad: true }),
-              ...(smartLowPoly && { smart_low_poly: true }),
-              ...(inParts && { generate_parts: true }),
+              // P1-20260311 does NOT support quad, smart_low_poly, generate_parts, geometry_quality
+              ...(!isP1 && quadMesh && { quad: true }),
+              ...(!isP1 && smartLowPoly && { smart_low_poly: true }),
+              ...(!isP1 && inParts && { generate_parts: true }),
               ...(modelSeed != null && { model_seed: modelSeed }),
               ...(imageSeed != null && { image_seed: imageSeed }),
               ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
@@ -698,18 +709,21 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               ...(!exportUv && { export_uv: false }),
             };
           } else if (genTab === "batch") {
+            const isP1 = effectiveModel === "P1-20260311";
             body = {
               type: "image_to_model",
               file: { type: "jpg", file_token: batchImages[0]?.token },
-              model_version: modelVer,
-              ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
+              model_version: effectiveModel,
+              ...(negPrompt.trim() && !isP1 && { negative_prompt: negPrompt.trim() }),
               ...(texOn && { texture: true }),
               ...(pbrOn && { pbr: true }),
               ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
               ...(makeBetter && { enable_image_autofix: true }),
               ...(polycount > 0 && { face_limit: polycount }),
-              ...(quadMesh && { quad: true }),
-              ...(smartLowPoly && { smart_low_poly: true }),
+              // P1-20260311 does NOT support quad, smart_low_poly, generate_parts, geometry_quality
+              ...(!isP1 && quadMesh && { quad: true }),
+              ...(!isP1 && smartLowPoly && { smart_low_poly: true }),
+              ...(!isP1 && inParts && { generate_parts: true }),
               ...(modelSeed != null && { model_seed: modelSeed }),
               ...(imageSeed != null && { image_seed: imageSeed }),
               ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
@@ -718,20 +732,22 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             };
           } else {
             const isUltra = meshQ === "ultra" && _isModern;
+            const isP1 = effectiveModel === "P1-20260311";
             body = {
               type: "image_to_model",
               file: { type: "jpg", file_token: imgToken },
-              model_version: modelVer,
-              ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
+              model_version: effectiveModel,
+              ...(negPrompt.trim() && !isP1 && { negative_prompt: negPrompt.trim() }),
               ...(texOn && { texture: true }),
               ...(pbrOn && { pbr: true }),
               ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
-              ...(isUltra && { geometry_quality: "detailed" }),
+              ...(!isP1 && isUltra && { geometry_quality: "detailed" }),
               ...(makeBetter && { enable_image_autofix: true }),
               ...(polycount > 0 && { face_limit: polycount }),
-              ...(quadMesh && { quad: true }),
-              ...(smartLowPoly && { smart_low_poly: true }),
-              ...(inParts && { generate_parts: true }),
+              // P1-20260311 does NOT support quad, smart_low_poly, generate_parts, geometry_quality
+              ...(!isP1 && quadMesh && { quad: true }),
+              ...(!isP1 && smartLowPoly && { smart_low_poly: true }),
+              ...(!isP1 && inParts && { generate_parts: true }),
               ...(modelSeed != null && { model_seed: modelSeed }),
               ...(imageSeed != null && { image_seed: imageSeed }),
               ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
@@ -964,7 +980,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               </h3>
             </div>
             <div className="flex-1 overflow-y-auto p-4 tp-scroll">
-              {mode === "generate" && <GeneratePanel genTab={genTab} setGenTab={setGenTab} modelVer={modelVer} setModelVer={setModelVer} prompt={prompt} setPrompt={setPrompt} negPrompt={negPrompt} setNegPrompt={setNegPrompt} makeBetter={makeBetter} setMakeBetter={setMakeBetter} imgPrev={imgPrev} setImgPrev={setImgPrev} imgUploading={imgUploading} handleImg={handleImg} meshQ={meshQ} setMeshQ={setMeshQ} inParts={inParts} setInParts={setInParts} privacy={privacy} setPrivacy={setPrivacy} texOn={texOn} setTexOn={setTexOn} tex4K={tex4K} setTex4K={setTex4K} pbrOn={pbrOn} setPbrOn={setPbrOn} polycount={polycount} setPolycount={setPolycount} quadMesh={quadMesh} setQuadMesh={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} tPose={tPose} setTPose={setTPose} modelSeed={modelSeed} setModelSeed={setModelSeed} textureSeed={textureSeed} setTextureSeed={setTextureSeed} imageSeed={imageSeed} setImageSeed={setImageSeed} autoSize={autoSize} setAutoSize={setAutoSize} exportUv={exportUv} setExportUv={setExportUv} multiImages={multiImages} setMultiImages={setMultiImages} batchImages={batchImages} setBatchImages={setBatchImages} handleMultiImg={handleMultiImg} handleBatchImg={handleBatchImg} getIdToken={getIdToken} backendCaps={backendCaps} color={color} isRunning={isRunning} handleGen={handleGen} setErrorMsg={setErrorMsg} />}
+              {mode === "generate" && <GeneratePanel genTab={genTab} setGenTab={setGenTab} modelVer={modelVer} setModelVer={setModelVer} prompt={prompt} setPrompt={setPrompt} negPrompt={negPrompt} setNegPrompt={setNegPrompt} makeBetter={makeBetter} setMakeBetter={setMakeBetter} imgPrev={imgPrev} setImgPrev={setImgPrev} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} imgToken={imgToken} meshQ={meshQ} setMeshQ={setMeshQ} inParts={inParts} setInParts={setInParts} privacy={privacy} setPrivacy={setPrivacy} texOn={texOn} setTexOn={setTexOn} tex4K={tex4K} setTex4K={setTex4K} pbrOn={pbrOn} setPbrOn={setPbrOn} polycount={polycount} setPolycount={setPolycount} quadMesh={quadMesh} setQuadMesh={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} tPose={tPose} setTPose={setTPose} modelSeed={modelSeed} setModelSeed={setModelSeed} textureSeed={textureSeed} setTextureSeed={setTextureSeed} imageSeed={imageSeed} setImageSeed={setImageSeed} autoSize={autoSize} setAutoSize={setAutoSize} exportUv={exportUv} setExportUv={setExportUv} multiImages={multiImages} setMultiImages={setMultiImages} batchImages={batchImages} setBatchImages={setBatchImages} handleMultiImg={handleMultiImg} handleBatchImg={handleBatchImg} getIdToken={getIdToken} backendCaps={backendCaps} color={color} isRunning={isRunning} handleGen={handleGen} setErrorMsg={setErrorMsg} activeStyles={activeStyle} onStyleToggle={handleStyleToggle} />}
               {(mode === "segment" || mode === "fill_parts") && <Segment segSub={mode === "fill_parts" ? "fill_parts" : segSub} activeTaskId={activeTaskId} isRiggedInput={isRiggedInput} color={color} />}
               {mode === "retopo" && <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={color} />}
               {mode === "texture" && <Texture mode={mode} activeTaskId={activeTaskId} texInputTab={texInputTab} setTexInputTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt} imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} multiImages={multiImages} setMultiImages={setMultiImages} tex4K={tex4K} setTex4K={setTex4K} pbrOn={texPbr} setPbrOn={setTexPbr} texAlignment={texAlignment} setTexAlignment={setTexAlignment} color={color} />}
