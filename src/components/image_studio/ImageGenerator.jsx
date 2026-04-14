@@ -423,6 +423,7 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken, isGl
   const [rightOpen, setRightOpen] = useState(false);
   const [offsets, setOffsets] = useState({ left: 320, right: 0 });
 
+  
   // Master Sidebar Sync
   useEffect(() => {
     setLeftOpen(isGlobalOpen);
