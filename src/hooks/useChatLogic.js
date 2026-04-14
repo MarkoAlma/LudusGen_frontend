@@ -3,12 +3,16 @@ import { db } from "../firebase/firebaseApp";
 import {
   collection, addDoc, query, orderBy, limit, getDocs,
   serverTimestamp, deleteDoc, doc, setDoc, getDoc, onSnapshot,
+  writeBatch,
 } from "firebase/firestore";
-import { DEFAULT_PRESETS } from "../ai_components/models";
+import { DEFAULT_PRESETS, ALL_MODELS } from "../ai_components/models";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-export function useChatLogic(selectedModel, userId, getIdToken) {
+// Legacy model IDs for migration
+const CHAT_MODEL_IDS = ALL_MODELS.filter(m => m.panelType === 'chat').map(m => m.id);
+
+export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -30,42 +34,96 @@ export function useChatLogic(selectedModel, userId, getIdToken) {
   const abortControllerRef = useRef(null);
   const userScrolledUp = useRef(false);
 
-  // Firestore refs
+  // ── Firestore refs — model-independent ────────────────────────────
   const getSessionRef = useCallback((sessionId) =>
-    doc(db, "conversations", userId, selectedModel.id, sessionId),
-  [userId, selectedModel.id]);
+    doc(db, "conversations", userId, "sessions", sessionId),
+  [userId]);
 
   const getMessagesRef = useCallback((sessionId) =>
-    collection(db, "conversations", userId, selectedModel.id, sessionId, "messages"),
-  [userId, selectedModel.id]);
+    collection(db, "conversations", userId, "sessions", sessionId, "messages"),
+  [userId]);
 
-  // Load History
+  // ── Load History — model-independent with legacy fallback ─────────
   const loadConversationList = useCallback(async () => {
     if (!userId) return;
     try {
-      const ref = collection(db, "conversations", userId, selectedModel.id);
-      const q = query(ref, orderBy("updatedAt", "desc"), limit(20));
+      // Try new path first
+      const newRef = collection(db, "conversations", userId, "sessions");
+      const q = query(newRef, orderBy("updatedAt", "desc"), limit(50));
       const snap = await getDocs(q);
-      setConversations(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      let convs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      // Also query legacy paths and merge
+      const legacyPromises = CHAT_MODEL_IDS.map(async (modelId) => {
+        try {
+          const ref = collection(db, "conversations", userId, modelId);
+          const lq = query(ref, orderBy("updatedAt", "desc"), limit(20));
+          const lsnap = await getDocs(lq);
+          return lsnap.docs.map(d => ({ id: d.id, ...d.data(), _legacyModelId: modelId }));
+        } catch { return []; }
+      });
+
+      const legacyConvs = (await Promise.all(legacyPromises)).flat();
+      const existingIds = new Set(convs.map(c => c.id));
+      for (const legacy of legacyConvs) {
+        if (!existingIds.has(legacy.id)) {
+          convs.push(legacy);
+        }
+      }
+
+      convs.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
+      setConversations(convs.slice(0, 50));
     } catch (e) { console.error(e); }
-  }, [userId, selectedModel.id]);
+  }, [userId]);
 
   const getCurrentSessionId = useCallback(() => {
-    let sid = sessionStorage.getItem(`chat_session_${selectedModel.id}`);
+    let sid = sessionStorage.getItem("chat_session_current");
     if (!sid) {
       sid = `session_${Date.now()}`;
-      sessionStorage.setItem(`chat_session_${selectedModel.id}`, sid);
+      sessionStorage.setItem("chat_session_current", sid);
     }
     return sid;
-  }, [selectedModel.id]);
+  }, []);
 
   const loadCurrentConversation = useCallback(async () => {
     if (!userId) return;
     setLoadingHistory(true);
     try {
       const sessionId = getCurrentSessionId();
-      const q = query(getMessagesRef(sessionId), orderBy("timestamp", "asc"), limit(200));
-      const snap = await getDocs(q);
+
+      // Try new path first
+      const newRef = getMessagesRef(sessionId);
+      const q = query(newRef, orderBy("timestamp", "asc"), limit(200));
+      let snap = await getDocs(q);
+
+      // If no data, try legacy model-keyed paths and migrate
+      if (snap.empty) {
+        for (const modelId of CHAT_MODEL_IDS) {
+          try {
+            const legacyRef = collection(db, "conversations", userId, modelId, sessionId, "messages");
+            const lq = query(legacyRef, orderBy("timestamp", "asc"), limit(200));
+            snap = await getDocs(lq);
+            if (!snap.empty) {
+              // Migrate: copy all messages to new path
+              const batch = writeBatch(db);
+              snap.docs.forEach(d => {
+                const newDocRef = doc(newRef);
+                batch.set(newDocRef, d.data());
+              });
+              // Also migrate session doc
+              const legacySessionRef = doc(db, "conversations", userId, modelId, sessionId);
+              const sessionSnap = await getDoc(legacySessionRef);
+              if (sessionSnap.exists()) {
+                const newSessionRef = getSessionRef(sessionId);
+                batch.set(newSessionRef, sessionSnap.data());
+              }
+              await batch.commit();
+              break;
+            }
+          } catch { /* continue to next model */ }
+        }
+      }
+
       const msgs = snap.docs.map((d) => d.data());
       setMessages(msgs.length > 0 ? msgs : [{
         role: "assistant",
@@ -74,7 +132,7 @@ export function useChatLogic(selectedModel, userId, getIdToken) {
       }]);
     } catch (e) { console.error(e); }
     setLoadingHistory(false);
-  }, [userId, selectedModel.id, getCurrentSessionId, getMessagesRef]);
+  }, [userId, getCurrentSessionId, getMessagesRef, getSessionRef, selectedModel]);
 
   useEffect(() => {
     loadConversationList();
@@ -154,6 +212,23 @@ export function useChatLogic(selectedModel, userId, getIdToken) {
     setSystemPrompt(selectedModel.defaultSystemPrompt || "");
   }, [selectedModel]);
 
+  // ── Trigger summary generation (fire-and-forget) ──────────────────
+  const triggerSummaryGeneration = useCallback(async (sessionId, currentMessages) => {
+    if (!userId || !sessionId || currentMessages.length < 15) return;
+    try {
+      const token = await getIdToken();
+      fetch(`${API_BASE}/api/chat/summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          sessionId,
+          messages: currentMessages.map(m => ({ role: m.role, content: m.content })),
+          modelId: selectedModel.id,
+        }),
+      }).catch(e => console.warn('[Summary] Fire-and-forget failed:', e));
+    } catch (e) { /* silent */ }
+  }, [userId, getIdToken, selectedModel.id]);
+
   const handleSend = async () => {
     if ((!input.trim() && !attachedImage) || isTyping) return;
 
@@ -176,6 +251,8 @@ export function useChatLogic(selectedModel, userId, getIdToken) {
 
     await saveMessage(userMsg);
 
+    const sessionId = getCurrentSessionId();
+
     try {
       const token = await getIdToken();
       const res = await fetch(`${API_BASE}/api/chat`, {
@@ -184,6 +261,7 @@ export function useChatLogic(selectedModel, userId, getIdToken) {
         body: JSON.stringify({
           model: selectedModel.apiModel,
           provider: selectedModel.provider,
+          sessionId,
           messages: [...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []), ...messages.map(m => ({ role: m.role, content: m.content })), { role: userMsg.role, content: userMsg.content }],
           temperature, max_tokens: maxTokens, top_p: topP, frequency_penalty: frequencyPenalty, presence_penalty: presencePenalty,
         }),
@@ -223,6 +301,18 @@ export function useChatLogic(selectedModel, userId, getIdToken) {
     }
   };
 
+  // ── Model switching (keeps conversation intact, generates summary) ──
+  const switchModel = useCallback((newModel) => {
+    // Generate summary before switching so the new model gets context
+    const sessionId = getCurrentSessionId();
+    if (userId && sessionId && messages.length >= 5) {
+      triggerSummaryGeneration(sessionId, messages);
+    }
+    if (onModelChange) {
+      onModelChange(newModel);
+    }
+  }, [onModelChange, userId, messages, getCurrentSessionId, triggerSummaryGeneration]);
+
   return {
     messages, setMessages, input, setInput, isTyping, handleSend,
     systemPrompt, setSystemPrompt, temperature, setTemperature,
@@ -231,5 +321,6 @@ export function useChatLogic(selectedModel, userId, getIdToken) {
     attachedImage, setAttachedImage,
     loadingHistory, conversations, chatScrollRef, textareaRef,
     presets, activePresetId, applyPreset, onEnhance, onDechant,
+    switchModel,
   };
 }

@@ -202,7 +202,7 @@ export default function ChatInput({
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             placeholder="Kérdezz bármit a LudusGen AI-tól..."
-            className="w-full bg-transparent border-none focus:ring-0 focus:outline-none text-white placeholder-gray-700 py-3.5 px-3 text-[14.5px] font-bold resize-none scrollbar-hide leading-relaxed relative z-10"
+            className="w-full bg-transparent border-none focus:ring-0 focus:outline-none text-white placeholder-zinc-500 py-3.5 px-3 text-[14.5px] font-medium resize-none scrollbar-hide leading-relaxed relative z-10"
           />
 
           {/* Send button */}
@@ -251,12 +251,12 @@ export default function ChatInput({
         {/* Footer hints — Station Log Labels */}
         <div className="hidden sm:flex items-center justify-center gap-8 mt-6">
           <div className="flex items-center gap-3 group/hint cursor-default">
-             <kbd className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-700 font-mono text-[9px] group-hover/hint:text-zinc-400 group-hover/hint:border-white/20 transition-all duration-700 italic font-black tracking-widest">ENTER</kbd>
-             <span className="text-[9px] font-black text-zinc-900 uppercase tracking-[0.4em] group-hover/hint:text-zinc-600 transition-colors">Command_Submit</span>
+             <kbd className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-500 font-mono text-[9px] group-hover/hint:text-zinc-400 group-hover/hint:border-white/20 transition-all duration-700 italic font-black tracking-widest">ENTER</kbd>
+             <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em] group-hover/hint:text-zinc-400 transition-colors">Command_Submit</span>
           </div>
           <div className="flex items-center gap-3 group/hint cursor-default">
-             <kbd className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-700 font-mono text-[9px] group-hover/hint:text-zinc-400 group-hover/hint:border-white/20 transition-all duration-700 italic font-black tracking-widest">SHIFT+ENTER</kbd>
-             <span className="text-[9px] font-black text-zinc-900 uppercase tracking-[0.4em] group-hover/hint:text-zinc-600 transition-colors">Vector_Return</span>
+             <kbd className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-500 font-mono text-[9px] group-hover/hint:text-zinc-400 group-hover/hint:border-white/20 transition-all duration-700 italic font-black tracking-widest">SHIFT+ENTER</kbd>
+             <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em] group-hover/hint:text-zinc-400 transition-colors">Vector_Return</span>
           </div>
         </div>
 

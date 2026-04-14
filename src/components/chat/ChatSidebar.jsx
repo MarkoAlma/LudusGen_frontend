@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { History, MessageSquare, Clock, Search, X, ChevronRight } from 'lucide-react';
+import { getModel } from '../../ai_components/models';
 
 function groupConversationsByDate(conversations) {
   const now = new Date();
@@ -144,6 +145,21 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
                             <span className="text-[8px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded border border-primary/20 shadow-[0_0_10px_rgba(138,43,226,0.1)]">
                               {conv.tokenCount || 0} TKNS
                             </span>
+                            {conv.modelName && (
+                              <>
+                                <div className="w-[1px] h-2.5 bg-white/10" />
+                                <span
+                                  className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border"
+                                  style={{
+                                    color: (getModel(conv.modelId)?.color || '#8b5cf6') + '99',
+                                    borderColor: (getModel(conv.modelId)?.color || '#8b5cf6') + '33',
+                                    backgroundColor: (getModel(conv.modelId)?.color || '#8b5cf6') + '11',
+                                  }}
+                                >
+                                  {conv.modelName}
+                                </span>
+                              </>
+                            )}
                             <div className="w-[1px] h-2.5 bg-white/10" />
                             <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">{conv.updatedAt ? new Date(conv.updatedAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '00:00'}</span>
                           </div>

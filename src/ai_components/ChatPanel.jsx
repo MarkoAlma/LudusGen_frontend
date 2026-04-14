@@ -19,7 +19,7 @@ const CONTENT_MAX_W = 'max-w-3xl';
 const HISTORY_SIDEBAR_W = 288; // px, matches w-72
 const SIDEBAR_W = 320; // AiStudioSidebar width
 
-export default function ChatPanel({ selectedModel, userId, getIdToken, setSidebarOpen, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+export default function ChatPanel({ selectedModel, userId, getIdToken, setSidebarOpen, isGlobalOpen, toggleGlobalSidebar, globalSidebar, onModelChange }) {
   const { registerPanel, unregisterPanel } = useStudioPanels();
 
   // Register panels (Chat has L1 + R, no L2)
@@ -64,7 +64,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
     applyPreset,
     onEnhance,
     onDechant,
-  } = useChatLogic(selectedModel, userId, getIdToken);
+  } = useChatLogic(selectedModel, userId, getIdToken, onModelChange);
 
   const [historySidebarOpen, setHistorySidebarOpen] = useState(true);
   const [configOpen, setConfigOpen] = useState(false);
@@ -99,7 +99,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
             conversations={conversations}
             loadingHistory={loadingHistory}
             onSelectSession={(id) => {
-              sessionStorage.setItem(`chat_session_${selectedModel.id}`, id);
+              sessionStorage.setItem("chat_session_current", id);
               window.location.reload();
             }}
             onClose={() => setHistorySidebarOpen(false)}
@@ -115,7 +115,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
         <ChatAtmosphere themeColor={themeColor} />
 
         {/* ── Main Chat Area ── */}
-        <div className="flex-1 flex flex-col min-w-0 relative h-full z-10 px-0">
+        {/* Main Interface Area */}
+        <div className="flex-1 flex flex-col min-w-0 relative h-full z-10 px-0 max-w-full">
 
           {/* Header */}
           <ChatHeader
@@ -127,11 +128,12 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
             historySidebarOpen={historySidebarOpen}
             isDesktop={isDesktop}
             sidebarCollapsed={!isGlobalOpen}
+            onModelSwitch={(newModel) => onModelChange?.(newModel)}
           />
 
           {/* Scrollable message area */}
           <div className="flex-1 relative overflow-hidden">
-            <div ref={chatScrollRef} className="h-full overflow-y-auto scrollbar-thin scroll-smooth w-full px-3 sm:px-6 lg:px-12">
+            <div ref={chatScrollRef} className="h-full overflow-y-auto scrollbar-thin scroll-smooth px-3 sm:px-6 lg:px-12">
               <div 
                 className="w-full pb-8 flex flex-col space-y-4 pt-24" 
               >
@@ -151,7 +153,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
           </div>
 
           {/* Input area */}
-          <div className="w-full px-3 sm:px-6 lg:px-12 pb-6 pt-1">
+          {/* Chat Input Wrapper */}
+          <div className="px-3 sm:px-6 lg:px-12 pb-6 pt-1 relative z-20">
             <ChatInput
                 input={input}
                 setInput={setInput}

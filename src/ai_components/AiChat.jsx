@@ -71,15 +71,39 @@ export default function AIChat({ user, getIdToken }) {
   const selectedModel = getModel(selectedAI) || ALL_MODELS[0];
 
   const handleSelectModel = useCallback((modelId) => {
+    const oldModel = getModel(selectedAI);
+    const newModel = getModel(modelId);
+
+    // If both are chat panel types, keep the same conversation session
+    const samePanelType = newModel?.panelType === oldModel?.panelType;
+
+    if (samePanelType && newModel?.panelType === 'chat') {
+      // Just change the model, don't reset the conversation
+      setSelectedAI(modelId);
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", "chat");
+        next.set("model", modelId);
+        return next;
+      }, { replace: true });
+
+      const gId = findModelGroup(modelId);
+      const cId = findModelCat(modelId);
+      if (gId) setOpenGroups((p) => new Set([...p, gId]));
+      if (cId) setOpenCats((p) => new Set([...p, cId]));
+      setSidebarOpen(false);
+      return;
+    }
+
+    // For different panel types, do the full reset
     setSelectedAI(modelId);
 
     // Sync URL tab parameter
-    const model = getModel(modelId);
-    if (model) {
+    if (newModel) {
       let tab = "chat";
-      if (model.panelType === "image") tab = "image";
-      else if (model.panelType === "audio") tab = "audio";
-      else if (["threed", "trellis", "tripo"].includes(model.panelType)) tab = "3d";
+      if (newModel.panelType === "image") tab = "image";
+      else if (newModel.panelType === "audio") tab = "audio";
+      else if (["threed", "trellis", "tripo"].includes(newModel.panelType)) tab = "3d";
 
       setSearchParams(prev => {
         const next = new URLSearchParams(prev);
@@ -94,7 +118,7 @@ export default function AIChat({ user, getIdToken }) {
     if (gId) setOpenGroups((p) => new Set([...p, gId]));
     if (cId) setOpenCats((p) => new Set([...p, cId]));
     setSidebarOpen(false);
-  }, [setSearchParams]);
+  }, [setSearchParams, selectedAI]);
 
   const toggleGroup = useCallback((id) => {
     setOpenGroups((p) => {
@@ -130,7 +154,8 @@ export default function AIChat({ user, getIdToken }) {
           handleSelectModel={handleSelectModel}
           setSidebarOpen={setSidebarOpen}
         />
-      )
+      ),
+      onModelChange: (newModel) => handleSelectModel(newModel.id),
     };
     switch (selectedModel.panelType) {
       case "chat":

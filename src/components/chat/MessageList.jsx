@@ -14,28 +14,6 @@ export default function MessageList({ messages, loadingHistory, selectedModel, o
   const themeColor = selectedModel?.color || "#8b5cf6";
   const isEmpty = !loadingHistory && messages.length === 0;
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.06,
-        delayChildren: 0.08
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { 
-      y: 0, 
-      opacity: 1,
-      transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
-    }
-  };
-
-
   return (
     <div className="flex flex-col space-y-4 w-full items-center">
       {/* Loading spinner */}
@@ -46,7 +24,7 @@ export default function MessageList({ messages, loadingHistory, selectedModel, o
               className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
               style={{ borderColor: `${themeColor}30`, borderTopColor: 'transparent' }}
             />
-            <span className="text-[10px] text-gray-600">Történet betöltése...</span>
+            <span className="text-[10px] text-gray-400">Történet betöltése...</span>
           </div>
         </div>
       )}
@@ -54,7 +32,6 @@ export default function MessageList({ messages, loadingHistory, selectedModel, o
       {/* Empty state */}
       {isEmpty && (
         <div className="flex flex-col items-center justify-center min-h-[400px] py-10 sm:py-20 gap-6 sm:gap-8">
-          {/* Icon with glow */}
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -71,7 +48,6 @@ export default function MessageList({ messages, loadingHistory, selectedModel, o
             />
           </motion.div>
 
-          {/* Welcome text */}
           <motion.div
             initial={{ y: 8, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -79,12 +55,11 @@ export default function MessageList({ messages, loadingHistory, selectedModel, o
             className="text-center"
           >
             <h3 className="text-2xl font-black text-white italic tracking-tighter mb-2">Üdvözöljük!</h3>
-            <p className="text-sm text-gray-500 max-w-sm leading-relaxed font-bold">
+            <p className="text-sm text-gray-400 max-w-sm leading-relaxed font-bold">
               Indítson egy beszélgetést az AI asszisztenssel. Írjon egy üzenetet lent, vagy válasszon egy témát.
             </p>
           </motion.div>
 
-          {/* Status badge */}
           <motion.div
             initial={{ y: 6, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -95,7 +70,6 @@ export default function MessageList({ messages, loadingHistory, selectedModel, o
             <span className="text-xs text-gray-400 font-bold">{selectedModel?.name || 'AI'} készen áll</span>
           </motion.div>
 
-          {/* Suggestion chips */}
           <motion.div
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -115,8 +89,8 @@ export default function MessageList({ messages, loadingHistory, selectedModel, o
                   onClick={() => onSuggestionClick?.(chip.text)}
                   className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10 transition-all duration-500 group/chip"
                 >
-                  <Icon className="w-4 h-4 text-gray-600 group-hover/chip:text-gray-400 transition-colors" />
-                  <span className="text-[11px] sm:text-[12px] text-gray-500 group-hover/chip:text-gray-300 transition-colors break-words font-bold">
+                  <Icon className="w-4 h-4 text-gray-500 group-hover/chip:text-gray-300 transition-colors" />
+                  <span className="text-[11px] sm:text-[12px] text-gray-400 group-hover/chip:text-gray-200 transition-colors break-words font-bold">
                     {chip.text}
                   </span>
                 </motion.button>
@@ -126,23 +100,17 @@ export default function MessageList({ messages, loadingHistory, selectedModel, o
         </div>
       )}
 
-      {/* Messages */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="flex flex-col w-full"
-      >
+      {/* Messages — no container animation, just direct render */}
+      <div className="flex flex-col w-full">
         {messages.map((msg, idx) => (
-          <motion.div key={msg.id || idx} variants={itemVariants}>
+          <div key={msg.id || idx}>
             <MessageItem
               message={msg}
               themeColor={themeColor}
             />
-          </motion.div>
+          </div>
         ))}
-      </motion.div>
-
+      </div>
 
       {/* Scroll anchor */}
       <div className="h-4" />
