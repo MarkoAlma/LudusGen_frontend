@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useContext, useCallback, useMemo } from "react";
+import toast from "react-hot-toast";
 import { createPortal } from "react-dom";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +20,7 @@ import {
   List, Quote, ChevronRight,
   PenSquare, Shield, Search, Rss, Link, Unlock,
 } from "lucide-react";
+import { API_BASE } from "../api/client";
 
 const CATEGORIES = {
   chat: { label: "Chat AI", emoji: "💬", color: "#a78bfa" },
@@ -29,8 +31,6 @@ const CATEGORIES = {
 };
 
 const ADMIN_UIDS = ["T7fU9Zp3N5M9wz2G8xQ4L1rV6bY2"];
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 // ─── Kapcsolódó témák fallback ─────────────────────────────────
 const RELATED_MOCK = [
@@ -1006,6 +1006,8 @@ export default function ForumPost({
             };
             setAuthorUserDoc(userData);
           }
+        } else {
+          console.warn("[ForumPost] Author profile fetch failed:", response.status);
         }
       } catch (e) {
         console.error("[ForumPost] Hiba a szerző adatainak lekérésekor (API):", e);

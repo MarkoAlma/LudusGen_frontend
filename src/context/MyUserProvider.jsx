@@ -10,11 +10,9 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import axios from "axios";
+import { API_BASE } from "../api/client";
 
 export const MyUserContext = createContext();
-
-// ── API alap URL a .env-ből ────────────────────────────
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const MyUserProvider = ({ children }) => {
   const [user, setUser] = useState(null);

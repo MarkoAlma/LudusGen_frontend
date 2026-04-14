@@ -4,6 +4,7 @@ import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
 import Enable2FA from "../components/Enable2Fa";
 import axios from "axios";
+import { API_BASE } from "../api/client";
 import UpdatePassword from "../components/UpdatePassword";
 import { auth } from "../firebase/firebaseApp";
 import { motion, AnimatePresence } from "framer-motion";
@@ -71,7 +72,7 @@ export default function Settings() {
       setLoading(true);
       setError(null);
       const token = await auth.currentUser.getIdToken();
-      const res = await axios.post("http://localhost:3001/api/update-profile", formData, {
+      const res = await axios.post(`${API_BASE}/api/update-profile`, formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.data.success) {
@@ -109,7 +110,7 @@ export default function Settings() {
       const token = await auth.currentUser.getIdToken();
       const fd = new FormData();
       fd.append("profilePicture", selectedFile);
-      const res = await axios.post("http://localhost:3001/api/upload-profile-picture", fd, {
+      const res = await axios.post(`${API_BASE}/api/upload-profile-picture`, fd, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" }
       });
       if (res.data.success) {

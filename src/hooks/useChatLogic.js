@@ -5,8 +5,7 @@ import {
   serverTimestamp, deleteDoc, doc, setDoc, getDoc, onSnapshot,
 } from "firebase/firestore";
 import { DEFAULT_PRESETS } from "../ai_components/models";
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+import { API_BASE } from "../api/client";
 
 export function useChatLogic(selectedModel, userId, getIdToken) {
   const [messages, setMessages] = useState([]);

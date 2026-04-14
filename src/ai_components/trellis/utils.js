@@ -74,7 +74,7 @@ export const defaultParams = {
 // GLB fetcher — VITE_API_URL-t használ, production-ban is működik
 // ────────────────────────────────────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_BASE } from '../../api/client';
 
 export async function fetchGlbAsBlob(modelUrl, getIdToken) {
   if (!modelUrl) return null;

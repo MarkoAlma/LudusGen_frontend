@@ -119,4 +119,97 @@ export const ENDPOINTS = {
   TRELLIS_PROXY: (url) => `/api/trellis/proxy?url=${encodeURIComponent(url)}`,
 };
 
+/**
+ * Upload a file (GLB/FBX/OBJ) to Tripo assets.
+ * @param {File} file
+ * @param {(() => Promise<string>) | string} getIdTokenOrToken
+ * @returns {Promise<{ success: boolean, filename?: string, message?: string }>}
+ */
+export async function uploadAsset(file, getIdTokenOrToken) {
+  const form = new FormData();
+  form.append('file', file);
+  const url = `${API_BASE}${ENDPOINTS.TRIPO_ASSETS_UPLOAD}`;
+  const token = typeof getIdTokenOrToken === 'function'
+    ? (await getIdTokenOrToken())
+    : (getIdTokenOrToken || '');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  return res.json();
+}
+
+/**
+ * Upload an image to Tripo for text-to-3D or image-to-3D.
+ * @param {File} file
+ * @param {(() => Promise<string>) | string} getIdTokenOrToken
+ * @returns {Promise<string>} imageToken
+ */
+export async function uploadTripoImage(file, getIdTokenOrToken) {
+  const form = new FormData();
+  form.append('file', file);
+  const url = `${API_BASE}${ENDPOINTS.TRIPO_UPLOAD}`;
+  const token = typeof getIdTokenOrToken === 'function'
+    ? (await getIdTokenOrToken())
+    : (getIdTokenOrToken || '');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const d = await res.json();
+  if (!d.success) throw new Error(d.message);
+  return d.imageToken;
+}
+
+/**
+ * Enhance or simplify a prompt via the /api/enhance endpoint.
+ * @param {object} params
+ * @param {string} params.systemPrompt - system message content
+ * @param {string} params.userPrompt - user message content
+ * @param {number} [params.temperature=0.4]
+ * @param {number} [params.top_p=0.9]
+ * @param {number} [params.max_tokens=10000]
+ * @param {string} [params.model='openai/gpt-oss-120b']
+ * @param {string} [params.provider='groq']
+ * @param {(() => Promise<string>) | string} params.getIdTokenOrToken
+ * @returns {Promise<string>} cleaned response text
+ */
+export async function enhancePrompt({
+  systemPrompt,
+  userPrompt,
+  temperature = 0.4,
+  top_p = 0.9,
+  max_tokens = 10000,
+  model = 'openai/gpt-oss-120b',
+  provider = 'groq',
+  getIdTokenOrToken,
+}) {
+  const headers = await authHeaders(getIdTokenOrToken);
+  const res = await fetch(`${API_BASE}${ENDPOINTS.ENHANCE}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model,
+      provider,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature,
+      top_p,
+      max_tokens,
+    }),
+  });
+  if (!res.ok) {
+    let errMsg = `HTTP ${res.status}`;
+    try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+    throw new Error(errMsg);
+  }
+  const json = await res.json();
+  if (!json.success) throw new Error(json.message || 'API hiba');
+  return (json.content || '').trim();
+}
+
 export { API_BASE };

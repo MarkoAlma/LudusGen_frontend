@@ -1,5 +1,6 @@
 import { useEffect, useState, useContext } from "react";
 import axios from "axios";
+import { API_BASE } from "../api/client";
 import { Shield, Smartphone, Key, Check, X, Sparkles, Copy, Download, AlertTriangle } from "lucide-react";
 import { MyUserContext } from "../context/MyUserProvider";
 import { auth } from "../firebase/firebaseApp";
@@ -42,7 +43,7 @@ export default function Enable2FA({ isOpen, onClose }) {
       setError(null);
       
       const headers = await getAuthHeaders();
-      const res = await axios.get("http://localhost:3001/api/setup-mfa", { headers });
+      const res = await axios.get(`${API_BASE}/api/setup-mfa`, { headers });
       
       console.log('📥 QR Setup Response:', res.data);
       
@@ -86,7 +87,7 @@ export default function Enable2FA({ isOpen, onClose }) {
       console.log('📤 Sending payload:', payload);
       
       const res = await axios.post(
-        "http://localhost:3001/api/verify-mfa", 
+        `${API_BASE}/api/verify-mfa`,
         payload,
         { headers }
       );
