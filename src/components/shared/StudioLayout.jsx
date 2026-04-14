@@ -1,22 +1,13 @@
-import React, { useEffect, createContext } from 'react';
-import { motion, AnimatePresence, useSpring, useMotionValueEvent, useTransform, useMotionValue } from 'framer-motion';
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, ChevronLeft, Columns, Square, Layout, X } from 'lucide-react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useSpring, useTransform, useMotionValueEvent } from 'framer-motion';
+import { ChevronRight, ChevronLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useStudioPanels } from '../../context/StudioPanelContext';
+import MobilePanelControls from './MobilePanelControls';
 
-/**
- * StudioLayoutContext
- * Provides raw MotionValues to performance-critical children (ThreeViewer, HUDs)
- * to bypass React re-renders during cinematic transitions.
- */
-export const StudioLayoutContext = createContext({
-  smoothL: null,
-  smoothR: null,
-});
+export const StudioLayoutContext = createContext(null);
 
-/**
- * StudioLayout
- * A unified cinematic layout manager for Tripo and Trellis studios.
- */
 export default function StudioLayout({
   children,
   leftSidebar,
@@ -24,278 +15,302 @@ export default function StudioLayout({
   rightSidebar,
   topHUD,
   bottomHUD,
-  leftWidth = 320,
-  leftSecondaryWidth = 300,
-  rightWidth = 280,
-  leftOpen = true,
-  leftSecondaryOpen = true,
+  leftOpen,
   setLeftOpen,
+  leftSecondaryOpen,
   setLeftSecondaryOpen,
-  rightOpen = true,
+  rightOpen,
   setRightOpen,
+  leftWidth = 320,
+  leftSecondaryWidth = 392,
+  leftSecondaryClosedWidth = 0,
+  rightWidth = 320,
   onOffsetChange,
   overlay = false,
-  onRightToggle,
+  accentColor = '#8b5cf6',
 }) {
-  // Breakpoints & Viewport Awareness
-  const isNarrow = useMediaQuery("(max-width: 1280px)");
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isNarrow = useMediaQuery('(max-width: 1279px)');
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const isTablet = isNarrow && !isMobile;
   const activeOverlay = overlay || isNarrow;
-  
-  // Custom widths for Mobile Drawer behavior
-  const effectiveL1Width = isMobile ? (window.innerWidth - 32) : leftWidth;
-  const effectiveSecondaryWidth = isMobile ? (window.innerWidth - 32) : leftSecondaryWidth;
-  const effectiveRWidth = isMobile ? (window.innerWidth - 32) : rightWidth;
 
-  // Cinematic Spring Configuration
-  const springConfig = { damping: 38, stiffness: 180, mass: 1 };
+  // ── Consume centralized panel state on mobile/tablet ─────────────────────
+  const panelCtx = useStudioPanels();
+  const usingCtx = !isMobile && !isTablet ? false : !!panelCtx;
 
-  // In overlay mode, sidebars float on top — layout doesn't shrink viewport
-  const layoutL1 = activeOverlay ? 0 : (leftOpen ? effectiveL1Width : 0);
-  const layoutL2 = activeOverlay ? 0 : ((leftSecondaryOpen && leftSecondarySidebar) ? effectiveSecondaryWidth : 0);
-  const layoutR = activeOverlay ? 0 : (rightOpen ? effectiveRWidth : 0);
+  // Resolve effective open states: use context on mobile/tablet, props on desktop
+  const effL1 = usingCtx ? panelCtx.panelState.L1 : leftOpen;
+  const effL2 = usingCtx ? panelCtx.panelState.L2 : leftSecondaryOpen;
+  const effR  = usingCtx ? panelCtx.panelState.R  : rightOpen;
 
-  const smoothL1 = useSpring(layoutL1, springConfig);
-  const smoothL2 = useSpring(layoutL2, springConfig);
-  const smoothR = useSpring(layoutR, springConfig);
+  // Resolve effective setters
+  const effSetL1 = usingCtx ? panelCtx.setPanelOpen.bind(null, 'L1') : setLeftOpen;
+  const effSetL2 = usingCtx ? panelCtx.setPanelOpen.bind(null, 'L2') : setLeftSecondaryOpen;
+  const effSetR  = usingCtx ? panelCtx.setPanelOpen.bind(null, 'R')  : setRightOpen;
 
-  // Unified L MotionValue for children/HUDs
-  const smoothL = useMotionValue(smoothL1.get() + smoothL2.get());
+  // ── Mobile: only show the active panel ───────────────────────────────────
+  const mobileActive = usingCtx ? panelCtx.mobileActive : null;
+  const showL1Mobile = isMobile && (!usingCtx || mobileActive === 'L1');
+  const showL2Mobile = isMobile && (!usingCtx || mobileActive === 'L2');
+  const showRMobile  = isMobile && (!usingCtx || mobileActive === 'R');
 
+  // On mobile, only one panel is "open" at a time
+  const mobileL1Open = isMobile ? showL1Mobile && effL1 : effL1;
+  const mobileL2Open = isMobile ? showL2Mobile && effL2 : effL2;
+  const mobileROpen  = isMobile ? showRMobile  && effR  : effR;
+
+  // ── Spring animations ────────────────────────────────────────────────────
+  const smoothL1 = useSpring(0, { damping: 24, stiffness: 260, mass: 0.6 });
+  const smoothL2 = useSpring(0, { damping: 24, stiffness: 260, mass: 0.6 });
+  const smoothR  = useSpring(0, { damping: 24, stiffness: 260, mass: 0.6 });
+
+  // ── Responsive widths ────────────────────────────────────────────────────
+  const getL1Width = () => {
+    if (isMobile) return typeof window !== 'undefined' ? window.innerWidth - 32 : 320;
+    if (isTablet) return 280;
+    return leftWidth;
+  };
+  const getL2Width = () => {
+    if (isMobile) return typeof window !== 'undefined' ? window.innerWidth - 32 : 320;
+    if (isTablet) return Math.min(typeof window !== 'undefined' ? window.innerWidth * 0.55 : 400, 400);
+    return leftSecondaryWidth;
+  };
+  const getRWidth = () => {
+    if (isMobile) return typeof window !== 'undefined' ? window.innerWidth - 32 : 320;
+    if (isTablet) return Math.min(typeof window !== 'undefined' ? window.innerWidth * 0.55 : 400, 400);
+    return rightWidth;
+  };
+
+  const targetL1 = mobileL1Open ? getL1Width() : 0;
+  const targetL2 = mobileL2Open ? getL2Width() : (leftSecondaryClosedWidth || 0);
+  const targetR  = mobileROpen  ? getRWidth()  : 0;
+
+  useEffect(() => { smoothL1.set(targetL1); }, [targetL1]);
+  useEffect(() => { smoothL2.set(targetL2); }, [targetL2]);
+  useEffect(() => { smoothR.set(targetR);  }, [targetR]);
+
+  const smoothL = useTransform([smoothL1, smoothL2], ([v1, v2]) => v1 + v2);
+
+  // ── Offset callback ──────────────────────────────────────────────────────
   useEffect(() => {
-    smoothL1.set(activeOverlay ? 0 : (leftOpen ? effectiveL1Width : 0));
-  }, [leftOpen, effectiveL1Width, activeOverlay, smoothL1]);
+    if (!onOffsetChange) return;
+    const unsubL = smoothL.on('change', v => onOffsetChange(prev => ({ ...prev, left: v })));
+    const unsubR = smoothR.on('change', v => onOffsetChange(prev => ({ ...prev, right: v })));
+    return () => { unsubL(); unsubR(); };
+  }, [onOffsetChange, smoothL, smoothR]);
 
-  useEffect(() => {
-    smoothL2.set(activeOverlay ? 0 : ((leftSecondaryOpen && leftSecondarySidebar) ? effectiveSecondaryWidth : 0));
-  }, [leftSecondaryOpen, effectiveSecondaryWidth, leftSecondarySidebar, activeOverlay, smoothL2]);
+  const rightToggleX = useTransform(smoothR, v => v * -1);
+  const effectiveL1Width = getL1Width();
 
-  useEffect(() => {
-    smoothR.set(activeOverlay ? 0 : (rightOpen ? effectiveRWidth : 0));
-  }, [rightOpen, effectiveRWidth, activeOverlay, smoothR]);
+  // ── Toggle handlers ──────────────────────────────────────────────────────
+  const handleToggleL1 = () => effSetL1?.(!effL1);
+  const handleToggleL2 = () => effSetL2?.(!effL2);
+  const handleToggleR  = () => effSetR?.(!effR);
 
-  // Synchronize unified L
-  useMotionValueEvent(smoothL1, "change", (v) => smoothL.set(v + smoothL2.get()));
-  useMotionValueEvent(smoothL2, "change", (v) => smoothL.set(smoothL1.get() + v));
+  // ── Mobile close handler ─────────────────────────────────────────────────
+  const handleMobileClose = (panelId) => {
+    if (panelId === 'L1') effSetL1?.(false);
+    if (panelId === 'L2') effSetL2?.(false);
+    if (panelId === 'R')  effSetR?.(false);
+  };
 
-  // Backwards compatibility for components not yet using Context
-  useMotionValueEvent(smoothL, "change", (latest) => {
-    onOffsetChange?.({ left: latest, right: smoothR.get() });
-  });
-  useMotionValueEvent(smoothR, "change", (latest) => {
-    onOffsetChange?.({ left: smoothL.get(), right: latest });
-  });
-
-  const rightToggleX = useTransform(smoothR, (v) => v * -1);
-
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <StudioLayoutContext.Provider value={{ smoothL, smoothR }}>
-      <div className="h-full w-full overflow-hidden bg-transparent text-white relative">
+      <div className="h-full w-full relative overflow-hidden">
+        {/* ── HUD overlays ─────────────────────────────────────────────── */}
+        {topHUD && <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">{topHUD}</div>}
 
-        {/* ── MAIN VIEWPORT AREA (FIXED/FULLSCREEN) ── */}
-        <div className="absolute inset-0 z-0 overflow-hidden">
-          <div className="h-full w-full flex flex-col">
-            {topHUD}
-            <div className="flex-1 relative overflow-hidden">
-              {children}
-            </div>
-            {bottomHUD}
-          </div>
-        </div>
-
-        {/* ── LEFT SIDEBAR STACK ── */}
-        <div className="absolute left-0 top-0 h-full flex pointer-events-none z-[60]">
-          {/* Level 1: Main Sidebar */}
-          {(activeOverlay ? leftOpen : true) && (
-            <motion.div
-              style={{ width: activeOverlay ? (leftOpen ? effectiveL1Width : 0) : smoothL1 }}
-              className={`h-full overflow-hidden pointer-events-auto ${activeOverlay ? 'fixed left-0 top-0 z-[100] bg-[#0a0a0f]/95 backdrop-blur-3xl border-r border-white/5 shadow-2xl' : ''}`}
-            >
-              <div style={{ width: effectiveL1Width, height: '100%', position: 'relative' }}>
-                {leftSidebar}
-                {isMobile && leftOpen && (
-                  <button onClick={() => setLeftOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors">
-                    <X className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Level 2: Secondary Content */}
-          {activeOverlay ? (
-            <AnimatePresence>
-              {leftSecondaryOpen && leftSecondarySidebar && (
-                <>
-                  {/* Backdrop */}
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/60 z-[65] backdrop-blur-[2px]"
-                    onClick={() => setLeftSecondaryOpen?.(false)}
-                  />
-                  <motion.div
-                    initial={{ x: "-100%" }}
-                    animate={{ x: 0 }}
-                    exit={{ x: "-100%" }}
-                    transition={{ type: "spring", damping: 28, stiffness: 200 }}
-                    className="fixed top-0 h-full z-[70] border-r border-white/5 overflow-hidden bg-[#0a0a0f]/95 backdrop-blur-3xl pointer-events-auto shadow-2xl"
-                    style={{ 
-                      left: (isMobile || !leftOpen) ? 0 : effectiveL1Width, 
-                      width: isMobile ? effectiveSecondaryWidth : leftSecondaryWidth 
-                    }}
-                  >
-                    <div className="h-full relative">
-                      {leftSecondarySidebar}
-                      {isMobile && (
-                        <button onClick={() => setLeftSecondaryOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-[101]">
-                          <X className="w-5 h-5" />
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          ) : (
-            <motion.div
-              style={{ width: smoothL2 }}
-              className="h-full border-r border-white/5 overflow-hidden bg-[#0a0a0f]/60 backdrop-blur-3xl pointer-events-auto"
-            >
-              <div style={{ width: effectiveSecondaryWidth, height: '100%' }}>
-                {leftSecondarySidebar}
-              </div>
-            </motion.div>
-          )}
-        </div>
-
-        {/* ── RIGHT SIDEBAR ── */}
-        {activeOverlay ? (
-          <AnimatePresence>
-            {rightOpen && (
-              <>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/60 z-[65] backdrop-blur-[2px]"
-                  onClick={() => setRightOpen(false)}
-                />
-                <motion.div
-                  initial={{ x: "100%" }}
-                  animate={{ x: 0 }}
-                  exit={{ x: "100%" }}
-                  transition={{ type: "spring", damping: 28, stiffness: 200 }}
-                  className="fixed right-0 top-0 h-full z-[70] border-l border-white/5 overflow-hidden bg-[#0a0a0f]/95 backdrop-blur-3xl pointer-events-auto shadow-2xl"
-                  style={{ width: isMobile ? effectiveRWidth : rightWidth }}
-                >
-                  <div className="h-full relative">
-                    {rightSidebar}
-                    {isMobile && (
-                      <button onClick={() => setRightOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-[101]">
-                        <X className="w-5 h-5" />
-                      </button>
-                    )}
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-        ) : (
+        {/* ── Left panels (combined container) — desktop only ──────────── */}
+        {!activeOverlay && leftSidebar && (
           <motion.div
-            style={{ width: smoothR }}
-            className="absolute right-0 top-0 h-full z-[60] border-l border-white/5 overflow-hidden"
+            className="absolute left-0 top-0 bottom-0 z-40 flex border-r border-white/5"
+            style={{ width: smoothL, background: '#0a0a14' }}
           >
-            <div style={{ width: effectiveRWidth, height: '100%' }}>
+            {/* L1: Master Sidebar */}
+            <motion.div
+              className="h-full flex-shrink-0"
+              style={{ width: smoothL1 }}
+            >
+              <div className="h-full overflow-hidden">
+                {leftSidebar}
+              </div>
+            </motion.div>
+
+            {/* L2: Secondary Panel */}
+            {leftSecondarySidebar && (
+              <motion.div
+                className="h-full flex-shrink-0"
+                style={{ width: smoothL2 }}
+              >
+                <div className="h-full overflow-hidden">
+                  {leftSecondarySidebar}
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── Right sidebar — desktop only ─────────────────────────────── */}
+        {!activeOverlay && rightSidebar && (
+          <motion.div
+            className="absolute right-0 top-0 bottom-0 z-40 border-l border-white/5"
+            style={{ width: smoothR, background: '#0a0a14' }}
+          >
+            <div className="h-full overflow-hidden">
               {rightSidebar}
             </div>
           </motion.div>
         )}
 
-        {/* ── LEFT TOGGLE BUTTON (2-ZONE) ── */}
-        {setLeftOpen && (
+        {/* ── Overlay backdrops (mobile/tablet) ────────────────────────── */}
+        {activeOverlay && (mobileL1Open || mobileL2Open || mobileROpen) && (
           <motion.div
+            className="fixed inset-0 z-30 bg-black/60"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => {
+              if (mobileROpen) handleMobileClose('R');
+              else if (mobileL2Open) handleMobileClose('L2');
+              else if (mobileL1Open) handleMobileClose('L1');
+            }}
+          />
+        )}
+
+        {/* ── Overlay panels (mobile/tablet slide-in) ──────────────────── */}
+        {activeOverlay && leftSidebar && (
+          <AnimatePresence>
+            {mobileL1Open && (
+              <motion.div
+                className="fixed top-0 left-0 bottom-0 z-35"
+                style={{ width: getL1Width() }}
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+              >
+                <div className="h-full overflow-hidden" style={{ background: '#0a0a14' }}>
+                  {leftSidebar}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+
+        {activeOverlay && leftSecondarySidebar && (
+          <AnimatePresence>
+            {mobileL2Open && (
+              <motion.div
+                className="fixed top-0 bottom-0 z-35"
+                style={{
+                  width: getL2Width(),
+                  left: mobileL1Open ? effectiveL1Width : 0,
+                }}
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+              >
+                <div className="h-full overflow-hidden" style={{ background: '#0a0a14' }}>
+                  {leftSecondarySidebar}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+
+        {activeOverlay && rightSidebar && (
+          <AnimatePresence>
+            {mobileROpen && (
+              <motion.div
+                className="fixed top-0 right-0 bottom-0 z-35"
+                style={{ width: getRWidth() }}
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+              >
+                <div className="h-full overflow-hidden" style={{ background: '#0a0a14' }}>
+                  {rightSidebar}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+
+        {/* ── Main content area ────────────────────────────────────────── */}
+        <motion.div
+          className="h-full relative z-10"
+          style={{
+            paddingLeft: activeOverlay ? 0 : smoothL,
+            paddingRight: activeOverlay ? 0 : smoothR,
+          }}
+        >
+          {children}
+        </motion.div>
+
+        {/* ── Mobile Panel Controls (SWAP + CLOSE / reopen) ────────────── */}
+        {activeOverlay && (
+          <MobilePanelControls color={accentColor} />
+        )}
+
+        {/* ── Toggle buttons (desktop only, not narrow) ────────────────── */}
+        {!activeOverlay && leftSidebar && (
+          <motion.div
+            className="absolute top-1/2 -translate-y-1/2 z-50 flex flex-col"
             style={{ x: smoothL }}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-[100]"
           >
-            <AnimatePresence mode="wait">
-              {/* State 3: Everything closed — single expand-all button */}
-              {(!leftOpen && !leftSecondaryOpen) && (
-                <motion.div
-                  key="expand-all"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <button
-                    onClick={() => { setLeftOpen(true); setLeftSecondaryOpen?.(true); }}
-                    className="w-14 h-14 flex items-center justify-center rounded-2xl bg-[#0a0a0f]/80 backdrop-blur-3xl border border-white/10 hover:bg-white/10 transition-colors duration-200 text-zinc-500 hover:text-white shadow-2xl"
-                    title="Expand All Panels"
-                  >
-                    <Layout className="w-5 h-5 translate-y-[1px]" />
-                  </button>
-                </motion.div>
-              )}
+            {/* L1 toggle */}
+            <button
+              onClick={handleToggleL1}
+              className="p-1.5 rounded-r-lg bg-[#0a0a14] border border-l-0 border-white/5 text-zinc-500 hover:text-white transition-colors cursor-pointer"
+              aria-label={effL1 ? 'Close sidebar' : 'Open sidebar'}
+            >
+              {effL1 ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5" />}
+            </button>
 
-              {/* Compound Unified Toggle (Master + Studio) */}
-              {(leftOpen || leftSecondaryOpen) && (
-                <motion.div
-                  key="unified-toggle"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <div className="flex bg-[#0a0a0f]/80 backdrop-blur-3xl border border-white/10 border-l-0 rounded-r-2xl overflow-hidden shadow-2xl">
-                    {/* Zone 1: Secondary Panel Toggle (Left) */}
-                    <button
-                      onClick={() => setLeftSecondaryOpen?.(!leftSecondaryOpen)}
-                      className="w-8 h-12 flex items-center justify-center text-zinc-600 hover:text-primary transition-colors duration-200"
-                      title={leftSecondaryOpen ? "Close Studio Panel" : "Open Studio Panel"}
-                    >
-                      <ChevronLeft className={`w-4 h-4 transition-transform duration-500 ${!leftSecondaryOpen ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {/* Zone 2: Close/Fold (Right - Ported from Sidebar Header) */}
-                    <button
-                      onClick={() => setLeftOpen(!leftOpen)}
-                      className="w-10 h-12 flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all border-l border-white/5"
-                      title={leftOpen ? "Fold Workspace Strip" : "Expand Workspace Strip"}
-                    >
-                      {leftOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* L2 toggle (only if secondary panel exists) */}
+            {leftSecondarySidebar && (
+              <button
+                onClick={handleToggleL2}
+                className="p-1.5 rounded-r-lg bg-[#0a0a14] border border-l-0 border-white/5 text-zinc-500 hover:text-white transition-colors cursor-pointer mt-1"
+                aria-label={effL2 ? 'Close panel' : 'Open panel'}
+              >
+                {effL2 ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              </button>
+            )}
           </motion.div>
         )}
 
-        {setRightOpen && (
+        {/* ── Right sidebar toggle — desktop ───────────────────────────── */}
+        {!activeOverlay && rightSidebar && (
           <motion.button
-            initial={false}
+            className="absolute top-1/2 -translate-y-1/2 z-50 p-1.5 rounded-l-lg bg-[#0a0a14] border border-r-0 border-white/5 text-zinc-500 hover:text-white transition-colors cursor-pointer"
             style={{ x: rightToggleX }}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-[100] flex items-center justify-center w-7 h-14 rounded-l-xl bg-[#0a0a0f]/80 backdrop-blur-2xl border border-white/10 border-r-0 hover:bg-white/10 transition-colors duration-200 text-zinc-500 hover:text-white shadow-2xl"
-            onClick={() => {
-              if (onRightToggle) { onRightToggle(); return; }
-              setRightOpen(v => !v);
-            }}
+            onClick={handleToggleR}
+            aria-label={effR ? 'Close archive' : 'Open archive'}
           >
-            <motion.div
-              animate={{ rotate: rightOpen ? 0 : 180 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            >
-              <PanelRightClose className="w-3.5 h-3.5" />
-            </motion.div>
+            {effR ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
           </motion.button>
         )}
 
+        {/* ── Archive toggle — mobile/tablet (moves with panel edge) ───── */}
+        {activeOverlay && rightSidebar && (
+          <motion.button
+            className="fixed top-1/2 z-50 flex items-center justify-center w-10 h-10 rounded-l-xl bg-[#0a0a14]/80 backdrop-blur-sm border border-r-0 border-white/10 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            style={{ right: 0, x: rightToggleX }}
+            onClick={handleToggleR}
+            aria-label={effR ? 'Close archive' : 'Open archive'}
+          >
+            {effR ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+          </motion.button>
+        )}
+
+        {/* ── Bottom HUD ───────────────────────────────────────────────── */}
+        {bottomHUD && <div className="absolute bottom-0 left-0 right-0 z-50 pointer-events-none">{bottomHUD}</div>}
       </div>
     </StudioLayoutContext.Provider>
   );
 }
-
-
-

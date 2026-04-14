@@ -1,82 +1,153 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 
 /**
- * ForumAnimatedBg — Combined animated background for the forum page.
- * Layers (all on a single 2D canvas for performance):
- *  1. Subtle grid
- *  2. Floating particles with constellation-style connecting lines
- *  3. Large glowing orbs (purple/blue) with slow drift
- *  4. Mouse-reactive glow (particles near cursor get brighter)
+ * ForumAnimatedBg — Premium animated background for the forum.
+ *
+ * Layers (single 2D canvas, GPU-friendly):
+ *  1. Dot-grid pattern (subtle, premium feel)
+ *  2. Large ambient gradient orbs with slow parallax drift
+ *  3. Multi-layer particles: tiny "dust" + medium "stars" + bright "diamonds"
+ *  4. Constellation connection lines between nearby particles
+ *  5. Slow horizontal light-sweep (premium accent)
+ *  6. Subtle vignette for depth
+ *
+ * No mouse-reactive glow — clean, professional, always-on animation.
  */
 export default function ForumAnimatedBg() {
   const canvasRef = useRef(null);
-  const mouseRef = useRef({ x: -9999, y: -9999 });
   const animRef = useRef(null);
   const particlesRef = useRef([]);
   const orbsRef = useRef([]);
+  const sweepsRef = useRef([]);
 
   const CONFIG = useRef({
-    particleCount: 80,
-    connectionDistance: 150,
-    mouseRadius: 200,
-    particleSpeed: 0.3,
-    orbCount: 5,
-    gridSize: 60,
-    gridOpacity: 0.03,
+    // Particles — 3 tiers for depth
+    dustCount: 60,
+    starCount: 35,
+    diamondCount: 8,
+    connectionDistance: 160,
+    particleSpeed: 0.25,
+
+    // Orbs
+    orbCount: 6,
+
+    // Grid
+    dotSpacing: 40,
+    dotRadius: 0.6,
+    dotOpacity: 0.06,
+
+    // Light sweeps
+    sweepCount: 2,
+
+    // Colors — premium palette: deep purple, electric blue, warm gold
     colors: {
-      particle: [139, 92, 246],   // purple
-      particleAlt: [59, 130, 246], // blue
+      purple: [139, 92, 246],
+      blue: [96, 165, 250],
+      gold: [251, 191, 36],
+      violet: [196, 130, 252],
+      cyan: [34, 211, 238],
       line: [139, 92, 246],
-      orb1: [139, 92, 246],       // purple
-      orb2: [59, 130, 246],       // blue
-      orb3: [168, 85, 247],       // violet
     }
   }).current;
 
+  const pickColor = useCallback((palette) => {
+    const keys = Object.keys(palette).filter(k => k !== 'line');
+    return palette[keys[Math.floor(Math.random() * keys.length)]];
+  }, []);
+
   const createParticles = useCallback((w, h) => {
     const particles = [];
-    for (let i = 0; i < CONFIG.particleCount; i++) {
+
+    // Tier 1: Dust — tiny, slow, very subtle
+    for (let i = 0; i < CONFIG.dustCount; i++) {
+      particles.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * CONFIG.particleSpeed * 0.3,
+        vy: (Math.random() - 0.5) * CONFIG.particleSpeed * 0.3 - 0.05,
+        radius: Math.random() * 0.8 + 0.3,
+        color: CONFIG.colors.purple,
+        pulse: Math.random() * Math.PI * 2,
+        pulseSpeed: Math.random() * 0.008 + 0.003,
+        tier: 'dust',
+        baseOpacity: 0.15,
+      });
+    }
+
+    // Tier 2: Stars — medium, moderate glow
+    for (let i = 0; i < CONFIG.starCount; i++) {
       particles.push({
         x: Math.random() * w,
         y: Math.random() * h,
         vx: (Math.random() - 0.5) * CONFIG.particleSpeed,
-        vy: (Math.random() - 0.5) * CONFIG.particleSpeed - 0.1,
-        radius: Math.random() * 2 + 0.5,
-        color: Math.random() > 0.5 ? CONFIG.colors.particle : CONFIG.colors.particleAlt,
+        vy: (Math.random() - 0.5) * CONFIG.particleSpeed - 0.08,
+        radius: Math.random() * 1.5 + 0.8,
+        color: pickColor(CONFIG.colors),
         pulse: Math.random() * Math.PI * 2,
-        pulseSpeed: Math.random() * 0.02 + 0.005,
+        pulseSpeed: Math.random() * 0.015 + 0.005,
+        tier: 'star',
+        baseOpacity: 0.4,
       });
     }
+
+    // Tier 3: Diamonds — bright, larger, slow pulse, rare
+    for (let i = 0; i < CONFIG.diamondCount; i++) {
+      particles.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * CONFIG.particleSpeed * 0.5,
+        vy: (Math.random() - 0.5) * CONFIG.particleSpeed * 0.5 - 0.03,
+        radius: Math.random() * 2 + 1.5,
+        color: Math.random() > 0.5 ? CONFIG.colors.gold : CONFIG.colors.violet,
+        pulse: Math.random() * Math.PI * 2,
+        pulseSpeed: Math.random() * 0.01 + 0.004,
+        tier: 'diamond',
+        baseOpacity: 0.6,
+      });
+    }
+
     return particles;
-  }, [CONFIG]);
+  }, [CONFIG, pickColor]);
 
   const createOrbs = useCallback((w, h) => {
-    const orbs = [];
     const orbConfigs = [
-      { color: CONFIG.colors.orb1, size: 300, x: 0.2, y: 0.3 },
-      { color: CONFIG.colors.orb2, size: 250, x: 0.8, y: 0.7 },
-      { color: CONFIG.colors.orb3, size: 200, x: 0.5, y: 0.1 },
-      { color: CONFIG.colors.orb1, size: 350, x: 0.1, y: 0.8 },
-      { color: CONFIG.colors.orb2, size: 280, x: 0.9, y: 0.2 },
+      { color: CONFIG.colors.purple, size: 400, x: 0.15, y: 0.25 },
+      { color: CONFIG.colors.blue, size: 350, x: 0.8, y: 0.65 },
+      { color: CONFIG.colors.gold, size: 250, x: 0.5, y: 0.1 },
+      { color: CONFIG.colors.violet, size: 380, x: 0.1, y: 0.75 },
+      { color: CONFIG.colors.cyan, size: 300, x: 0.85, y: 0.15 },
+      { color: CONFIG.colors.purple, size: 450, x: 0.55, y: 0.85 },
     ];
-    for (let i = 0; i < CONFIG.orbCount && i < orbConfigs.length; i++) {
-      const cfg = orbConfigs[i];
-      orbs.push({
-        x: cfg.x * w,
-        y: cfg.y * h,
-        baseX: cfg.x * w,
-        baseY: cfg.y * h,
-        radius: cfg.size,
-        color: cfg.color,
-        phaseX: Math.random() * Math.PI * 2,
-        phaseY: Math.random() * Math.PI * 2,
-        speedX: Math.random() * 0.0003 + 0.0001,
-        speedY: Math.random() * 0.0003 + 0.0001,
-        amplitudeX: Math.random() * 100 + 50,
-        amplitudeY: Math.random() * 80 + 40,
+    return orbConfigs.map((cfg) => ({
+      x: cfg.x * w,
+      y: cfg.y * h,
+      baseX: cfg.x * w,
+      baseY: cfg.y * h,
+      radius: cfg.size,
+      color: cfg.color,
+      phaseX: Math.random() * Math.PI * 2,
+      phaseY: Math.random() * Math.PI * 2,
+      speedX: Math.random() * 0.0002 + 0.00008,
+      speedY: Math.random() * 0.0002 + 0.00008,
+      amplitudeX: Math.random() * 120 + 60,
+      amplitudeY: Math.random() * 100 + 50,
+      opacity: 0.04 + Math.random() * 0.02,
+    }));
+  }, [CONFIG]);
+
+  const createSweeps = useCallback((w, h) => {
+    const sweeps = [];
+    for (let i = 0; i < CONFIG.sweepCount; i++) {
+      sweeps.push({
+        y: Math.random() * h,
+        speed: Math.random() * 0.3 + 0.15,
+        width: Math.random() * 200 + 150,
+        color: i === 0 ? CONFIG.colors.purple : CONFIG.colors.blue,
+        opacity: 0.015 + Math.random() * 0.01,
+        phase: Math.random() * Math.PI * 2,
       });
     }
-    return orbs;
+    return sweeps;
   }, [CONFIG]);
 
   useEffect(() => {
@@ -90,6 +161,7 @@ export default function ForumAnimatedBg() {
 
     particlesRef.current = createParticles(w, h);
     orbsRef.current = createOrbs(w, h);
+    sweepsRef.current = createSweeps(w, h);
 
     const handleResize = () => {
       w = window.innerWidth;
@@ -98,21 +170,10 @@ export default function ForumAnimatedBg() {
       canvas.height = h;
       particlesRef.current = createParticles(w, h);
       orbsRef.current = createOrbs(w, h);
-    };
-
-    const handleMouseMove = (e) => {
-      mouseRef.current.x = e.clientX;
-      mouseRef.current.y = e.clientY;
-    };
-
-    const handleMouseLeave = () => {
-      mouseRef.current.x = -9999;
-      mouseRef.current.y = -9999;
+      sweepsRef.current = createSweeps(w, h);
     };
 
     window.addEventListener('resize', handleResize);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseleave', handleMouseLeave);
 
     // ── Animation Loop ──
     let time = 0;
@@ -120,44 +181,57 @@ export default function ForumAnimatedBg() {
       time++;
       ctx.clearRect(0, 0, w, h);
 
-      // ── 1. Grid ──
-      ctx.strokeStyle = `rgba(139, 92, 246, ${CONFIG.gridOpacity})`;
-      ctx.lineWidth = 0.5;
-      const gs = CONFIG.gridSize;
-      for (let x = 0; x <= w; x += gs) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, h);
-        ctx.stroke();
-      }
-      for (let y = 0; y <= h; y += gs) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
+      // ═══════════════════════════════════════
+      //  LAYER 1: Dot Grid
+      // ═══════════════════════════════════════
+      const gs = CONFIG.dotSpacing;
+      ctx.fillStyle = `rgba(139, 92, 246, ${CONFIG.dotOpacity})`;
+      for (let x = gs / 2; x < w; x += gs) {
+        for (let y = gs / 2; y < h; y += gs) {
+          ctx.beginPath();
+          ctx.arc(x, y, CONFIG.dotRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
-      // ── 2. Glowing Orbs ──
+      // ═══════════════════════════════════════
+      //  LAYER 2: Ambient Gradient Orbs
+      // ═══════════════════════════════════════
       ctx.globalCompositeOperation = 'lighter';
       for (const orb of orbsRef.current) {
         orb.x = orb.baseX + Math.sin(time * orb.speedX + orb.phaseX) * orb.amplitudeX;
         orb.y = orb.baseY + Math.cos(time * orb.speedY + orb.phaseY) * orb.amplitudeY;
 
-        const gradient = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, orb.radius);
         const [r, g, b] = orb.color;
-        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.06)`);
-        gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.02)`);
+        const gradient = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, orb.radius);
+        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${orb.opacity})`);
+        gradient.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, ${orb.opacity * 0.4})`);
         gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(orb.x, orb.y, orb.radius, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      // ═══════════════════════════════════════
+      //  LAYER 3: Light Sweeps
+      // ═══════════════════════════════════════
+      for (const sweep of sweepsRef.current) {
+        const sweepY = (sweep.y + time * sweep.speed) % (h + sweep.width * 2) - sweep.width;
+        const [r, g, b] = sweep.color;
+        const grad = ctx.createLinearGradient(0, sweepY - sweep.width / 2, 0, sweepY + sweep.width / 2);
+        grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0)`);
+        grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${sweep.opacity})`);
+        grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, sweepY - sweep.width / 2, w, sweep.width);
+      }
       ctx.globalCompositeOperation = 'source-over';
 
-      // ── 3. Particles + Connections ──
+      // ═══════════════════════════════════════
+      //  LAYER 4: Particles + Constellation Lines
+      // ═══════════════════════════════════════
       const particles = particlesRef.current;
-      const mouse = mouseRef.current;
 
       // Update positions
       for (const p of particles) {
@@ -165,53 +239,101 @@ export default function ForumAnimatedBg() {
         p.y += p.vy;
         p.pulse += p.pulseSpeed;
 
-        // Wrap around edges
-        if (p.x < -10) p.x = w + 10;
-        if (p.x > w + 10) p.x = -10;
-        if (p.y < -10) p.y = h + 10;
-        if (p.y > h + 10) p.y = -10;
+        // Wrap around edges with padding
+        if (p.x < -20) p.x = w + 20;
+        if (p.x > w + 20) p.x = -20;
+        if (p.y < -20) p.y = h + 20;
+        if (p.y > h + 20) p.y = -20;
       }
 
-      // Draw connections (constellation lines)
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
+      // Constellation lines (only between stars and diamonds, not dust)
+      const connectable = particles.filter(p => p.tier !== 'dust');
+      for (let i = 0; i < connectable.length; i++) {
+        for (let j = i + 1; j < connectable.length; j++) {
+          const dx = connectable[i].x - connectable[j].x;
+          const dy = connectable[i].y - connectable[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < CONFIG.connectionDistance) {
-            const opacity = (1 - dist / CONFIG.connectionDistance) * 0.12;
+            const opacity = (1 - dist / CONFIG.connectionDistance) * 0.08;
             const [r, g, b] = CONFIG.colors.line;
             ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
             ctx.lineWidth = 0.5;
             ctx.beginPath();
-            ctx.moveTo(particles[i].x, particles[i].y);
-            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.moveTo(connectable[i].x, connectable[i].y);
+            ctx.lineTo(connectable[j].x, connectable[j].y);
             ctx.stroke();
           }
         }
       }
 
-      // Draw particles
+      // Draw particles by tier
       for (const p of particles) {
-        const pulseFactor = 0.7 + Math.sin(p.pulse) * 0.3;
+        const pulseFactor = 0.6 + Math.sin(p.pulse) * 0.4;
         const [r, g, b] = p.color;
-        const finalOpacity = Math.min(0.5 * pulseFactor, 1);
+        const finalOpacity = Math.min(p.baseOpacity * pulseFactor, 1);
 
-        // Glow
-        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 4);
-        glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${finalOpacity * 0.5})`);
-        glow.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius * 4, 0, Math.PI * 2);
-        ctx.fill();
+        if (p.tier === 'dust') {
+          // Simple dot, no glow
+          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${finalOpacity})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.tier === 'star') {
+          // Soft glow
+          const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 3);
+          glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${finalOpacity * 0.4})`);
+          glow.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius * 3, 0, Math.PI * 2);
+          ctx.fill();
 
-        // Core dot
-        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${finalOpacity})`;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius * pulseFactor, 0, Math.PI * 2);
-        ctx.fill();
+          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${finalOpacity})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius * pulseFactor, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (p.tier === 'diamond') {
+          // Bright multi-layer glow + cross sparkle
+          const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 5);
+          glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${finalOpacity * 0.5})`);
+          glow.addColorStop(0.3, `rgba(${r}, ${g}, ${b}, ${finalOpacity * 0.15})`);
+          glow.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius * 5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Core
+          ctx.fillStyle = `rgba(255, 255, 255, ${finalOpacity * 0.7})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius * 0.5 * pulseFactor, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Cross sparkle
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${finalOpacity * 0.3})`;
+          ctx.lineWidth = 0.5;
+          const sparkleLen = p.radius * 3 * pulseFactor;
+          ctx.beginPath();
+          ctx.moveTo(p.x - sparkleLen, p.y);
+          ctx.lineTo(p.x + sparkleLen, p.y);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y - sparkleLen);
+          ctx.lineTo(p.x, p.y + sparkleLen);
+          ctx.stroke();
+          ctx.globalCompositeOperation = 'source-over';
+        }
       }
+
+      // ═══════════════════════════════════════
+      //  LAYER 5: Vignette
+      // ═══════════════════════════════════════
+      const vignette = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.25, w / 2, h / 2, Math.max(w, h) * 0.75);
+      vignette.addColorStop(0, 'rgba(10, 10, 26, 0)');
+      vignette.addColorStop(1, 'rgba(10, 10, 26, 0.35)');
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, w, h);
 
       animRef.current = requestAnimationFrame(animate);
     };
@@ -221,20 +343,15 @@ export default function ForumAnimatedBg() {
     return () => {
       cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseleave', handleMouseLeave);
     };
-  }, [CONFIG, createParticles, createOrbs]);
+  }, [CONFIG, createParticles, createOrbs, createSweeps, pickColor]);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#0a0a1a]">
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
-        style={{ opacity: 1 }}
       />
-      {/* Very subtle depth overlay — keeps text readable without darkening */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a1a]/20 via-transparent to-[#0a0a1a]/30" />
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { ALL_MODELS, getModel, findModelGroup, findModelCat } from "./models";
 import ChatPanel from "./ChatPanel";
 import ImagePanel from "./ImagePanel";
 import AudioPanel from "./AudioPanel";
-import Trellis2Panel from "./meshy/Meshy";
+import MeshyStudio from "./meshy/Meshy";
 import TrellisPanel from "./trellis/TrellisPanel";
 import TripoPanel from "./tripo/TripoPanel";
 import { MyUserContext } from "../context/MyUserProvider";
@@ -119,7 +119,18 @@ export default function AIChat({ user, getIdToken }) {
       getIdToken,
       setSidebarOpen,
       isGlobalOpen: desktopSidebarOpen, // MASTER SYNC
-      toggleGlobalSidebar: toggleDesktopSidebar
+      toggleGlobalSidebar: toggleDesktopSidebar,
+      globalSidebar: (
+        <AiStudioSidebar
+          selectedAI={selectedAI}
+          openGroups={openGroups}
+          openCats={openCats}
+          toggleGroup={toggleGroup}
+          toggleCat={toggleCat}
+          handleSelectModel={handleSelectModel}
+          setSidebarOpen={setSidebarOpen}
+        />
+      )
     };
     switch (selectedModel.panelType) {
       case "chat":
@@ -129,7 +140,7 @@ export default function AIChat({ user, getIdToken }) {
       case "audio":
         return <AudioPanel {...props} />;
       case "threed":
-        return <Trellis2Panel {...props} />;
+        return <MeshyStudio {...props} />;
       case "trellis":
         return <TrellisPanel {...props} />;
       case "tripo":
@@ -142,31 +153,8 @@ export default function AIChat({ user, getIdToken }) {
   const is3D = ["threed", "trellis", "tripo"].includes(selectedModel?.panelType);
 
   return (
-    <div className="flex w-full h-full bg-[#0a0a0f] transition-all duration-300 overflow-hidden relative z-10 flex-1">
+    <div className="flex w-full h-full bg-[#0a0a0f] overflow-hidden relative z-10 flex-1">
       <BackgroundFilters />
-
-
-
-      {/* Sidebar - Desktop */}
-      <div className="hidden lg:block h-full flex-shrink-0 relative z-20">
-        <motion.aside 
-          style={{ width: smoothWidth }}
-          className="h-full overflow-hidden"
-        >
-          <div className="w-[320px] h-full overflow-hidden">
-            <AiStudioSidebar
-              selectedAI={selectedAI}
-              openGroups={openGroups}
-              openCats={openCats}
-              toggleGroup={toggleGroup}
-              toggleCat={toggleCat}
-              handleSelectModel={handleSelectModel}
-              setSidebarOpen={setSidebarOpen}
-            />
-          </div>
-        </motion.aside>
-
-      </div>
 
       {/* Sidebar - Mobile Overlay */}
       <AnimatePresence>

@@ -5,10 +5,15 @@ import App from './App.jsx'
 import "tailwindcss";
 import { BrowserRouter } from 'react-router-dom';
 import MyUserProvider from './context/MyUserProvider.jsx';
+import { StudioPanelProvider } from './context/StudioPanelContext.jsx';
 createRoot(document.getElementById('root')).render(
-  <MyUserProvider>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </MyUserProvider>
+  <StrictMode>
+    <MyUserProvider>
+      <StudioPanelProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </StudioPanelProvider>
+    </MyUserProvider>
+  </StrictMode>
 )

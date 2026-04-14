@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 
 import StudioLayout from "../../components/shared/StudioLayout";
+import { useStudioPanels } from "../../context/StudioPanelContext";
 
 // ── Sub-modules ────────────────────────────────────────────────────────────
 import ThreeViewer from "./viewer/ThreeViewer";
@@ -59,7 +60,7 @@ import {
 const PROMPT_MAX = 600;
 const LS_KEY = "meshy_panel_history_v1";
 const POLL_MS = 2500;
-const API_BASE = "/api/meshy";
+const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/meshy`;
 
 // ── localStorage helpers ───────────────────────────────────────────────────
 const loadHistory = () => {
@@ -530,8 +531,21 @@ function WireframeControl({
   );
 }
 
-export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlobalOpen, toggleGlobalSidebar }) {
+export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+  const { registerPanel, unregisterPanel } = useStudioPanels();
   const color = selectedModel?.color || "#06b6d4";
+
+  // Register panels with centralized manager
+  useEffect(() => {
+    registerPanel('L1');
+    registerPanel('L2');
+    registerPanel('R');
+    return () => {
+      unregisterPanel('L1');
+      unregisterPanel('L2');
+      unregisterPanel('R');
+    };
+  }, [registerPanel, unregisterPanel]);
 
   // ── Input & generation state ─────────────────────────────────────────────
   const [inputMode, setInputMode] = useState("text");
@@ -853,7 +867,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
   }, [history, histSearch]);
 
   return (
-    <>
+    <div className="flex-1 flex flex-col h-full w-full bg-[#03000a] text-white overflow-hidden relative font-['Outfit']">
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .animate-spin { animation: spin 1s linear infinite; }
@@ -872,112 +886,147 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
         setLeftSecondaryOpen={setLeftSecondaryOpen}
         rightOpen={rightOpen}
         setRightOpen={setRightOpen}
-        leftWidth={72}
-        leftSecondaryWidth={320}
+        leftWidth={320}
+        leftSecondaryWidth={392}
+        leftSecondaryClosedWidth={0}
         rightWidth={320}
         onOffsetChange={setOffsets}
-        leftSidebar={
-          <div className="h-full flex flex-col items-center pt-6 bg-[#030308] border-r border-white/5">
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-lg mb-8"
-              style={{ backgroundColor: `${color}15`, borderColor: `${color}30`, color }}
-              title="Forge Station"
-            >
-              <Sparkles className="w-6 h-6" />
-            </div>
-            
-            <button
-              onClick={() => setLeftSecondaryOpen(!leftSecondaryOpen)}
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${
-                leftSecondaryOpen 
-                  ? "bg-white/10 border-white/20 text-white shadow-lg shadow-white/5" 
-                  : "bg-transparent border-transparent text-zinc-600 hover:text-zinc-400"
-              }`}
-              style={leftSecondaryOpen ? { borderColor: `${color}40`, color } : {}}
-              title="Meshy Generation Controls"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-          </div>
-        }
+        leftSidebar={globalSidebar}
         leftSecondarySidebar={
-          <div className="h-full flex flex-col overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5 tp-scroll">
-            <div className="p-6 border-b border-white/5 bg-white/[0.01]">
-              <div className="flex bg-white/[0.02] border border-white/5 rounded-xl p-1 mb-2">
-                {[
-                  { id: "text", label: "Neural Prompt", icon: <Type className="w-3 h-3" /> },
-                  { id: "image", label: "Image Reference", icon: <ImageIcon className="w-3 h-3" /> },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setInputMode(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer border-none ${inputMode === tab.id ? 'bg-white/5 text-white' : 'text-zinc-600 hover:text-zinc-400'
+          <div className="h-full flex flex-row overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
+            {/* Tool Strip (72px) */}
+            <div className="w-[72px] h-full flex flex-col items-center pt-6 space-y-4 border-r border-white/5 bg-[#030308]">
+              {[
+                { id: 'model', label: 'MODEL', icon: <Sparkles className="w-5 h-5" />, color },
+                { id: 'segment', label: 'SEGMENT', icon: <Box className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'retopo', label: 'RETOPO', icon: <Layers className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'texture', label: 'TEXTURE', icon: <Paintbrush2 className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'edit', label: 'EDIT', icon: <Wand2 className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'refine', label: 'REFINE', icon: <RefreshCw className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'stylize', label: 'STYLIZE', icon: <Sparkles className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'animate', label: 'ANIMATE', icon: <PersonStanding className="w-5 h-5" />, color: '#94a3b8' },
+              ].map((tool, idx) => (
+                <button
+                  key={tool.id}
+                  className={`group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer ${idx === 0 ? 'mb-4' : ''}`}
+                >
+                  <div
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${idx === 0
+                      ? "bg-white/5 border-white/10 shadow-xl"
+                      : "bg-transparent border-transparent"
                       }`}
+                    style={idx === 0 ? { borderColor: `${tool.color}40`, color: tool.color } : { color: '#52525b' }}
                   >
-                    {tab.icon} {tab.label}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4">
-                <BgColorPicker value={bgColor} onChange={setBgColor} />
-              </div>
+                    {tool.icon}
+                  </div>
+                  <AnimatePresence mode="wait">
+                    {leftSecondaryOpen && (
+                      <motion.span
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 overflow-hidden ${idx === 0 ? 'text-white' : 'text-zinc-700'}`}
+                      >
+                        {tool.label}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </button>
+              ))}
+
+              <div className="flex-1" />
+
+              <button
+                onClick={() => setLeftSecondaryOpen(!leftSecondaryOpen)}
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${leftSecondaryOpen
+                  ? "bg-white/10 border-white/20 text-white shadow-lg"
+                  : "bg-transparent border-transparent text-zinc-600 hover:text-zinc-400"
+                  }`}
+                title="Toggle Panel"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-              {inputMode === "image" ? (
-                <>
-                  <div className="flex items-center gap-2 mb-3 px-1">
-                    <ImageIcon className="w-3 h-3 text-zinc-700" />
-                    <span className="text-zinc-600 font-black text-[9px] uppercase tracking-[0.4em] italic">Visual Seed</span>
-                  </div>
-                  <div
-                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = color; }}
-                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)"; }}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square rounded-2xl border-2 border-dashed border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-all cursor-pointer flex flex-col items-center justify-center p-4 relative overflow-hidden group/drop"
-                  >
-                    {imagePreview ? (
-                      <div className="absolute inset-0">
-                        <img src={imagePreview} alt="preview" className="w-full h-full object-cover transition-transform duration-700 group-hover/drop:scale-110" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/drop:opacity-100 transition-opacity flex items-center justify-center">
-                          <p className="text-white font-black text-[10px] uppercase tracking-widest">Swap Reference</p>
-                        </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }}
-                          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/80 text-red-400 border-none cursor-pointer flex items-center justify-center hover:scale-110 transition-all z-10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <Upload className="w-8 h-8 text-zinc-700 mb-2" />
-                        <p className="text-zinc-600 text-[9px] font-black uppercase tracking-widest text-center">Drop image or click to upload</p>
-                      </>
-                    )}
-                  </div>
-                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleDrop({ ...e, dataTransfer: { files: e.target.files } })} />
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-3 px-1">
-                    <div className="flex items-center gap-2">
-                      <Wand2 className="w-3.5 h-3.5 text-zinc-400" />
-                      <span className="text-zinc-200 font-black text-[10px] uppercase tracking-[0.4em] italic">Neural Prompt</span>
+            {/* Side Panel Content (320px) */}
+            <div className="flex-1 overflow-hidden tp-scroll h-full">
+              <div className="p-6 border-b border-white/5 bg-white/[0.01]">
+                <div className="flex bg-white/[0.02] border border-white/5 rounded-xl p-1 mb-2">
+                  {[
+                    { id: "text", label: "Neural Prompt", icon: <Type className="w-3 h-3" /> },
+                    { id: "image", label: "Image Reference", icon: <ImageIcon className="w-3 h-3" /> },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setInputMode(tab.id)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer border-none ${inputMode === tab.id ? 'bg-white/5 text-white' : 'text-zinc-600 hover:text-zinc-400'
+                        }`}
+                    >
+                      {tab.icon} {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4">
+                  <BgColorPicker value={bgColor} onChange={setBgColor} />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide pb-32">
+                {inputMode === "image" ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                      <ImageIcon className="w-3 h-3 text-zinc-700" />
+                      <span className="text-zinc-600 font-black text-[9px] uppercase tracking-[0.4em] italic">Visual Seed</span>
                     </div>
-                  </div>
-                  <div className="relative group">
-                    <textarea
-                      value={prompt}
-                      maxLength={PROMPT_MAX}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      placeholder="CONSTRUCT MODEL FROM DESCRIPTIVE DATA..."
-                      className="w-full min-h-[140px] px-4 py-4 rounded-2xl text-[11px] font-black uppercase tracking-tight text-zinc-200 bg-white/[0.01] border border-white/5 hover:border-white/10 focus:border-zinc-500 outline-none transition-all resize-none placeholder:text-zinc-800 scrollbar-hide"
-                    />
-                  </div>
-                </>
-              )}
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = color; }}
+                      onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)"; }}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="aspect-square rounded-2xl border-2 border-dashed border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-all cursor-pointer flex flex-col items-center justify-center p-4 relative overflow-hidden group/drop"
+                    >
+                      {imagePreview ? (
+                        <div className="absolute inset-0">
+                          <img src={imagePreview} alt="preview" className="w-full h-full object-cover transition-transform duration-700 group-hover/drop:scale-110" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/drop:opacity-100 transition-opacity flex items-center justify-center">
+                            <p className="text-white font-black text-[10px] uppercase tracking-widest">Swap Reference</p>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }}
+                            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/80 text-red-400 border-none cursor-pointer flex items-center justify-center hover:scale-110 transition-all z-10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 text-zinc-700 mb-2" />
+                          <p className="text-zinc-600 text-[9px] font-black uppercase tracking-widest text-center">Drop image or click to upload</p>
+                        </>
+                      )}
+                    </div>
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleDrop({ ...e, dataTransfer: { files: e.target.files } })} />
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-3 px-1">
+                      <div className="flex items-center gap-2">
+                        <Wand2 className="w-3.5 h-3.5 text-zinc-400" />
+                        <span className="text-zinc-200 font-black text-[10px] uppercase tracking-[0.4em] italic">Neural Prompt</span>
+                      </div>
+                    </div>
+                    <div className="relative group">
+                      <textarea
+                        value={prompt}
+                        maxLength={PROMPT_MAX}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="CONSTRUCT MODEL FROM DESCRIPTIVE DATA..."
+                        className="w-full min-h-[140px] px-4 py-4 rounded-2xl text-[11px] font-black uppercase tracking-tight text-zinc-200 bg-white/[0.01] border border-white/5 hover:border-white/10 focus:border-zinc-500 outline-none transition-all resize-none placeholder:text-zinc-800 scrollbar-hide"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
 
               <div className="mt-6 p-6 border-t border-white/5 bg-white/[0.01]">
                 {isRunning && (
@@ -1189,152 +1238,152 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
               </div>
             </div>
           )}
-            {/* Top toolbar (Floating) — STATION HUD ENTRY */}
-            <div
-              className="absolute top-24 left-1/2 -translate-x-1/2 flex items-center p-1.5 rounded-2xl border border-white/5 backdrop-blur-3xl shadow-2xl z-50 transition-all duration-700 hover:border-white/10"
-              style={{
-                background: "rgba(10,10,15,0.4)",
-                gap: 12,
-              }}
-            >
-              <div className="flex items-center gap-4 px-2">
-                <div className="flex items-center gap-1.5 mr-2">
-                  <div className="w-1 h-1 rounded-full animate-pulse shadow-[0_0_8px_#10b981]" style={{ background: color }} />
-                  <span className="text-zinc-600 font-black text-[9px] uppercase tracking-[0.4em] italic leading-none">Nézet</span>
-                </div>
-
-                {/* View mode buttons — STATION ENGINE SELECTORS */}
-                <div className="flex items-center gap-1">
-                  {VIEW_MODES.map((v) => (
-                    <Tooltip key={v.id} text={v.tip} side="bottom">
-                      <button
-                        onClick={() => setViewMode(v.id)}
-                        className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest cursor-pointer border-none transition-all duration-500 ${viewMode === v.id
-                            ? 'text-white'
-                            : 'text-zinc-600 hover:text-zinc-300'
-                          }`}
-                        style={viewMode === v.id ? {
-                          background: color,
-                          boxShadow: `0 0 15px ${color}40`,
-                        } : {
-                          background: 'rgba(255,255,255,0.02)'
-                        }}
-                      >
-                        {v.label}
-                      </button>
-                    </Tooltip>
-                  ))}
-
-                  {/* Wireframe Controls */}
-                  {modelUrl && (
-                    <div className="ml-1 border-l border-white/5 pl-2">
-                      <WireframeControl
-                        active={wireframeOverlay}
-                        onToggle={() => setWireframeOverlay((v) => !v)}
-                        opacity={wireOpacity}
-                        onOpacityChange={setWireOpacity}
-                        color={wireColor}
-                        onColorChange={setWireColor}
-                        accentColor={color}
-                      />
-                    </div>
-                  )}
-                </div>
+          {/* Top toolbar (Floating) — STATION HUD ENTRY */}
+          <div
+            className="absolute top-24 left-1/2 -translate-x-1/2 flex items-center p-1.5 rounded-2xl border border-white/5 backdrop-blur-3xl shadow-2xl z-50 transition-all duration-700 hover:border-white/10"
+            style={{
+              background: "rgba(10,10,15,0.4)",
+              gap: 12,
+            }}
+          >
+            <div className="flex items-center gap-4 px-2">
+              <div className="flex items-center gap-1.5 mr-2">
+                <div className="w-1 h-1 rounded-full animate-pulse shadow-[0_0_8px_#10b981]" style={{ background: color }} />
+                <span className="text-zinc-600 font-black text-[9px] uppercase tracking-[0.4em] italic leading-none">Nézet</span>
               </div>
 
-              {/* Right actions — STATION COMMANDS */}
-              <div className="flex items-center gap-1.5 border-l border-white/5 pl-4 ml-2 mr-2">
-                {modelUrl && (
-                  <div className="flex items-center gap-1.5">
-                    {[
-                      {
-                        label: "Remesh",
-                        icon: <Settings className="w-3 h-3" />,
-                        onClick: () => setShowRemesh(true),
-                      },
-                      {
-                        label: "Edit Texture",
-                        icon: <Paintbrush2 className="w-3 h-3" />,
-                        onClick: () => setShowEditTexture(true),
-                      },
-                      {
-                        label: "Animate",
-                        icon: <PersonStanding className="w-3 h-3" />,
-                        onClick: () => setShowAnimate(true),
-                      },
-                    ].map((btn) => (
-                      <button
-                        key={btn.label}
-                        onClick={btn.onClick}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-white bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 transition-all cursor-pointer"
-                      >
-                        {btn.icon} {btn.label}
-                      </button>
-                    ))}
-
+              {/* View mode buttons — STATION ENGINE SELECTORS */}
+              <div className="flex items-center gap-1">
+                {VIEW_MODES.map((v) => (
+                  <Tooltip key={v.id} text={v.tip} side="bottom">
                     <button
-                      onClick={() => setShowDownload(true)}
-                      className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] italic text-white transition-all cursor-pointer shadow-xl hover:scale-105 active:scale-95 border-none"
-                      style={{
-                        background: `linear-gradient(135deg, ${color}, #8b5cf6)`,
-                        boxShadow: `0 8px 32px ${color}33`,
+                      onClick={() => setViewMode(v.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest cursor-pointer border-none transition-all duration-500 ${viewMode === v.id
+                        ? 'text-white'
+                        : 'text-zinc-600 hover:text-zinc-300'
+                        }`}
+                      style={viewMode === v.id ? {
+                        background: color,
+                        boxShadow: `0 0 15px ${color}40`,
+                      } : {
+                        background: 'rgba(255,255,255,0.02)'
                       }}
                     >
-                      <Download className="w-3.5 h-3.5" /> Export
-                    </button>
-                    <div className="w-[1px] h-4 bg-white/5 mx-2" />
-                  </div>
-                )}
-
-                {/* Action Buttons Integration */}
-                <div className="flex items-center gap-1">
-                  <Tooltip text="Feltöltés (3D)" side="bottom">
-                    <button
-                      onClick={() => modelFileInputRef.current?.click()}
-                      className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 text-zinc-600 hover:text-zinc-300 transition-all cursor-pointer"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
+                      {v.label}
                     </button>
                   </Tooltip>
+                ))}
 
-                  <div className="flex items-center gap-1 border-l border-white/5 pl-2 ml-1">
-                    <div className="flex items-center gap-1 mr-1">
-                      <div className="w-1 h-1 rounded-full bg-zinc-800" />
-                      <span className="text-zinc-800 font-black text-[8px] uppercase tracking-[0.4em] italic leading-none">Fény</span>
-                    </div>
-                    <LightingControls
-                      viewMode={viewMode}
-                      lightMode={lightMode}
-                      setLightMode={setLightMode}
-                      lightStrength={lightStrength}
-                      setLightStrength={setLightStrength}
-                      lightRotation={lightRotation}
-                      setLightRotation={setLightRotation}
-                      lightAutoRotate={lightAutoRotate}
-                      setLightAutoRotate={setLightAutoRotate}
-                      lightAutoRotateSpeed={lightAutoRotateSpeed}
-                      setLightAutoRotateSpeed={setLightAutoRotateSpeed}
-                      dramaticColor={dramaticColor}
-                      setDramaticColor={setDramaticColor}
-                      bgLightOn={bgLightOn}
-                      setBgLightOn={setBgLightOn}
-                      bgLightColor={bgLightColor}
-                      setBgLightColor={setBgLightColor}
-                      bgLightSize={bgLightSize}
-                      setBgLightSize={setBgLightSize}
-                      bgLightIntensity={bgLightIntensity}
-                      setBgLightIntensity={setBgLightIntensity}
-                      gridColor1={gridColor1}
-                      setGridColor1={setGridColor1}
-                      gridColor2={gridColor2}
-                      setGridColor2={setGridColor2}
+                {/* Wireframe Controls */}
+                {modelUrl && (
+                  <div className="ml-1 border-l border-white/5 pl-2">
+                    <WireframeControl
+                      active={wireframeOverlay}
+                      onToggle={() => setWireframeOverlay((v) => !v)}
+                      opacity={wireOpacity}
+                      onOpacityChange={setWireOpacity}
+                      color={wireColor}
+                      onColorChange={setWireColor}
+                      accentColor={color}
                     />
                   </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right actions — STATION COMMANDS */}
+            <div className="flex items-center gap-1.5 border-l border-white/5 pl-4 ml-2 mr-2">
+              {modelUrl && (
+                <div className="flex items-center gap-1.5">
+                  {[
+                    {
+                      label: "Remesh",
+                      icon: <Settings className="w-3 h-3" />,
+                      onClick: () => setShowRemesh(true),
+                    },
+                    {
+                      label: "Edit Texture",
+                      icon: <Paintbrush2 className="w-3 h-3" />,
+                      onClick: () => setShowEditTexture(true),
+                    },
+                    {
+                      label: "Animate",
+                      icon: <PersonStanding className="w-3 h-3" />,
+                      onClick: () => setShowAnimate(true),
+                    },
+                  ].map((btn) => (
+                    <button
+                      key={btn.label}
+                      onClick={btn.onClick}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-white bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 transition-all cursor-pointer"
+                    >
+                      {btn.icon} {btn.label}
+                    </button>
+                  ))}
+
+                  <button
+                    onClick={() => setShowDownload(true)}
+                    className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] italic text-white transition-all cursor-pointer shadow-xl hover:scale-105 active:scale-95 border-none"
+                    style={{
+                      background: `linear-gradient(135deg, ${color}, #8b5cf6)`,
+                      boxShadow: `0 8px 32px ${color}33`,
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export
+                  </button>
+                  <div className="w-[1px] h-4 bg-white/5 mx-2" />
+                </div>
+              )}
+
+              {/* Action Buttons Integration */}
+              <div className="flex items-center gap-1">
+                <Tooltip text="Feltöltés (3D)" side="bottom">
+                  <button
+                    onClick={() => modelFileInputRef.current?.click()}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 text-zinc-600 hover:text-zinc-300 transition-all cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
+
+                <div className="flex items-center gap-1 border-l border-white/5 pl-2 ml-1">
+                  <div className="flex items-center gap-1 mr-1">
+                    <div className="w-1 h-1 rounded-full bg-zinc-800" />
+                    <span className="text-zinc-800 font-black text-[8px] uppercase tracking-[0.4em] italic leading-none">Fény</span>
+                  </div>
+                  <LightingControls
+                    viewMode={viewMode}
+                    lightMode={lightMode}
+                    setLightMode={setLightMode}
+                    lightStrength={lightStrength}
+                    setLightStrength={setLightStrength}
+                    lightRotation={lightRotation}
+                    setLightRotation={setLightRotation}
+                    lightAutoRotate={lightAutoRotate}
+                    setLightAutoRotate={setLightAutoRotate}
+                    lightAutoRotateSpeed={lightAutoRotateSpeed}
+                    setLightAutoRotateSpeed={setLightAutoRotateSpeed}
+                    dramaticColor={dramaticColor}
+                    setDramaticColor={setDramaticColor}
+                    bgLightOn={bgLightOn}
+                    setBgLightOn={setBgLightOn}
+                    bgLightColor={bgLightColor}
+                    setBgLightColor={setBgLightColor}
+                    bgLightSize={bgLightSize}
+                    setBgLightSize={setBgLightSize}
+                    bgLightIntensity={bgLightIntensity}
+                    setBgLightIntensity={setBgLightIntensity}
+                    gridColor1={gridColor1}
+                    setGridColor1={setGridColor1}
+                    gridColor2={gridColor2}
+                    setGridColor2={setGridColor2}
+                  />
                 </div>
               </div>
             </div>
-          </main>
-        </StudioLayout>
+          </div>
+        </main>
+      </StudioLayout>
 
       <input ref={modelFileInputRef} type="file" accept=".glb,.gltf,.obj" className="hidden" onChange={(e) => handleUpload3DModel(e.target.files[0])} />
 
@@ -1369,6 +1418,6 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
           modelUrl={modelUrl}
         />
       )}
-    </>
+    </div>
   );
 }
