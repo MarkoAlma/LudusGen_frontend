@@ -14,8 +14,7 @@ import {
 import { MyUserContext } from "../context/MyUserProvider";
 import { auth } from "../firebase/firebaseApp";
 import axios from "axios";
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+import { API_BASE } from "../api/client";
 
 // ─── Kredit csomagok ───────────────────────────────────────────
 const PACKAGES = [
@@ -132,6 +131,7 @@ export default function CreditTopup({ isOpen, onClose }) {
       }
     } catch (err) {
       console.error("get-credits error:", err);
+      setError("Nem sikerült betölteni az egyenleget: " + (err.response?.data?.message || err.message));
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 

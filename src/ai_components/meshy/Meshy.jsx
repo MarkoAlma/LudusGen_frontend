@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import toast from "react-hot-toast";
 import {
   Upload,
   RotateCcw,
@@ -36,6 +37,7 @@ import {
 
 import StudioLayout from "../../components/shared/StudioLayout";
 import { useStudioPanels } from "../../context/StudioPanelContext";
+import { API_BASE as API_BASE_RAW } from "../../api/client";
 
 // ── Sub-modules ────────────────────────────────────────────────────────────
 import ThreeViewer from "./viewer/ThreeViewer";
@@ -60,7 +62,7 @@ import {
 const PROMPT_MAX = 600;
 const LS_KEY = "meshy_panel_history_v1";
 const POLL_MS = 2500;
-const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:3001"}/api/meshy`;
+const API_BASE = `${API_BASE_RAW}/api/meshy`;
 
 // ── localStorage helpers ───────────────────────────────────────────────────
 const loadHistory = () => {
@@ -707,8 +709,18 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
           const res = await fetch(`${API_BASE}/task/${type}/${id}`, {
             headers,
           });
+          if (!res.ok) {
+            let errMsg = `HTTP ${res.status}`;
+            try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+            console.error("[Meshy] poll request failed:", errMsg);
+            return;
+          }
           const data = await res.json();
-          if (!data.success) return;
+          if (!data.success) {
+            console.error("[Meshy] poll returned non-success:", data.message);
+            toast.error("Generálási hiba: " + (data.message || "ismeretlen hiba"));
+            return;
+          }
           setProgress(data.progress ?? 0);
           setGenStatus(data.status?.toLowerCase() ?? "pending");
           if (data.status === "SUCCEEDED") {

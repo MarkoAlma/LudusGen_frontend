@@ -610,10 +610,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (mode === "stylize") return 20;
     if (mode !== "generate") return MODE_COST[mode] ?? 10;
     const type = genTab === "text" ? "text_to_model" : genTab === "multi" ? "multiview_to_model" : "image_to_model";
-    if (modelVer === "v1.4-20240625") return type === "text_to_model" ? 20 : 30;
-    const isP1 = modelVer === "P1-20260311";
+    // P1-20260311 fails for text_to_model — auto-switched to v3.1, so use v3.1 pricing
+    const effectiveVer = (genTab === "text" && modelVer === "P1-20260311") ? "v3.1-20260211" : modelVer;
+    if (effectiveVer === "v1.4-20240625") return type === "text_to_model" ? 20 : 30;
+    const isP1 = effectiveVer === "P1-20260311";
     const isText = type === "text_to_model";
-    const isModern = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
+    const isModern = effectiveVer === "P1-20260311" || effectiveVer.startsWith("v3.");
     const isUltra = meshQ === "ultra" && isModern;
     const base = isP1 ? (isText ? 30 : 40) : (isText ? 10 : 20);
     const hasTex = texOn || pbrOn;
@@ -647,13 +649,17 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     try {
       const headers = await authH();
       let body;
-      const _isModern = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
+      // P1-20260311 consistently fails for text_to_model ("Failed to call LLM API").
+      // Safety net: force v3.1 at submission time if text_to_model with P1.
+      const effectiveModel = (genTab === "text" && modelVer === "P1-20260311")
+        ? "v3.1-20260211" : modelVer;
+      const _isModern = effectiveModel === "P1-20260311" || effectiveModel.startsWith("v3.");
       switch (mode) {
         case "generate":
           if (genTab === "text") {
             const isUltra = meshQ === "ultra" && _isModern;
             body = {
-              type: "text_to_model", prompt: prompt.trim(), model_version: modelVer,
+              type: "text_to_model", prompt: prompt.trim(), model_version: effectiveModel,
               ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
               ...(tPose && { t_pose: true }),
               ...(texOn && { texture: true }),

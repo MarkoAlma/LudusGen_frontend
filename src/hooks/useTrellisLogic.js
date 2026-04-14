@@ -7,7 +7,7 @@ import {
   loadHistoryPageFromFirestore,
 } from '../ai_components/trellis/utils';
 import { TRELLIS_ENHANCE_PROMPT, TRELLIS_SIMPLIFY_PROMPT } from '../ai_components/trellis/Constants';
-import { API_BASE } from '../api/client';
+import { enhancePrompt } from '../api/client';
 
 export function useTrellisLogic(userId, getIdToken) {
   const [prompt, setPrompt] = useState("");

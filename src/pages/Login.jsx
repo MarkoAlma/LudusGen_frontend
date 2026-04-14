@@ -17,6 +17,7 @@ import { IoCheckmarkDoneOutline } from "react-icons/io5";
 import { FaCheck } from "react-icons/fa";
 import { useEffect, useRef } from "react";
 import axios from "axios";
+import { API_BASE } from "../api/client";
 import TwoFactorLogin from "../components/TwoFactorLogin";
 import AuthShell from '../components/auth/AuthShell';
 import AuthTabs from '../components/auth/AuthTabs';
@@ -209,7 +210,7 @@ export default function Login({ isOpen, onClose }) {
         console.log("FORGOT HANDLER START");
         // await resetPassword(formData.email);
 
-        await axios.post('http://localhost:3001/api/forgot-password', {
+        await axios.post(`${API_BASE}/api/forgot-password`, {
           email: formData.email
         });
 

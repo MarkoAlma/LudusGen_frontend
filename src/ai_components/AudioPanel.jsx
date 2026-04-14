@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import toast from "react-hot-toast";
 import {
   Music, Play, Pause, Download, Loader2, XCircle, Mic,
   Bookmark, History, Volume2, X, Globe, Sparkles, Settings2, Activity, Zap, ActivitySquare, Speaker,
@@ -14,7 +15,7 @@ import AudioEngineBg from '../assets/backgrounds/motif_audio_bg.png';
 import StudioLayout from '../components/shared/StudioLayout';
 import { useStudioPanels } from '../context/StudioPanelContext';
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+import { API_BASE } from "../api/client";
 
 const TTS_VOICES = [
   { id: "alloy", label: "Alloy", desc: "Semleges, kiegyensúlyozott" },
@@ -297,6 +298,11 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(body),
       });
+      if (!res.ok) {
+        let errMsg = `HTTP ${res.status}`;
+        try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+        throw new Error(errMsg);
+      }
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
 

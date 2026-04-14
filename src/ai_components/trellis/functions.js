@@ -1,3 +1,4 @@
+import { API_BASE } from '../../api/client';
 
 const VIEW_MODES = [
   { id: 'clay', label: 'Clay', tip: 'Clay — semleges szürke agyag' },
@@ -141,7 +142,6 @@ Rules:
 - Keep it compact, safe, and Trellis-compatible`;
 
 // ── Standalone GLB fetcher ────────────────────────────────────────────────────
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 async function fetchGlbAsBlob(modelUrl, getIdToken) {
   if (!modelUrl) return null;

@@ -520,7 +520,16 @@ Respond ONLY with plain text, no JSON, no explanation.`;
             <button
               key={t.id}
               className={"tp-inp-tab" + (genTab === t.id ? " active" : "") + (disabled ? " model-na" : "")}
-              onClick={() => { if (!disabled) setGenTab(t.id); }}
+              onClick={() => {
+                if (!disabled) {
+                  setGenTab(t.id);
+                  // P1-20260311 consistently fails for text_to_model ("Failed to call LLM API").
+                  // Auto-switch to v3.1 when user selects text tab with P1.
+                  if (t.id === "text" && modelVer === "P1-20260311") {
+                    setModelVer("v3.1-20260211");
+                  }
+                }
+              }}
               title={disabled ? `Not available with ${modelVer}` : t.tip}
               style={{
                 color: genTab === t.id ? "#0a0a1a" : "#4a4a68",
