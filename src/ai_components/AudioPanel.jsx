@@ -12,6 +12,7 @@ import { DEFAULT_PRESETS } from "./models";
 import BackgroundFilters from '../components/chat/BackgroundFilters';
 import AudioEngineBg from '../assets/backgrounds/motif_audio_bg.png';
 import StudioLayout from '../components/shared/StudioLayout';
+import { useStudioPanels } from '../context/StudioPanelContext';
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -150,6 +151,18 @@ const MiniWaveform = ({ color, isPlaying }) => (
 );
 
 export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+  const { registerPanel, unregisterPanel } = useStudioPanels();
+
+  // Register panels (Audio only has L1 + L2, no archive)
+  useEffect(() => {
+    registerPanel('L1');
+    registerPanel('L2');
+    return () => {
+      unregisterPanel('L1');
+      unregisterPanel('L2');
+    };
+  }, [registerPanel, unregisterPanel]);
+
   const isTTS = selectedModel.audioType === "tts";
   const isNvidiaRiva = selectedModel.provider === "nvidia-riva";
 

@@ -12,6 +12,7 @@ import ConfigPanel from '../components/chat/ConfigPanel';
 import ChatAtmosphere from '../components/chat/ChatAtmosphere';
 
 import StudioLayout from '../components/shared/StudioLayout';
+import { useStudioPanels } from '../context/StudioPanelContext';
 
 // Shared layout constant — all content aligns to this max-width
 const CONTENT_MAX_W = 'max-w-3xl';
@@ -19,6 +20,17 @@ const HISTORY_SIDEBAR_W = 288; // px, matches w-72
 const SIDEBAR_W = 320; // AiStudioSidebar width
 
 export default function ChatPanel({ selectedModel, userId, getIdToken, setSidebarOpen, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+  const { registerPanel, unregisterPanel } = useStudioPanels();
+
+  // Register panels (Chat has L1 + R, no L2)
+  useEffect(() => {
+    registerPanel('L1');
+    registerPanel('R');
+    return () => {
+      unregisterPanel('L1');
+      unregisterPanel('R');
+    };
+  }, [registerPanel, unregisterPanel]);
   const group = findModelGroup(selectedModel?.id);
   const themeColor = selectedModel?.color || "#8b5cf6";
   const { navHeight } = useContext(MyUserContext);

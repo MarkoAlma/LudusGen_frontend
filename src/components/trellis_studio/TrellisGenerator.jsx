@@ -6,8 +6,22 @@ import TrellisControls from './TrellisControls';
 import TrellisWorkspace from './TrellisWorkspace';
 import Shared3DHistory from '../shared/Shared3DHistory';
 import StudioLayout from '../shared/StudioLayout';
+import { useStudioPanels } from '../../context/StudioPanelContext';
 
 export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+  const { registerPanel, unregisterPanel } = useStudioPanels();
+
+  // Register panels with centralized manager
+  useEffect(() => {
+    registerPanel('L1');
+    registerPanel('L2');
+    registerPanel('R');
+    return () => {
+      unregisterPanel('L1');
+      unregisterPanel('L2');
+      unregisterPanel('R');
+    };
+  }, [registerPanel, unregisterPanel]);
   const {
     prompt, setPrompt,
     genStatus, setGenStatus,

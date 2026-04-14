@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 
 import StudioLayout from "../../components/shared/StudioLayout";
+import { useStudioPanels } from "../../context/StudioPanelContext";
 
 // ── Sub-modules ────────────────────────────────────────────────────────────
 import ThreeViewer from "./viewer/ThreeViewer";
@@ -531,7 +532,20 @@ function WireframeControl({
 }
 
 export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+  const { registerPanel, unregisterPanel } = useStudioPanels();
   const color = selectedModel?.color || "#06b6d4";
+
+  // Register panels with centralized manager
+  useEffect(() => {
+    registerPanel('L1');
+    registerPanel('L2');
+    registerPanel('R');
+    return () => {
+      unregisterPanel('L1');
+      unregisterPanel('L2');
+      unregisterPanel('R');
+    };
+  }, [registerPanel, unregisterPanel]);
 
   // ── Input & generation state ─────────────────────────────────────────────
   const [inputMode, setInputMode] = useState("text");

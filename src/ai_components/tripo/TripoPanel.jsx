@@ -32,6 +32,7 @@ import Animate from "./Animate";
 import { motion, AnimatePresence, animate } from "framer-motion";
 import { MyUserContext } from "../../context/MyUserProvider";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { useStudioPanels } from "../../context/StudioPanelContext";
 import toast from "react-hot-toast";
 
 /* ─── constants ─────────────────────────────────────────────────────── */
@@ -206,8 +207,24 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const userCredits = user?.credits ?? 0;
 
   // ── responsive breakpoints ──────────────────────────────────────────
-  const isMobile = useMediaQuery("(max-width: 640px)");
-  const isTablet = useMediaQuery("(max-width: 1024px)");
+  const isMobile640 = useMediaQuery("(max-width: 640px)");
+  const isTablet1024 = useMediaQuery("(max-width: 1024px)");
+  // Use context-driven breakpoints on mobile/tablet, local on desktop
+  const { isMobile: ctxMobile, isTablet: ctxTablet, registerPanel, unregisterPanel } = useStudioPanels();
+  const isMobile = ctxMobile || isMobile640;
+  const isTablet = ctxTablet || isTablet1024;
+
+  // Register panels with centralized manager
+  useEffect(() => {
+    registerPanel('L1');
+    registerPanel('L2');
+    registerPanel('R');
+    return () => {
+      unregisterPanel('L1');
+      unregisterPanel('L2');
+      unregisterPanel('R');
+    };
+  }, [registerPanel, unregisterPanel]);
 
   // Responsive sidebar widths
   const leftW = isMobile ? 48 : isTablet ? 52 : 62;
