@@ -9,10 +9,11 @@ export default function AppLayout({ children, hideNav = false, hideFooter = fals
   const isChat = location.pathname.startsWith('/chat');
 
   const isHome = location.pathname === '/';
+  const isForum = location.pathname.startsWith('/forum');
 
   return (
     <>
-      <Background />
+      {!isForum && <Background />}
       {!hideNav && <Navbar />}
       <main className={`relative z-10 ${
         isChat 

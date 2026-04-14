@@ -12,8 +12,10 @@ import {
   ArrowUp, Rss, Award, Tag, Globe, Heart, Smile,
   BarChart2, PenSquare, HelpCircle, Megaphone, AtSign,
   Trash2, Edit3, Unlock, Home, Activity, Code, Image, Music, Box,
+  Bold, Italic, List, Heading2, Quote, Link,
 } from "lucide-react";
 import ForumPost from "./ForumPost";
+import ForumAnimatedBg from "../components/ForumAnimatedBg";
 import CreditTopup from "../components/CreditTopup";
 import { auth, db } from "../firebase/firebaseApp";
 import { onAuthStateChanged } from "firebase/auth";
@@ -104,97 +106,10 @@ const getTagColor = (label) => {
   return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
 };
 
+// ── Circuit Board Background — dense, detailed, GPU-optimized ──
 
-// ── Neural Flux Terminal Components ──────────────────────────
-const DataBeam = ({ path, delay = 0, duration = 3 }) => (
-  <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" style={{ zIndex: 0 }}>
-    <path d={path} fill="none" stroke="rgba(124, 58, 237, 0.07)" strokeWidth="1" />
-    <motion.path
-      d={path}
-      fill="none"
-      stroke="url(#beamGradient)"
-      strokeWidth="2"
-      strokeLinecap="round"
-      initial={{ pathLength: 0, opacity: 0 }}
-      animate={{
-        pathLength: [0, 0.2, 0],
-        pathOffset: [0, 1.2],
-        opacity: [0, 1, 0]
-      }}
-      transition={{
-        duration,
-        repeat: Infinity,
-        delay,
-        ease: "easeInOut"
-      }}
-    />
-    <defs>
-      <linearGradient id="beamGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="transparent" />
-        <stop offset="50%" stopColor="#7c3aed" />
-        <stop offset="100%" stopColor="transparent" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
-
-const TechnicalHUD = () => (
-  <div className="absolute inset-0 pointer-events-none font-mono text-[0.5rem] sm:text-[0.6rem] text-[#7c3aed]/30 uppercase tracking-widest p-3 sm:p-6 select-none">
-    {/* Corner HUDs */}
-    <div className="absolute top-4 sm:top-8 left-4 sm:left-8 border-l border-t border-[#7c3aed]/20 p-1.5 sm:p-2">
-      <div>SYS_KERN: ACTIVE</div>
-      <div>NET_SYNC: 0x7c3ae</div>
-    </div>
-    <div className="absolute top-4 sm:top-8 right-4 sm:right-8 border-r border-t border-[#7c3aed]/20 p-1.5 sm:p-2 text-right">
-      <div>FORGE_CORE_v7.4</div>
-      <div>SEC_LEVEL: ALPHA</div>
-    </div>
-    <div className="absolute bottom-4 sm:bottom-8 left-4 sm:left-8 border-l border-b border-[#7c3aed]/20 p-1.5 sm:p-2">
-      <div>COORD: 47.4979 N</div>
-      <div>19.0402 E</div>
-    </div>
-    <div className="absolute bottom-4 sm:bottom-8 right-4 sm:right-8 border-r border-b border-[#7c3aed]/20 p-1.5 sm:p-2 text-right">
-      <div>MEMORY_OK</div>
-      <div>NEURAL_LINK: STABLE</div>
-    </div>
-
-    {/* Center Scanline Effect */}
-    <motion.div
-      animate={{ y: ["-10vh", "110vh"] }}
-      transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-      className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[#7c3aed]/20 to-transparent opacity-20"
-    />
-  </div>
-);
-
-const NeuralNetwork = () => {
-  const paths = [
-    // Bal oldal
-    "M-100,200 Q400,100 800,400 T1500,200",
-    "M200,-100 Q600,400 300,900",
-    "M-50,600 Q300,700 900,500 T1600,800",
-    "M500,-50 Q450,500 550,1100",
-    // Jobb oldal + teljes szélesség
-    "M1200,1000 Q800,600 1300,100",
-    "M1400,-100 Q1000,400 1600,800",
-    "M900,-50 Q1400,300 1800,600 T2000,400",
-    "M1500,100 Q1700,500 1300,900 T1800,1100",
-    "M800,800 Q1200,400 1600,200 T2200,500",
-    "M1600,50 Q1800,400 1400,700 T1900,1000",
-    // Középső + átlós irányok
-    "M-100,800 Q700,200 1400,700 T2200,300",
-    "M300,1100 Q900,500 1500,800",
-  ];
-  return (
-    <>
-      {paths.map((p, i) => (
-        <DataBeam key={i} path={p} delay={i * 1.5} duration={5 + (i % 6)} />
-      ))}
-    </>
-  );
-};
-
-
+// ─── Forum Background — Animated Canvas (particles + grid + network + orbs) ──
+const ForumBackground = ForumAnimatedBg;
 
 const RECENT_ACTIVITY = [
   { user: "pixel_witch", action: "hozzászólt", post: "Midjourney v7 guide", time: "2p", color: "#f472b6" },
@@ -452,9 +367,9 @@ const PostCard = ({
       transition={{ duration: 0.2, ease: "easeOut" }}
       className="group cursor-pointer relative overflow-hidden sm:overflow-visible"
       style={{
-        background: "linear-gradient(145deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.3))",
-        backdropFilter: "blur(40px)",
-        WebkitBackdropFilter: "blur(40px)",
+        background: "linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.4))",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
         borderColor: `${cat.color}25`,
         borderTop: `1px solid ${cat.color}40`,
         borderLeft: `1px solid ${cat.color}30`,
@@ -644,7 +559,57 @@ const PostCard = ({
   );
 };
 
-// ─── New / Edit Post Modal ────────────────────────────────────────
+// ─── WYSIWYG Editor Styles ────────────────────────────────────────
+const editorStyles = `
+  .wysiwyg-editor h2 {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .wysiwyg-editor h2::before {
+    content: '';
+    width: 3px;
+    height: 1.2rem;
+    background: #8b5cf6;
+    border-radius: 99px;
+    display: inline-block;
+  }
+  .wysiwyg-editor blockquote {
+    border-left: 3px solid #8b5cf6;
+    padding-left: 1rem;
+    color: #9ca3af;
+    font-style: italic;
+    margin: 1rem 0;
+  }
+  .wysiwyg-editor pre {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    font-family: monospace;
+    color: #67e8f9;
+    margin: 1rem 0;
+    white-space: pre-wrap;
+  }
+  .wysiwyg-editor ul {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    margin: 1rem 0;
+  }
+  .wysiwyg-editor li {
+    margin-bottom: 0.25rem;
+    color: #d1d5db;
+  }
+  .wysiwyg-editor a {
+    color: #8b5cf6;
+    text-decoration: underline;
+  }
+`;
 const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = null }) => {
   const isEditMode = !!editPost;
   const [title, setTitle] = useState("");
@@ -654,13 +619,23 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
   const [addPoll, setAddPoll] = useState(false);
   const [pollQ, setPollQ] = useState("");
   const [pollOpts, setPollOpts] = useState(["", ""]);
-  const [preview, setPreview] = useState(false);
+
+  const editorRef = useRef(null);
+  const [isEditorEmpty, setIsEditorEmpty] = useState(!content);
+  const cat = CATEGORIES.find(c => c.id === selectedCat);
 
   useEffect(() => {
     if (isOpen) {
       if (isEditMode && editPost) {
         setTitle(editPost.title || "");
+        // Pre-fill contentEditable with HTML if needed, but since we store MD, 
+        // we'll need a basic MD->HTML converter for editing
+        const initialHtml = markdownToHtml(editPost.content || "");
+        if (editorRef.current) {
+          editorRef.current.innerHTML = initialHtml;
+        }
         setContent(editPost.content || "");
+        setIsEditorEmpty(!editPost.content);
         setSelectedCat(editPost.category || "chat");
         setTags((editPost.tags || []).join(", "));
         if (editPost.poll) {
@@ -674,27 +649,81 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
         }
       } else {
         setTitle("");
+        if (editorRef.current) editorRef.current.innerHTML = "";
         setContent("");
+        setIsEditorEmpty(true);
         setSelectedCat(defaultCategory || "chat");
         setTags("");
         setAddPoll(false);
         setPollQ("");
         setPollOpts(["", ""]);
       }
-      setPreview(false);
     }
   }, [isOpen, isEditMode, editPost, defaultCategory]);
 
   if (!isOpen) return null;
-  const cat = CATEGORIES.find(c => c.id === selectedCat);
+
+  // Simple MD to HTML for initializing the editor in edit mode
+  const markdownToHtml = (md) => {
+    if (!md) return "";
+    return md
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+      .replace(/^> (.*$)/gm, '<blockquote>$1</blockquote>')
+      .replace(/^- (.*$)/gm, '<li>$1</li>')
+      .replace(/`(.*?)`/g, '<code>$1</code>')
+      .replace(/\n/g, '<br>');
+  };
+
+  // HTML to MD for serializing the editor content before submission
+  const htmlToMarkdown = (html) => {
+    let md = html
+      .replace(/<strong>(.*?)<\/strong>/g, '**$1**')
+      .replace(/<b>(.*?)<\/b>/g, '**$1**')
+      .replace(/<em>(.*?)<\/em>/g, '*$1*')
+      .replace(/<i>(.*?)<\/i>/g, '*$1*')
+      .replace(/<h2>(.*?)<\/h2>/g, '## $1\n')
+      .replace(/<blockquote>(.*?)<\/blockquote>/g, '> $1\n')
+      .replace(/<li>(.*?)<\/li>/g, '- $1\n')
+      .replace(/<\/li>/g, '') // clean up
+      .replace(/<ul>/g, '').replace(/<\/ul>/g, '')
+      .replace(/<code>(.*?)<\/code>/g, '`$1`')
+      .replace(/<br\s*\/?>/g, '\n')
+      .replace(/<div>/g, '\n').replace(/<\/div>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/<[^>]*>/g, ''); // strip any remaining tags
+    return md.trim();
+  };
 
   const addPollOpt = () => { if (pollOpts.length < 6) setPollOpts(p => [...p, ""]); };
 
+  const handleFormat = (command, value = null) => {
+    document.execCommand(command, false, value);
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+  };
+
+  const handleLink = () => {
+    const url = window.prompt("Írd be a hivatkozás címét (URL):", "https://");
+    if (url) handleFormat("createLink", url);
+  };
+
+  const handleEditorInput = (e) => {
+    const html = e.currentTarget.innerHTML;
+    setIsEditorEmpty(!e.currentTarget.textContent.trim() && !html.includes('<img') && !html.includes('<br'));
+  };
+
   const handleSubmit = () => {
     if (!title.trim() || title.trim().length < 10) return;
+
+    // Serialize editor HTML to Markdown
+    const finalContent = editorRef.current ? htmlToMarkdown(editorRef.current.innerHTML) : "";
+
     const data = {
       title: title.trim(),
-      content: content.trim(),
+      content: finalContent,
       category: selectedCat,
       tags: tags.split(",").map(t => t.trim()).filter(Boolean),
       poll: addPoll && pollQ
@@ -708,144 +737,172 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
     onClose();
   };
 
+  const ToolbarBtn = ({ icon: Icon, onClick, label }) => (
+    <button onClick={onClick} title={label}
+      className="cursor-pointer p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-all active:scale-90 group relative">
+      <Icon className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+      <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black text-[0.6rem] text-white opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+        {label}
+      </div>
+    </button>
+  );
+
   return createPortal(
     <div className="fixed inset-0 flex items-center justify-center p-3 sm:p-4" style={{ zIndex: 10000 }}>
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <style>{editorStyles}</style>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col"
         style={{ background: "#13111c", border: "1px solid rgba(255,255,255,0.08)", maxHeight: "92vh", boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-white/5 flex-shrink-0">
-          <h3 className="text-white/90 font-semibold flex items-center gap-2 text-sm min-w-0"
-            style={{ fontFamily: "'Instrument Serif', serif" }}>
-            {isEditMode
-              ? <><Edit3 className="w-4 h-4 flex-shrink-0" style={{ color: cat?.color }} /> <span className="truncate hidden sm:inline">Téma szerkesztése</span><span className="sm:hidden">Szerkesztés</span></>
-              : <><PenSquare className="w-4 h-4 flex-shrink-0" style={{ color: cat?.color }} /> <span className="truncate hidden sm:inline">Új téma indítása</span><span className="sm:hidden">Új téma</span></>
-            }
-          </h3>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => setPreview(v => !v)}
-              className="cursor-pointer text-xs px-2 sm:px-3 py-1.5 rounded-lg transition-all"
-              style={{ background: preview ? `${cat?.color}12` : "rgba(255,255,255,0.04)", color: preview ? cat?.color : "#5a5470", border: `1px solid ${preview ? cat?.color + "25" : "rgba(255,255,255,0.06)"}` }}>
-              {preview ? "Szerk." : "Előnézet"}
-            </button>
-            <button onClick={onClose} className="cursor-pointer p-1 rounded-lg text-gray-600 hover:text-white hover:bg-white/5 transition-all"><X className="w-4 h-4" /></button>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-white/5 flex-shrink-0 bg-white/[0.01]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${cat?.color}15`, color: cat?.color }}>
+              {isEditMode ? <Edit3 className="w-4 h-4" /> : <PenSquare className="w-5 h-5" />}
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-sm tracking-tight leading-none" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {isEditMode ? "Téma szerkesztése" : "Új téma indítása"}
+              </h3>
+              <p className="text-[0.6rem] text-gray-500 mt-1.5 uppercase tracking-widest font-bold opacity-40">Bejegyzés létrehozása</p>
+            </div>
           </div>
+          <button onClick={onClose} className="cursor-pointer p-2 rounded-xl text-gray-600 hover:text-white hover:bg-white/5 transition-all"><X className="w-4 h-4" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-3 sm:py-4 space-y-4">
-          <div>
-            <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider block mb-2">Kategória *</label>
-            <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+        <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-6 space-y-7">
+          {/* Category */}
+          <div className="space-y-3">
+            <label className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest block opacity-70">Kategória választása</label>
+            <div className="grid grid-cols-5 gap-2.5">
               {CATEGORIES.filter(c => c.id !== "all").map(c => (
                 <button key={c.id} onClick={() => setSelectedCat(c.id)}
-                  className="cursor-pointer flex flex-col items-center gap-0.5 sm:gap-1 py-2 sm:py-2.5 rounded-xl transition-all text-xs active:scale-95"
-                  style={{ background: selectedCat === c.id ? `${c.color}10` : "transparent", border: `1px solid ${selectedCat === c.id ? c.color + "30" : "rgba(255,255,255,0.06)"}`, color: selectedCat === c.id ? c.color : "#5a5470" }}>
-                  <span className="text-base sm:text-lg">{c.emoji}</span>
-                  <span className="font-medium leading-tight text-center text-[0.6rem] sm:text-xs">{c.label}</span>
+                  className="cursor-pointer flex flex-col items-center gap-2 py-3.5 rounded-2xl transition-all active:scale-95"
+                  style={{
+                    background: selectedCat === c.id ? `${c.color}15` : "rgba(255,255,255,0.02)",
+                    border: `1px solid ${selectedCat === c.id ? c.color + "50" : "rgba(255,255,255,0.05)"}`,
+                    color: selectedCat === c.id ? "#ffffff" : "#5a5470",
+                    boxShadow: selectedCat === c.id ? `0 8px 20px ${c.color}20` : "none"
+                  }}>
+                  <span className="text-xl filter drop-shadow-sm">{c.emoji}</span>
+                  <span className="font-bold text-[0.65rem] tracking-tight">{c.label}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          <div>
-            <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider block mb-1.5">Cím *</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Fogalmazd meg egyértelműen a témát..."
-              className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
-              style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${title.length >= 10 ? (cat?.color || "#8b5cf6") + "30" : "rgba(255,255,255,0.06)"}` }} />
-            <div className="flex justify-between mt-1">
-              <span className="text-xs" style={{ color: title.length > 0 && title.length < 10 ? "#f87171" : "#5a5470" }}>
-                {title.length > 0 && title.length < 10 ? `Még ${10 - title.length} karakter kell` : "Min. 10 karakter"}
+          {/* Title */}
+          <div className="space-y-3">
+            <label className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest block opacity-70">Téma megnevezése</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Miről szeretnél beszélgetni?"
+              className="w-full px-5 py-4 rounded-2xl text-white text-[0.95rem] placeholder-gray-700 bg-white/[0.03] border border-white/[0.06] focus:border-purple-500/30 focus:outline-none transition-all shadow-inner"
+            />
+            <div className="flex justify-between items-center text-[0.6rem] px-1 font-bold tracking-wider">
+              <span style={{ color: title.length > 0 && title.length < 10 ? "#f87171" : "#5a5470" }}>
+                {title.length > 0 && title.length < 10 ? `SZÜKSÉGES: ${10 - title.length} KARAKTER` : "MINIMUM 10 KARAKTER ELEVE"}
               </span>
-              <span className="text-xs" style={{ color: title.length >= 10 ? "#4ade80" : "#5a5470" }}>{title.length}/200</span>
+              <span className="opacity-40">{title.length}/200</span>
             </div>
-            {title.length >= 5 && (
-              <div className="mt-1 flex items-center gap-1.5">
-                <span className="text-gray-600 text-xs">URL:</span>
-                <span className="text-gray-500 text-xs font-mono">
-                  /forum/{selectedCat}/{generateSlug(title) || "..."}
-                </span>
-              </div>
-            )}
           </div>
 
-          <div>
-            <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider block mb-1.5">Tartalom</label>
-            {!preview ? (
-              <textarea value={content} onChange={e => setContent(e.target.value)}
-                placeholder="Markdown támogatott: **félkövér**, `kód`, ## fejléc, - lista..."
-                rows={7} className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 resize-none focus:outline-none font-mono"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }} />
-            ) : (
-              <div className="w-full px-3 py-2.5 rounded-xl text-gray-400 text-sm min-h-[160px] leading-relaxed"
-                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                {content || <span className="text-gray-600 italic">Tartalom előnézete itt jelenik meg...</span>}
+          {/* Editor */}
+          <div className="space-y-3">
+            <label className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest block opacity-70">Kifejtés és részletek</label>
+            <div className="flex flex-col rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden focus-within:border-purple-500/30 transition-all shadow-inner relative">
+              <div className="px-3 py-2 border-b border-white/[0.04] bg-white/[0.01] flex items-center gap-1">
+                <ToolbarBtn icon={Bold} onClick={() => handleFormat("bold")} label="Félkövér" />
+                <ToolbarBtn icon={Italic} onClick={() => handleFormat("italic")} label="Dőlt" />
+                <div className="w-px h-4 bg-white/10 mx-1.5" />
+                <ToolbarBtn icon={Heading2} onClick={() => handleFormat("formatBlock", "h2")} label="Címsor" />
+                <ToolbarBtn icon={Quote} onClick={() => handleFormat("formatBlock", "blockquote")} label="Idézet" />
+                <ToolbarBtn icon={List} onClick={() => handleFormat("insertUnorderedList")} label="Felsorolás" />
+                <div className="w-px h-4 bg-white/10 mx-1.5" />
+                <ToolbarBtn icon={Code} onClick={() => handleFormat("formatBlock", "pre")} label="Kód" />
+                <ToolbarBtn icon={Link} onClick={handleLink} label="Hivatkozás" />
               </div>
-            )}
+              <div className="relative min-h-[220px] flex flex-col">
+                {isEditorEmpty && (
+                  <div className="absolute top-4 left-5 text-gray-700 pointer-events-none text-[0.95rem] select-none">
+                    Ide írd a bejegyzésed tartalmát...
+                  </div>
+                )}
+                <div
+                  ref={editorRef}
+                  contentEditable={true}
+                  onInput={handleEditorInput}
+                  className="w-full px-5 py-4 text-white text-[0.95rem] bg-transparent focus:outline-none leading-relaxed min-h-[200px] wysiwyg-editor"
+                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                />
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="text-gray-500 text-xs font-semibold uppercase tracking-wider block mb-1.5">Tagek (vesszővel elválasztva)</label>
-            <input value={tags} onChange={e => setTags(e.target.value)} placeholder="pl. claude, prompt-engineering, tipp"
-              className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }} />
-            {tags && (
-              <div className="flex gap-1.5 flex-wrap mt-2">
-                {tags.split(",").map(t => t.trim()).filter(Boolean).map(t => (
-                  <span key={t} className="text-xs px-2 py-0.5 rounded-full" style={{ background: `${cat?.color}10`, color: cat?.color, border: `1px solid ${cat?.color}20` }}>#{t}</span>
-                ))}
-              </div>
-            )}
+          {/* Tags */}
+          <div className="space-y-3">
+            <label className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest block opacity-70">Címkék hozzáfűzése</label>
+            <div className="relative group">
+              <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-700 group-focus-within:text-purple-400 transition-colors" />
+              <input value={tags} onChange={e => setTags(e.target.value)} placeholder="például: claude, tipp, hír (vesszővel elválasztva)"
+                className="w-full pl-11 pr-5 py-4 rounded-2xl text-white text-sm placeholder-gray-700 bg-white/[0.03] border border-white/[0.06] focus:outline-none focus:border-purple-500/30 transition-all" />
+            </div>
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl"
-            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-            <div className="flex items-center gap-2">
-              <BarChart2 className="w-4 h-4 text-purple-400" />
-              <span className="text-white/80 text-sm font-medium">Szavazás hozzáadása</span>
+          {/* Poll */}
+          <div className="p-5 rounded-2xl border border-white/[0.06] bg-white/[0.02] flex items-center justify-between group hover:border-emerald-500/20 transition-all">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-all">
+                <BarChart2 className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <span className="text-white font-bold block leading-none text-sm">Szavazás indítása</span>
+                <span className="text-[0.65rem] text-gray-500 mt-1.5 font-medium block">Interaktív kérdés a többi felhasználónak</span>
+              </div>
             </div>
             <button onClick={() => setAddPoll(v => !v)}
-              className="cursor-pointer relative rounded-full transition-all duration-200"
-              style={{ background: addPoll ? `linear-gradient(135deg, ${cat?.color}, ${cat?.color}99)` : "rgba(255,255,255,0.08)", minWidth: "2.5rem", height: "1.375rem", width: "2.5rem" }}>
-              <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
-                style={{ left: addPoll ? "calc(100% - 1.125rem)" : "0.125rem" }} />
+              className="cursor-pointer relative w-11 h-6 rounded-full transition-all duration-300 shadow-inner"
+              style={{ background: addPoll ? "#10b981" : "rgba(255,255,255,0.08)" }}>
+              <span className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300 shadow-md"
+                style={{ left: addPoll ? "24px" : "4px" }} />
             </button>
           </div>
 
           {addPoll && (
-            <div className="p-4 rounded-xl space-y-3" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-              <input value={pollQ} onChange={e => setPollQ(e.target.value)} placeholder="Szavazás kérdése..."
-                className="w-full px-3 py-2 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }} />
-              {pollOpts.map((opt, i) => (
-                <div key={i} className="flex gap-2">
-                  <input value={opt} onChange={e => { const n = [...pollOpts]; n[i] = e.target.value; setPollOpts(n); }}
-                    placeholder={`${i + 1}. lehetőség`}
-                    className="flex-1 px-3 py-2 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none"
-                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }} />
-                  {i > 1 && (
-                    <button onClick={() => setPollOpts(p => p.filter((_, j) => j !== i))}
-                      className="cursor-pointer p-2 rounded-xl text-red-400 hover:bg-red-500/10 transition-all"><X className="w-3.5 h-3.5" /></button>
-                  )}
-                </div>
-              ))}
+            <div className="p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] space-y-5 animate-in fade-in slide-in-from-top-4 duration-500">
+              <input value={pollQ} onChange={e => setPollQ(e.target.value)} placeholder="Tedd fel a kérdésed..."
+                className="w-full px-5 py-3 rounded-xl text-white text-sm placeholder-gray-700 bg-white/[0.03] border border-white/[0.06] focus:outline-none" />
+              <div className="space-y-3">
+                {pollOpts.map((opt, i) => (
+                  <div key={i} className="flex gap-3">
+                    <input value={opt} onChange={e => { const n = [...pollOpts]; n[i] = e.target.value; setPollOpts(n); }}
+                      placeholder={`${i + 1}. opció`}
+                      className="flex-1 px-5 py-3 rounded-xl text-white text-sm placeholder-gray-700 bg-white/[0.03] border border-white/[0.06] focus:outline-none" />
+                    {i > 1 && (
+                      <button onClick={() => setPollOpts(p => p.filter((_, j) => j !== i))}
+                        className="cursor-pointer p-2.5 text-red-400/40 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"><X className="w-4 h-4" /></button>
+                    )}
+                  </div>
+                ))}
+              </div>
               {pollOpts.length < 6 && (
-                <button onClick={addPollOpt} className="cursor-pointer text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1">
-                  <Plus className="w-3 h-3" /> Lehetőség hozzáadása
+                <button onClick={addPollOpt} className="cursor-pointer text-xs font-bold text-gray-500 hover:text-white flex items-center gap-2 transition-all p-1">
+                  <Plus className="w-4 h-4" /> Új opció hozzáadása
                 </button>
               )}
             </div>
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-white/5 flex gap-2 flex-shrink-0">
-          <button onClick={onClose} className="cursor-pointer flex-1 py-2.5 rounded-xl text-sm text-gray-500 hover:text-gray-300 transition-all"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>Mégse</button>
+        {/* Footer */}
+        <div className="px-6 py-6 border-t border-white/5 flex gap-4 flex-shrink-0 bg-white/[0.01]">
+          <button onClick={onClose} className="cursor-pointer flex-1 py-4 rounded-2xl text-sm font-bold text-gray-500 hover:text-white bg-white/[0.03] border border-white/[0.06] transition-all">Mégse</button>
           <button onClick={handleSubmit} disabled={title.trim().length < 10}
-            className="cursor-pointer flex-1 py-2.5 rounded-xl text-sm text-white font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-30 flex items-center justify-center gap-2"
-            style={{ background: cat ? `linear-gradient(135deg, ${cat.color}, ${cat.color}99)` : "rgba(255,255,255,0.08)", boxShadow: cat && title.length >= 10 ? `0 4px 16px ${cat.color}20` : "none" }}>
-            {isEditMode
-              ? <><CheckCircle className="w-3.5 h-3.5" /> Mentés</>
-              : <><Send className="w-3.5 h-3.5" /> Közzétesz</>
-            }
+            className="cursor-pointer flex-[2] py-4 rounded-2xl text-sm text-white font-bold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-2.5"
+            style={{
+              background: cat ? `linear-gradient(135deg, ${cat.color}, ${cat.color}CC)` : "rgba(255,255,255,0.08)",
+              boxShadow: cat && title.length >= 10 ? `0 12px 30px ${cat.color}35` : "none"
+            }}>
+            {isEditMode ? <CheckCircle className="w-4 h-4" /> : <Send className="w-5 h-5" />}
+            {isEditMode ? "Változtatások mentése" : "Téma közzététele"}
           </button>
         </div>
       </div>
@@ -1681,53 +1738,12 @@ export default function Forum() {
   return (
     <div className="min-h-screen relative overflow-hidden text-white"
       style={{
-        backgroundColor: "#06050a",
+        backgroundColor: "transparent",
         fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif"
       }}>
 
-      {/* ── Premium High-Fidelity Background: Neural Flux Terminal ── */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#030108]">
-
-        {/* Layer 1: Atmospheric Depth Gradients */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#060110] via-transparent to-[#060110]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#060110]/95 via-transparent to-[#060110]/95" />
-
-        {/* Layer 2: Highly Blurred Original Texture */}
-        <div className="absolute inset-0 transform scale-105 opacity-15">
-          <img
-            src="/forum_bg.png"
-            alt=""
-            className="w-full h-full object-cover mix-blend-screen"
-            style={{ filter: "brightness(0.5) blur(40px)" }}
-          />
-        </div>
-
-        {/* Layer 3: Tech Grid & Matrix Pattern */}
-        <div className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: "radial-gradient(#7c3aed 0.5px, transparent 0.5px)",
-            backgroundSize: "24px 24px"
-          }} />
-
-        {/* Layer 4: Neural Data Flow (Beams) */}
-        <NeuralNetwork />
-
-        {/* Layer 5: Technical HUD & Scanlines */}
-        <TechnicalHUD />
-
-        {/* Layer 6: Cinematic Ambient Glows */}
-        <div className="absolute top-[-20%] left-[-10%] w-[80vw] h-[80vh] rounded-full blur-[160px] opacity-[0.14]"
-          style={{ background: "radial-gradient(circle, #7c3aed, transparent 70%)" }} />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[80vw] h-[80vh] rounded-full blur-[180px] opacity-[0.1]"
-          style={{ background: "radial-gradient(circle, #4c1d95, transparent 70%)" }} />
-
-        {/* Layer 7: Premium Matte Noise & Vignette */}
-        <div className="absolute inset-0 opacity-[0.06] mix-blend-overlay pointer-events-none"
-          style={{
-            backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E')"
-          }} />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.6)_100%)]" />
-      </div>
+      {/* ── Studio Background ── */}
+      <ForumBackground />
 
 
 

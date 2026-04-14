@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Settings2, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
 import ImageControls from './ImageControls';
 import ImageWorkspace from './ImageWorkspace';
 import ImageStudioBG from '../../assets/image_studio_v2.png';
@@ -546,14 +546,13 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken, isGl
           >
             <Sparkles className="w-6 h-6" />
           </div>
-          
+
           <button
             onClick={() => setLeftSecondaryOpen(!leftSecondaryOpen)}
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${
-              leftSecondaryOpen 
-                ? "bg-white/10 border-white/20 text-white shadow-lg shadow-white/5" 
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${leftSecondaryOpen
+                ? "bg-white/10 border-white/20 text-white shadow-lg shadow-white/5"
                 : "bg-transparent border-transparent text-zinc-600 hover:text-zinc-400"
-            }`}
+              }`}
             style={leftSecondaryOpen ? { borderColor: `${themeColor}40`, color: themeColor } : {}}
             title="Image Generation Controls"
           >
