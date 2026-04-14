@@ -7,7 +7,8 @@ import ImageStudioBG from '../../assets/image_studio_v2.png';
 import BackgroundFilters from '../chat/BackgroundFilters';
 import StudioLayout from '../shared/StudioLayout';
 import { useSidebarState } from '../../hooks/useSidebarState';
-import { API_BASE } from '../../api/client';
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const ENHANCING_PROMPT_EDIT = `
 You are a prompt rewriter specialized for Qwen-Image-Edit running on ModelScope / DashScope.
 Qwen-Image-Edit is an IMAGE EDITING model — not a generation model.
@@ -418,9 +419,11 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken, isGl
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [leftOpen, setLeftOpen] = useState(true);
+  const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(false);
   const [offsets, setOffsets] = useState({ left: 320, right: 0 });
 
+  
   // Master Sidebar Sync
   useEffect(() => {
     setLeftOpen(isGlobalOpen);
@@ -550,8 +553,8 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken, isGl
               >
                 <div
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${idx === 0
-                      ? "bg-white/5 border-white/10 shadow-xl"
-                      : "bg-transparent border-transparent"
+                    ? "bg-white/5 border-white/10 shadow-xl"
+                    : "bg-transparent border-transparent"
                     }`}
                   style={idx === 0 ? { borderColor: `${tool.color}40`, color: tool.color } : { color: '#52525b' }}
                 >

@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect, useContext, useCallback, useMemo } from "react";
-import toast from "react-hot-toast";
 import { createPortal } from "react-dom";
 import { MyUserContext } from "../context/MyUserProvider";
-import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase/firebaseApp";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -20,7 +18,7 @@ import {
   List, Quote, ChevronRight,
   PenSquare, Shield, Search, Rss, Link, Unlock,
 } from "lucide-react";
-import { API_BASE } from "../api/client";
+import ForumAnimatedBg from "../components/ForumAnimatedBg";
 
 const CATEGORIES = {
   chat: { label: "Chat AI", emoji: "💬", color: "#a78bfa" },
@@ -31,6 +29,8 @@ const CATEGORIES = {
 };
 
 const ADMIN_UIDS = ["T7fU9Zp3N5M9wz2G8xQ4L1rV6bY2"];
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 // ─── Kapcsolódó témák fallback ─────────────────────────────────
 const RELATED_MOCK = [
@@ -193,91 +193,11 @@ const CopyCodeBtn = ({ code }) => {
   );
 };
 
-// ── Neural Flux Terminal Components (same as Forum.jsx) ──────────────────────────
-const DataBeam = ({ path, delay = 0, duration = 3 }) => (
-  <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" style={{ zIndex: 0 }}>
-    <path d={path} fill="none" stroke="rgba(124, 58, 237, 0.07)" strokeWidth="1" />
-    <motion.path
-      d={path}
-      fill="none"
-      stroke="url(#beamGradientFP)"
-      strokeWidth="2"
-      strokeLinecap="round"
-      initial={{ pathLength: 0, opacity: 0 }}
-      animate={{
-        pathLength: [0, 0.2, 0],
-        pathOffset: [0, 1.2],
-        opacity: [0, 1, 0]
-      }}
-      transition={{
-        duration,
-        repeat: Infinity,
-        delay,
-        ease: "easeInOut"
-      }}
-    />
-    <defs>
-      <linearGradient id="beamGradientFP" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="transparent" />
-        <stop offset="50%" stopColor="#7c3aed" />
-        <stop offset="100%" stopColor="transparent" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
+// ─── Forum Background — Animated Canvas (shared with Forum.jsx) ──
+const ForumBackground = ForumAnimatedBg;
 
-const TechnicalHUDFP = () => (
-  <div className="absolute inset-0 pointer-events-none font-mono text-[0.5rem] sm:text-[0.6rem] text-[#7c3aed]/30 uppercase tracking-widest p-3 sm:p-6 select-none">
-    <div className="absolute top-4 sm:top-8 left-4 sm:left-8 border-l border-t border-[#7c3aed]/20 p-1.5 sm:p-2">
-      <div>SYS_KERN: ACTIVE</div>
-      <div>NET_SYNC: 0x8ff42</div>
-    </div>
-    <div className="absolute top-4 sm:top-8 right-4 sm:right-8 border-r border-t border-[#7c3aed]/20 p-1.5 sm:p-2 text-right">
-      <div>FORGE_CORE_v7.4</div>
-      <div>SEC_LEVEL: ALPHA</div>
-    </div>
-    <div className="absolute bottom-4 sm:bottom-8 left-4 sm:left-8 border-l border-b border-[#7c3aed]/20 p-1.5 sm:p-2">
-      <div>COORD: 47.4979 N</div>
-      <div>19.0402 E</div>
-    </div>
-    <div className="absolute bottom-4 sm:bottom-8 right-4 sm:right-8 border-r border-b border-[#7c3aed]/20 p-1.5 sm:p-2 text-right">
-      <div>MEMORY_OK</div>
-      <div>NEURAL_LINK: STABLE</div>
-    </div>
-    <motion.div
-      animate={{ y: ["-10vh", "110vh"] }}
-      transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-      className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[#7c3aed]/20 to-transparent opacity-20"
-    />
-  </div>
-);
 
-const NeuralNetworkFP = () => {
-  const paths = [
-    // Bal oldal
-    "M-100,200 Q400,100 800,400 T1500,200",
-    "M200,-100 Q600,400 300,900",
-    "M-50,600 Q300,700 900,500 T1600,800",
-    "M500,-50 Q450,500 550,1100",
-    // Jobb oldal + teljes szélesség
-    "M1200,1000 Q800,600 1300,100",
-    "M1400,-100 Q1000,400 1600,800",
-    "M900,-50 Q1400,300 1800,600 T2000,400",
-    "M1500,100 Q1700,500 1300,900 T1800,1100",
-    "M800,800 Q1200,400 1600,200 T2200,500",
-    "M1600,50 Q1800,400 1400,700 T1900,1000",
-    // Középső + átlós
-    "M-100,800 Q700,200 1400,700 T2200,300",
-    "M300,1100 Q900,500 1500,800",
-  ];
-  return (
-    <>
-      {paths.map((p, i) => (
-        <DataBeam key={i} path={p} delay={i * 1.5} duration={5 + (i % 6)} />
-      ))}
-    </>
-  );
-};
+
 
 // ─── Glass card ───────────────────────────────────────────────────
 const GlassCard = ({ children, style = {}, className = "" }) => (
@@ -353,75 +273,39 @@ const PollWidget = ({ poll, color, currentUserId, onVote }) => {
 // ─── Reaction bar ─────────────────────────────────────────────────
 
 
-// ─── Comment editor ───────────────────────────────────────────────
 const CommentEditor = ({ placeholder, onSubmit, onCancel, color, isReply = false, defaultValue = "", submitLabel = "Közzétesz" }) => {
   const [text, setText] = useState(defaultValue);
-  const [preview, setPreview] = useState(false);
-  const textareaRef = useRef(null);
-
-  const insertMd = (wrap) => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart, end = ta.selectionEnd;
-    const sel = text.slice(start, end) || "szöveg";
-    const before = text.slice(0, start), after = text.slice(end);
-    setText(before + wrap + sel + wrap + after);
-    setTimeout(() => { ta.focus(); ta.setSelectionRange(start + wrap.length, start + wrap.length + sel.length); }, 10);
-  };
 
   return (
-    <div>
-      {!isReply && (
-        <div className="flex items-center gap-1 mb-2">
-          {[
-            { icon: <Bold className="w-3 h-3" />, action: () => insertMd("**"), title: "Félkövér" },
-            { icon: <Italic className="w-3 h-3" />, action: () => insertMd("*"), title: "Dőlt" },
-            { icon: <Code className="w-3 h-3" />, action: () => insertMd("`"), title: "Kód" },
-            { icon: <Quote className="w-3 h-3" />, action: () => setText(t => t + "\n> "), title: "Idézet" },
-            { icon: <List className="w-3 h-3" />, action: () => setText(t => t + "\n- "), title: "Lista" },
-          ].map((btn, i) => (
-            <button key={i} onClick={btn.action} title={btn.title}
-              className="cursor-pointer p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-white/10 transition-all">
-              {btn.icon}
-            </button>
-          ))}
-          <div className="w-px h-4 bg-white/10 mx-1" />
-          <button onClick={() => setPreview(v => !v)}
-            className="cursor-pointer px-2.5 py-1 rounded-lg text-xs transition-all"
-            style={{ background: preview ? `${color}20` : "rgba(255,255,255,0.04)", color: preview ? color : "#6b7280", border: `1px solid ${preview ? color + "40" : "rgba(255,255,255,0.08)"}` }}>
-            {preview ? "Szerkesztés" : "Előnézet"}
-          </button>
-        </div>
-      )}
+    <div className="mt-4 space-y-3 relative z-10 animate-in fade-in slide-in-from-top-2 duration-300">
+      <textarea 
+        value={text} 
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { 
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { 
+            e.preventDefault(); 
+            if (text.trim()) { onSubmit(text); setText(""); } 
+          } 
+        }}
+        placeholder={placeholder}
+        rows={isReply ? 2 : 4}
+        className="w-full px-4 py-3.5 rounded-2xl text-white text-sm placeholder-gray-700 bg-[#0c0a12] border border-white/[0.08] focus:border-purple-500/30 focus:outline-none transition-all resize-none leading-relaxed"
+        style={{ minHeight: isReply ? "60px" : "110px", boxShadow: "inset 0 4px 12px rgba(0,0,0,0.4)" }} 
+      />
 
-      {!preview ? (
-        <textarea ref={textareaRef} value={text}
-          onChange={e => { setText(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 200) + "px"; }}
-          onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (text.trim()) { onSubmit(text); setText(""); } } }}
-          placeholder={placeholder}
-          rows={isReply ? 2 : 4}
-          className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 resize-none focus:outline-none transition-all font-mono"
-          style={{ background: "#0c0a12", border: `1px solid ${text ? color + "40" : "rgba(255,255,255,0.08)"}`, minHeight: isReply ? "56px" : "100px" }} />
-      ) : (
-        <div className="w-full px-3 py-2.5 rounded-xl text-gray-300 text-sm leading-relaxed min-h-[80px]"
-          style={{ background: "#0c0a12", border: "1px solid rgba(255,255,255,0.08)" }}>
-          {text ? renderMd(text) : <span className="text-gray-600 italic">Előnézet...</span>}
-        </div>
-      )}
-
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-gray-700 text-xs">Ctrl+Enter = küldés{!isReply && " · Markdown támogatott"}</span>
-        <div className="flex gap-2">
+      <div className="flex items-center justify-between mt-2 px-1">
+        <span className="text-gray-700 text-[0.65rem] font-bold uppercase tracking-widest opacity-40">Ctrl+Enter = küldés</span>
+        <div className="flex gap-3">
           {onCancel && (
-            <button onClick={onCancel} className="cursor-pointer px-3 py-1.5 rounded-xl text-xs text-gray-500 hover:text-gray-300 hover:bg-white/8 transition-all">
+            <button onClick={onCancel} className="cursor-pointer px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-white hover:bg-white/5 transition-all">
               Mégse
             </button>
           )}
           <button onClick={() => { if (text.trim()) { onSubmit(text); setText(""); } }}
             disabled={!text.trim()}
-            className="cursor-pointer flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90 active:scale-[0.97] disabled:opacity-30"
-            style={{ background: text.trim() ? `linear-gradient(135deg, ${color}, ${color}99)` : "rgba(255,255,255,0.04)", boxShadow: text.trim() ? `0 4px 16px ${color}25` : "none" }}>
-            <Send className="w-3 h-3" /> {submitLabel}
+            className="cursor-pointer flex items-center gap-2 px-5 py-2 rounded-xl text-xs text-white font-bold transition-all hover:opacity-90 active:scale-[0.97] disabled:opacity-20 disabled:grayscale"
+            style={{ background: text.trim() ? `linear-gradient(135deg, ${color}, ${color}CC)` : "rgba(255,255,255,0.04)", boxShadow: text.trim() ? `0 8px 20px ${color}20` : "none" }}>
+            <Send className="w-3.5 h-3.5" /> {submitLabel}
           </button>
         </div>
       </div>
@@ -955,7 +839,6 @@ export default function ForumPost({
 
 
   const { user: globalUser } = useContext(MyUserContext);
-  const navigate = useNavigate();
   const cat = CATEGORIES[post?.category] || CATEGORIES.chat;
   const color = cat.color;
 
@@ -1006,8 +889,6 @@ export default function ForumPost({
             };
             setAuthorUserDoc(userData);
           }
-        } else {
-          console.warn("[ForumPost] Author profile fetch failed:", response.status);
         }
       } catch (e) {
         console.error("[ForumPost] Hiba a szerző adatainak lekérésekor (API):", e);
@@ -1334,53 +1215,12 @@ export default function ForumPost({
     <div
       className="min-h-screen relative overflow-hidden text-white"
       style={{
-        backgroundColor: "#06050a",
+        backgroundColor: "transparent",
         fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif"
       }}
     >
-      {/* ── Premium High-Fidelity Background: Neural Flux Terminal ── */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#030108]">
-
-        {/* Layer 1: Atmospheric Depth Gradients */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#060110] via-transparent to-[#060110]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#060110]/95 via-transparent to-[#060110]/95" />
-
-        {/* Layer 2: Highly Blurred Original Texture */}
-        <div className="absolute inset-0 transform scale-105 opacity-15">
-          <img
-            src="/forum_bg.png"
-            alt=""
-            className="w-full h-full object-cover mix-blend-screen"
-            style={{ filter: "brightness(0.5) blur(40px)" }}
-          />
-        </div>
-
-        {/* Layer 3: Tech Grid & Matrix Pattern */}
-        <div className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: "radial-gradient(#7c3aed 0.5px, transparent 0.5px)",
-            backgroundSize: "24px 24px"
-          }} />
-
-        {/* Layer 4: Neural Data Flow (Beams) */}
-        <NeuralNetworkFP />
-
-        {/* Layer 5: Technical HUD & Scanlines */}
-        <TechnicalHUDFP />
-
-        {/* Layer 6: Cinematic Ambient Glows */}
-        <div className="absolute top-[-20%] left-[-10%] w-[80vw] h-[80vh] rounded-full blur-[160px] opacity-[0.14]"
-          style={{ background: "radial-gradient(circle, #7c3aed, transparent 70%)" }} />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[80vw] h-[80vh] rounded-full blur-[180px] opacity-[0.1]"
-          style={{ background: "radial-gradient(circle, #4c1d95, transparent 70%)" }} />
-
-        {/* Layer 7: Premium Matte Noise & Vignette */}
-        <div className="absolute inset-0 opacity-[0.06] mix-blend-overlay pointer-events-none"
-          style={{
-            backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noise%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noise)%22/%3E%3C/svg%3E')"
-          }} />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.6)_100%)]" />
-      </div>
+      {/* ── Studio Background ── */}
+      <ForumBackground />
 
       <div className="relative z-10 w-full">
 
