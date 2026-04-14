@@ -82,106 +82,79 @@ export default function MobilePanelControls({ color = '#8b5cf6' }) {
     );
   }
 
-  // ── Panel open: show SWAP (left) + CLOSE (right) ──────────────────────
+  // ── Panel open: show a vertical strip in the 72px gap ─────────────────
+  const isGapOnRight = mobileActive === 'L1' || mobileActive === 'L2';
+  const otherPanels = availablePanels.filter(id => id !== mobileActive);
+
+  // Common button styles inherited from the "all closed" state
+  const btnStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    background: 'rgba(10,10,20,0.85)',
+    backdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    pointerEvents: 'auto',
+  };
+
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ duration: 0.2 }}
+        initial={{ opacity: 0, scale: 0.9, x: isGapOnRight ? 20 : -20 }}
+        animate={{ opacity: 1, scale: 1, x: 0 }}
+        exit={{ opacity: 0, scale: 0.9, x: isGapOnRight ? 20 : -20 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         style={{
-          position: 'absolute',
+          position: 'fixed',
           top: 12,
-          left: 12,
-          right: 12,
+          [isGapOnRight ? 'right' : 'left']: 14,
           zIndex: 60,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          gap: 8,
           pointerEvents: 'none',
         }}
       >
-        {/* Active panel indicator */}
-        <div
-          style={{
-            pointerEvents: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 12px',
-            borderRadius: 10,
-            background: 'rgba(10,10,20,0.85)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.08)',
-          }}
+        {/* Close Button — High visibility */}
+        <button
+          onClick={() => setPanelOpen(mobileActive, false)}
+          aria-label="Close panel"
+          style={{ ...btnStyle, color: '#f87171', border: '1px solid rgba(248,113,113,0.3)' }}
         >
-          <span
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: 6,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color,
-              background: `${color}18`,
-              border: `1px solid ${color}30`,
-            }}
-          >
-            {PANEL_ICONS[mobileActive]}
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0', letterSpacing: '0.04em' }}>
-            {PANEL_LABELS[mobileActive]}
-          </span>
-        </div>
+          <X style={{ width: 18, height: 18 }} />
+        </button>
 
-        {/* Actions: SWAP + CLOSE */}
-        <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-          {/* Swap — only between L1 and L2 */}
+        {/* Swap Button — Between L1 and L2 */}
+        {(mobileActive === 'L1' || mobileActive === 'L2') && (
           <button
             onClick={swapMobilePanel}
             aria-label="Swap panel"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              background: 'rgba(10,10,20,0.85)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#a5b4fc',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
+            style={{ ...btnStyle, color: '#a5b4fc' }}
           >
-            <ArrowLeftRight style={{ width: 16, height: 16 }} />
+            <ArrowLeftRight style={{ width: 18, height: 18 }} />
           </button>
+        )}
 
-          {/* Close */}
+        {/* Tiny Separator */}
+        <div style={{ width: 20, height: 1, opacity: 0.1, background: '#fff', margin: '4px 0' }} />
+
+        {/* Quick-access to OTHER panels */}
+        {otherPanels.map(id => (
           <button
-            onClick={() => setPanelOpen(mobileActive, false)}
-            aria-label="Close panel"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              background: 'rgba(10,10,20,0.85)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#f87171',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
+            key={id}
+            onClick={() => setPanelOpen(id, true)}
+            aria-label={`Switch to ${PANEL_LABELS[id]}`}
+            style={{ ...btnStyle, color: '#94a3b8' }}
           >
-            <X style={{ width: 16, height: 16 }} />
+            {PANEL_ICONS[id]}
           </button>
-        </div>
+        ))}
       </motion.div>
     </AnimatePresence>
   );

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSpring, useTransform, useMotionValueEvent } from 'framer-motion';
-import { ChevronRight, ChevronLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X } from 'lucide-react';
+import { ChevronRight, ChevronLeft, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X, ArrowLeftRight } from 'lucide-react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useStudioPanels } from '../../context/StudioPanelContext';
 import MobilePanelControls from './MobilePanelControls';
@@ -38,21 +38,30 @@ export default function StudioLayout({
   const panelCtx = useStudioPanels();
   const usingCtx = !isMobile && !isTablet ? false : !!panelCtx;
 
-  // Resolve effective open states: use context on mobile/tablet, props on desktop
-  const effL1 = usingCtx ? panelCtx.panelState.L1 : leftOpen;
-  const effL2 = usingCtx ? panelCtx.panelState.L2 : leftSecondaryOpen;
-  const effR  = usingCtx ? panelCtx.panelState.R  : rightOpen;
-
-  // Resolve effective setters
-  const effSetL1 = usingCtx ? panelCtx.setPanelOpen.bind(null, 'L1') : setLeftOpen;
-  const effSetL2 = usingCtx ? panelCtx.setPanelOpen.bind(null, 'L2') : setLeftSecondaryOpen;
-  const effSetR  = usingCtx ? panelCtx.setPanelOpen.bind(null, 'R')  : setRightOpen;
-
   // ── Mobile: only show the active panel ───────────────────────────────────
   const mobileActive = usingCtx ? panelCtx.mobileActive : null;
   const showL1Mobile = isMobile && (!usingCtx || mobileActive === 'L1');
   const showL2Mobile = isMobile && (!usingCtx || mobileActive === 'L2');
   const showRMobile  = isMobile && (!usingCtx || mobileActive === 'R');
+
+  // Resolve effective open states: use context on mobile/tablet, props on desktop
+  // On mobile, we strictly follow mobileActive to ensure actions (toggle/swap) are in sync
+  const effL1 = isMobile 
+    ? (mobileActive === 'L1' && (usingCtx ? panelCtx.panelState.L1 : true))
+    : (usingCtx ? panelCtx.panelState.L1 : leftOpen);
+    
+  const effL2 = isMobile 
+    ? (mobileActive === 'L2' && (usingCtx ? panelCtx.panelState.L2 : true))
+    : (usingCtx ? panelCtx.panelState.L2 : leftSecondaryOpen);
+    
+  const effR = isMobile 
+    ? (mobileActive === 'R' && (usingCtx ? panelCtx.panelState.R : true))
+    : (usingCtx ? panelCtx.panelState.R : rightOpen);
+
+  // Resolve effective setters
+  const effSetL1 = usingCtx ? panelCtx.setPanelOpen.bind(null, 'L1') : setLeftOpen;
+  const effSetL2 = usingCtx ? panelCtx.setPanelOpen.bind(null, 'L2') : setLeftSecondaryOpen;
+  const effSetR  = usingCtx ? panelCtx.setPanelOpen.bind(null, 'R')  : setRightOpen;
 
   // On mobile, only one panel is "open" at a time
   const mobileL1Open = isMobile ? showL1Mobile && effL1 : effL1;
@@ -66,17 +75,17 @@ export default function StudioLayout({
 
   // ── Responsive widths ────────────────────────────────────────────────────
   const getL1Width = () => {
-    if (isMobile) return typeof window !== 'undefined' ? window.innerWidth - 32 : 320;
+    if (isMobile) return typeof window !== 'undefined' ? window.innerWidth - 72 : 248;
     if (isTablet) return 280;
     return leftWidth;
   };
   const getL2Width = () => {
-    if (isMobile) return typeof window !== 'undefined' ? window.innerWidth - 32 : 320;
+    if (isMobile) return typeof window !== 'undefined' ? window.innerWidth - 72 : 248;
     if (isTablet) return Math.min(typeof window !== 'undefined' ? window.innerWidth * 0.55 : 400, 400);
     return leftSecondaryWidth;
   };
   const getRWidth = () => {
-    if (isMobile) return typeof window !== 'undefined' ? window.innerWidth - 32 : 320;
+    if (isMobile) return typeof window !== 'undefined' ? window.innerWidth - 72 : 248;
     if (isTablet) return Math.min(typeof window !== 'undefined' ? window.innerWidth * 0.55 : 400, 400);
     return rightWidth;
   };
@@ -251,18 +260,12 @@ export default function StudioLayout({
           {children}
         </motion.div>
 
-        {/* ── Mobile Panel Controls (SWAP + CLOSE / reopen) ────────────── */}
-        {activeOverlay && (
-          <MobilePanelControls color={accentColor} />
-        )}
-
-        {/* ── Toggle buttons (desktop only, not narrow) ────────────────── */}
-        {!activeOverlay && leftSidebar && (
+        {/* ── Toggle buttons (Desktop) ────────────────────────────────── */}
+        {!isMobile && leftSidebar && (
           <motion.div
-            className="absolute top-1/2 -translate-y-1/2 z-50 flex flex-col"
-            style={{ x: smoothL }}
+            className="absolute left-0 top-1/2 z-50 flex flex-col items-start"
+            style={{ x: smoothL, y: '-50%' }}
           >
-            {/* L1 toggle */}
             <button
               onClick={handleToggleL1}
               className="p-1.5 rounded-r-lg bg-[#0a0a14] border border-l-0 border-white/5 text-zinc-500 hover:text-white transition-colors cursor-pointer"
@@ -270,8 +273,6 @@ export default function StudioLayout({
             >
               {effL1 ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5" />}
             </button>
-
-            {/* L2 toggle (only if secondary panel exists) */}
             {leftSecondarySidebar && (
               <button
                 onClick={handleToggleL2}
@@ -284,11 +285,10 @@ export default function StudioLayout({
           </motion.div>
         )}
 
-        {/* ── Right sidebar toggle — desktop ───────────────────────────── */}
-        {!activeOverlay && rightSidebar && (
+        {!isMobile && rightSidebar && (
           <motion.button
-            className="absolute top-1/2 -translate-y-1/2 z-50 p-1.5 rounded-l-lg bg-[#0a0a14] border border-r-0 border-white/5 text-zinc-500 hover:text-white transition-colors cursor-pointer"
-            style={{ x: rightToggleX }}
+            className="absolute right-0 top-1/2 z-50 p-1.5 rounded-l-lg bg-[#0a0a14] border border-r-0 border-white/5 text-zinc-500 hover:text-white transition-colors cursor-pointer"
+            style={{ x: rightToggleX, y: '-50%' }}
             onClick={handleToggleR}
             aria-label={effR ? 'Close archive' : 'Open archive'}
           >
@@ -296,15 +296,53 @@ export default function StudioLayout({
           </motion.button>
         )}
 
-        {/* ── Archive toggle — mobile/tablet (moves with panel edge) ───── */}
-        {activeOverlay && rightSidebar && (
-          <motion.button
-            className="fixed top-1/2 z-50 flex items-center justify-center w-10 h-10 rounded-l-xl bg-[#0a0a14]/80 backdrop-blur-sm border border-r-0 border-white/10 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-            style={{ right: 0, x: rightToggleX }}
-            onClick={handleToggleR}
-            aria-label={effR ? 'Close archive' : 'Open archive'}
+        {/* ── Mobile Toggle Buttons (Left) ────────────────────────────── */}
+        {isMobile && leftSidebar && (
+          <motion.div
+            className="absolute left-0 top-1/2 z-50 flex flex-col items-start"
+            style={{ 
+              x: smoothL, 
+              y: leftSecondarySidebar ? '-50%' : 'calc(-50% - 30px)' 
+            }}
           >
-            {effR ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+            <div className="flex flex-col shadow-2xl">
+              <button
+                onClick={handleToggleL1}
+                className="w-11 h-11 flex items-center justify-center bg-[#0a0a14] border border-l-0 border-white/10 text-zinc-400 rounded-r-xl"
+              >
+                {mobileActive === 'L1' ? (
+                  <X className="w-5 h-5 text-red-400/80" />
+                ) : (
+                  (mobileActive === 'L2') ? <ArrowLeftRight className="w-5 h-5 text-indigo-400" /> : <PanelLeftOpen className="w-5 h-5" />
+                )}
+              </button>
+              {leftSecondarySidebar && (
+                <button
+                  onClick={handleToggleL2}
+                  className="w-11 h-11 mt-[50px] flex items-center justify-center bg-[#0a0a14] border border-l-0 border-white/10 text-zinc-400 rounded-r-xl"
+                >
+                  {mobileActive === 'L2' ? (
+                    <X className="w-5 h-5 text-red-400/80" />
+                  ) : (
+                    (mobileActive === 'L1') ? <ArrowLeftRight className="w-5 h-5 text-indigo-400" /> : <ChevronRight className="w-5 h-5" />
+                  )}
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Mobile Toggle Button (Right) ───────────────────────────── */}
+        {isMobile && rightSidebar && (
+          <motion.button
+            onClick={handleToggleR}
+            className="absolute right-0 top-1/2 z-50 w-11 h-11 flex items-center justify-center bg-[#0a0a14] border border-r-0 border-white/10 text-zinc-400 shadow-2xl rounded-l-xl"
+            style={{ 
+              x: rightToggleX, 
+              y: leftSecondarySidebar ? '-50%' : 'calc(-50% + 30px)' 
+            }}
+          >
+            {effR ? <X className="w-5 h-5 text-red-400/80" /> : <PanelRightOpen className="w-5 h-5" />}
           </motion.button>
         )}
 

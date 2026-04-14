@@ -19,15 +19,15 @@ export function StudioPanelProvider({ children }) {
   // Panel open state
   const [panelState, setPanelState] = useState({
     L1: true,
-    L2: true,
+    L2: false,
     R: false,
   });
 
   // LRU stack: most-recent at end
-  const [activeStack, setActiveStack] = useState(['L1', 'L2']);
+  const [activeStack, setActiveStack] = useState(['L1']);
 
   // Mobile: which panel is currently the "active" single panel
-  const [mobileActive, setMobileActive] = useState('L2');
+  const [mobileActive, setMobileActive] = useState('L1');
 
   // Track available panels (children can register which panels they support)
   const [availablePanels, setAvailablePanels] = useState(['L1', 'L2', 'R']);
@@ -126,10 +126,17 @@ export function StudioPanelProvider({ children }) {
     });
   }, [isMobile, isTablet, mobileActive, activeStack, availablePanels]);
 
-  // ── Explicit set ────────────────────────────────────────────────────────
   const setPanelOpen = useCallback((id, open) => {
+    // On mobile, if we're opening a panel, we always want to hit the activation logic 
+    // even if it was technically "open" in background state.
     setPanelState(prev => {
-      if (prev[id] === open) return prev;
+      const isAlreadyInCorrectState = prev[id] === open;
+      
+      // Early return only if not mobile, OR if mobile is already showing the correct active panel
+      if (!isMobile && isAlreadyInCorrectState) return prev;
+      if (isMobile && isAlreadyInCorrectState && open && mobileActive === id) return prev;
+      if (isMobile && isAlreadyInCorrectState && !open && mobileActive !== id) return prev;
+
       const nextState = { ...prev, [id]: open };
 
       if (open) {
@@ -140,7 +147,6 @@ export function StudioPanelProvider({ children }) {
             return [id];
           }
           if (isTablet && newStack.length > 2) {
-            // Close L1 first, then fall back to LRU
             const evicted = newStack.includes('L1') ? 'L1' : newStack[0];
             nextState[evicted] = false;
             return newStack.filter(p => p !== evicted);
@@ -148,12 +154,13 @@ export function StudioPanelProvider({ children }) {
           return newStack;
         });
       } else {
-        setActiveStack(stack => stack.filter(p => p !== id));
-        if (isMobile && mobileActive === id) {
-          // Allow all panels to be closed on mobile
-          const remaining = activeStack.filter(p => p !== id);
-          setMobileActive(remaining[remaining.length - 1] || null);
-        }
+        setActiveStack(stack => {
+          const newStack = stack.filter(p => p !== id);
+          if (isMobile && mobileActive === id) {
+            setMobileActive(newStack[newStack.length - 1] || null);
+          }
+          return newStack;
+        });
       }
 
       return nextState;
