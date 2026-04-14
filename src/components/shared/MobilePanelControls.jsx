@@ -136,7 +136,7 @@ export default function MobilePanelControls({ color = '#8b5cf6' }) {
           </span>
         </div>
 
-        {/* Actions: SWAP (left) + CLOSE (right) */}
+        {/* Actions: SWAP + CLOSE */}
         <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
           {/* Swap — only between L1 and L2 */}
           <button

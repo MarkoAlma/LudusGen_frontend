@@ -8,7 +8,7 @@ const StudioPanelContext = createContext(null);
  * Centralized state manager for AiStudio panels (L1: Master, L2: Studio, R: Archive).
  *
  * Desktop (>= 1280px): No limit — all 3 panels can be open simultaneously.
- * Tablet  (768–1279px): Max 2 panels open — LRU eviction closes least-recently-used.
+ * Tablet  (768–1279px): Max 2 panels open — closes L1 (nav sidebar) first, then LRU.
  * Mobile  (< 768px):    Max 1 panel open — true swap system with CLOSE + SWAP actions.
  */
 export function StudioPanelProvider({ children }) {
@@ -32,6 +32,29 @@ export function StudioPanelProvider({ children }) {
   // Track available panels (children can register which panels they support)
   const [availablePanels, setAvailablePanels] = useState(['L1', 'L2', 'R']);
 
+  // ── Enforce constraints reactively ──────────────────────────────────────
+  // Runs on every panel change (not just breakpoint transitions) to ensure
+  // the limits are always respected regardless of how a panel was opened.
+  useEffect(() => {
+    if (isMobile && activeStack.length > 1) {
+      // Mobile: max 1 panel — keep only the most recent
+      const last = activeStack[activeStack.length - 1];
+      setMobileActive(last);
+      setPanelState({ L1: last === 'L1', L2: last === 'L2', R: last === 'R' });
+      setActiveStack([last]);
+    } else if (isTablet && activeStack.length > 2) {
+      // Tablet: max 2 panels — close L1 first, then fall back to LRU
+      const evictId = activeStack.includes('L1') ? 'L1' : activeStack[0];
+      const kept = activeStack.filter(p => p !== evictId);
+      setPanelState({
+        L1: kept.includes('L1'),
+        L2: kept.includes('L2'),
+        R: kept.includes('R'),
+      });
+      setActiveStack(kept);
+    }
+  }, [isMobile, isTablet, activeStack]);
+
   // ── Enforce constraints on breakpoint change ────────────────────────────
   const prevMobileRef = useRef(isMobile);
   const prevTabletRef = useRef(isTablet);
@@ -52,9 +75,10 @@ export function StudioPanelProvider({ children }) {
     }
 
     if (!wasTablet && isTablet) {
-      // Entering tablet: max 2
-      const kept = activeStack.slice(-2);
-      if (kept.length < activeStack.length) {
+      // Entering tablet: max 2 — close L1 first, then fall back to LRU
+      if (activeStack.length > 2) {
+        const evictId = activeStack.includes('L1') ? 'L1' : activeStack[0];
+        const kept = activeStack.filter(p => p !== evictId);
         setPanelState({
           L1: kept.includes('L1'),
           L2: kept.includes('L2'),
@@ -66,7 +90,7 @@ export function StudioPanelProvider({ children }) {
 
     prevMobileRef.current = isMobile;
     prevTabletRef.current = isTablet;
-  }, [isMobile, isTablet, activeStack]);
+  }, [isMobile, isTablet]);
 
   // ── Toggle a panel ──────────────────────────────────────────────────────
   const togglePanel = useCallback((id) => {
@@ -82,24 +106,19 @@ export function StudioPanelProvider({ children }) {
             return [id];
           }
           if (isTablet && newStack.length > 2) {
-            const kept = newStack.slice(-2);
-            // Close the evicted panel
-            const evicted = newStack[0];
+            // Close L1 first, then fall back to LRU
+            const evicted = newStack.includes('L1') ? 'L1' : newStack[0];
             nextState[evicted] = false;
-            return kept;
+            return newStack.filter(p => p !== evicted);
           }
           return newStack;
         });
       } else {
         setActiveStack(stack => stack.filter(p => p !== id));
         if (isMobile && mobileActive === id) {
-          // Closing the active mobile panel — switch to another available
+          // Closing the active mobile panel — allow all panels to be closed
           const remaining = activeStack.filter(p => p !== id);
-          const next = remaining[remaining.length - 1] || availablePanels.find(p => p !== id);
-          if (next) {
-            setMobileActive(next);
-            nextState[next] = true;
-          }
+          setMobileActive(remaining[remaining.length - 1] || null);
         }
       }
 
@@ -121,22 +140,19 @@ export function StudioPanelProvider({ children }) {
             return [id];
           }
           if (isTablet && newStack.length > 2) {
-            const kept = newStack.slice(-2);
-            const evicted = newStack[0];
+            // Close L1 first, then fall back to LRU
+            const evicted = newStack.includes('L1') ? 'L1' : newStack[0];
             nextState[evicted] = false;
-            return kept;
+            return newStack.filter(p => p !== evicted);
           }
           return newStack;
         });
       } else {
         setActiveStack(stack => stack.filter(p => p !== id));
         if (isMobile && mobileActive === id) {
+          // Allow all panels to be closed on mobile
           const remaining = activeStack.filter(p => p !== id);
-          const next = remaining[remaining.length - 1] || availablePanels.find(p => p !== id);
-          if (next) {
-            setMobileActive(next);
-            nextState[next] = true;
-          }
+          setMobileActive(remaining[remaining.length - 1] || null);
         }
       }
 

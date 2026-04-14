@@ -296,10 +296,11 @@ export default function StudioLayout({
           </motion.button>
         )}
 
-        {/* ── Archive toggle — mobile/tablet ───────────────────────────── */}
+        {/* ── Archive toggle — mobile/tablet (moves with panel edge) ───── */}
         {activeOverlay && rightSidebar && (
           <motion.button
-            className="fixed top-1/2 right-3 z-50 flex items-center justify-center w-10 h-10 rounded-xl bg-[#0a0a14]/80 backdrop-blur-sm border border-white/10 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            className="fixed top-1/2 z-50 flex items-center justify-center w-10 h-10 rounded-l-xl bg-[#0a0a14]/80 backdrop-blur-sm border border-r-0 border-white/10 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            style={{ right: 0, x: rightToggleX }}
             onClick={handleToggleR}
             aria-label={effR ? 'Close archive' : 'Open archive'}
           >

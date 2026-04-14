@@ -9,7 +9,7 @@ import StudioLayout from '../shared/StudioLayout';
 import { useStudioPanels } from '../../context/StudioPanelContext';
 
 export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
-  const { registerPanel, unregisterPanel } = useStudioPanels();
+  const { registerPanel, unregisterPanel, togglePanel } = useStudioPanels();
 
   // Register panels with centralized manager
   useEffect(() => {

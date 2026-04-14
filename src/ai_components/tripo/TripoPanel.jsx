@@ -210,7 +210,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const isMobile640 = useMediaQuery("(max-width: 640px)");
   const isTablet1024 = useMediaQuery("(max-width: 1024px)");
   // Use context-driven breakpoints on mobile/tablet, local on desktop
-  const { isMobile: ctxMobile, isTablet: ctxTablet, registerPanel, unregisterPanel } = useStudioPanels();
+  const { isMobile: ctxMobile, isTablet: ctxTablet, registerPanel, unregisterPanel, togglePanel } = useStudioPanels();
   const isMobile = ctxMobile || isMobile640;
   const isTablet = ctxTablet || isTablet1024;
 
