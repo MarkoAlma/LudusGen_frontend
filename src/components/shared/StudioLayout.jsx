@@ -111,6 +111,12 @@ export default function StudioLayout({
   const rightToggleX = useTransform(smoothR, v => v * -1);
   const effectiveL1Width = getL1Width();
 
+  // ── Transform hooks (Must be top-level for React) ────────────────────────
+  const combinedLeftWidth = leftWidth + (leftSecondarySidebar ? leftSecondaryWidth : 0);
+  const desktopLX = useTransform(smoothL, v => v - combinedLeftWidth);
+  const desktopRX = useTransform(smoothR, v => (rightWidth - v));
+  const contentWidthExpr = useTransform([smoothL, smoothR], ([l, r]) => `calc(100% - ${l + r}px)`);
+
   // ── Toggle handlers ──────────────────────────────────────────────────────
   const handleToggleL1 = () => effSetL1?.(!effL1);
   const handleToggleL2 = () => effSetL2?.(!effL2);
@@ -126,74 +132,75 @@ export default function StudioLayout({
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <StudioLayoutContext.Provider value={{ smoothL, smoothR }}>
-      <div className="h-full w-full relative overflow-hidden">
+      <div className="h-full w-full relative overflow-hidden bg-[#05050a]">
         {/* ── HUD overlays ─────────────────────────────────────────────── */}
-        {topHUD && <div className="absolute top-0 left-0 right-0 z-50 pointer-events-none">{topHUD}</div>}
+        {topHUD && (
+          <div className="absolute top-0 left-0 right-0 z-[60] pointer-events-none">
+            {topHUD}
+          </div>
+        )}
 
-        {/* ── Left panels (combined container) — desktop only ──────────── */}
+        {/* ── Desktop Sidebars (Transform-based for performance) ────────── */}
         {!activeOverlay && leftSidebar && (
           <motion.div
-            className="absolute left-0 top-0 bottom-0 z-40 flex border-r border-white/5"
-            style={{ width: smoothL, background: '#0a0a14' }}
+            className="absolute left-0 top-0 bottom-0 z-40 flex border-r border-white/5 will-change-transform"
+            style={{ 
+              x: desktopLX,
+              width: combinedLeftWidth,
+              background: '#0a0a14' 
+            }}
           >
             {/* L1: Master Sidebar */}
-            <motion.div
-              className="h-full flex-shrink-0"
-              style={{ width: smoothL1 }}
-            >
-              <div className="h-full overflow-hidden">
-                {leftSidebar}
-              </div>
-            </motion.div>
+            <div className="h-full flex-shrink-0" style={{ width: leftWidth }}>
+              <div className="h-full overflow-hidden">{leftSidebar}</div>
+            </div>
 
             {/* L2: Secondary Panel */}
             {leftSecondarySidebar && (
-              <motion.div
-                className="h-full flex-shrink-0"
-                style={{ width: smoothL2 }}
-              >
-                <div className="h-full overflow-hidden">
-                  {leftSecondarySidebar}
-                </div>
-              </motion.div>
+              <div className="h-full flex-shrink-0" style={{ width: leftSecondaryWidth }}>
+                <div className="h-full overflow-hidden">{leftSecondarySidebar}</div>
+              </div>
             )}
           </motion.div>
         )}
 
-        {/* ── Right sidebar — desktop only ─────────────────────────────── */}
         {!activeOverlay && rightSidebar && (
           <motion.div
-            className="absolute right-0 top-0 bottom-0 z-40 border-l border-white/5"
-            style={{ width: smoothR, background: '#0a0a14' }}
+            className="absolute right-0 top-0 bottom-0 z-40 border-l border-white/5 will-change-transform"
+            style={{ 
+              x: desktopRX,
+              width: rightWidth, 
+              background: '#0a0a14' 
+            }}
           >
-            <div className="h-full overflow-hidden">
-              {rightSidebar}
-            </div>
+            <div className="h-full overflow-hidden">{rightSidebar}</div>
           </motion.div>
         )}
 
         {/* ── Overlay backdrops (mobile/tablet) ────────────────────────── */}
-        {activeOverlay && (mobileL1Open || mobileL2Open || mobileROpen) && (
-          <motion.div
-            className="fixed inset-0 z-30 bg-black/60"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={() => {
-              if (mobileROpen) handleMobileClose('R');
-              else if (mobileL2Open) handleMobileClose('L2');
-              else if (mobileL1Open) handleMobileClose('L1');
-            }}
-          />
-        )}
+        <AnimatePresence>
+          {activeOverlay && (mobileL1Open || mobileL2Open || mobileROpen) && (
+            <motion.div
+              className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              onClick={() => {
+                if (mobileROpen) handleMobileClose('R');
+                else if (mobileL2Open) handleMobileClose('L2');
+                else if (mobileL1Open) handleMobileClose('L1');
+              }}
+            />
+          )}
+        </AnimatePresence>
 
         {/* ── Overlay panels (mobile/tablet slide-in) ──────────────────── */}
         {activeOverlay && leftSidebar && (
           <AnimatePresence>
             {mobileL1Open && (
               <motion.div
-                className="fixed top-0 left-0 bottom-0 z-35"
+                className="fixed top-0 left-0 bottom-0 z-35 bg-[#0a0a14] will-change-transform"
                 style={{ width: getL1Width() }}
                 initial={{ x: '-100%' }}
                 animate={{ x: 0 }}
@@ -212,7 +219,7 @@ export default function StudioLayout({
           <AnimatePresence>
             {mobileL2Open && (
               <motion.div
-                className="fixed top-0 bottom-0 z-35"
+                className="fixed top-0 bottom-0 z-35 bg-[#0a0a14] will-change-transform"
                 style={{
                   width: getL2Width(),
                   left: mobileL1Open ? effectiveL1Width : 0,
@@ -234,7 +241,7 @@ export default function StudioLayout({
           <AnimatePresence>
             {mobileROpen && (
               <motion.div
-                className="fixed top-0 right-0 bottom-0 z-35"
+                className="fixed top-0 right-0 bottom-0 z-35 bg-[#0a0a14] will-change-transform"
                 style={{ width: getRWidth() }}
                 initial={{ x: '100%' }}
                 animate={{ x: 0 }}
@@ -251,10 +258,13 @@ export default function StudioLayout({
 
         {/* ── Main content area ────────────────────────────────────────── */}
         <motion.div
-          className="h-full relative z-10"
+          className="h-full w-full relative z-10 will-change-transform shadow-inner"
           style={{
-            paddingLeft: activeOverlay ? 0 : smoothL,
-            paddingRight: activeOverlay ? 0 : smoothR,
+            x: activeOverlay ? 0 : smoothL,
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            width: activeOverlay ? '100%' : contentWidthExpr,
           }}
         >
           {children}
