@@ -123,14 +123,20 @@ export default function Shared3DHistory({
       const d = await res.json();
       if (!d.success) throw new Error(d.message);
       toast.success(`Sikeres feltöltés: ${d.filename}`);
-      fetchItems(false); // Reload history immediately
+      // Reload history immediately, then auto-select the uploaded model
+      await fetchItems(false);
       setActiveTab('upload');
+      // Auto-select the first upload item so activeTaskId is populated
+      if (onSelect && d.taskId) {
+        const uploadedItem = { id: d.historyId || d.taskId, taskId: d.taskId, source: 'upload', status: 'success', model_url: d.modelUrl || null };
+        onSelect(uploadedItem);
+      }
     } catch (e) {
       toast.error(`Nem sikerült feltölteni a fájlt: ${e.message}`);
     } finally {
       setAssetUploading(false);
     }
-  }, [getIdToken]);
+  }, [getIdToken, onSelect]);
 
   const handleDeleteLocally = async (item) => {
     if (!window.confirm(`Biztosan törlöd: "${item.prompt?.slice(0, 30) || 'Modell'}"?`)) return;

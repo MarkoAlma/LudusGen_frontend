@@ -76,7 +76,7 @@ export const defaultParams = {
 
 import { API_BASE } from '../../api/client';
 
-export async function fetchGlbAsBlob(modelUrl, getIdToken) {
+export async function fetchGlbAsBlob(modelUrl, getIdToken, taskId = null) {
   if (!modelUrl) return null;
   if (modelUrl.startsWith('data:')) return modelUrl;
 
@@ -84,7 +84,7 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken) {
   if (modelUrl.startsWith('/api/')) {
     fetchUrl = `${API_BASE}${modelUrl}`;
   } else if (modelUrl.includes('tripo3d.com') || modelUrl.includes('tripo3d.ai')) {
-    fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}`;
+    fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}${taskId ? `&taskId=${taskId}` : ''}`;
   } else if (
     modelUrl.startsWith('https://s3.') ||
     modelUrl.includes('backblazeb2.com') ||
@@ -127,7 +127,7 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken) {
  * Fetch model as ArrayBuffer (for thumbnail generation).
  * Returns { buffer: ArrayBuffer, blobUrl: string }
  */
-export async function fetchModelData(modelUrl, getIdToken) {
+export async function fetchModelData(modelUrl, getIdToken, taskId = null) {
   if (!modelUrl) return null;
   if (modelUrl.startsWith('data:')) return null;
 
@@ -135,7 +135,7 @@ export async function fetchModelData(modelUrl, getIdToken) {
   if (modelUrl.startsWith('/api/')) {
     fetchUrl = `${API_BASE}${modelUrl}`;
   } else if (modelUrl.includes('tripo3d.com') || modelUrl.includes('tripo3d.ai')) {
-    fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}`;
+    fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}${taskId ? `&taskId=${taskId}` : ''}`;
   } else if (
     modelUrl.startsWith('https://s3.') ||
     modelUrl.includes('backblazeb2.com') ||
