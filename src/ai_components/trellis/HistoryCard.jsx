@@ -80,7 +80,7 @@ const HistoryCard = React.memo(function HistoryCard({
     (async () => {
       setThumbLoading(true);
       try {
-        const data = await fetchModelData(item.model_url, getIdToken);
+        const data = await fetchModelData(item.model_url, getIdToken, item.taskId);
         if (cancelled || !data) return;
         
         // Pass ArrayBuffer directly — no double-fetch needed

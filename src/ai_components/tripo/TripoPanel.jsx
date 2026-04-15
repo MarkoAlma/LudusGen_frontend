@@ -345,11 +345,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [texPbr, setTexPbr] = useState(false);
   const [texAlignment, setTexAlignment] = useState("original_image");
 
-  // texture_edit
+  // texture_edit — Magic Brush (viewport inpainting)
   const [brushMode, setBrushMode] = useState("Gen Mode");
   const [brushPrompt, setBrushPrompt] = useState("");
   const [creativity, setCreativity] = useState(0.6);
   const [brushColor, setBrushColor] = useState("#ffffff");
+  const [brushSize, setBrushSize] = useState(10);
+  const canvasRef = useRef(null);
+  const isDrawingRef = useRef(false);
 
   // panels / modals
   const [dlOpen, setDlOpen] = useState(false);
@@ -431,6 +434,77 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const ms = !animSearch || a.label.toLowerCase().includes(animSearch.toLowerCase());
     return mc && ms;
   }), [animSearch, animCat]);
+
+  /* ── Canvas painting setup for Magic Brush ──────────────────────────── */
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    const getPos = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      };
+    };
+
+    const drawDot = (x, y) => {
+      ctx.fillStyle = brushColor;
+      ctx.beginPath();
+      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    const drawLine = (from, to) => {
+      ctx.strokeStyle = brushColor;
+      ctx.lineWidth = brushSize;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+    };
+
+    let lastPos = null;
+
+    const onPointerDown = (e) => {
+      isDrawingRef.current = true;
+      lastPos = getPos(e);
+      drawDot(lastPos.x, lastPos.y);
+    };
+    const onPointerMove = (e) => {
+      if (!isDrawingRef.current) return;
+      const pos = getPos(e);
+      drawLine(lastPos, pos);
+      lastPos = pos;
+    };
+    const onPointerUp = () => { isDrawingRef.current = false; lastPos = null; };
+
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerup", onPointerUp);
+    canvas.addEventListener("pointerleave", onPointerUp);
+
+    return () => {
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointerleave", onPointerUp);
+    };
+  }, [canvasRef, brushColor, brushSize]);
+
+  /* ── Helper: get mask blob from canvas ─────────────────────────────── */
+  const getMaskBlob = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), "image/png");
+    });
+  }, [canvasRef]);
 
   const canGen = useMemo(() => {
     if (isRunning) return false;
@@ -536,7 +610,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         const dp = Math.min(prog, 99); setProgress(dp); updatePersistedProgress(dp); prevProgress = prog;
       }
       if (d.status === "success") {
-        if (!d.modelUrl) throw Object.assign(new Error("Content blocked by Tripo. Credits were not charged."), { type: "nsfw" });
+        // prerigcheck tasks don't return a model — they only set rigCheckResult
+        if (!d.modelUrl && d.rigCheckResult === null) {
+          throw Object.assign(new Error("Content blocked by Tripo. Credits were not charged."), { type: "nsfw" });
+        }
         await onSuccess(d); return;
       }
       if (d.status === "failed" || d.status === "cancelled") {
@@ -546,13 +623,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     throw new Error("Timeout");
   }, []);
 
-  const fetchProxy = useCallback(async (rawUrl, retries = 3) => {
+  const fetchProxy = useCallback(async (rawUrl, taskId = null, retries = 3) => {
     let lastErr;
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
         if (attempt > 0) await new Promise(r => setTimeout(r, 1200 * attempt));
         const t = await getIdToken();
-        const res = await fetch(BASE_URL + "/api/tripo/model-proxy?url=" + encodeURIComponent(rawUrl), { headers: { Authorization: "Bearer " + t }, signal: AbortSignal.timeout(45_000) });
+        const proxyUrl = BASE_URL + "/api/tripo/model-proxy?url=" + encodeURIComponent(rawUrl) + (taskId ? `&taskId=${taskId}` : "");
+        const res = await fetch(proxyUrl, { headers: { Authorization: "Bearer " + t }, signal: AbortSignal.timeout(45_000) });
         if (!res.ok) throw new Error("Model load HTTP " + res.status);
         const blob = await res.blob();
         if (!blob || blob.size === 0) throw new Error("Empty model response");
@@ -585,7 +663,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           if (currentRequestId.current !== requestId) return;
           const rawUrl = d.modelUrl;
           if (!rawUrl) throw Object.assign(new Error("Content blocked."), { type: "nsfw" });
-          const blob = await fetchProxy(rawUrl);
+          const blob = await fetchProxy(rawUrl, persisted.taskId);
           if (pt.cancelled) { revokeBlobUrl(blob); return; }
           revokeBlobUrl(prevUrl.current);
           setModelUrl(blob); prevUrl.current = blob;
@@ -655,6 +733,31 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     try {
       const headers = await authH();
       let body;
+
+      /* ── texture_edit: upload mask from canvas before building body ── */
+      let maskToken = null;
+      if (mode === "texture_edit") {
+        try {
+          const maskBlob = await getMaskBlob();
+          if (maskBlob && maskBlob.size > 0) {
+            const t = getIdToken ? await getIdToken() : "";
+            const maskForm = new FormData();
+            maskForm.append("file", maskBlob, "mask.png");
+            const maskRes = await fetch(BASE_URL + "/api/tripo/upload", {
+              method: "POST",
+              headers: { Authorization: "Bearer " + t },
+              body: maskForm,
+            });
+            const maskData = await maskRes.json();
+            if (maskData.success) {
+              maskToken = maskData.imageToken;
+            }
+          }
+        } catch (e) {
+          console.warn("[TripoPanel] Mask upload failed, continuing without mask:", e.message);
+        }
+      }
+
       // P1-20260311 consistently fails for text_to_model ("Failed to call LLM API").
       // Safety net: force v3.1 at submission time if text_to_model with P1.
       const effectiveModel = (genTab === "text" && modelVer === "P1-20260311")
@@ -777,7 +880,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             ...(texAlignment && { texture_alignment: texAlignment }),
           };
           break;
-        case "texture_edit": body = { type: "texture_edit", original_model_task_id: (editId.trim() || srcId), ...(brushPrompt.trim() && { prompt: brushPrompt.trim() }), creativity_strength: creativity }; break;
+        case "texture_edit":
+          body = {
+            type: "texture_edit",
+            original_model_task_id: (editId.trim() || srcId),
+            ...(brushPrompt.trim() && { prompt: brushPrompt.trim() }),
+            creativity_strength: creativity,
+            ...(maskToken && { file: { type: "png", file_token: maskToken } }),
+          };
+          break;
         case "refine": body = { type: "refine_model", original_model_task_id: (refineId.trim() || srcId) }; break;
         case "stylize": body = { type: "stylize_model", original_model_task_id: (stylizeId.trim() || srcId), style: stylizeStyle }; break;
         case "animate": body = { type: "animate_retarget", original_model_task_id: (riggedId || srcId), animation: animSlug, out_format: "glb" }; break;
@@ -803,7 +914,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         if (currentRequestId.current !== requestId) return;
         const rawUrl = d.modelUrl;
         if (!rawUrl) throw Object.assign(new Error("Generation blocked: content policy or empty output. Credits were not charged."), { type: "nsfw" });
-        const blob = await fetchProxy(rawUrl);
+        const blob = await fetchProxy(rawUrl, td.taskId);
         if (pt.cancelled) { revokeBlobUrl(blob); return; }
         revokeBlobUrl(prevUrl.current);
         setModelUrl(blob); prevUrl.current = blob;
@@ -827,7 +938,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setErrorMsg(e.message ?? "Network error");
       refreshCredits?.();
     }
-  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, modelUrl, pollTask, fetchProxy, revokeBlobUrl, saveHist, activeTaskId, refreshCredits, userCredits, genCost, refineId, stylizeId, stylizeStyle]);
+  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, modelUrl, pollTask, fetchProxy, revokeBlobUrl, saveHist, activeTaskId, refreshCredits, userCredits, genCost, refineId, stylizeId, stylizeStyle, getMaskBlob, getIdToken]);
 
   const handleAutoRig = useCallback(async () => {
     if (!activeTaskId && !animId) return;
@@ -849,7 +960,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       const rd = await rr.json(); if (!rd.success) throw new Error(rd.message);
       await pollTask(rd.taskId, pt, headers, async d => {
         if (pt.cancelled) return;
-        const blob = d.modelUrl ? await fetchProxy(d.modelUrl) : null;
+        const blob = d.modelUrl ? await fetchProxy(d.modelUrl, rd.taskId) : null;
         if (pt.cancelled) { revokeBlobUrl(blob); return; }
         if (blob) { revokeBlobUrl(prevUrl.current); setModelUrl(blob); prevUrl.current = blob; }
         setRiggedId(rd.taskId); setRigStep("rigged"); setStatusMsg(""); setGenStatus("succeeded");
@@ -886,7 +997,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
     if (item.model_url) {
       try {
-        const b = await fetchProxy(item.model_url);
+        const b = await fetchProxy(item.model_url, item.taskId);
         if (!t.cancelled) { revokeBlobUrl(prevUrl.current); setModelUrl(b); prevUrl.current = b; }
         else { revokeBlobUrl(b); }
       } catch (loadErr) {
@@ -960,7 +1071,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             {NAV.map(n => {
               const Icon = n.icon;
               const isN = modelVer !== "P1-20260311" && !modelVer.startsWith("v3.");
-              const actsAsN = isN && (n.id === "segment" || n.id === "texture_edit" || n.id === "retopo");
+              const actsAsN = isN && (n.id === "segment" || n.id === "retopo");
               return (
                 <Tooltip key={n.id} text={n.label + (actsAsN ? " (Not supported by Model V1/V2)" : "")} side="right">
                   <button
@@ -994,7 +1105,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               {(mode === "segment" || mode === "fill_parts") && <Segment segSub={mode === "fill_parts" ? "fill_parts" : segSub} activeTaskId={activeTaskId} isRiggedInput={isRiggedInput} color={color} />}
               {mode === "retopo" && <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={color} />}
               {mode === "texture" && <Texture mode={mode} activeTaskId={activeTaskId} texInputTab={texInputTab} setTexInputTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt} imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} multiImages={multiImages} setMultiImages={setMultiImages} tex4K={tex4K} setTex4K={setTex4K} pbrOn={texPbr} setPbrOn={setTexPbr} texAlignment={texAlignment} setTexAlignment={setTexAlignment} color={color} />}
-              {mode === "texture_edit" && <Texture mode={mode} activeTaskId={activeTaskId} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} color={color} />}
+              {mode === "texture_edit" && <Texture mode={mode} activeTaskId={activeTaskId} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} brushSize={brushSize} setBrushSize={setBrushSize} canvasRef={canvasRef} color={color} />}
               {mode === "animate" && <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} handleAutoRig={handleAutoRig} color={color} />}
               {mode === "refine" && (
                 <div>
@@ -1100,7 +1211,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             onSelect={selHist}
             onReuse={reuse}
             onDownload={async (i) => {
-              try { const b = await fetchProxy(i.model_url); setDlItem({ blobUrl: b, item: i }); setDlOpen(true); }
+              try { const b = await fetchProxy(i.model_url, i.taskId); setDlItem({ blobUrl: b, item: i }); setDlOpen(true); }
               catch (e) { alert(e.message); }
             }}
           />

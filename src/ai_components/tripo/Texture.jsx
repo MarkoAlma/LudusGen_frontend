@@ -1,9 +1,21 @@
 // trellis/Texture.jsx
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   Image, Cpu, Pencil, HelpCircle, Check, Loader2,
   PersonStanding, Zap, Upload, X,
 } from "lucide-react";
+
+/* ─── helpers ────────────────────────────────────────────────────────── */
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
 
 /*
  *  Tripo API task mapping:
@@ -193,7 +205,36 @@ function MagicBrushPanel({
   creativity, setCreativity,
   brushMode, setBrushMode,
   brushColor, setBrushColor,
+  brushSize, setBrushSize,
+  canvasRef,
 }) {
+  const spectrumRef = useRef(null);
+  const [spectrumPct, setSpectrumPct] = useState(50);
+
+  /* ── pick color from the rainbow bar ─────────────────────────────── */
+  const pickFromSpectrum = useCallback((clientX) => {
+    const el = spectrumRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    setSpectrumPct(Math.round(pct * 100));
+    /* HSL rainbow: hue 0→360 maps to the bar's 0→1 */
+    const hue = pct * 360;
+    const hex = hslToHex(hue, 100, 50);
+    setBrushColor(hex);
+  }, [setBrushColor]);
+
+  const handleSpectrumMouseDown = useCallback((e) => {
+    pickFromSpectrum(e.clientX);
+    const onMove = (ev) => pickFromSpectrum(ev.clientX);
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [pickFromSpectrum]);
+
   const handleHex = e => {
     const hex = e.target.value.replace(/[^0-9a-fA-F]/g, "").slice(0, 6);
     setBrushColor("#" + hex);
@@ -256,16 +297,53 @@ function MagicBrushPanel({
         </>
       )}
 
-      {/* Paint Mode — direct color fill */}
+      {/* Paint Mode — direct color painting on canvas */}
       {brushMode === "Paint Mode" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ borderRadius: 12, overflow: "hidden", height: 180, cursor: "crosshair", position: "relative" }}>
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, #fff, " + brushColor + ")" }} />
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent, #000)" }} />
+          {/* Drawing canvas */}
+          <div style={{ borderRadius: 12, overflow: "hidden", position: "relative", border: "1px solid rgba(255,255,255,0.09)" }}>
+            <canvas
+              ref={canvasRef}
+              width={512}
+              height={512}
+              style={{ width: "100%", aspectRatio: "1/1", display: "block", cursor: "crosshair", background: "#1a1a2e" }}
+            />
+            <div style={{ position: "absolute", top: 6, right: 6, display: "flex", gap: 4 }}>
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", background: "rgba(0,0,0,0.5)", borderRadius: 4, padding: "2px 6px" }}>
+                Paint mask
+              </span>
+            </div>
           </div>
-          <div style={{ height: 14, borderRadius: 7, background: "linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)", cursor: "pointer", position: "relative" }}>
-            <div style={{ position: "absolute", top: -2, left: "50%", width: 18, height: 18, borderRadius: "50%", background: "#fff", border: "2px solid rgba(0,0,0,0.3)", transform: "translateX(-50%)", boxShadow: "0 1px 4px rgba(0,0,0,0.4)" }} />
+
+          {/* Brush size */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+              <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Brush Size</span>
+              <span style={{ marginLeft: "auto", color: "#2d2d48", fontSize: 9, fontFamily: "monospace" }}>1 – 50</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <input
+                type="range" min={1} max={50} step={1}
+                value={brushSize}
+                onChange={e => setBrushSize(Number(e.target.value))}
+                style={{ flex: 1, accentColor: "#6c63ff" }}
+              />
+              <div style={{ width: 40, height: 40, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.05)" }}>
+                <div style={{ width: Math.max(4, Math.min(32, brushSize)), height: Math.max(4, Math.min(32, brushSize)), borderRadius: "50%", background: brushColor }} />
+              </div>
+            </div>
           </div>
+
+          {/* Color spectrum bar */}
+          <div
+            ref={spectrumRef}
+            onPointerDown={handleSpectrumMouseDown}
+            style={{ height: 14, borderRadius: 7, background: "linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)", cursor: "pointer", position: "relative" }}
+          >
+            <div style={{ position: "absolute", top: -2, left: `${spectrumPct}%`, width: 18, height: 18, borderRadius: "50%", background: "#fff", border: "2px solid rgba(0,0,0,0.3)", transform: "translateX(-50%)", boxShadow: "0 1px 4px rgba(0,0,0,0.4)", pointerEvents: "none" }} />
+          </div>
+
+          {/* Color swatch + hex input */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 32, height: 32, borderRadius: "50%", background: brushColor, border: "2px solid rgba(255,255,255,0.15)", flexShrink: 0 }} />
             <input
@@ -311,6 +389,8 @@ export default function Texture({
   brushPrompt, setBrushPrompt,
   creativity, setCreativity,                 // creativity_strength 0–1
   brushColor, setBrushColor,
+  brushSize, setBrushSize,                   // brush radius in pixels
+  canvasRef,                                 // ref for the paint canvas element
 }) {
   return (
     <>
@@ -405,6 +485,8 @@ export default function Texture({
             creativity={creativity} setCreativity={setCreativity}
             brushMode={brushMode} setBrushMode={setBrushMode}
             brushColor={brushColor} setBrushColor={setBrushColor}
+            brushSize={brushSize} setBrushSize={setBrushSize}
+            canvasRef={canvasRef}
           />
         </>
       )}
