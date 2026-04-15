@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ImagePlus, X, ArrowUp, Mic, Check } from 'lucide-react';
+import { ImagePlus, X, ArrowUp, Mic, Check, Square } from 'lucide-react';
 
 export default function ChatInput({
-  input, setInput, isTyping, handleSend,
+  input, setInput, isTyping, handleSend, handleStop,
   attachedImage, setAttachedImage, textareaRef
 }) {
   const fileInputRef = useRef(null);
@@ -11,6 +11,13 @@ export default function ChatInput({
   const [justSent, setJustSent] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
+  
+  // Reset height when input is cleared externally
+  React.useEffect(() => {
+    if (input === '' && textareaRef?.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  }, [input, textareaRef]);
 
   const handleTextChange = (e) => {
     setInput(e.target.value);
@@ -213,18 +220,17 @@ export default function ChatInput({
           {/* Send button */}
           <div className="shrink-0">
             <motion.button
-              onClick={handleSendWithAnimation}
-              disabled={!hasContent || isTyping}
-              whileTap={(hasContent && !isTyping) ? { scale: 0.95 } : {}}
+              onClick={isTyping ? handleStop : (hasContent ? handleSendWithAnimation : undefined)}
+              disabled={!hasContent && !isTyping}
+              whileTap={(hasContent || isTyping) ? { scale: 0.92 } : {}}
               className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-all duration-700 relative overflow-hidden group/send ${
-                hasContent && !isTyping
-                  ? 'bg-primary text-white shadow-[0_10px_30px_rgba(138,43,226,0.3)] hover:shadow-[0_15px_40px_rgba(138,43,226,0.4)] hover:scale-105'
-                  : 'bg-white/[0.04] text-gray-700 pointer-events-none'
+                isTyping
+                  ? 'bg-red-500/10 border border-red-500/20 text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.1)] hover:bg-red-500/20 hover:border-red-500/40'
+                  : hasContent
+                    ? 'bg-primary text-white shadow-[0_10px_30px_rgba(138,43,226,0.3)] hover:shadow-[0_15px_40px_rgba(138,43,226,0.4)] hover:scale-105'
+                    : 'bg-white/[0.04] text-gray-700 pointer-events-none'
               }`}
             >
-              {/* Forum-style shimmer */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/send:translate-x-full transition-transform duration-1000" />
-
               <AnimatePresence mode="wait">
                 {justSent ? (
                   <motion.div
@@ -238,14 +244,23 @@ export default function ChatInput({
                   </motion.div>
                 ) : isTyping ? (
                   <motion.div
-                    key="typing"
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                    key="stop"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0, opacity: 0 }}
+                    className="flex items-center justify-center"
                   >
-                    <div className="w-6 h-6 rounded-full border-2 border-white/10 border-t-white" />
+                    <Square className="w-5 h-5 fill-current" />
                   </motion.div>
                 ) : (
-                  <ArrowUp className="w-6 h-6" />
+                  <motion.div
+                    key="send"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0, opacity: 0 }}
+                  >
+                    <ArrowUp className="w-6 h-6" />
+                  </motion.div>
                 )}
               </AnimatePresence>
             </motion.button>

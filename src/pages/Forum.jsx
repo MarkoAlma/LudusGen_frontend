@@ -997,6 +997,15 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
           {/* Tags */}
           <div className="space-y-3">
             <label className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest block opacity-70">Címkék hozzáfűzése</label>
+            {tags.trim() && (
+              <div className="flex flex-wrap gap-2 px-1">
+                {tags.split(",").map(t => t.trim()).filter(Boolean).map((t, i) => (
+                  <span key={i} className="px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[0.7rem] font-bold tracking-wide">
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="relative group">
               <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-700 group-focus-within:text-purple-400 transition-colors" />
               <input value={tags} onChange={e => setTags(e.target.value)} placeholder="például: claude, tipp, hír (vesszővel elválasztva)"

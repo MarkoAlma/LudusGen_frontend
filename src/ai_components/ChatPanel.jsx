@@ -65,6 +65,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
     onEnhance,
     onDechant,
     createNewSession,
+    handleStop,
   } = useChatLogic(selectedModel, userId, getIdToken, onModelChange);
 
   const [historySidebarOpen, setHistorySidebarOpen] = useState(true);
@@ -136,9 +137,9 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
 
           {/* Scrollable message area */}
           <div className="flex-1 relative overflow-hidden">
-            <div ref={chatScrollRef} className="h-full overflow-y-auto scrollbar-thin scroll-smooth px-3 sm:px-6 lg:px-12">
-              <div 
-                className="w-full pb-8 flex flex-col space-y-4 pt-24" 
+            <div ref={chatScrollRef} className="h-full overflow-y-auto scrollbar-thin px-3 sm:px-6 lg:px-12">
+              <div
+                className="w-full pb-8 flex flex-col space-y-4 pt-24"
               >
                 <MessageList
                   messages={messages}
@@ -159,11 +160,12 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
           {/* Chat Input Wrapper */}
           <div className="px-3 sm:px-6 lg:px-12 pb-6 pt-1 relative z-20 flex justify-center">
             <div className="w-full max-w-3xl">
-            <ChatInput
+              <ChatInput
                 input={input}
                 setInput={setInput}
                 isTyping={isTyping}
                 handleSend={handleSend}
+                handleStop={handleStop}
                 attachedImage={attachedImage}
                 setAttachedImage={setAttachedImage}
                 textareaRef={textareaRef}
@@ -171,31 +173,31 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
             </div>
           </div>
 
-        {/* ── Config Panel ── */}
-        <ConfigPanel
-          isOpen={configOpen}
-          onClose={() => setConfigOpen(false)}
-          temperature={temperature}
-          setTemperature={setTemperature}
-          maxTokens={maxTokens}
-          setMaxTokens={setMaxTokens}
-          topP={topP}
-          setTopP={setTopP}
-          frequencyPenalty={frequencyPenalty}
-          setFrequencyPenalty={setFrequencyPenalty}
-          presencePenalty={presencePenalty}
-          setPresencePenalty={setPresencePenalty}
-          systemPrompt={systemPrompt}
-          setSystemPrompt={setSystemPrompt}
-          themeColor={themeColor}
-          navHeight={navHeight}
-          selectedModelId={selectedModel?.id}
-          presets={presets}
-          activePresetId={activePresetId}
-          applyPreset={applyPreset}
-          onEnhance={onEnhance}
-          onDechant={onDechant}
-        />
+          {/* ── Config Panel ── */}
+          <ConfigPanel
+            isOpen={configOpen}
+            onClose={() => setConfigOpen(false)}
+            temperature={temperature}
+            setTemperature={setTemperature}
+            maxTokens={maxTokens}
+            setMaxTokens={setMaxTokens}
+            topP={topP}
+            setTopP={setTopP}
+            frequencyPenalty={frequencyPenalty}
+            setFrequencyPenalty={setFrequencyPenalty}
+            presencePenalty={presencePenalty}
+            setPresencePenalty={setPresencePenalty}
+            systemPrompt={systemPrompt}
+            setSystemPrompt={setSystemPrompt}
+            themeColor={themeColor}
+            navHeight={navHeight}
+            selectedModelId={selectedModel?.id}
+            presets={presets}
+            activePresetId={activePresetId}
+            applyPreset={applyPreset}
+            onEnhance={onEnhance}
+            onDechant={onDechant}
+          />
         </div>
       </div>
     </StudioLayout>

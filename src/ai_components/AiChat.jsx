@@ -13,6 +13,7 @@ import AiStudioSidebar from "../components/chat/AiStudioSidebar";
 import BackgroundFilters from "../components/chat/BackgroundFilters";
 
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { API_BASE } from "../api/client";
 
 export default function AIChat({ user, getIdToken }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -79,6 +80,18 @@ export default function AIChat({ user, getIdToken }) {
     const samePanelType = newModel?.panelType === oldModel?.panelType;
 
     if (samePanelType && newModel?.panelType === 'chat') {
+      // Notify backend to generate summary for model switch
+      const sessionId = sessionStorage.getItem("chat_session_current");
+      if (sessionId) {
+        getIdToken().then(token =>
+          fetch(`${API_BASE}/api/chat/switch-model`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ sessionId, newModelId: modelId })
+          }).catch(e => console.warn('[ModelSwitch] Failed:', e))
+        );
+      }
+
       // Just change the model, don't reset the conversation
       // Don't update URL — prevents re-render/refresh
       setSelectedAI(modelId);

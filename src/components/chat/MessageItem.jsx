@@ -16,9 +16,9 @@ const CodeBlock = ({ lang, code }) => {
   };
 
   return (
-    <div className="relative my-6 rounded-2xl overflow-hidden border border-white/5 bg-[#0a0a0f] shadow-2xl group/code">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 bg-white/[0.03] border-b border-white/5">
+    <div className="relative my-6 rounded-2xl border border-white/5 bg-[#0a0a0f] shadow-2xl group/code">
+      {/* Header - Sticky */}
+      <div className="sticky top-0 z-30 flex items-center justify-between px-5 py-3 bg-[#0a0a0f]/95 backdrop-blur-md border-b border-white/5 shadow-lg rounded-t-2xl">
         <div className="flex items-center gap-4">
           <div className="flex gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-red-500/30" />
@@ -39,18 +39,18 @@ const CodeBlock = ({ lang, code }) => {
           {copied ? (
             <>
               <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-emerald-400">Copied</span>
+              <span className="text-emerald-400 whitespace-nowrap">Copied</span>
             </>
           ) : (
             <>
               <Copy className="w-3.5 h-3.5" />
-              <span>Copy</span>
+              <span className="whitespace-nowrap">Copy</span>
             </>
           )}
         </button>
       </div>
       {/* Code Content */}
-      <div className="p-4 md:p-5 overflow-x-auto relative">
+      <div className="p-4 md:p-5 overflow-auto max-h-[600px] relative">
         <pre className="text-[13px] font-mono leading-relaxed text-white relative z-10">
           <code className="block">{code}</code>
         </pre>
@@ -64,26 +64,60 @@ const CodeBlock = ({ lang, code }) => {
 /* ──────────────────────────────────────────────────────────────────── */
 const renderContent = (text) => {
   if (!text) return null;
-  const parts = text.split(/(```[\s\S]*?```)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('```')) {
-      const match = part.match(/```(\w+)?\n?([\s\S]*?)```/);
-      return <CodeBlock key={i} lang={match?.[1]} code={match?.[2]} />;
-    }
 
-    const rendered = part.split(/(\*\*[^*]+\*\*)/g).map((seg, j) => {
-      if (seg.startsWith('**') && seg.endsWith('**')) {
-        return <strong key={j} className="text-white font-bold">{seg.slice(2, -2)}</strong>;
+  // Split by ``` to handle both closed and open (streaming) code blocks
+  const sections = text.split("```");
+  const elements = [];
+
+  for (let i = 0; i < sections.length; i++) {
+    const isCode = i % 2 === 1;
+    const content = sections[i];
+
+    if (isCode) {
+      // It's a code block (even if the closing ``` hasn't arrived yet)
+      let lang = "";
+      let code = content;
+
+      // Extract language from first line if possible
+      const firstNewline = content.indexOf("\n");
+      if (firstNewline !== -1) {
+        lang = content.substring(0, firstNewline).trim();
+        code = content.substring(firstNewline + 1);
+      } else if (content.length > 0 && i < sections.length - 1) {
+        // If we have a following section, then this section is definitely the lang + code
+        // Or if no newline, maybe it's just the lang? Let's check.
+        lang = content.trim();
+        code = "";
       }
-      return seg;
-    });
 
-    return (
-      <p key={i} className="whitespace-pre-wrap mb-4 last:mb-0 leading-relaxed text-[14px] text-white text-left">
-        {rendered}
-      </p>
-    );
-  });
+      elements.push(<CodeBlock key={`code-${i}`} lang={lang} code={code} />);
+    } else {
+      // It's regular text
+      if (!content.trim() && i > 0 && i < sections.length - 1) continue;
+
+      const rendered = content.split(/(\*\*[^*]+\*\*)/g).map((seg, j) => {
+        if (seg.startsWith("**") && seg.endsWith("**")) {
+          return (
+            <strong key={j} className="text-white font-bold">
+              {seg.slice(2, -2)}
+            </strong>
+          );
+        }
+        return seg;
+      });
+
+      elements.push(
+        <p
+          key={`text-${i}`}
+          className="whitespace-pre-wrap mb-4 last:mb-0 leading-relaxed text-[14px] text-white text-left"
+        >
+          {rendered}
+        </p>
+      );
+    }
+  }
+
+  return elements;
 };
 
 /* ──────────────────────────────────────────────────────────────────── */
@@ -142,9 +176,8 @@ export default function MessageItem({ message, themeColor }) {
   }, [message.timestamp, message.createdAt]);
 
   return (
-    <div className={`flex mb-8 w-full ${
-      isAi ? 'flex-row items-start justify-start' : 'flex-row-reverse items-start justify-start'
-    }`}>
+    <div className={`flex mb-8 w-full ${isAi ? 'flex-row items-start justify-start' : 'flex-row-reverse items-start justify-start'
+      }`}>
       {/* Avatar */}
       <div className="relative shrink-0 mt-1">
         <div
@@ -172,9 +205,9 @@ export default function MessageItem({ message, themeColor }) {
         {/* Bubble */}
         <div className="flex flex-col w-full">
           <div
-            className={`relative px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6 border shadow-lg overflow-hidden ${isAi
-                ? 'bg-white/[0.06] border-white/10 rounded-2xl rounded-tl-none rounded-br-none'
-                : 'bg-white/[0.04] border-white/8 rounded-2xl rounded-tr-none'
+            className={`relative px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6 border shadow-lg ${isAi
+              ? 'bg-white/[0.06] border-white/10 rounded-2xl rounded-tl-none rounded-br-none'
+              : 'bg-white/[0.04] border-white/8 rounded-2xl rounded-tr-none'
               }`}
           >
             {/* Image Attachment */}

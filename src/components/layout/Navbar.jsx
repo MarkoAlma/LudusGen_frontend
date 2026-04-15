@@ -99,6 +99,8 @@ export default function Navbar() {
     { label: 'AI 3D', icon: Box, path: '/chat?tab=3d' },
   ];
 
+
+
   if (!showNavbar) return null;
   // Don't show regular Navbar in AI studio. We'll render just the user dropdown manually there.
   if (location.pathname.startsWith('/chat')) return null;
