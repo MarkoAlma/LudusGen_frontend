@@ -181,36 +181,62 @@ export default function AiStudioSidebar({
       {/* ── Model List ── */}
       <div className="flex-1 overflow-y-auto px-5 py-6 space-y-1 relative z-10 scrollbar-hide">
         {MODEL_GROUPS.map((group) => {
-          const isOpen = openGroups.has(group.id);
+          // Skip Chat group — model switching is now handled by ModelBar at the top
+          if (group.id === 'chat') return null;
+
+          // Code group: always open, no accordion toggle (model switching is in ModelBar)
+          const isCodeGroup = group.id === 'code';
+          const isOpen = isCodeGroup || openGroups.has(group.id);
           const hasActive = group.categories.some(c => c.models.some(m => m.id === selectedAI));
 
           return (
             <div key={group.id}>
               {/* Group Header */}
-              <button
-                onClick={() => toggleGroup(group.id)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-300 group ${isOpen
-                  ? 'bg-white/[0.04] border border-white/10'
-                  : 'hover:bg-white/[0.02] border border-transparent'
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-all ${isOpen ? 'bg-white/[0.06] scale-100' : 'bg-transparent opacity-40 scale-90'
-                    }`}>
-                    {group.emoji}
+              {!isCodeGroup ? (
+                <button
+                  onClick={() => toggleGroup(group.id)}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all duration-300 group ${isOpen
+                    ? 'bg-white/[0.04] border border-white/10'
+                    : 'hover:bg-white/[0.02] border border-transparent'
+                    }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-all ${isOpen ? 'bg-white/[0.06] scale-100' : 'bg-transparent opacity-40 scale-90'
+                      }`}>
+                      {group.emoji}
+                    </div>
+                    <span className={`text-[12px] font-black uppercase tracking-[0.15em] transition-colors ${isOpen ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'
+                      }`}>
+                      {group.label}
+                    </span>
                   </div>
-                  <span className={`text-[12px] font-black uppercase tracking-[0.15em] transition-colors ${isOpen ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'
-                    }`}>
-                    {group.label}
-                  </span>
-                </div>
-                <div className={`transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`}>
-                  <ChevronDown className={`w-4 h-4 ${isOpen ? 'text-zinc-400' : 'text-zinc-700'}`} />
-                </div>
-              </button>
+                  <div className={`transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`}>
+                    <ChevronDown className={`w-4 h-4 ${isOpen ? 'text-zinc-400' : 'text-zinc-700'}`} />
+                  </div>
+                </button>
+              ) : (
+                /* Code group: clickable header, navigates to code panel */
+                <button
+                  onClick={() => {
+                    const firstCodeModel = group.categories[0]?.models[0];
+                    if (firstCodeModel) handleSelectModel(firstCodeModel.id);
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.06] transition-all duration-300 cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base bg-white/[0.06]">
+                      {group.emoji}
+                    </div>
+                    <span className="text-[12px] font-black uppercase tracking-[0.15em] text-white">
+                      {group.label}
+                    </span>
+                  </div>
+                  
+                </button>
+              )}
 
               {/* Expanded Content */}
-              {isOpen && (
+              {isOpen && !isCodeGroup && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}

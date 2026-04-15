@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Menu, Settings2, Sparkles, History, Wifi, ChevronDown, ChevronUp } from 'lucide-react';
+import { Menu, Settings2, Sparkles, History, Wifi, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ALL_MODELS } from '../../ai_components/models';
 
@@ -9,7 +9,7 @@ const SIDEBAR_W = 320;
 
 const CHAT_MODELS = ALL_MODELS.filter(m => m.panelType === 'chat');
 
-export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySidebarOpen, onConfigOpen, navHeight, historySidebarOpen, isDesktop, sidebarCollapsed, onModelSwitch }) {
+export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySidebarOpen, onConfigOpen, navHeight, historySidebarOpen, isDesktop, sidebarCollapsed, onModelSwitch, onNewChat }) {
   const themeColor = selectedModel?.color || "#8b5cf6";
   const [latency, setLatency] = useState(12);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
@@ -90,10 +90,6 @@ export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySi
         {/* Info + Model Switcher */}
         <div className="flex flex-col justify-center">
           <div className="flex items-center gap-3">
-            <h2 className="text-sm font-black text-white italic tracking-widest leading-none max-w-[100px] sm:max-w-none truncate">
-              {selectedModel?.name || "AI Chat"}
-            </h2>
-
             {/* Model Switcher Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
@@ -167,7 +163,22 @@ export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySi
         <div className="w-px h-8 bg-white/10 mx-2 hidden sm:block" />
 
         {/* Actions */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {/* New Chat Button */}
+          <button
+            onClick={onNewChat}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 hover:border-primary/30 hover:shadow-[0_0_15px_rgba(138,43,226,0.15)] active:scale-95 transition-all duration-300"
+            title="Új beszélgetés"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] hidden sm:inline">Új</span>
+          </button>
+
+          {/* Model name — top-right */}
+          <h2 className="text-sm font-black text-white italic tracking-widest leading-none truncate hidden sm:block">
+            {selectedModel?.name || "AI Chat"}
+          </h2>
+
           <button
             onClick={() => setHistorySidebarOpen(true)}
             className="xl:hidden p-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all"

@@ -17,6 +17,7 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 export default function AIChat({ user, getIdToken }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAI, setSelectedAI] = useState("claude_sonnet");
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Desktop Sidebar Persistence & Motion
@@ -79,19 +80,15 @@ export default function AIChat({ user, getIdToken }) {
 
     if (samePanelType && newModel?.panelType === 'chat') {
       // Just change the model, don't reset the conversation
+      // Don't update URL — prevents re-render/refresh
       setSelectedAI(modelId);
-      setSearchParams(prev => {
-        const next = new URLSearchParams(prev);
-        next.set("tab", "chat");
-        next.set("model", modelId);
-        return next;
-      }, { replace: true });
 
       const gId = findModelGroup(modelId);
       const cId = findModelCat(modelId);
       if (gId) setOpenGroups((p) => new Set([...p, gId]));
       if (cId) setOpenCats((p) => new Set([...p, cId]));
       setSidebarOpen(false);
+      setModelDropdownOpen(false);
       return;
     }
 
@@ -118,6 +115,7 @@ export default function AIChat({ user, getIdToken }) {
     if (gId) setOpenGroups((p) => new Set([...p, gId]));
     if (cId) setOpenCats((p) => new Set([...p, cId]));
     setSidebarOpen(false);
+    setModelDropdownOpen(false);
   }, [setSearchParams, selectedAI]);
 
   const toggleGroup = useCallback((id) => {
@@ -156,6 +154,10 @@ export default function AIChat({ user, getIdToken }) {
         />
       ),
       onModelChange: (newModel) => handleSelectModel(newModel.id),
+      initialDropdownOpen: modelDropdownOpen,
+      onNewChatWithPicker: () => {
+        setModelDropdownOpen(true);
+      },
     };
     switch (selectedModel.panelType) {
       case "chat":
@@ -218,7 +220,7 @@ export default function AIChat({ user, getIdToken }) {
       <main className="flex-1 min-w-0 flex flex-col relative h-full">
         <AnimatePresence mode="wait">
           <motion.div
-            key={selectedAI}
+            key={selectedModel.panelType}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}

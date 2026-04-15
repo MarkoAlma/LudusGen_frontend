@@ -173,7 +173,12 @@ export default function StudioLayout({
               background: '#0a0a14' 
             }}
           >
-            <div className="h-full overflow-hidden">{rightSidebar}</div>
+            <div
+              className="h-full overflow-hidden"
+              style={{ backfaceVisibility: 'hidden', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}
+            >
+              {rightSidebar}
+            </div>
           </motion.div>
         )}
 

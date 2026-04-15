@@ -155,7 +155,14 @@ export default function ChatInput({
 
         {/* Forum-Matched Command Module */}
         <div
-          className={`flex items-end gap-3 p-4 pl-6 rounded-[1.5rem] border transition-all duration-700 relative backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] ${
+          onClick={(e) => {
+            // Focus textarea when clicking anywhere in the input area,
+            // except on buttons and file input
+            if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'svg' && !e.target.closest('button')) {
+              textareaRef?.current?.focus();
+            }
+          }}
+          className={`flex items-center gap-3 px-5 py-3 rounded-[1.5rem] border transition-all duration-700 relative backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] cursor-text ${
             focused
               ? 'bg-white/[0.08] border-primary/40'
               : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/10'
@@ -166,10 +173,8 @@ export default function ChatInput({
             <div className="absolute inset-0 rounded-[1.5rem] border border-primary/20 blur-md pointer-events-none opacity-30" />
           )}
 
-
-
           {/* Left actions */}
-          <div className="flex items-center gap-0.5 sm:gap-1 pb-1.5">
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             <button
               onClick={() => fileInputRef.current?.click()}
               className="p-2 sm:p-2.5 rounded-2xl hover:bg-white/5 text-gray-500 hover:text-primary transition-all duration-500 group/icon"
@@ -182,7 +187,7 @@ export default function ChatInput({
             </button>
           </div>
 
-          <div className="w-px h-8 bg-white/5 self-center mb-1 hidden sm:block" />
+          <div className="w-px h-8 bg-white/5 shrink-0 hidden sm:block" />
 
           <input
             type="file"
@@ -202,16 +207,16 @@ export default function ChatInput({
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             placeholder="Kérdezz bármit a LudusGen AI-tól..."
-            className="w-full bg-transparent border-none focus:ring-0 focus:outline-none text-white placeholder-zinc-500 py-3.5 px-3 text-[14.5px] font-medium resize-none scrollbar-hide leading-relaxed relative z-10"
+            className="w-full bg-transparent border-none focus:ring-0 focus:outline-none text-white placeholder-zinc-500 py-2 px-2 text-[14.5px] font-medium resize-none scrollbar-hide leading-relaxed relative z-10"
           />
 
           {/* Send button */}
-          <div className="pb-1.5 pr-1.5 flex items-center gap-2">
+          <div className="shrink-0">
             <motion.button
               onClick={handleSendWithAnimation}
               disabled={!hasContent || isTyping}
               whileTap={(hasContent && !isTyping) ? { scale: 0.95 } : {}}
-              className={`w-11 h-11 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all duration-700 relative overflow-hidden group/send ${
+              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-all duration-700 relative overflow-hidden group/send ${
                 hasContent && !isTyping
                   ? 'bg-primary text-white shadow-[0_10px_30px_rgba(138,43,226,0.3)] hover:shadow-[0_15px_40px_rgba(138,43,226,0.4)] hover:scale-105'
                   : 'bg-white/[0.04] text-gray-700 pointer-events-none'
@@ -219,7 +224,7 @@ export default function ChatInput({
             >
               {/* Forum-style shimmer */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/send:translate-x-full transition-transform duration-1000" />
-              
+
               <AnimatePresence mode="wait">
                 {justSent ? (
                   <motion.div
@@ -244,7 +249,6 @@ export default function ChatInput({
                 )}
               </AnimatePresence>
             </motion.button>
-
           </div>
         </div>
 

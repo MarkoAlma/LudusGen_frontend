@@ -47,7 +47,10 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
   ];
 
   return (
-    <div className="flex flex-col h-full bg-[#03000a] w-full relative overflow-hidden">
+    <div
+      className="flex flex-col h-full bg-[#03000a] w-full relative overflow-hidden"
+      style={{ WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}
+    >
       {/* Forum-Matched Atmospheric Glow */}
       <div className="absolute inset-0 z-0 pointer-events-none opacity-20">
         <div className="absolute bottom-[10%] right-[-20%] w-96 h-96 bg-primary/20 blur-[120px] rounded-full" />

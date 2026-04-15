@@ -623,6 +623,15 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
   const editorRef = useRef(null);
   const [isEditorEmpty, setIsEditorEmpty] = useState(!content);
   const cat = CATEGORIES.find(c => c.id === selectedCat);
+  const [formatState, setFormatState] = useState({
+    bold: false,
+    italic: false,
+    h2: false,
+    blockquote: false,
+    insertUnorderedList: false,
+    pre: false,
+    createLink: false,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -660,6 +669,40 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
       }
     }
   }, [isOpen, isEditMode, editPost, defaultCategory]);
+
+  // Track formatting state at cursor position (Word-like behavior)
+  const updateFormatState = () => {
+    const sel = window.getSelection();
+    let blockVal = "";
+    if (sel && sel.rangeCount > 0 && editorRef.current) {
+      let node = sel.getRangeAt(0).startContainer;
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+      // Walk up, skipping <p> wrappers to find the real block container
+      while (node && node !== editorRef.current && node !== document.body) {
+        const tag = node.tagName?.toLowerCase();
+        if (tag === "h2" || tag === "blockquote" || tag === "pre") {
+          blockVal = tag;
+          break;
+        }
+        if (tag === "p") { node = node.parentElement; continue; }
+        node = node.parentElement;
+      }
+    }
+    setFormatState({
+      bold: document.queryCommandState("bold"),
+      italic: document.queryCommandState("italic"),
+      h2: blockVal === "h2",
+      blockquote: blockVal === "blockquote",
+      insertUnorderedList: document.queryCommandState("insertUnorderedList"),
+      pre: blockVal === "pre",
+      createLink: document.queryCommandState("createLink"),
+    });
+  };
+
+  useEffect(() => {
+    document.addEventListener("selectionchange", updateFormatState);
+    return () => document.removeEventListener("selectionchange", updateFormatState);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -699,10 +742,117 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
   const addPollOpt = () => { if (pollOpts.length < 6) setPollOpts(p => [...p, ""]); };
 
   const handleFormat = (command, value = null) => {
-    document.execCommand(command, false, value);
-    if (editorRef.current) {
-      editorRef.current.focus();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !editorRef.current) return;
+
+    // Save the current selection before focus changes
+    const savedRange = sel.getRangeAt(0).cloneRange();
+
+    // Restore selection in the editor
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+    editorRef.current.focus();
+
+    const range = savedRange;
+
+    // Block-level commands: toggle behavior (mutually exclusive)
+    if (command === "formatBlock" && value) {
+      // Find the block element at cursor by walking up to editor's direct child
+      let node = range.startContainer;
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+      // Walk up until we reach a direct child of the editor
+      while (node && node.parentElement !== editorRef.current && node !== editorRef.current) {
+        const tag = node.tagName?.toLowerCase();
+        if (tag === "h2" || tag === "blockquote" || tag === "pre") break;
+        if (tag === "p") { node = node.parentElement; continue; }
+        node = node.parentElement;
+      }
+      const currentTag = node?.tagName?.toLowerCase() || "";
+
+      if (currentTag === value) {
+        // Already in this format — toggle off to <p> via direct DOM
+        const p = document.createElement("p");
+        p.innerHTML = node.innerHTML;
+        node.replaceWith(p);
+        const newRange = document.createRange();
+        newRange.setStart(p.firstChild || p, 0);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } else if (currentTag === "h2" || currentTag === "blockquote" || currentTag === "pre") {
+        // In a different block format — replace the block element directly
+        let innerHTML = node.innerHTML;
+        innerHTML = innerHTML.replace(/^<p[^>]*>/i, '').replace(/<\/p>$/i, '');
+        const newBlock = document.createElement(value);
+        newBlock.innerHTML = innerHTML || "\u00A0";
+        node.replaceWith(newBlock);
+        const newRange = document.createRange();
+        newRange.setStart(newBlock.firstChild || newBlock, 0);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } else {
+        document.execCommand("formatBlock", false, value);
+      }
+      updateFormatState();
+      return;
     }
+
+    if (command === "insertUnorderedList") {
+      document.execCommand("insertUnorderedList");
+      return;
+    }
+
+    // Inline commands with no selection: auto-select the word at cursor (invisibly)
+    if (sel.isCollapsed) {
+      const node = range.startContainer;
+      const offset = range.startOffset;
+
+      if (node.nodeType === Node.TEXT_NODE && editorRef.current.contains(node)) {
+        const text = node.textContent;
+        let start = offset;
+        let end = offset;
+        while (start > 0 && /\S/.test(text[start - 1])) start--;
+        while (end < text.length && /\S/.test(text[end])) end++;
+
+        if (start !== end) {
+          const wordRange = document.createRange();
+          wordRange.setStart(node, start);
+          wordRange.setEnd(node, end);
+          sel.removeAllRanges();
+          sel.addRange(wordRange);
+
+          document.execCommand(command, false, value);
+
+          // Restore cursor to original position (hide selection from user)
+          try {
+            const restoredRange = document.createRange();
+            let targetNode = node;
+            let remainingOffset = offset;
+            while (remainingOffset > targetNode.textContent.length && targetNode.nextSibling) {
+              remainingOffset -= targetNode.textContent.length;
+              targetNode = targetNode.nextSibling;
+            }
+            const safeOffset = Math.min(remainingOffset, targetNode.textContent.length);
+            restoredRange.setStart(targetNode, safeOffset);
+            restoredRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(restoredRange);
+          } catch {
+            if (editorRef.current.lastChild) {
+              const r = document.createRange();
+              r.selectNodeContents(editorRef.current);
+              r.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(r);
+            }
+          }
+          return;
+        }
+      }
+    }
+
+    document.execCommand(command, false, value);
   };
 
   const handleLink = () => {
@@ -737,10 +887,17 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
     onClose();
   };
 
-  const ToolbarBtn = ({ icon: Icon, onClick, label }) => (
-    <button onClick={onClick} title={label}
-      className="cursor-pointer p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-all active:scale-90 group relative">
-      <Icon className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+  const ToolbarBtn = ({ icon: Icon, onClick, label, active }) => (
+    <button
+      onPointerDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      title={label}
+      className={`cursor-pointer p-1.5 rounded-lg transition-all active:scale-90 group relative ${
+        active
+          ? 'bg-white/10 text-white'
+          : 'text-gray-500 hover:text-white hover:bg-white/5'
+      }`}>
+      <Icon className={`w-3.5 h-3.5 ${active ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}`} />
       <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black text-[0.6rem] text-white opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
         {label}
       </div>
@@ -810,15 +967,15 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
             <label className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest block opacity-70">Kifejtés és részletek</label>
             <div className="flex flex-col rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden focus-within:border-purple-500/30 transition-all shadow-inner relative">
               <div className="px-3 py-2 border-b border-white/[0.04] bg-white/[0.01] flex items-center gap-1">
-                <ToolbarBtn icon={Bold} onClick={() => handleFormat("bold")} label="Félkövér" />
-                <ToolbarBtn icon={Italic} onClick={() => handleFormat("italic")} label="Dőlt" />
+                <ToolbarBtn icon={Bold} onClick={() => handleFormat("bold")} label="Félkövér" active={formatState.bold} />
+                <ToolbarBtn icon={Italic} onClick={() => handleFormat("italic")} label="Dőlt" active={formatState.italic} />
                 <div className="w-px h-4 bg-white/10 mx-1.5" />
-                <ToolbarBtn icon={Heading2} onClick={() => handleFormat("formatBlock", "h2")} label="Címsor" />
-                <ToolbarBtn icon={Quote} onClick={() => handleFormat("formatBlock", "blockquote")} label="Idézet" />
-                <ToolbarBtn icon={List} onClick={() => handleFormat("insertUnorderedList")} label="Felsorolás" />
+                <ToolbarBtn icon={Heading2} onClick={() => handleFormat("formatBlock", "h2")} label="Címsor" active={formatState.h2} />
+                <ToolbarBtn icon={Quote} onClick={() => handleFormat("formatBlock", "blockquote")} label="Idézet" active={formatState.blockquote} />
+                <ToolbarBtn icon={List} onClick={() => handleFormat("insertUnorderedList")} label="Felsorolás" active={formatState.insertUnorderedList} />
                 <div className="w-px h-4 bg-white/10 mx-1.5" />
-                <ToolbarBtn icon={Code} onClick={() => handleFormat("formatBlock", "pre")} label="Kód" />
-                <ToolbarBtn icon={Link} onClick={handleLink} label="Hivatkozás" />
+                <ToolbarBtn icon={Code} onClick={() => handleFormat("formatBlock", "pre")} label="Kód" active={formatState.pre} />
+                <ToolbarBtn icon={Link} onClick={handleLink} label="Hivatkozás" active={formatState.createLink} />
               </div>
               <div className="relative min-h-[220px] flex flex-col">
                 {isEditorEmpty && (

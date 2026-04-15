@@ -4,7 +4,7 @@ import { PanelRightClose, PanelRightOpen, PanelLeftClose, PanelLeftOpen, Layout 
 import { MyUserContext } from '../context/MyUserProvider';
 import { useChatLogic } from '../hooks/useChatLogic';
 import { findModelGroup } from './models';
-import ChatHeader from '../components/chat/ChatHeader';
+import ModelBar from '../components/chat/ModelBar';
 import MessageList from '../components/chat/MessageList';
 import ChatInput from '../components/chat/ChatInput';
 import ChatSidebar from '../components/chat/ChatSidebar';
@@ -19,7 +19,7 @@ const CONTENT_MAX_W = 'max-w-3xl';
 const HISTORY_SIDEBAR_W = 288; // px, matches w-72
 const SIDEBAR_W = 320; // AiStudioSidebar width
 
-export default function ChatPanel({ selectedModel, userId, getIdToken, setSidebarOpen, isGlobalOpen, toggleGlobalSidebar, globalSidebar, onModelChange }) {
+export default function ChatPanel({ selectedModel, userId, getIdToken, setSidebarOpen, isGlobalOpen, toggleGlobalSidebar, globalSidebar, onModelChange, initialDropdownOpen = false, onNewChatWithPicker }) {
   const { registerPanel, unregisterPanel } = useStudioPanels();
 
   // Register panels (Chat has L1 + R, no L2)
@@ -64,6 +64,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
     applyPreset,
     onEnhance,
     onDechant,
+    createNewSession,
   } = useChatLogic(selectedModel, userId, getIdToken, onModelChange);
 
   const [historySidebarOpen, setHistorySidebarOpen] = useState(true);
@@ -119,7 +120,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
         <div className="flex-1 flex flex-col min-w-0 relative h-full z-10 px-0 max-w-full">
 
           {/* Header */}
-          <ChatHeader
+          <ModelBar
             selectedModel={selectedModel}
             setSidebarOpen={setSidebarOpen}
             setHistorySidebarOpen={() => setHistorySidebarOpen(true)}
@@ -129,6 +130,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
             isDesktop={isDesktop}
             sidebarCollapsed={!isGlobalOpen}
             onModelSwitch={(newModel) => onModelChange?.(newModel)}
+            onNewChat={() => { createNewSession(); onNewChatWithPicker?.(); }}
+            initialDropdownOpen={initialDropdownOpen}
           />
 
           {/* Scrollable message area */}
@@ -154,7 +157,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
 
           {/* Input area */}
           {/* Chat Input Wrapper */}
-          <div className="px-3 sm:px-6 lg:px-12 pb-6 pt-1 relative z-20">
+          <div className="px-3 sm:px-6 lg:px-12 pb-6 pt-1 relative z-20 flex justify-center">
+            <div className="w-full max-w-3xl">
             <ChatInput
                 input={input}
                 setInput={setInput}
@@ -164,8 +168,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
                 setAttachedImage={setAttachedImage}
                 textareaRef={textareaRef}
               />
+            </div>
           </div>
-        </div>
 
         {/* ── Config Panel ── */}
         <ConfigPanel
@@ -192,6 +196,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
           onEnhance={onEnhance}
           onDechant={onDechant}
         />
+        </div>
       </div>
     </StudioLayout>
   );
