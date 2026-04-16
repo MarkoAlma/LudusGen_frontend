@@ -345,7 +345,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [history, setHistory] = useState([]);
   const [selHistId, setSelHistId] = useState(null);
   const activeH = useMemo(() => history.find(h => h.id === selHistId), [history, selHistId]);
-  const activeTaskId = activeH?.task_id || activeH?.id || "";
+  const activeTaskId = activeH?.taskId || activeH?.task_id || activeH?.id || "";
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [loadingId, setLoadingId] = useState(null);
 
@@ -1571,4 +1571,4 @@ function TripoWorkspaceWrapper({
       )}
     </div>
   );
-}
+}
