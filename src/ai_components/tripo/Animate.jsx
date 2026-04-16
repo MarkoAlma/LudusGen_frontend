@@ -34,7 +34,7 @@ function CoinIcon({ size = 15 }) {
   );
 }
 
-function AnimCard({ anim, isSelected, onSelect }) {
+function AnimCard({ anim, isSelected, selCount, onSelect }) {
   const [err, setErr] = useState(false);
   return (
     <div
@@ -49,6 +49,11 @@ function AnimCard({ anim, isSelected, onSelect }) {
         {isSelected && (
           <div style={{ position: "absolute", top: 4, right: 4, width: 16, height: 16, borderRadius: "50%", background: "#6c63ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Check style={{ width: 9, height: 9, color: "#fff" }} />
+          </div>
+        )}
+        {!isSelected && selCount >= 5 && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ color: "#8a8aaa", fontSize: 9, fontWeight: 700 }}>MAX</span>
           </div>
         )}
       </div>
@@ -306,7 +311,14 @@ export default function Animate({
       {/* Animation grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
         {effectiveAnims.map(a => (
-          <AnimCard key={a.id} anim={a} isSelected={selAnim === a.id} onSelect={() => setSelAnim(selAnim === a.id ? null : a.id)} />
+          <AnimCard key={a.id} anim={a} isSelected={selAnim.has(a.id)} selCount={selAnim.size} onSelect={() => {
+            setSelAnim(prev => {
+              const next = new Set(prev);
+              if (next.has(a.id)) { next.delete(a.id); }
+              else if (next.size < 5) { next.add(a.id); }
+              return next;
+            });
+          }} />
         ))}
         {effectiveAnims.length === 0 && (
           <p style={{ gridColumn: "span 2", color: "#1e1e38", fontSize: 11, textAlign: "center", margin: "16px 0" }}>No results</p>

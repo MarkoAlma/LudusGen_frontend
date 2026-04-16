@@ -298,7 +298,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [animModelVer, setAnimModelVer] = useState("v2.5-animals");
   const [animSearch, setAnimSearch] = useState("");
   const [animCat, setAnimCat] = useState("all");
-  const [selAnim, setSelAnim] = useState(null);
+  const [selAnim, setSelAnim] = useState(new Set());
   const [rigStep, setRigStep] = useState("idle");
   const [riggedId, setRiggedId] = useState(null);
   const riggedIdRef = useRef(null);
@@ -345,7 +345,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [history, setHistory] = useState([]);
   const [selHistId, setSelHistId] = useState(null);
   const activeH = useMemo(() => history.find(h => h.id === selHistId), [history, selHistId]);
-  const activeTaskId = activeH?.task_id || activeH?.id || "";
+  const activeTaskId = activeH?.taskId || activeH?.task_id || activeH?.id || "";
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [loadingId, setLoadingId] = useState(null);
 
@@ -528,7 +528,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       case "texture_edit": return !!(editId.trim() || activeTaskId);
       case "refine": return !!(refineId.trim() || activeTaskId);
       case "stylize": return !!(stylizeId.trim() || activeTaskId);
-      case "animate": return !!riggedId && !!selAnim;
+      case "animate": return !!riggedId && selAnim.size > 0;
       default: return false;
     }
   }, [isRunning, mode, genTab, prompt, imgToken, batchImages, segId, fillId, retopoId, activeTaskId, texInputTab, texPrompt, multiImages, editId, texId, refineId, stylizeId, riggedId, selAnim]);
@@ -778,7 +778,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const requestId = crypto.randomUUID(); currentRequestId.current = requestId;
     userStoppedRef.current = false;
     const srcId = activeTaskId;
-    const animSlug = selAnim ? getAnimById(selAnim)?.slug : null;
+    const animSlugs = [...selAnim].map(id => getAnimById(id)?.slug).filter(Boolean);
+    const animSlug = animSlugs.length === 1 ? animSlugs[0] : null;
     try {
       const headers = await authH();
       let body;
@@ -945,7 +946,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         case "stylize": body = { type: "stylize_model", original_model_task_id: (stylizeId.trim() || srcId), style: stylizeStyle }; break;
         case "animate": {
           const baseModelId = riggedId || activeH?.params?.originalModelTaskId || activeTaskId;
-          body = { type: "animate_retarget", original_model_task_id: baseModelId, animation: animSlug, out_format: "glb" };
+          if (animSlugs.length > 1) {
+            body = { type: "animate_retarget", original_model_task_id: baseModelId, animations: animSlugs, out_format: "glb" };
+          } else {
+            body = { type: "animate_retarget", original_model_task_id: baseModelId, animation: animSlugs[0], out_format: "glb" };
+          }
           break;
         }
         default: return;
@@ -978,8 +983,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         if (mode === "animate") {
           // Animated model is still rigged — keep rig state alive
           setRiggedId(td.taskId); setShowRig(true);
-          const animInfo = selAnim ? getAnimById(selAnim) : null;
-          if (!userStoppedRef.current) await saveHist(td.taskId, rawUrl, { prompt: animInfo?.label ?? "animation", animation: animSlug, animated: true, animationName: animInfo?.label });
+          const animLabels = [...selAnim].map(id => getAnimById(id)?.label).filter(Boolean);
+          if (!userStoppedRef.current) await saveHist(td.taskId, rawUrl, { prompt: animLabels.join(", ") || "animation", animation: animSlug, animations: animSlugs.length > 1 ? animSlugs : undefined, animated: true, animationName: animLabels.join(", ") });
         } else {
           setRigStep("idle"); setRiggedId(null); setShowRig(false);
           if (!userStoppedRef.current) await saveHist(td.taskId, rawUrl, { prompt: prompt.trim() });
@@ -1077,15 +1082,24 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setRigStep("rigged");
       setShowRig(true);
       // Restore animation selection if this is an animated model
-      if (item?.params?.animation) {
+      if (item?.params?.animations && item.params.animations.length > 0) {
+        // Multi-animation restore
+        const ids = item.params.animations
+          .map(slug => ANIMATION_LIBRARY.find(a => a.slug === slug)?.id)
+          .filter(Boolean);
+        setSelAnim(new Set(ids));
+      } else if (item?.params?.animation) {
+        // Single-animation restore (legacy)
         const anim = ANIMATION_LIBRARY.find(a => a.slug === item.params.animation);
-        if (anim) setSelAnim(anim.id);
+        setSelAnim(anim ? new Set([anim.id]) : new Set());
+      } else {
+        setSelAnim(new Set());
       }
     } else {
       setRiggedId(null);
       setRigStep("idle");
       setShowRig(false);
-      setSelAnim(null);
+      setSelAnim(new Set());
     }
     if (item.model_url) {
       try {
@@ -1571,4 +1585,4 @@ function TripoWorkspaceWrapper({
       )}
     </div>
   );
-}
+}
