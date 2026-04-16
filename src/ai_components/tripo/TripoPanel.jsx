@@ -973,9 +973,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       await pollTask(td.taskId, pt, headers, async d => {
         if (pt.cancelled) return;
         if (currentRequestId.current !== requestId) return;
-        const rawUrl = d.modelUrl;
-        if (!rawUrl) throw Object.assign(new Error("Generation blocked: content policy or empty output. Credits were not charged."), { type: "nsfw" });
-        const blob = await fetchProxy(rawUrl, td.taskId);
+        const animatedModels = Array.isArray(d.rawOutput?.animated_models) ? d.rawOutput.animated_models : null;
+        const rawUrl = d.modelUrl ?? (animatedModels ? animatedModels[0] : null);
+        if (!rawUrl) throw Object.assign(new Error("Generation blocked: content policy or empty output. Credits were not charged."), { type: "nsfw" }); const blob = await fetchProxy(rawUrl, td.taskId);
         if (pt.cancelled) { revokeBlobUrl(blob); return; }
         revokeBlobUrl(prevUrl.current);
         setModelUrl(blob); prevUrl.current = blob;
