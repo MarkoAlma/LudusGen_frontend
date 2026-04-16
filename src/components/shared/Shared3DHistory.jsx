@@ -4,7 +4,7 @@ import {
   History, Search, Trash2, Box, ChevronRight, ChevronLeft,
   Clock, Download, Loader2, ChevronDown, Sparkles, Info
 } from 'lucide-react';
-import { collection, query, where, orderBy, getDocs, limit, startAfter } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, limit, startAfter, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseApp';
 import HistoryCard from '../../ai_components/trellis/HistoryCard';
 import { getItemTs } from '../../ai_components/trellis/utils';
@@ -43,30 +43,22 @@ export default function Shared3DHistory({
   const lastDocR = useRef(null);
   const histInit = useRef(false);
   const assetFileRef = useRef(null);
+  const lastFetchTs = useRef(0);
 
-  const fetchItems = async (isLoadMore = false) => {
+  // ── Real-time Listener ───────────────────────────────────────────────────
+  useEffect(() => {
     if (!userId) return;
-    if (!isLoadMore) {
-      setHistLoad(true);
-      lastDocR.current = null;
-      setHasMore(false);
-    } else {
-      setMoreLoad(true);
-    }
 
-    try {
-      const constraints = [
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc'),
-        limit(PAGE_SIZE)
-      ];
-      if (isLoadMore && lastDocR.current) {
-        constraints.push(startAfter(lastDocR.current));
-      }
+    const constraints = [
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(PAGE_SIZE)
+    ];
 
-      const q = query(collection(db, 'trellis_history'), ...constraints);
-      const snap = await getDocs(q);
-
+    const q = query(collection(db, 'trellis_history'), ...constraints);
+    
+    // onSnapshot automatically handles initial load and subsequent updates
+    const unsubscribe = onSnapshot(q, (snap) => {
       const now = Date.now();
       const items = snap.docs
         .map((doc) => ({ id: doc.id, ...doc.data() }))
@@ -75,38 +67,50 @@ export default function Shared3DHistory({
           return ts === 0 || (now - ts) < HISTORY_TTL_MS;
         });
 
-      const newLastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
-
-      if (!isLoadMore) {
-        setHistory(items);
-      } else {
-        setHistory(prev => {
-          // avoid duplicates just in case
-          const existingIds = new Set(prev.map(i => i.id));
-          return [...prev, ...items.filter(i => !existingIds.has(i.id))];
-        });
-      }
-
-      lastDocR.current = newLastDoc;
-      // We assume there are more if we got a full page
+      setHistory(items);
+      lastDocR.current = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
       setHasMore(snap.docs.length === PAGE_SIZE);
+      setHistLoad(false);
+    }, (err) => {
+      console.error("[Shared3DHistory] onSnapshot error:", err);
+      setHistLoad(false);
+    });
 
+    return () => unsubscribe();
+  }, [userId]);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || moreLoad || !lastDocR.current) return;
+    setMoreLoad(true);
+    try {
+      const constraints = [
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        startAfter(lastDocR.current),
+        limit(PAGE_SIZE)
+      ];
+      const q = query(collection(db, 'trellis_history'), ...constraints);
+      const snap = await getDocs(q);
+      const now = Date.now();
+      const items = snap.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((item) => {
+          const ts = getItemTs(item);
+          return ts === 0 || (now - ts) < HISTORY_TTL_MS;
+        });
+
+      setHistory(prev => {
+        const existingIds = new Set(prev.map(i => i.id));
+        return [...prev, ...items.filter(i => !existingIds.has(i.id))];
+      });
+      lastDocR.current = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
+      setHasMore(snap.docs.length === PAGE_SIZE);
     } catch (e) {
-      console.error("[Shared3DHistory] fetch error:", e);
+      console.error("[Shared3DHistory] loadMore error:", e);
     } finally {
-      if (!isLoadMore) setHistLoad(false);
-      else setMoreLoad(false);
+      setMoreLoad(false);
     }
-  };
-
-  useEffect(() => {
-    fetchItems(false);
-  }, [userId, refreshTrigger]);
-
-  const loadMore = useCallback(() => {
-    if (!hasMore || moreLoad) return;
-    fetchItems(true);
-  }, [hasMore, moreLoad]);
+  }, [userId, hasMore, moreLoad]);
 
   const handleAssetUpload = useCallback(async (file) => {
     if (!file) return;

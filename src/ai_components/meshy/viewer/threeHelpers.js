@@ -160,7 +160,7 @@ export function applyViewMode(s, mode) {
       if (!s._uvMats.has(node.uuid)) {
         const buildBasic = (m) => {
           const map = (m?.map) ?? null;
-          if (map) { map.encoding = THREE.sRGBEncoding; map.needsUpdate = true; }
+          if (map) { map.colorSpace = THREE.SRGBColorSpace; map.needsUpdate = true; }
           return new THREE.MeshBasicMaterial({
             map, color: map ? 0xffffff : (m?.color ?? new THREE.Color(0xe0dbd5)),
           });
@@ -193,6 +193,89 @@ export function applyWireframeOverlay(s, show, opacity = 0.22, hexColor = 0xffff
     node.add(lines);
   });
 
+  s.markDirty?.();
+}
+
+// ── applyRigSkeletonOverlay ───────────────────────────────────────────────────
+// Renders the skeleton/bone hierarchy of a rigged GLTF model as colored lines.
+// Tripo rigged models embed a THREE.Skeleton with bone nodes in the scene graph.
+export function applyRigSkeletonOverlay(s, show, opacity = 0.85, hexColor = 0x22c55e) {
+  const { THREE, scene, model } = s;
+  if (!THREE || !model) return;
+
+  // Remove any existing rig overlay
+  if (s._rigOverlay) {
+    scene.remove(s._rigOverlay);
+    s._rigOverlay.traverse((c) => { if (c.material) c.material.dispose(); });
+    s._rigOverlay = null;
+  }
+  if (!show) { s.markDirty?.(); return; }
+
+  // Collect all bone nodes from the ENTIRE scene graph (not just model),
+  // because GLTF armatures may be siblings of the mesh, not children.
+  const boneNodes = [];
+  scene.traverse((node) => {
+    if (node.isBone || (node.userData && node.userData.isBone)) {
+      boneNodes.push(node);
+    }
+    if (node.isSkinnedMesh && node.skeleton) {
+      node.skeleton.bones.forEach((b) => {
+        if (!boneNodes.includes(b)) boneNodes.push(b);
+      });
+    }
+  });
+
+  if (boneNodes.length === 0) {
+    s.markDirty?.();
+    return;
+  }
+
+  // Ensure world matrices are up to date across the full scene
+  scene.updateMatrixWorld(true);
+
+  // Build line segments connecting parent→child bones in WORLD space.
+  // We add the overlay directly to the scene (not as a child of model) so
+  // the model's scale/position transform is NOT applied twice.
+  const positions = [];
+  const dotPositions = [];
+  boneNodes.forEach((bone) => {
+    if (bone.parent && boneNodes.includes(bone.parent)) {
+      const pWorld = new THREE.Vector3();
+      const cWorld = new THREE.Vector3();
+      bone.parent.getWorldPosition(pWorld);
+      bone.getWorldPosition(cWorld);
+
+      positions.push(pWorld.x, pWorld.y, pWorld.z, cWorld.x, cWorld.y, cWorld.z);
+    }
+
+    // Joint dot position in world space
+    const jWorld = new THREE.Vector3();
+    bone.getWorldPosition(jWorld);
+    dotPositions.push(jWorld.x, jWorld.y, jWorld.z);
+  });
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const mat = new THREE.LineBasicMaterial({ color: hexColor, opacity, transparent: true, depthTest: true });
+  const lines = new THREE.LineSegments(geo, mat);
+  lines.userData.isRigOverlay = true;
+  lines.renderOrder = 3;
+
+  // Joint dots
+  const dotGeo = new THREE.BufferGeometry();
+  dotGeo.setAttribute('position', new THREE.Float32BufferAttribute(dotPositions, 3));
+  const dotMat = new THREE.PointsMaterial({ color: hexColor, size: 0.06, sizeAttenuation: true, transparent: true, opacity });
+  const dots = new THREE.Points(dotGeo, dotMat);
+  dots.userData.isRigOverlay = true;
+  dots.renderOrder = 3;
+
+  const group = new THREE.Group();
+  group.add(lines);
+  group.add(dots);
+  group.userData.isRigOverlay = true;
+  // Add directly to scene in world space — NOT as child of model
+  scene.add(group);
+  s._rigOverlay = group;
   s.markDirty?.();
 }
 
@@ -231,7 +314,7 @@ export function disposeModel(scene, model, origMaterials, wireCache, clayMats, u
   scene.remove(model);
 }
 
-export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOverlay = false, wireOpacity = 0.22, wireHexColor = 0xffffff) {
+export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOverlay = false, wireOpacity = 0.22, wireHexColor = 0xffffff, showRig = false, onRigDetected = null) {
   const { THREE, scene, placeholder } = s;
   if (!THREE) return;
   if (placeholder) placeholder.visible = false;
@@ -240,6 +323,12 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     disposeModel(scene, s.model, s.origMaterials, s._wireCache, s._clayMats, s._uvMats);
     s.model = null;
     s.origMaterials.clear();
+    // Clean up rig overlay
+    if (s._rigOverlay) {
+      scene.remove(s._rigOverlay);
+      s._rigOverlay.traverse((c) => { if (c.material) c.material.dispose(); });
+      s._rigOverlay = null;
+    }
   }
 
   const handleSuccess = (object) => {
@@ -269,8 +358,35 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     s.cam.panY = 0;
     syncCamera(s.camera, s.cam);
 
+    // ── ANIMATION PLAYBACK ──────────────────────────────────────────────
+    // GLTF/FBX models from Tripo's animate_retarget contain animation clips.
+    // Without an AnimationMixer, the model loads but never animates.
+    if (s._mixer) { s._mixer.stopAllAction(); s._mixer = null; }
+    s._animClips = [];
+    s._animAction = null;
+    const clips = object.animations || [];
+    if (clips.length > 0) {
+      s._animClips = clips;
+      const mixer = new THREE.AnimationMixer(model);
+      const action = mixer.clipAction(clips[0]);
+      action.play();
+      s._mixer = mixer;
+      s._animAction = action;
+      // If the model has animations, stop auto-spin so it doesn't fight the animation
+      if (!s._userSpinForced) s.autoSpin = false;
+    }
+
+    // Detect rig bones
+    let boneCount = 0;
+    model.traverse((node) => {
+      if (node.isBone) boneCount++;
+      if (node.isSkinnedMesh && node.skeleton) boneCount = Math.max(boneCount, node.skeleton.bones.length);
+    });
+    if (boneCount > 0 && onRigDetected) onRigDetected(boneCount);
+
     applyViewMode(s, currentViewMode);
     if (wireframeOverlay) applyWireframeOverlay(s, true, wireOpacity, wireHexColor);
+    if (showRig) applyRigSkeletonOverlay(s, true);
     s.autoSpin = autoSpin;
     s.markDirty?.();
   };
@@ -278,7 +394,11 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
   // Detect format by extension first
   const ext = url.split('?')[0].split('.').pop().toLowerCase();
   if (ext === 'fbx') {
-    new FBXLoader().load(url, handleSuccess, undefined, (err) => console.error("Model load error:", err));
+    // FBXLoader.load() is async — suppress warnings for the whole load cycle
+    const _origWarn = console.warn;
+    console.warn = () => { };
+    const restoreWarn = () => { console.warn = _origWarn; };
+    new FBXLoader().load(url, (object) => { restoreWarn(); handleSuccess(object); }, undefined, (err) => { restoreWarn(); console.error("Model load error:", err); });
     return;
   }
   if (['glb', 'gltf'].includes(ext)) {
@@ -297,8 +417,15 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
       // const isGLB = headerStr.startsWith('glTF');
 
       if (isFBX) {
-        const loader = new FBXLoader();
-        const object = loader.parse(buffer, '');
+        const _origWarn = console.warn;
+        console.warn = () => { };
+        let object;
+        try {
+          const loader = new FBXLoader();
+          object = loader.parse(buffer, '');
+        } finally {
+          console.warn = _origWarn;
+        }
         handleSuccess(object);
       } else {
         // Default to GLTF
@@ -319,3 +446,20 @@ export function setCameraPreset(s, preset) {
   syncCamera(s.camera, s.cam);
   s.markDirty?.();
 }
+
+// ── modelHasTextures ────────────────────────────────────────────────────────
+// Returns true if any mesh material has a diffuse/albedo map. Used to verify
+// that a model loaded from archive actually has textures (not the base/clay
+// variant saved before the pbr_model priority fix).
+export function modelHasTextures(model) {
+  if (!model) return false;
+  let texturedCount = 0;
+  let meshCount = 0;
+  model.traverse((node) => {
+    if (!node.isMesh) return;
+    meshCount++;
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    mats.forEach((m) => { if (m?.map) texturedCount++; });
+  });
+  return meshCount > 0 && texturedCount > 0;
+}

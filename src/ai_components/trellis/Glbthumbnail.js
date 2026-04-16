@@ -46,8 +46,8 @@ function _enqueue(run) {
  */
 export function generateGlbThumbnail(source, options = {}) {
   const {
-    width   = 280,
-    height  = 280,
+    width = 280,
+    height = 280,
     bgColor = '#1a1528',
   } = options;
 
@@ -56,7 +56,7 @@ export function generateGlbThumbnail(source, options = {}) {
 
     function cleanup() {
       if (renderer) {
-        try { renderer.forceContextLoss(); } catch (_) {}
+        try { renderer.forceContextLoss(); } catch (_) { }
         renderer.dispose();
       }
       if (scene) {
@@ -89,7 +89,7 @@ export function generateGlbThumbnail(source, options = {}) {
 
       // ── Renderer setup ───────────────────────────────────────────────
       const canvas = document.createElement('canvas');
-      canvas.width  = width;
+      canvas.width = width;
       canvas.height = height;
 
       renderer = new THREE.WebGLRenderer({
@@ -101,11 +101,11 @@ export function generateGlbThumbnail(source, options = {}) {
       renderer.setSize(width, height);
       renderer.setPixelRatio(1);
       renderer.setClearColor(bgColor, 1);
-      renderer.outputColorSpace    = THREE.SRGBColorSpace;
-      renderer.toneMapping         = THREE.ACESFilmicToneMapping;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.3;
-      renderer.shadowMap.enabled   = true;
-      renderer.shadowMap.type      = THREE.PCFShadowMap;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
 
       scene = new THREE.Scene();
       scene.background = new THREE.Color(bgColor);
@@ -139,7 +139,48 @@ export function generateGlbThumbnail(source, options = {}) {
 
       let model;
       if (isFBX) {
-        model = new FBXLoader().parse(buffer, '');
+        // Suppress FBXLoader's console.warn about unsupported material maps
+        const _origWarn = console.warn;
+        console.warn = () => { };
+        try {
+          model = new FBXLoader().parse(buffer, '');
+        } finally {
+          console.warn = _origWarn;
+        }
+
+        // Normalize FBX materials to MeshStandardMaterial — FBXLoader creates
+        // MeshPhongMaterial/LambertMaterial which render black in this renderer
+        if (model) {
+          model.traverse((node) => {
+            if (!node.isMesh) return;
+            const origMats = Array.isArray(node.material) ? node.material : [node.material];
+            const newMats = origMats.map((orig) => {
+              try {
+                const colorMap = orig?.map ?? null;
+                const normalMap = orig?.normalMap ?? null;
+                const color = colorMap
+                  ? 0xffffff
+                  : (orig?.color ? orig.color.getHex() : 0xcccccc);
+                const hasAlpha = !!orig?.alphaMap || orig?.transparent === true || (orig?.opacity != null && orig.opacity < 1);
+
+                return new THREE.MeshStandardMaterial({
+                  map: colorMap,
+                  normalMap,
+                  color,
+                  metalness: 0.3,
+                  roughness: 0.7,
+                  transparent: hasAlpha,
+                  side: orig?.side ?? THREE.FrontSide,
+                });
+              } catch (_) {
+                return new THREE.MeshStandardMaterial({
+                  color: 0x7c3aed, metalness: 0.4, roughness: 0.3,
+                });
+              }
+            });
+            node.material = Array.isArray(node.material) ? newMats : newMats[0];
+          });
+        }
       } else {
         const gltf = await new Promise((res, rej) => {
           new GLTFLoader().parse(buffer, '', res, rej);
@@ -149,6 +190,39 @@ export function generateGlbThumbnail(source, options = {}) {
 
       if (!model) throw new Error('Parser returned null model');
 
+      // ── Normalize GLB materials — same approach as FBX ───────────────
+      // GLTFLoader can produce MeshBasicMaterial or materials with wrong
+      // color space that render completely black in this renderer.
+      model.traverse((node) => {
+        if (!node.isMesh) return;
+        const origMats = Array.isArray(node.material) ? node.material : [node.material];
+        const newMats = origMats.map((orig) => {
+          try {
+            const colorMap = orig?.map ?? null;
+            const normalMap = orig?.normalMap ?? null;
+            const color = colorMap
+              ? 0xffffff
+              : (orig?.color ? orig.color.getHex() : 0xcccccc);
+            const hasAlpha = !!orig?.alphaMap || orig?.transparent === true || (orig?.opacity != null && orig.opacity < 1);
+
+            return new THREE.MeshStandardMaterial({
+              map: colorMap,
+              normalMap,
+              color,
+              metalness: orig?.metalness ?? 0.3,
+              roughness: orig?.roughness ?? 0.7,
+              transparent: hasAlpha,
+              side: orig?.side ?? THREE.FrontSide,
+            });
+          } catch (_) {
+            return new THREE.MeshStandardMaterial({
+              color: 0x7c3aed, metalness: 0.4, roughness: 0.3,
+            });
+          }
+        });
+        node.material = Array.isArray(node.material) ? newMats : newMats[0];
+      });
+
       // ── Configure meshes ─────────────────────────────────────────────
       if (typeof model.traverse === 'function') {
         model.traverse(n => {
@@ -156,7 +230,7 @@ export function generateGlbThumbnail(source, options = {}) {
             if (n.geometry && !n.geometry.attributes.normal) {
               n.geometry.computeVertexNormals();
             }
-            n.castShadow    = true;
+            n.castShadow = true;
             n.receiveShadow = true;
           }
         });
@@ -164,14 +238,14 @@ export function generateGlbThumbnail(source, options = {}) {
       scene.add(model);
 
       // ── Camera framing ───────────────────────────────────────────────
-      const box    = new THREE.Box3().setFromObject(model);
+      const box = new THREE.Box3().setFromObject(model);
       const center = box.getCenter(new THREE.Vector3());
-      const size   = box.getSize(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
       model.position.sub(center);
 
       const aspect = width / height;
-      const fovV   = camera.fov * (Math.PI / 180);
-      const fovH   = 2 * Math.atan(Math.tan(fovV / 2) * aspect);
+      const fovV = camera.fov * (Math.PI / 180);
+      const fovH = 2 * Math.atan(Math.tan(fovV / 2) * aspect);
 
       const neededForH = (size.x / 2) / Math.tan(fovH / 2);
       const neededForV = (size.y / 2) / Math.tan(fovV / 2);
@@ -181,7 +255,7 @@ export function generateGlbThumbnail(source, options = {}) {
       camera.position.set(dist * 0.4, dist * 0.15, dist * 0.92);
       camera.lookAt(0, 0, 0);
       camera.near = 0.01;
-      camera.far  = dist * 20;
+      camera.far = dist * 20;
       camera.updateProjectionMatrix();
 
       keyLight.target.position.set(0, 0, 0);

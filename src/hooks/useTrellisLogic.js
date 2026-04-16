@@ -88,6 +88,7 @@ export function useTrellisLogic(userId, getIdToken) {
         prompt: prompt.trim(),
         status: "succeeded",
         model_url: data.glb_url,
+        taskId: data.taskId, // Store the task source for future refresh/cleanup
         params: { ...params, seed: resolvedSeed },
         style: selectedStyle,
         ts: Date.now()
@@ -97,6 +98,14 @@ export function useTrellisLogic(userId, getIdToken) {
       const newItem = { id: docId, ...itemData, createdAt: { toDate: () => new Date() } };
       setHistory(prev => [newItem, ...prev]);
       setActiveItem(newItem);
+
+      // Acknowledge task to stop background recovery polling
+      if (data.taskId) {
+        fetch(`${API_BASE}/api/tripo/task/${data.taskId}/ack`, {
+          method: "POST",
+          headers
+        }).catch(e => console.warn(`[useTrellisLogic] ACK failed for task ${data.taskId}:`, e.message));
+      }
 
     } catch (err) {
       if (err.name !== "AbortError") {

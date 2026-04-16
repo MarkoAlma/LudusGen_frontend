@@ -49,6 +49,7 @@ export {
 
 // Specialized components
 export { WireframeControl } from './WireframeControl';
+export { RigControl } from './RigControl';
 export { BgColorPicker } from './BgColorPicker';
 export { default as HistoryCard } from './HistoryCard';
 export { default as StylePicker } from './StylePicker';

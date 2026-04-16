@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Loader2, Zap, Wand2, AlertCircle, Eye } from 'lucide-react';
+import { Loader2, Zap, Wand2, AlertCircle, Eye, Sparkles } from 'lucide-react';
 import { API_BASE, authHeaders } from '../api/client';
 
 function Tooltip({ text, children, side = 'top' }) {
@@ -84,9 +84,11 @@ function Enhancer({
   getIdToken,
   enhancing_prompt,
   dechanting_prompt,
+  super_enhancing_prompt,   // ← opcionális super enhance prompt
   onBusyChange,
   inputImages = [],          // ← feltöltött képek [{dataUrl, name}]
   gemmaVisionPrompt = '',    // ← opcionális override; ha üres, GEMMA_IMAGE_DESCRIBE_PROMPT-ot használ
+  stylePrefix = '',          // ← nem módosítható szürke prefix (pl. "[Image #1] ")
 }) {
   const disabled = false;
 
@@ -96,11 +98,12 @@ function Enhancer({
   }, [getIdToken]);
 
   const [enhancing,        setEnhancing]        = useState(false);
+  const [superEnhancing,   setSuperEnhancing]   = useState(false);
   const [dechanting,       setDechanting]        = useState(false);
   const [describingImages, setDescribingImages]  = useState(false);
   const [streamError,      setStreamError]       = useState(null);
 
-  const isBusy = enhancing || dechanting || describingImages;
+  const isBusy = enhancing || superEnhancing || dechanting || describingImages;
 
   useEffect(() => {
     onBusyChange?.(isBusy);
@@ -197,13 +200,19 @@ function Enhancer({
   // ── Enhance ───────────────────────────────────────────────────────────────
   // Ha vannak feltöltött képek (edit mód), először Gemma leírja őket,
   // majd a leírás + felhasználói szöveg együtt megy a Cerebras edit enhancernek.
-  const handleEnhance = useCallback(async () => {
-    if (!value.trim() || enhancing || describingImages) return;
-    setEnhancing(true);
+  // A stylePrefix-et mindig kiszűrjük a küldés előtt — az AI nem látja.
+  const handleEnhance = useCallback(async (superMode = false) => {
+    if (!value.trim() || enhancing || superEnhancing || describingImages) return;
+    if (superMode) setSuperEnhancing(true);
+    else setEnhancing(true);
     setStreamError(null);
 
     try {
+      // Strip stylePrefix from the value before sending to AI
       let userContent = value.trim();
+      if (stylePrefix && userContent.startsWith(stylePrefix)) {
+        userContent = userContent.slice(stylePrefix.length).trim();
+      }
 
       // Ha vannak feltöltött képek → vision describe lépés
       if (inputImages.length > 0) {
@@ -211,35 +220,33 @@ function Enhancer({
         try {
           const description = await callVisionDescribe(inputImages);
           if (description) {
-            // A Cerebras edit enhancer ezt kapja:
-            // felhasználói utasítás + Gemma képleírás mint kontextus
             userContent =
-              `USER'S EDIT INSTRUCTION:\n${value.trim()}\n\n` +
+              `USER'S EDIT INSTRUCTION:\n${userContent}\n\n` +
               `---\n` +
               `VISUAL CONTEXT — uploaded images analyzed by vision AI (Gemma 3 27B IT):\n${description}`;
           }
         } catch (vErr) {
-          // Vision describe sikertelen → graceful fallback, csak szöveggel próbáljuk
           console.warn('Vision describe failed, falling back to text-only enhance:', vErr.message);
           setStreamError(`⚠️ Képelemzés sikertelen (${vErr.message}), csak szöveges prompttal próbálom.`);
-          // Ne dobjuk tovább — folytassuk szöveg-only módban
         } finally {
           setDescribingImages(false);
         }
       }
 
-      const raw = await callChat(enhancing_prompt, userContent, 0.4, 0.9, 10000);
+      const systemPrompt = superMode && super_enhancing_prompt ? super_enhancing_prompt : enhancing_prompt;
+      const raw = await callChat(systemPrompt, userContent, 0.4, 0.9, 10000);
       const ok  = applyResult(raw);
       if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
-      else if (streamError?.startsWith('⚠️')) setStreamError(null); // sikeres → töröljük a warning-ot
+      else if (streamError?.startsWith('⚠️')) setStreamError(null);
     } catch (err) {
       console.error('Enhance hiba:', err);
       setStreamError(err.message || 'Enhance sikertelen');
     } finally {
       setEnhancing(false);
+      setSuperEnhancing(false);
       setDescribingImages(false);
     }
-  }, [value, enhancing, describingImages, enhancing_prompt, inputImages, callChat, callVisionDescribe, applyResult, streamError]);
+  }, [value, enhancing, superEnhancing, describingImages, enhancing_prompt, super_enhancing_prompt, inputImages, callChat, callVisionDescribe, applyResult, streamError, stylePrefix]);
 
   // ── Dechance ──────────────────────────────────────────────────────────────
   const handleDechance = useCallback(async () => {
@@ -260,7 +267,8 @@ function Enhancer({
 
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef(null);
-  const remaining   = MAX_CHARS - value.length;
+  const prefixLen   = stylePrefix.length;
+  const remaining   = MAX_CHARS - prefixLen - value.length;
   const isOverLimit = remaining < 0;
   const hasContent  = value.trim().length > 0;
   const hasImages   = inputImages.length > 0;
@@ -332,6 +340,29 @@ function Enhancer({
           }} />
         )}
 
+        {stylePrefix && (
+          <div style={{
+            padding: '10px 14px 0',
+            position: 'relative', zIndex: 2,
+          }}>
+            <span style={{
+              display: 'inline-block',
+              padding: '3px 8px',
+              borderRadius: 6,
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              color: 'rgba(255,255,255,0.3)',
+              fontSize: 11,
+              fontFamily: "'SF Pro Text', system-ui, -apple-system, sans-serif",
+              letterSpacing: '0.01em',
+              userSelect: 'none',
+              pointerEvents: 'none',
+              whiteSpace: 'pre',
+            }}>
+              {stylePrefix}
+            </span>
+          </div>
+        )}
         <textarea
           ref={textareaRef}
           value={value}
@@ -340,11 +371,11 @@ function Enhancer({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           disabled={disabled}
-          placeholder={'Írj le egy promptot angolul…\npl. a rustic log cabin with a stone chimney'}
+          placeholder={stylePrefix ? 'Írj le egy promptot angolul…' : 'Írj le egy promptot angolul…\npl. a rustic log cabin with a stone chimney'}
           rows={5}
           style={{
             width: '100%', boxSizing: 'border-box',
-            padding: '13px 14px 36px 14px',
+            padding: stylePrefix ? '8px 14px 36px 14px' : '13px 14px 36px 14px',
             resize: 'none', minHeight: 108, maxHeight: 220,
             fontSize: 12, lineHeight: 1.8,
             color: disabled ? 'rgba(229,231,235,0.3)' : '#e5e7eb',
@@ -460,7 +491,7 @@ function Enhancer({
         </Tooltip>
         <Tooltip text={enhanceTooltip} side="top">
           <ActionButton
-            onClick={handleEnhance}
+            onClick={() => handleEnhance(false)}
             disabled={enhanceDisabled}
             loading={enhancing || describingImages}
             accentColor={color}
@@ -472,6 +503,19 @@ function Enhancer({
             loadingLabel={describingImages ? 'Gemma…' : 'Enhance…'}
           />
         </Tooltip>
+        {super_enhancing_prompt && (
+          <Tooltip text={!hasContent ? 'Írj be egy promptot először' : 'Super Enhance — kiegészítőkkel és extra részletességgel'} side="top">
+            <ActionButton
+              onClick={() => handleEnhance(true)}
+              disabled={enhanceDisabled}
+              loading={superEnhancing || describingImages}
+              accentColor="#a855f7"
+              icon={<Sparkles style={{ width: 10, height: 10 }} />}
+              label="Super Enhance"
+              loadingLabel={describingImages ? 'Gemma…' : 'Super…'}
+            />
+          </Tooltip>
+        )}
       </div>
 
       <style>{`

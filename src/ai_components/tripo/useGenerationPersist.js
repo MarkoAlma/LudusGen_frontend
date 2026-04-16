@@ -15,11 +15,12 @@ const LS_KEY = "tripo_active_gen";
  *   mode: string,
  *   prompt: string,
  *   modelVer: string,
+ *   riggedId: string | null,
  * }} PersistedGen
  */
 
 export function persistGen(data) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify({ ...data, savedAt: Date.now() })); }
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ ...data, riggedId: data.riggedId ?? null, savedAt: Date.now() })); }
   catch { /* quota / private browsing */ }
 }
 

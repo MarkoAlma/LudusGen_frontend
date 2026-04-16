@@ -115,8 +115,11 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken, taskId = null) {
   }
 
   if (!r.ok) {
+    if (r.status === 410) {
+      throw new Error("A modell lejárt vagy törölve lett a forrás szerverről (Tripo).");
+    }
     const body = await r.text().catch(() => '');
-    throw new Error(`GLB letöltés sikertelen: HTTP ${r.status} — ${fetchUrl}\n${body.slice(0, 200)}`);
+    throw new Error(`GLB letöltés sikertelen: HTTP ${r.status}${body ? ` — ${body.slice(0, 100)}` : ""}`);
   }
 
   const blob = await r.blob();
@@ -159,13 +162,16 @@ export async function fetchModelData(modelUrl, getIdToken, taskId = null) {
   let r = await tryFetch(fetchUrl);
 
   if (!r.ok && [401, 502].includes(r.status)) {
+    // Retry on auth expiration or transient gateway errors, but SKIP permanent errors like 410 Gone
     console.warn(`fetchModelData: attempt 1 failed (${r.status}), retrying in 1.2s...`);
     await new Promise(res => setTimeout(res, 1200));
     r = await tryFetch(fetchUrl);
   }
 
   if (!r.ok) {
-    throw new Error(`Model fetch failed: HTTP ${r.status} — ${fetchUrl}`);
+    const err = new Error(`Model fetch failed: HTTP ${r.status}`);
+    err.status = r.status;
+    throw err;
   }
 
   const buffer = await r.arrayBuffer();

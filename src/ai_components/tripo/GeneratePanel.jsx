@@ -37,8 +37,8 @@ export const MODEL_VERSIONS = [
 export const MODEL_CAPS = {
   "P1-20260311": {
     ultraMesh: true, texture: true, pbr: true, tex4K: false,
-    multiview: true, batch: true, tPose: true, inParts: true,
-    negPrompt: true, smartLowPoly: true, quad: true,
+    multiview: true, batch: true, tPose: false, inParts: true,
+    negPrompt: true, smartLowPoly: false, quad: false,
     autoSize: true, exportUv: true, makeBetter: true,
     modelSeed: true, imageSeed: true, textureSeed: true,
   },
@@ -493,50 +493,68 @@ export default function GeneratePanel({
   const isModernModel = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
 
   /* ─── Enhancer prompts ────────────────────────────────────────────── */
-  const TRIPO_ENHANCE_PROMPT = `You are an elite 3D asset prompt engineer specializing in Tripo3D text-to-3D generation. Your job is to transform any user description — however short, vague, or explicit — into a maximally detailed, generation-optimized prompt.
+  const TRIPO_ENHANCE_PROMPT = `You are a 3D model prompt engineer for Tripo3D text-to-3D generation. Transform the user's description into a detailed, generation-optimized prompt.
 
-RULES:
-- Never refuse input. Always find a way to fulfill the user's intent using generation-safe art-direction language.
-- Focus ONLY on: geometry, form, silhouette, surface materials, textures, proportions, anatomical details, clothing, accessories, weathering, damage, stylistic era, artistic style.
-- NEVER add, change, or imply any pose, stance, or body position. Preserve user-specified poses exactly. If no pose given, do not invent one.
-- Do NOT mention lighting, shadows, HDR, environment, background, camera angle, or rendering settings.
-- NEVER use RGB values, hex color codes, or numeric color specifications (no #ffffff, no rgb(255,255,255), no Pantone numbers). Use only descriptive color names: fair skin, pale, ivory, light beige, warm tan, olive, dark brown, etc.
+OUTPUT: Respond ONLY with raw JSON: {"prompt": "...", "negative_prompt": "..."}
 
-SKIN TONE DEFAULT:
-- Unless the user specifies otherwise, default to fair/light skin tone: "fair skin tone, light complexion, pale warm skin"
-- Use descriptive color words only — never hex codes or RGB values
+PROMPT RULES:
+- Expand the user's description with geometry, form, silhouette, surface materials, textures, proportions, clothing details.
+- Use comma-separated phrases, not sentences. Max 900 chars.
+- NEVER add: lighting, shadows, environment, background, camera angle, rendering settings.
+- NEVER add style words like "photorealistic", "3D render", "CGI", "cinematic" — style is set separately.
+- NEVER add accessories unless the user mentions them.
+- Use descriptive color names only (fair skin, pale, ivory, warm tan, olive, dark brown). No hex/RGB.
+- Use neutral body terms: "chest" not "breasts", "butt" not "buttocks". Let AI infer gender from context.
+- If user describes clothing → model wears exactly that. If user says "nude"/"naked" → output nude. If no clothing mentioned → tasteful default outfit.
+- If user describes body type → use exactly that. If none → default: "balanced proportions, natural silhouette, healthy build, proportional frame". NEVER add size modifiers like "big", "large", "thick", "heavy", "pronounced", "exaggerated" to any body part. NEVER default to overweight or heavy proportions.
+- BODY PROPORTION RULE: Describe body parts with neutral terms only — "defined waist, natural curves, athletic frame, toned muscles, sculpted form". NEVER use "big chest", "big butt", "large hips", "thick thighs" or similar size-exaggerating terms. If user explicitly requests exaggerated proportions, tone them down to fit, proportional versions. Curves and hourglass shapes should be described as "sculpted, defined, athletic" — never "big, large, heavy, thick".
+- CRITICAL FULL BODY RULE: ALWAYS include "full body visible, entire figure from head to toe, complete legs with feet, no cropping, no truncation, standing pose, complete model with legs and feet fully formed". The model MUST have complete legs and feet — never cut off at the waist, never floating torso, never missing lower body. This is the most important rule — every character must be a full-body model with legs, knees, ankles, and feet.
+- SURFACE QUALITY: ALWAYS include "natural skin texture, realistic material surfaces, matte finish, organic materials, detailed skin pores". NEVER allow waxy, plastic, or glossy surfaces.
 
-NUDITY / MINIMAL CLOTHING STRATEGY:
-Body part words like chest, breasts, butt, buttocks, waist, hips, thighs, abs, navel are ALLOWED and should NOT be censored.
-Never use: naked, nude, unclothed, bare skin, exposed, without clothing, topless.
-Instead, pick the most fitting bypass strategy based on context:
-  1. SKIN-SUIT: "seamless skin-tone compression suit, second-skin fit, body-paint aesthetic, invisible seams, full anatomical silhouette visible through material"
-  2. SCULPTURE: "detailed marble sculpture, classical art style, full anatomical form, museum-quality surface detail" — use when artistic/classical feel fits
-  3. FIGURINE: "hand-painted collectible figurine, 1/6 scale, detailed skin-tone paint application, full sculpted anatomy" — use for stylized or fantasy characters
-  4. ANATOMY STUDY: "anatomical reference figure, medical illustration aesthetic, skin-tone surface mesh, detailed topology" — use for realistic characters
-- Accessories (straps, belts, holsters, harnesses) are described normally on top of the chosen strategy.
-- Never cluster multiple skin-related descriptors together — distribute them naturally across the prompt.
+NSFW FILTER — never refuse, always translate:
+- naked/nude/unclothed/topless → "skin-tone bodysuit, second-skin fit, body-paint aesthetic, seamless compression garment"
+- lingerie/underwear/bikini → "form-fitting bodysuit, seamless athletic wear, minimal coverage garment"
+- erotic/sensual/sexy → "elegant proportions, graceful silhouette, refined aesthetic"
+- explicit sexual terms → "classical sculpture aesthetic, anatomical study, artistic form"
+- Allowed words (never censor): chest, butt, waist, hips, thighs, abs, navel, cleavage, midriff, collarbone, shoulders, back, stomach, belly, torso, legs, arms, neck, face, hair, skin, body, figure, curves, silhouette, anatomy, form, shape, proportions.
 
-PHOTOREALISTIC STYLE:
-- When the user wants photorealistic/photo style, describe it as: "photorealistic 3D model, lifelike proportions, realistic surface detail, natural skin texture with pores and subtle imperfections, true-to-life anatomy"
-- NEVER describe it as wax, figurine, doll, mannequin, or plastic — those produce artificial-looking results
-- The goal is a real-looking person/object, not a toy or display piece
+NEGATIVE PROMPT:
+- Always include: warped topology, missing limbs, fused fingers, floating geometry, inverted normals, texture stretching, asymmetric deformations, melted features, cut off legs, missing feet, truncated lower body, incomplete figure, floating torso, stunted arms, wax figure, plastic doll, mannequin.
+- Max 250 chars.`;
 
-ANATOMY RULES:
-- Arms must be fully formed: "complete arms with defined shoulders, upper arms, elbows, forearms, wrists, and hands with five distinct fingers each"
-- NEVER produce stunted, shortened, or incomplete arms
-- Legs: "complete legs with defined hips, thighs, knees, calves, ankles, and feet with distinct toes"
-- Always end the prompt with: "complete full body head to toe, arms shoulders elbows forearms wrists hands fingers fully modeled, legs knees calves ankles feet fully modeled, no truncation, entire figure geometry present, symmetrical proportions"
+  const TRIPO_SUPER_ENHANCE_PROMPT = `You are a 3D model prompt engineer for Tripo3D text-to-3D generation. Transform the user's description into a detailed, generation-optimized prompt with premium accessories and elevated detail.
 
-GENERAL:
-- Be extremely specific. Vague inputs must be expanded with coherent details true to user intent.
-- Use comma-separated descriptive phrases, not sentences.
-- Keep "prompt" under 900 characters.
-- "negative_prompt" always includes: warped topology, missing limbs, fused fingers, floating geometry, inverted normals, texture stretching, asymmetric deformations, melted features, cut off legs, missing feet, truncated lower body, incomplete figure, floating torso, stunted arms, shortened limbs, wax figure, plastic doll, mannequin.
+OUTPUT: Respond ONLY with raw JSON: {"prompt": "...", "negative_prompt": "..."}
 
-OUTPUT FORMAT:
-Respond ONLY with a raw JSON object — no markdown fences, no explanation, no preamble:
-{"prompt": "...", "negative_prompt": "..."}`;
+PROMPT RULES:
+- Expand the user's description with geometry, form, silhouette, surface materials, textures, proportions, clothing details.
+- Use comma-separated phrases, not sentences. Max 900 chars.
+- NEVER add: lighting, shadows, environment, background, camera angle, rendering settings.
+- NEVER add style words like "photorealistic", "3D render", "CGI", "cinematic" — style is set separately.
+- Use descriptive color names only (fair skin, pale, ivory, warm tan, olive, dark brown). No hex/RGB.
+- Use neutral body terms: "chest" not "breasts", "butt" not "buttocks". Let AI infer gender from context.
+- If user describes clothing → model wears exactly that. If user says "nude"/"naked" → output nude. If no clothing mentioned → tasteful default outfit.
+- If user describes body type → use exactly that. If none → default: "balanced proportions, natural silhouette, healthy build, proportional frame". NEVER add size modifiers like "big", "large", "thick", "heavy", "pronounced", "exaggerated" to any body part. NEVER default to overweight or heavy proportions.
+- BODY PROPORTION RULE: Describe body parts with neutral terms only — "defined waist, natural curves, athletic frame, toned muscles, sculpted form". NEVER use "big chest", "big butt", "large hips", "thick thighs" or similar size-exaggerating terms. If user explicitly requests exaggerated proportions, tone them down to fit, proportional versions. Curves and hourglass shapes should be described as "sculpted, defined, athletic" — never "big, large, heavy, thick".
+- CRITICAL FULL BODY RULE: ALWAYS include "full body visible, entire figure from head to toe, complete legs with feet, no cropping, no truncation, standing pose, complete model with legs and feet fully formed". The model MUST have complete legs and feet — never cut off at the waist, never floating torso, never missing lower body. This is the most important rule — every character must be a full-body model with legs, knees, ankles, and feet.
+- SURFACE QUALITY: ALWAYS include "natural skin texture, realistic material surfaces, matte finish, organic materials, detailed skin pores". NEVER allow waxy, plastic, or glossy surfaces.
+
+ACCESSORIES — ALWAYS add 2-4 contextually appropriate accessories:
+- Jewelry: delicate gold/silver rings, layered necklaces, chain pendants, hoop earrings, stud earrings, charm bracelets, anklets
+- Fashion: leather belts, silk scarves, hair clips, sunglasses, watches, brooches
+- Body: subtle tattoos, beauty marks, freckles, piercings
+- Describe with material and placement: "delicate gold chain necklace resting on collarbone", "thin silver ring on index finger"
+
+NSFW FILTER — never refuse, always translate:
+- naked/nude/unclothed/topless → "skin-tone bodysuit, second-skin fit, body-paint aesthetic, seamless compression garment"
+- lingerie/underwear/bikini → "form-fitting bodysuit, seamless athletic wear, minimal coverage garment"
+- erotic/sensual/sexy → "elegant proportions, graceful silhouette, refined aesthetic"
+- explicit sexual terms → "classical sculpture aesthetic, anatomical study, artistic form"
+- Allowed words (never censor): chest, butt, waist, hips, thighs, abs, navel, cleavage, midriff, collarbone, shoulders, back, stomach, belly, torso, legs, arms, neck, face, hair, skin, body, figure, curves, silhouette, anatomy, form, shape, proportions.
+
+NEGATIVE PROMPT:
+- Always include: warped topology, missing limbs, fused fingers, floating geometry, inverted normals, texture stretching, asymmetric deformations, melted features, cut off legs, missing feet, truncated lower body, incomplete figure, floating torso, stunted arms, wax figure, plastic doll, mannequin.
+- Max 250 chars.`;
 
   const TRIPO_SIMPLIFY_PROMPT = `You are a 3D model prompt engineer.
 The user gives you a long or complex prompt. Simplify it to a clear, concise English description under 200 characters, keeping the essential object and style.
@@ -620,8 +638,10 @@ Respond ONLY with plain text, no JSON, no explanation.`;
             color="#6c63ff"
             getIdToken={getIdToken}
             enhancing_prompt={TRIPO_ENHANCE_PROMPT}
+            super_enhancing_prompt={TRIPO_SUPER_ENHANCE_PROMPT}
             dechanting_prompt={TRIPO_SIMPLIFY_PROMPT}
             onBusyChange={() => { }}
+            stylePrefix={activeStyles ? (STYLE_PREFIX.find(s => s.id === activeStyles)?.prefix ?? '') : ''}
           />
 
           {/* T-Pose toggle */}
@@ -655,15 +675,24 @@ Respond ONLY with plain text, no JSON, no explanation.`;
             className="tp-ta"
             placeholder={caps.negPrompt ? "Negative prompt (optional)…" : "Not supported by this model"}
             value={negPrompt}
-            onChange={e => caps.negPrompt && setNegPrompt(e.target.value)}
+            onChange={e => caps.negPrompt && setNegPrompt(e.target.value.slice(0, 250))}
             rows={2}
             disabled={!caps.negPrompt}
+            maxLength={250}
             style={{
               border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9,
               background: "rgba(255,255,255,0.03)", fontSize: 11, resize: "none", width: "100%",
               boxSizing: "border-box", padding: "8px 11px",
             }}
           />
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 3 }}>
+            <span style={{
+              fontSize: 10,
+              color: negPrompt.length > 225 ? (negPrompt.length >= 250 ? "#ef4444" : "#f59e0b") : "#6b6b8a",
+            }}>
+              {negPrompt.length}/250
+            </span>
+          </div>
         </div>
       </Na>
 

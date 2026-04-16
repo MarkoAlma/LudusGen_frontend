@@ -4,10 +4,11 @@ import { StudioLayoutContext } from "../../../components/shared/StudioLayout";
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {
   syncCamera, buildPlaceholder,
   createSunLight,
-  applyLights, applyViewMode, applyWireframeOverlay,
+  applyLights, applyViewMode, applyWireframeOverlay, applyRigSkeletonOverlay,
   setSceneBg, setGridColor, loadGLB,
 } from './threeHelpers';
 
@@ -24,9 +25,11 @@ export default function ThreeViewer({
   wireframeOverlay = false,
   wireOpacity = 0.22,
   wireHexColor = 0xffffff,
+  showRig = false,
   autoSpin = false,
   onSpinStop,
   onNonGlbUrl,
+  onRigDetected,
   bgColor = 'default',
   gridColor1 = '#1e1e3a',
   gridColor2 = '#111128',
@@ -57,14 +60,23 @@ export default function ThreeViewer({
         stencil: false,
       });
       renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.4;
+      renderer.toneMapping = THREE.NeutralToneMapping;
+      renderer.toneMappingExposure = 1.2;
       renderer.setSize(W, H);
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFShadowMap;
       renderer.sortObjects = false;
       el.appendChild(renderer.domElement);
+
+      // ── ENVIRONMENT MAP for PBR materials ─────────────────────────────────────
+      // Without an envMap, MeshStandardMaterial has no specular reflections,
+      // producing a flat/waxy appearance. RoomEnvironment provides neutral
+      // studio-like reflections that give PBR surfaces natural depth.
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      pmremGenerator.compileEquirectangularShader();
+      const envTexture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+      scene.environment = envTexture;
 
       const grid = new THREE.GridHelper(20, 40,
         parseInt(gridColor1.replace('#', ''), 16),
@@ -117,6 +129,7 @@ export default function ThreeViewer({
         drag: { active: false, mode: 'orbit', x: 0, y: 0 },
         frame: null,
         markDirty,
+        pmremGenerator, envTexture,
       };
 
       applyLights(S.current, lightMode, color, lightStrength, lightRotation, dramaticColor, viewMode);
@@ -140,6 +153,11 @@ export default function ThreeViewer({
         }
         if (lightMoving) {
           S.current.lightGroup.rotation.y += S.current.lightAutoRotateSpeed * dt;
+          _dirty = true;
+        }
+        // Animation mixer update — plays GLTF/FBX animation clips
+        if (S.current._mixer) {
+          S.current._mixer.update(dt);
           _dirty = true;
         }
 
@@ -174,6 +192,9 @@ export default function ThreeViewer({
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeObs?.disconnect();
       if (S.current?.frame) cancelAnimationFrame(S.current.frame);
+      if (S.current?._mixer) { S.current._mixer.stopAllAction(); S.current._mixer = null; }
+      if (S.current?.pmremGenerator) S.current.pmremGenerator.dispose();
+      if (S.current?.envTexture) S.current.envTexture.dispose();
       if (S.current?.renderer) {
         S.current.renderer.dispose();
         if (el.contains(S.current.renderer.domElement)) el.removeChild(S.current.renderer.domElement);
@@ -208,6 +229,11 @@ export default function ThreeViewer({
 
   useEffect(() => {
     if (!S.current?.scene) return;
+    applyRigSkeletonOverlay(S.current, showRig);
+  }, [showRig]);
+
+  useEffect(() => {
+    if (!S.current?.scene) return;
     applyLights(S.current, lightMode, color, lightStrength, lightRotation, dramaticColor, viewMode);
   }, [lightMode, color, lightStrength, lightRotation, dramaticColor]); // eslint-disable-line
 
@@ -236,7 +262,7 @@ export default function ThreeViewer({
         return;
       }
     }
-    loadGLB(S.current, modelUrl, viewMode, autoSpin, wireframeOverlay, wireOpacity, wireHexColor);
+    loadGLB(S.current, modelUrl, viewMode, autoSpin, wireframeOverlay, wireOpacity, wireHexColor, showRig, onRigDetected);
   }, [modelUrl]); // eslint-disable-line
 
   useEffect(() => {

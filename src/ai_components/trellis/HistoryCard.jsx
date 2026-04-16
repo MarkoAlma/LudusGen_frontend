@@ -7,6 +7,7 @@ import {
   Loader2,
   Box,
   Sparkles,
+  AlertCircle,
 } from "lucide-react";
 import { getCachedThumbnail } from "./Glbthumbnail";
 import { fetchModelData } from "./utils";
@@ -49,6 +50,9 @@ function useContainerWidth(ref) {
   return width;
 }
 
+// Session-wide memory cache for dead assets to prevent redundant console spam
+const EXPIRED_URLS = new Set();
+
 // ─────────────────────────────────────────────────────────────────────────────
 const HistoryCard = React.memo(function HistoryCard({
   item,
@@ -69,16 +73,23 @@ const HistoryCard = React.memo(function HistoryCard({
   const [thumbnail, setThumbnail] = useState(null);
   const [thumbLoading, setThumbLoading] = useState(false);
   const [thumbError, setThumbError] = useState(false);
+  const [errorCode, setErrorCode] = useState(null);
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
     if (!item?.model_url) return;
+    if (item?.status === "failed" || EXPIRED_URLS.has(item.model_url)) {
+      setThumbError(true);
+      if (EXPIRED_URLS.has(item.model_url)) setErrorCode(410);
+      return;
+    }
 
     // Try to render thumbnails for everything — Glbthumbnail will handle sniffing
     let cancelled = false;
     setThumbError(false);
     (async () => {
       setThumbLoading(true);
+      setErrorCode(null);
       try {
         const data = await fetchModelData(item.model_url, getIdToken, item.taskId);
         if (cancelled || !data) return;
@@ -102,8 +113,16 @@ const HistoryCard = React.memo(function HistoryCard({
         }
       } catch (err) {
         if (!cancelled) {
+          const status = err.status || null;
+          setErrorCode(status);
           setThumbError(true);
-          console.error("[HistoryCard] thumbnail error:", err?.message, "URL:", item.model_url);
+          
+          if (status === 410) {
+            EXPIRED_URLS.add(item.model_url);
+            console.warn(`[HistoryCard] Source Expired (410) for task ${item.taskId || "unknown"}. Marked as failed.`);
+          } else {
+            console.error("[HistoryCard] thumbnail error:", err?.message, "URL:", item.model_url);
+          }
         }
       } finally {
         if (!cancelled) setThumbLoading(false);
@@ -252,6 +271,8 @@ const handleReuse = useCallback(
               flexDirection: "column",
               alignItems: "center",
               gap: 8,
+              padding: "0 10px",
+              textAlign: "center"
             }}
           >
             <div
@@ -259,8 +280,8 @@ const handleReuse = useCallback(
                 width: 40,
                 height: 40,
                 borderRadius: 12,
-                background: thumbError ? "rgba(239,68,68,0.07)" : `${accent}08`,
-                border: `1px solid ${thumbError ? "rgba(239,68,68,0.18)" : accent + "18"}`,
+                background: thumbError ? (errorCode === 410 ? "rgba(255,165,0,0.07)" : "rgba(239,68,68,0.07)") : `${accent}08`,
+                border: `1px solid ${thumbError ? (errorCode === 410 ? "rgba(255,165,0,0.2)" : "rgba(239,68,68,0.18)") : accent + "18"}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -270,20 +291,58 @@ const handleReuse = useCallback(
                 style={{
                   width: 20,
                   height: 20,
-                  color: thumbError ? "#ef4444" : `${accent}40`,
+                  color: thumbError ? (errorCode === 410 ? "#ffa500" : "#ef4444") : `${accent}40`,
+                  opacity: 0.5
                 }}
               />
             </div>
             {thumbError && (
-              <span
-                style={{
-                  color: "#2d2d4a",
-                  fontSize: 8,
-                  fontFamily: "monospace",
-                }}
-              >
-                no preview
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span
+                  style={{
+                    color: errorCode === 410 ? "#ffa500" : "#6b7280",
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: '0.05em',
+                    fontFamily: "'SF Mono', monospace",
+                  }}
+                >
+                  {errorCode === 410 ? "EXPIRED" : "ERROR"}
+                </span>
+                <span
+                  style={{
+                    color: "#2d2d4a",
+                    fontSize: 8,
+                    fontWeight: 500,
+                    opacity: 0.6
+                  }}
+                >
+                  {errorCode === 410 ? "Source GONE" : "No preview"}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Failed Status Overlay */}
+        {item?.status === "failed" && !thumbnail && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(10,8,20,0.85)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            zIndex: 2
+          }}>
+            <AlertCircle style={{ width: 22, height: 22, color: '#ef4444', opacity: 0.8 }} />
+            <span style={{ color: '#ef4444', fontSize: 9, fontWeight: 700 }}>FAILED</span>
+            {item.error && (
+               <span style={{ color: '#4b5563', fontSize: 7, padding: '0 12px', textAlign: 'center' }}>
+                 {item.error.length > 40 ? item.error.slice(0, 40) + '...' : item.error}
+               </span>
             )}
           </div>
         )}
