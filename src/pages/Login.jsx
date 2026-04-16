@@ -38,6 +38,7 @@ export default function Login({ isOpen, onClose }) {
   const [pending2FAEmail, setPending2FAEmail] = useState("");
   const [pending2FAPassword, setPending2FAPassword] = useState(""); // ✅ Tároljuk a jelszót is
 
+  
   const [email, setEmail] = useState("");
   const [sessionId, setSessionId] = useState(null);
   const [provider, setProvider] = useState(null); // 'email' vagy 'google'
