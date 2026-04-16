@@ -16,9 +16,9 @@ const CodeBlock = ({ lang, code }) => {
   };
 
   return (
-    <div className="relative my-6 rounded-2xl overflow-hidden border border-white/5 bg-[#0a0a0f] shadow-2xl group/code">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 bg-white/[0.03] border-b border-white/5">
+    <div className="relative my-6 rounded-2xl border border-white/5 bg-[#0a0a0f] shadow-2xl group/code">
+      {/* Header - Sticky */}
+      <div className="sticky top-0 z-30 flex items-center justify-between px-5 py-3 bg-[#0a0a0f]/95 backdrop-blur-md border-b border-white/5 shadow-lg rounded-t-2xl">
         <div className="flex items-center gap-4">
           <div className="flex gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-red-500/30" />
@@ -39,18 +39,18 @@ const CodeBlock = ({ lang, code }) => {
           {copied ? (
             <>
               <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-emerald-400">Copied</span>
+              <span className="text-emerald-400 whitespace-nowrap">Copied</span>
             </>
           ) : (
             <>
               <Copy className="w-3.5 h-3.5" />
-              <span>Copy</span>
+              <span className="whitespace-nowrap">Copy</span>
             </>
           )}
         </button>
       </div>
       {/* Code Content */}
-      <div className="p-4 md:p-5 overflow-x-auto relative">
+      <div className="p-4 md:p-5 overflow-auto max-h-[600px] relative">
         <pre className="text-[13px] font-mono leading-relaxed text-white relative z-10">
           <code className="block">{code}</code>
         </pre>
@@ -64,26 +64,60 @@ const CodeBlock = ({ lang, code }) => {
 /* ──────────────────────────────────────────────────────────────────── */
 const renderContent = (text) => {
   if (!text) return null;
-  const parts = text.split(/(```[\s\S]*?```)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('```')) {
-      const match = part.match(/```(\w+)?\n?([\s\S]*?)```/);
-      return <CodeBlock key={i} lang={match?.[1]} code={match?.[2]} />;
-    }
 
-    const rendered = part.split(/(\*\*[^*]+\*\*)/g).map((seg, j) => {
-      if (seg.startsWith('**') && seg.endsWith('**')) {
-        return <strong key={j} className="text-white font-bold">{seg.slice(2, -2)}</strong>;
+  // Split by ``` to handle both closed and open (streaming) code blocks
+  const sections = text.split("```");
+  const elements = [];
+
+  for (let i = 0; i < sections.length; i++) {
+    const isCode = i % 2 === 1;
+    const content = sections[i];
+
+    if (isCode) {
+      // It's a code block (even if the closing ``` hasn't arrived yet)
+      let lang = "";
+      let code = content;
+
+      // Extract language from first line if possible
+      const firstNewline = content.indexOf("\n");
+      if (firstNewline !== -1) {
+        lang = content.substring(0, firstNewline).trim();
+        code = content.substring(firstNewline + 1);
+      } else if (content.length > 0 && i < sections.length - 1) {
+        // If we have a following section, then this section is definitely the lang + code
+        // Or if no newline, maybe it's just the lang? Let's check.
+        lang = content.trim();
+        code = "";
       }
-      return seg;
-    });
 
-    return (
-      <p key={i} className="whitespace-pre-wrap mb-4 last:mb-0 leading-relaxed text-[14px] text-white text-left">
-        {rendered}
-      </p>
-    );
-  });
+      elements.push(<CodeBlock key={`code-${i}`} lang={lang} code={code} />);
+    } else {
+      // It's regular text
+      if (!content.trim() && i > 0 && i < sections.length - 1) continue;
+
+      const rendered = content.split(/(\*\*[^*]+\*\*)/g).map((seg, j) => {
+        if (seg.startsWith("**") && seg.endsWith("**")) {
+          return (
+            <strong key={j} className="text-white font-bold">
+              {seg.slice(2, -2)}
+            </strong>
+          );
+        }
+        return seg;
+      });
+
+      elements.push(
+        <p
+          key={`text-${i}`}
+          className="whitespace-pre-wrap mb-4 last:mb-0 leading-relaxed text-[14px] text-white text-left"
+        >
+          {rendered}
+        </p>
+      );
+    }
+  }
+
+  return elements;
 };
 
 /* ──────────────────────────────────────────────────────────────────── */
@@ -93,22 +127,57 @@ export default function MessageItem({ message, themeColor }) {
   const isAi = message.role === 'assistant';
 
   // Resolve the model that generated this message (or fall back to current themeColor)
-  const msgModel = isAi && message.modelId ? getModel(message.modelId) : null;
+  const msgModel = isAi && (message.modelId || message.model) ? getModel(message.modelId || message.model) : null;
   const messageColor = msgModel?.color || themeColor;
   const [copiedInline, setCopiedInline] = useState(false);
 
   const timestamp = useMemo(() => {
+    let date = null;
     if (message.timestamp) {
-      const d = new Date(message.timestamp);
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (typeof message.timestamp === 'object' && message.timestamp.seconds !== undefined) {
+        date = new Date(message.timestamp.seconds * 1000);
+      } else if (typeof message.timestamp === 'string') {
+        date = new Date(message.timestamp);
+      } else if (typeof message.timestamp === 'number') {
+        date = new Date(message.timestamp);
+      }
     }
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }, [message.timestamp]);
+    if (!date || isNaN(date.getTime()) && message.createdAt) {
+      date = new Date(message.createdAt);
+    }
+    if (!date || isNaN(date.getTime())) {
+      return '';
+    }
+    const now = new Date();
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    const diffWeeks = Math.floor(diffMs / 604800000);
+
+    // Today: show time
+    if (diffDays === 0) return timeStr;
+    // Yesterday
+    if (diffDays === 1) return 'tegnap';
+    // This week
+    if (diffDays < 7) return `${diffDays} napja`;
+    // This month (weeks)
+    if (diffWeeks === 1) return '1 hete';
+    if (diffWeeks < 4) return `${diffWeeks} hete`;
+    // Months
+    const diffMonths = Math.floor(diffMs / 2592000000);
+    if (diffMonths === 1) return '1 hónapja';
+    if (diffMonths < 12) return `${diffMonths} hónapja`;
+    // Years
+    const diffYears = Math.floor(diffMs / 31536000000);
+    if (diffYears === 1) return '1 éve';
+    return `${diffYears} éve`;
+  }, [message.timestamp, message.createdAt]);
 
   return (
-    <div className={`flex mb-8 w-full ${
-      isAi ? 'flex-row items-start justify-start' : 'flex-row-reverse items-start justify-start'
-    }`}>
+    <div className={`flex mb-8 w-full ${isAi ? 'flex-row items-start justify-start' : 'flex-row-reverse items-start justify-start'
+      }`}>
       {/* Avatar */}
       <div className="relative shrink-0 mt-1">
         <div
@@ -127,30 +196,18 @@ export default function MessageItem({ message, themeColor }) {
         {/* Meta: Name + Timestamp */}
         <div className={`flex items-center gap-3 mb-2 ${isAi ? '' : 'flex-row-reverse'}`}>
           <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/60">
-            {isAi ? 'Ludus Gen' : 'Te'}
+            {isAi ? (msgModel?.name || 'AI') : 'Te'}
           </span>
           <div className="w-1 h-1 rounded-full bg-white/20" />
           <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{timestamp}</span>
-          {isAi && msgModel && (
-            <span
-              className="text-[8px] font-bold px-1.5 py-0.5 rounded-md border"
-              style={{
-                color: messageColor,
-                borderColor: messageColor + '55',
-                backgroundColor: messageColor + '15',
-              }}
-            >
-              {msgModel.name}
-            </span>
-          )}
         </div>
 
         {/* Bubble */}
         <div className="flex flex-col w-full">
           <div
-            className={`relative px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6 border shadow-lg overflow-hidden ${isAi
-                ? 'bg-white/[0.06] border-white/10 rounded-2xl rounded-tl-none rounded-br-none'
-                : 'bg-white/[0.04] border-white/8 rounded-2xl rounded-tr-none'
+            className={`relative px-4 py-4 sm:px-6 sm:py-5 md:px-8 md:py-6 border shadow-lg ${isAi
+              ? 'bg-white/[0.06] border-white/10 rounded-2xl rounded-tl-none rounded-br-none'
+              : 'bg-white/[0.04] border-white/8 rounded-2xl rounded-tr-none'
               }`}
           >
             {/* Image Attachment */}

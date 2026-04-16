@@ -2,8 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { db } from "../firebase/firebaseApp";
 import {
   collection, addDoc, query, orderBy, limit, getDocs,
-  serverTimestamp, deleteDoc, doc, setDoc, getDoc, onSnapshot,
-  writeBatch,
+  serverTimestamp, doc, setDoc, getDoc, writeBatch,
 } from "firebase/firestore";
 import { DEFAULT_PRESETS, ALL_MODELS } from "../ai_components/models";
 import { API_BASE } from "../api/client";
@@ -32,6 +31,9 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
   const textareaRef = useRef(null);
   const abortControllerRef = useRef(null);
   const userScrolledUp = useRef(false);
+  const selectedModelRef = useRef(selectedModel);
+  // Update ref synchronously on every render so handleSend always has current model
+  selectedModelRef.current = selectedModel;
 
   // ── Firestore refs — model-independent ────────────────────────────
   const getSessionRef = useCallback((sessionId) =>
@@ -127,27 +129,48 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
       const msgs = snap.docs.map((d) => d.data());
       setMessages(msgs.length > 0 ? msgs : [{
         role: "assistant",
-        content: `Szia! ${selectedModel.name} itt. Miben segíthetek? 🚀`,
-        model: selectedModel.id, id: "welcome",
+        content: `Szia! AI asszisztens itt. Miben segíthetek? 🚀`,
+        model: "ai", id: "welcome",
       }]);
     } catch (e) { console.error(e); }
     setLoadingHistory(false);
-  }, [userId, getCurrentSessionId, getMessagesRef, getSessionRef, selectedModel]);
+  }, [userId, getCurrentSessionId, getMessagesRef, getSessionRef]);
 
   useEffect(() => {
     loadConversationList();
     loadCurrentConversation();
   }, [loadConversationList, loadCurrentConversation]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Track whether user intentionally scrolled up
   useEffect(() => {
-    if (chatScrollRef.current && messages.length > 0) {
-      const el = chatScrollRef.current;
-      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
-      if (isNearBottom || messages[messages.length - 1]?.role === 'user') {
-        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-      }
+    const el = chatScrollRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      userScrolledUp.current = distanceFromBottom > 10;
+    };
+
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-scroll to bottom when new messages arrive or streaming updates
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (!el || messages.length === 0) return;
+
+    const lastMsg = messages[messages.length - 1];
+    const isNewMessage = lastMsg?.role === 'user' || (lastMsg?.role === 'assistant' && lastMsg?.isStreaming && !lastMsg?.content);
+
+    if (isNewMessage) {
+      userScrolledUp.current = false;
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else if (!userScrolledUp.current) {
+      // User is at the bottom → keep following during streaming
+      el.scrollTop = el.scrollHeight;
     }
+    // User scrolled up (>10px) → do NOT auto-scroll, let them read
   }, [messages]);
 
   const saveMessage = async (msg) => {
@@ -158,13 +181,15 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         ? msg.content.find((p) => p.type === "text")?.text || ""
         : msg.content;
 
+      const model = selectedModelRef.current;
+
       const msgData = {
         role: msg.role,
         content: contentToSave,
         model: msg.model,
         id: msg.id,
-        modelId: selectedModel.id,
-        modelName: selectedModel.name,
+        modelId: model.id,
+        modelName: model.name,
         timestamp: serverTimestamp(),
         createdAt: new Date().toISOString(),
         ...(msg.usage ? { usage: msg.usage } : {}),
@@ -173,8 +198,8 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
       await addDoc(getMessagesRef(sessionId), msgData);
       await setDoc(getSessionRef(sessionId), {
         sessionId,
-        modelId: selectedModel.id,
-        modelName: selectedModel.name,
+        modelId: model.id,
+        modelName: model.name,
         ...(msg.role === "user" ? { title: contentToSave.slice(0, 60) } : {}),
         lastMessage: contentToSave.slice(0, 100),
         lastRole: msg.role,
@@ -212,25 +237,25 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     setSystemPrompt(selectedModel.defaultSystemPrompt || "");
   }, [selectedModel]);
 
+  const createNewSession = useCallback(() => {
+    const newSid = `session_${Date.now()}`;
+    sessionStorage.setItem("chat_session_current", newSid);
+    setMessages([]);
+    setInput("");
+    setAttachedImage(null);
+    setIsTyping(false);
+    // Reload conversation list and load the new empty session
+    loadConversationList();
+    loadCurrentConversation();
+  }, [loadConversationList, loadCurrentConversation]);
+
   // ── Trigger summary generation (fire-and-forget) ──────────────────
-  const triggerSummaryGeneration = useCallback(async (sessionId, currentMessages) => {
-    if (!userId || !sessionId || currentMessages.length < 15) return;
-    try {
-      const token = await getIdToken();
-      fetch(`${API_BASE}/api/chat/summary`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          sessionId,
-          messages: currentMessages.map(m => ({ role: m.role, content: m.content })),
-          modelId: selectedModel.id,
-        }),
-      }).catch(e => console.warn('[Summary] Fire-and-forget failed:', e));
-    } catch (e) { /* silent */ }
-  }, [userId, getIdToken, selectedModel.id]);
+  // REMOVED — backend now handles context/summary
 
   const handleSend = async () => {
     if ((!input.trim() && !attachedImage) || isTyping) return;
+
+    const model = selectedModelRef.current;
 
     const userMsg = {
       role: "user",
@@ -238,80 +263,150 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         { type: "image_url", image_url: { url: attachedImage.dataUrl } },
         { type: "text", text: input.trim() },
       ] : input.trim(),
-      model: selectedModel.id,
+      model: model.id,
       id: Date.now().toString(),
       attachedImagePreview: attachedImage?.dataUrl ?? null,
     };
 
     const aiMsgId = `ai_${Date.now()}`;
-    setMessages(prev => [...prev, userMsg, { role: "assistant", content: "", model: selectedModel.id, id: aiMsgId, isStreaming: true }]);
+    setMessages(prev => [...prev, userMsg, { role: "assistant", content: "", model: model.id, id: aiMsgId, isStreaming: true }]);
     setInput("");
     setAttachedImage(null);
     setIsTyping(true);
 
+    // Save user message to Firestore
     await saveMessage(userMsg);
 
     const sessionId = getCurrentSessionId();
 
     try {
       const token = await getIdToken();
+      const controller = new AbortController();
+      abortControllerRef.current = { controller, accumulated: "" };
+
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          model: selectedModel.apiModel,
-          provider: selectedModel.provider,
           sessionId,
-          messages: [...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []), ...messages.map(m => ({ role: m.role, content: m.content })), { role: userMsg.role, content: userMsg.content }],
-          temperature, max_tokens: maxTokens, top_p: topP, frequency_penalty: frequencyPenalty, presence_penalty: presencePenalty,
+          message: input.trim(),
+          attachedImage: attachedImage?.dataUrl,
+          messageId: aiMsgId, // Pass the ID to the backend
         }),
+        signal: controller.signal,
       });
 
-      if (!res.ok) throw new Error("Szerver hiba");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n");
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            if (data === "[DONE]") continue;
-            try {
-              const parsed = JSON.parse(data);
-              accumulated += parsed.delta || "";
-              setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: accumulated } : m));
-            } catch (e) { }
-          }
-        }
+      if (!res.ok) {
+        const errorBody = await res.text();
+        console.error('[Chat] Server error:', res.status, errorBody);
+        throw new Error(`Szerver hiba: ${res.status} - ${errorBody}`);
       }
 
-      const finalMsg = { role: "assistant", content: accumulated, model: selectedModel.id, id: aiMsgId };
-      await saveMessage(finalMsg);
-      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...finalMsg, isStreaming: false } : m));
+      // Check if response is SSE streaming or JSON
+      const contentType = res.headers.get('content-type') || '';
+
+      if (contentType.includes('text/event-stream')) {
+        // SSE streaming (Cerebras, Mistral, Groq, Gemini, NVIDIA, OpenRouter)
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6);
+              if (data === "[DONE]") continue;
+              try {
+                const parsed = JSON.parse(data);
+                accumulated += parsed.delta || "";
+                if (abortControllerRef.current) abortControllerRef.current.accumulated = accumulated;
+                setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: accumulated } : m));
+              } catch (e) { }
+            }
+          }
+        }
+
+        const finalMsg = { role: "assistant", content: accumulated, model: model.id, id: aiMsgId };
+        await saveMessage(finalMsg);
+        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...finalMsg, isStreaming: false } : m));
+      } else {
+        // JSON response (Anthropic, OpenAI)
+        const data = await res.json();
+        if (data.success) {
+          const finalMsg = { role: "assistant", content: data.content, model: model.id, id: aiMsgId };
+          await saveMessage(finalMsg);
+          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...finalMsg, isStreaming: false } : m));
+        } else {
+          throw new Error(data.message || 'Ismeretlen hiba');
+        }
+      }
     } catch (e) {
-      console.error(e);
+      if (e.name === 'AbortError') {
+        const accumulated = abortControllerRef.current?.accumulated || "";
+        const finalMsg = { role: "assistant", content: accumulated, model: model.id, id: aiMsgId, isStreaming: false };
+        
+        // Update local UI immediately
+        setMessages(prev => prev.map(m => m.id === aiMsgId ? finalMsg : m));
+
+        // Call finalize endpoint to sync DB with visible text and update tokens
+        if (aiMsgId && sessionId) {
+          fetch(`${API_BASE}/api/chat/finalize`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              sessionId,
+              messageId: aiMsgId,
+              content: accumulated
+            })
+          }).catch(err => console.error('[Finalize] Sync failed:', err));
+        }
+      } else {
+        console.error(e);
+        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: `Hiba: ${e.message}`, isStreaming: false } : m));
+      }
     } finally {
       setIsTyping(false);
+      abortControllerRef.current = null;
     }
   };
 
-  // ── Model switching (keeps conversation intact, generates summary) ──
-  const switchModel = useCallback((newModel) => {
-    // Generate summary before switching so the new model gets context
+  // Stop streaming (called from UI)
+  const handleStop = useCallback(async () => {
     const sessionId = getCurrentSessionId();
-    if (userId && sessionId && messages.length >= 5) {
-      triggerSummaryGeneration(sessionId, messages);
+    if (!sessionId) return;
+
+    try {
+      const token = await getIdToken();
+      // Signal the backend to kill the upstream AI connection
+      // We don't abort the local fetch here so that we can drain the buffer
+      await fetch(`${API_BASE}/api/chat/stop`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sessionId }),
+      });
+      console.log(`[Chat] Safe stop signal sent for session ${sessionId}`);
+    } catch (e) {
+      console.error('[Chat] Stop signal failed:', e);
+      // Fallback: hard abort if signal fails
+      if (abortControllerRef.current?.controller) {
+        abortControllerRef.current.controller.abort();
+      }
     }
+  }, []);
+
+  // ── Model switching ───────────────────────────────────────────────
+  const switchModel = useCallback((newModel) => {
     if (onModelChange) {
       onModelChange(newModel);
     }
-  }, [onModelChange, userId, messages, getCurrentSessionId, triggerSummaryGeneration]);
+  }, [onModelChange]);
 
   return {
     messages, setMessages, input, setInput, isTyping, handleSend,
@@ -321,6 +416,6 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     attachedImage, setAttachedImage,
     loadingHistory, conversations, chatScrollRef, textareaRef,
     presets, activePresetId, applyPreset, onEnhance, onDechant,
-    switchModel,
+    switchModel, createNewSession, handleStop,
   };
 }

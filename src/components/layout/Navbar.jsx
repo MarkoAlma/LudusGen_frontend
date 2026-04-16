@@ -93,11 +93,13 @@ export default function Navbar() {
   }, []);
 
   const studioItems = [
-    { label: 'AI Chat', icon: MessageSquare, path: '/chat?tab=chat' },
+    { label: 'AI Code', icon: MessageSquare, path: '/chat?tab=chat' },
     { label: 'AI Image', icon: ImageIcon, path: '/chat?tab=image' },
     { label: 'AI Audio', icon: Music, path: '/chat?tab=audio' },
     { label: 'AI 3D', icon: Box, path: '/chat?tab=3d' },
   ];
+
+
 
   if (!showNavbar) return null;
   // Don't show regular Navbar in AI studio. We'll render just the user dropdown manually there.
@@ -123,7 +125,7 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-1">
               <NavLink to="/" active={location.pathname === '/'}>Home</NavLink>
 
-              <div 
+              <div
                 className="relative"
                 onMouseLeave={() => setStudioDropdownOpen(false)}
               >
@@ -154,9 +156,9 @@ export default function Navbar() {
                           const targetTab = urlParams.get('tab');
                           const currentParams = new URLSearchParams(location.search);
                           const currentTab = currentParams.get('tab');
-                          
+
                           const isActive = location.pathname.startsWith('/chat') && currentTab === targetTab;
-                          
+
                           return (
                             <Link
                               key={item.label}

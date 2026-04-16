@@ -13,10 +13,12 @@ import AiStudioSidebar from "../components/chat/AiStudioSidebar";
 import BackgroundFilters from "../components/chat/BackgroundFilters";
 
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { API_BASE } from "../api/client";
 
 export default function AIChat({ user, getIdToken }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAI, setSelectedAI] = useState("claude_sonnet");
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Desktop Sidebar Persistence & Motion
@@ -78,20 +80,28 @@ export default function AIChat({ user, getIdToken }) {
     const samePanelType = newModel?.panelType === oldModel?.panelType;
 
     if (samePanelType && newModel?.panelType === 'chat') {
+      // Notify backend to generate summary for model switch
+      const sessionId = sessionStorage.getItem("chat_session_current");
+      if (sessionId) {
+        getIdToken().then(token =>
+          fetch(`${API_BASE}/api/chat/switch-model`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ sessionId, newModelId: modelId })
+          }).catch(e => console.warn('[ModelSwitch] Failed:', e))
+        );
+      }
+
       // Just change the model, don't reset the conversation
+      // Don't update URL — prevents re-render/refresh
       setSelectedAI(modelId);
-      setSearchParams(prev => {
-        const next = new URLSearchParams(prev);
-        next.set("tab", "chat");
-        next.set("model", modelId);
-        return next;
-      }, { replace: true });
 
       const gId = findModelGroup(modelId);
       const cId = findModelCat(modelId);
       if (gId) setOpenGroups((p) => new Set([...p, gId]));
       if (cId) setOpenCats((p) => new Set([...p, cId]));
       setSidebarOpen(false);
+      setModelDropdownOpen(false);
       return;
     }
 
@@ -118,6 +128,7 @@ export default function AIChat({ user, getIdToken }) {
     if (gId) setOpenGroups((p) => new Set([...p, gId]));
     if (cId) setOpenCats((p) => new Set([...p, cId]));
     setSidebarOpen(false);
+    setModelDropdownOpen(false);
   }, [setSearchParams, selectedAI]);
 
   const toggleGroup = useCallback((id) => {
@@ -156,6 +167,10 @@ export default function AIChat({ user, getIdToken }) {
         />
       ),
       onModelChange: (newModel) => handleSelectModel(newModel.id),
+      initialDropdownOpen: modelDropdownOpen,
+      onNewChatWithPicker: () => {
+        setModelDropdownOpen(true);
+      },
     };
     switch (selectedModel.panelType) {
       case "chat":
@@ -218,7 +233,7 @@ export default function AIChat({ user, getIdToken }) {
       <main className="flex-1 min-w-0 flex flex-col relative h-full">
         <AnimatePresence mode="wait">
           <motion.div
-            key={selectedAI}
+            key={selectedModel.panelType}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}

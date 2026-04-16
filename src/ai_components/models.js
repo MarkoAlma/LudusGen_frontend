@@ -135,14 +135,14 @@ export const MODEL_GROUPS = [
                         panelType: "chat",
                         defaultSystemPrompt: "You are a helpful AI assistant powered by Google Gemini. Respond in the same language the user writes in.",
                     },
-                    { id: "groq-gpt120b", name: "GPT OSS 120B", apiModel: "openai/gpt-oss-120b", provider: "groq", color: "#10a37f", gradient: "from-teal-400 to-emerald-500" },
-                    { id: "groq-qwen3", name: "Qwen3 32B", apiModel: "qwen/qwen3-32b", provider: "groq", color: "#9333ea", gradient: "from-purple-400 to-indigo-500" },
-                    { id: "groq-llama70b", name: "Llama 3.3 70B", apiModel: "llama-3.3-70b-versatile", provider: "groq", color: "#f55036", gradient: "from-orange-500 to-red-600" },
-                    { id: "cerebras-llama8b",   name: "Llama 3.1 8B (Cerebras)",      apiModel: "llama3.1-8b",                   provider: "cerebras", color: "#818cf8", gradient: "from-indigo-400 to-blue-500" },
-                    { id: "mistral-large",   name: "Mistral Large (Mistral)",    apiModel: "mistral-large-latest",    provider: "mistral", color: "#f97316", gradient: "from-orange-400 to-red-500", defaultTemperature: 0.2, defaultMaxTokens: 2048, defaultTopP: 0.9  },
-                    { id: "nvidia-glm4.7",   name: "Z.ai GLM 4.7 (NVIDIA)",    apiModel: "z-ai/glm4.7",    provider: "nvidia", color: "#16f921", gradient: "from-lime-400 to-green-500", defaultTemperature: 0.7, defaultMaxTokens: 2048, defaultTopP: 0.9 },
-                    { id: "deepseek-v3.2", name: "DeepSeek v3.2 (NVIDIA)", apiModel: "deepseek-ai/deepseek-v3.2", provider: "nvidia", color: "#3b82f6", gradient: "from-blue-500 to-indigo-600", defaultTemperature: 0.3, defaultMaxTokens: 2048, defaultTopP: 0.95 },
-                    { id: "google-gemma-3-27b-it", name: "(img) Gemma 3 27B IT (NVIDIA)", apiModel: "google/gemma-3-27b-it", provider: "nvidia", color: "#4285f4", gradient: "from-blue-400 to-red-400", supportsVision: true, defaultTemperature: 0.8, defaultMaxTokens: 2048, defaultTopP: 0.95 },
+                    { id: "groq-gpt120b", name: "GPT OSS 120B", apiModel: "openai/gpt-oss-120b", provider: "groq", color: "#10a37f", gradient: "from-teal-400 to-emerald-500", panelType: "chat" },
+                    { id: "groq-qwen3", name: "Qwen3 32B", apiModel: "qwen/qwen3-32b", provider: "groq", color: "#9333ea", gradient: "from-purple-400 to-indigo-500", panelType: "chat" },
+                    { id: "groq-llama70b", name: "Llama 3.3 70B", apiModel: "llama-3.3-70b-versatile", provider: "groq", color: "#f55036", gradient: "from-orange-500 to-red-600", panelType: "chat" },
+                    { id: "cerebras-llama8b",   name: "Llama 3.1 8B (Cerebras)",      apiModel: "llama3.1-8b",                   provider: "cerebras", color: "#818cf8", gradient: "from-indigo-400 to-blue-500", panelType: "chat" },
+                    { id: "mistral-large",   name: "Mistral Large (Mistral)",    apiModel: "mistral-large-latest",    provider: "mistral", color: "#f97316", gradient: "from-orange-400 to-red-500", defaultTemperature: 0.2, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat"  },
+                    { id: "nvidia-glm4.7",   name: "Z.ai GLM 4.7 (NVIDIA)",    apiModel: "z-ai/glm4.7",    provider: "nvidia", color: "#16f921", gradient: "from-lime-400 to-green-500", defaultTemperature: 0.7, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat" },
+                    { id: "deepseek-v3.2", name: "DeepSeek v3.2 (NVIDIA)", apiModel: "deepseek-ai/deepseek-v3.2", provider: "nvidia", color: "#3b82f6", gradient: "from-blue-500 to-indigo-600", defaultTemperature: 0.3, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
+                    { id: "google-gemma-3-27b-it", name: "(img) Gemma 3 27B IT (NVIDIA)", apiModel: "google/gemma-3-27b-it", provider: "nvidia", color: "#4285f4", gradient: "from-blue-400 to-red-400", supportsVision: true, defaultTemperature: 0.8, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
                     
                     
 //                     {
