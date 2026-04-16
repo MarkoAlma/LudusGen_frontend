@@ -331,14 +331,14 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         }
 
         const finalMsg = { role: "assistant", content: accumulated, model: model.id, id: aiMsgId };
-        await saveMessage(finalMsg);
+        // await saveMessage(finalMsg);
         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...finalMsg, isStreaming: false } : m));
       } else {
         // JSON response (Anthropic, OpenAI)
         const data = await res.json();
         if (data.success) {
           const finalMsg = { role: "assistant", content: data.content, model: model.id, id: aiMsgId };
-          await saveMessage(finalMsg);
+          // await saveMessage(finalMsg);
           setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...finalMsg, isStreaming: false } : m));
         } else {
           throw new Error(data.message || 'Ismeretlen hiba');
