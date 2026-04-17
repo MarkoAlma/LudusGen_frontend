@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { db } from "../firebase/firebaseApp";
 import {
-  collection, addDoc, query, orderBy, limit, getDocs,
+  collection, addDoc, query, orderBy, limit, limitToLast, getDocs,
   serverTimestamp, doc, setDoc, getDoc, writeBatch,
 } from "firebase/firestore";
 import { DEFAULT_PRESETS, ALL_MODELS } from "../ai_components/models";
@@ -95,7 +95,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
 
       // Try new path first
       const newRef = getMessagesRef(sessionId);
-      const q = query(newRef, orderBy("timestamp", "asc"), limit(200));
+      const q = query(newRef, orderBy("timestamp", "asc"), limitToLast(200));
       let snap = await getDocs(q);
 
       // If no data, try legacy model-keyed paths and migrate
