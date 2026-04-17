@@ -27,10 +27,9 @@ function hslToHex(h, s, l) {
  *          pbr=true OVERRIDES texture=true — the API treats them as exclusive.
  *    NOTE: texture_alignment: "original_image" (default) | "geometry"
  *
- *  mode="texture_edit" → Magic Brush (view-based inpainting, frontend-driven)
- *    Uses creativity_strength (0–1) and a mask painted on the 3D viewport.
- *    Gen Mode: prompt-based regeneration of painted region.
- *    Paint Mode: direct color painting.
+ *  mode="texture_edit" → task type: "texture_model" (with painted mask as reference image)
+ *    Gen Mode: prompt-based regeneration via texture_model with mask file.
+ *    Paint Mode: direct color painting on 3D viewport, canvas sent as mask.
  *
  *  REMOVED modes (not available as separate Tripo API v2 tasks):
  *    texture_upscale → no such task exists
@@ -56,9 +55,9 @@ function CoinIcon({ size = 15 }) {
 function SelectedModelBadge({ activeTaskId }) {
   if (!activeTaskId) return null;
   return (
-    <div style={{ padding: "8px 10px", borderRadius: 9, background: "rgba(108,99,255,0.08)", border: "1px solid rgba(108,99,255,0.25)", marginBottom: 14 }}>
-      <p style={{ color: "#a5a0ff", fontSize: 11, fontWeight: 600, margin: 0 }}>Selected model</p>
-      <p style={{ color: "#2d2d48", fontSize: 9, margin: "2px 0 0", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+    <div style={{ padding: "8px 12px", borderRadius: 12, background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.2)", marginBottom: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+      <p style={{ color: "#b5b0ff", fontSize: 11, fontWeight: 600, margin: 0 }}>Selected model</p>
+      <p style={{ color: "#2d2d48", fontSize: 10, margin: "2px 0 0", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {activeTaskId}
       </p>
     </div>
@@ -243,7 +242,7 @@ function MagicBrushPanel({
   return (
     <div>
       {/* Mode switcher */}
-      <div style={{ display: "flex", gap: 3, padding: "3px", background: "rgba(255,255,255,0.06)", borderRadius: 11, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 3, padding: "4px", background: "rgba(255,255,255,0.05)", borderRadius: 13, marginBottom: 16, boxShadow: "inset 0 1px 2px rgba(0,0,0,0.15)" }}>
         {["Gen Mode", "Paint Mode"].map(m => (
           <button
             key={m}
@@ -256,7 +255,7 @@ function MagicBrushPanel({
       {/* Gen Mode — prompt-based inpainting */}
       {brushMode === "Gen Mode" && (
         <>
-          <div style={{ borderRadius: 12, border: "1px solid rgba(255,255,255,0.09)", background: "rgba(255,255,255,0.03)", marginBottom: 16, overflow: "hidden" }}>
+          <div style={{ borderRadius: 13, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", marginBottom: 16, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
             <textarea
               className="tp-ta"
               value={brushPrompt}
@@ -301,7 +300,7 @@ function MagicBrushPanel({
       {brushMode === "Paint Mode" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {/* Drawing canvas */}
-          <div style={{ borderRadius: 12, overflow: "hidden", position: "relative", border: "1px solid rgba(255,255,255,0.09)" }}>
+          <div style={{ borderRadius: 13, overflow: "hidden", position: "relative", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
             <canvas
               ref={canvasRef}
               width={512}
@@ -366,8 +365,8 @@ function MagicBrushPanel({
  *                   supports image / multi-view / text input
  *                   options: pbr, tex4K (texture_quality "HD"), texture_seed
  *
- *  "texture_edit" → Magic Brush viewport inpainting
- *                   creativity_strength 0–1, Gen Mode / Paint Mode
+ *  "texture_edit" → texture_model API task (with painted mask as file reference)
+ *                   Gen Mode / Paint Mode
  *
  *  REMOVED: "texture_upscale" — no such Tripo API v2 task
  *  REMOVED: "texture_pbr"    — use mode="texture" with pbrOn=true instead

@@ -22,7 +22,7 @@ import DownloadModal from "../trellis/DownloadModal";
 import { saveHistoryToFirestore, loadHistoryPageFromFirestore } from "../trellis/utils";
 import Shared3DHistory from "../../components/shared/Shared3DHistory";
 import { getAnimById, ANIMATION_LIBRARY, ANIM_CATEGORIES } from "./animationlibrary";
-import { persistGen, loadPersistedGen, updatePersistedProgress, clearPersistedGen } from "./useGenerationPersist";
+import { persistGen, loadPersistedGen, updatePersistedProgress, clearPersistedGen, markHistorySaved } from "./useGenerationPersist";
 
 import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX } from "./GeneratePanel";
 import Segment from "./Segment";
@@ -30,6 +30,7 @@ import Retopo from "./Retopo";
 import Texture from "./Texture";
 import Animate from "./Animate";
 import { motion, AnimatePresence, animate } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
 import { MyUserContext } from "../../context/MyUserProvider";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useStudioPanels } from "../../context/StudioPanelContext";
@@ -43,6 +44,9 @@ const POLL_MAX = 500;
 
 const PROGRESS_JUMP_LIMIT = 30;
 const STUCK_THRESHOLD_MS = 300_000;
+
+// Session-level dedup guard — prevents double Firestore writes if saveHist is called twice for the same URL
+const _savedUrls = new Set();
 
 const NAV = [
   { id: "generate", label: "Model", icon: Sparkles, sub: false },
@@ -72,18 +76,18 @@ const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
   :root {
     --bg-base: #0a0a14;
-    --bg-panel: rgba(10, 10, 20, 0.4);
-    --bg-surface: rgba(255, 255, 255, 0.02);
-    --bg-raised: rgba(255, 255, 255, 0.04);
+    --bg-panel: rgba(10, 10, 20, 0.45);
+    --bg-surface: rgba(255, 255, 255, 0.025);
+    --bg-raised: rgba(255, 255, 255, 0.045);
     --accent: #8b5cf6;
     --accent-bright: #a78bfa;
-    --accent-glow: rgba(139, 92, 246, 0.3);
-    --text-primary: #ffffff;
+    --accent-glow: rgba(139, 92, 246, 0.25);
+    --text-primary: #f0f0f8;
     --text-secondary: #94a3b8;
     --text-muted: #475569;
     --text-faint: #1e293b;
-    --border: rgba(255, 255, 255, 0.05);
-    --border-accent: rgba(139, 92, 246, 0.3);
+    --border: rgba(255, 255, 255, 0.06);
+    --border-accent: rgba(139, 92, 246, 0.28);
     --error: #ef4444;
     --success: #10b981;
   }
@@ -91,6 +95,7 @@ const CSS = `
   @keyframes fadeUp { from { opacity:0;transform:translateY(6px) } to { opacity:1;transform:none } }
   .anim-spin { animation: spin 1s linear infinite; }
   .fade-up   { animation: fadeUp 0.18s ease forwards; }
+  .tp-viewport canvas { position: relative !important; z-index: 0 !important; }
   .tp-scroll { scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.06) transparent; }
   .tp-scroll::-webkit-scrollbar { width:3px; }
   .tp-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:3px; }
@@ -112,53 +117,54 @@ const CSS = `
   .tp-switch { width:36px;height:20px;border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;cursor:pointer; }
   .tp-switch::after { content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.4); }
   .tp-switch.on::after { transform:translateX(16px); }
-  .tp-input { width:100%;padding:8px 11px;border-radius:9px;font-size:12px;color:var(--text-primary);background:var(--bg-raised);border:1px solid var(--border);outline:none;font-family:inherit;transition:border-color 0.14s,background 0.14s;box-sizing:border-box; }
-  .tp-input:focus { border-color:var(--border-accent);background:rgba(30,30,54,0.9); }
+  .tp-input { width:100%;padding:9px 12px;border-radius:10px;font-size:12px;color:var(--text-primary);background:var(--bg-raised);border:1px solid var(--border);outline:none;font-family:inherit;transition:border-color 0.18s,background 0.18s,box-shadow 0.18s;box-sizing:border-box; }
+  .tp-input:focus { border-color:var(--border-accent);background:rgba(30,30,54,0.9);box-shadow:0 0 0 3px rgba(139,92,246,0.08); }
   .tp-input::placeholder { color:var(--text-muted); }
-  .tp-ta { width:100%;padding:10px 12px;border-radius:10px;font-size:12px;color:var(--text-primary);background:var(--bg-raised);border:1px solid var(--border);outline:none;font-family:inherit;resize:none;line-height:1.6;box-sizing:border-box;transition:border-color 0.14s; }
+  .tp-ta { width:100%;padding:10px 13px;border-radius:11px;font-size:12px;color:var(--text-primary);background:var(--bg-raised);border:1px solid var(--border);outline:none;font-family:inherit;resize:none;line-height:1.6;box-sizing:border-box;transition:border-color 0.18s,box-shadow 0.18s; }
   .tp-ta::placeholder { color:var(--text-muted); }
-  .tp-ta:focus { border-color:var(--border-accent);outline:none; }
-  .tp-drop:hover { border-color:rgba(108,99,255,0.4) !important; }
+  .tp-ta:focus { border-color:var(--border-accent);outline:none;box-shadow:0 0 0 3px rgba(139,92,246,0.08); }
+  .tp-drop:hover { border-color:rgba(108,99,255,0.4) !important;box-shadow:0 0 12px rgba(108,99,255,0.06); }
   .tp-sub-tab { padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;border:none;transition:all 0.13s;font-family:inherit; }
   .tp-sub-tab.on { background:rgba(124,111,255,0.25);color:var(--accent-bright);outline:1px solid var(--border-accent); }
   .tp-sub-tab:not(.on) { background:transparent;color:var(--text-muted); }
   .tp-sub-tab:not(.on):hover { color:#5a5a7a;background:rgba(255,255,255,0.04); }
-  .tp-inp-tab { flex:1;padding:7px 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:all 0.15s;font-family:inherit;background:transparent; }
-  .tp-inp-tab.active { background:#ffffff;box-shadow:0 1px 6px rgba(0,0,0,0.35); }
-  .tp-qual-btn { flex:1;padding:10px 4px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all 0.14s;display:flex;align-items:center;justify-content:center;gap:5px;font-family:inherit; }
-  .tp-gen-btn { width:100%;padding:16px 0;border-radius:13px;font-size:15px;font-weight:800;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:0.03em;transition:all 0.2s;font-family:inherit; }
-  .tp-gen-btn.go { background: var(--accent); color:#ffffff; box-shadow:0 15px 45px rgba(139, 92, 246, 0.3); }
-  .tp-gen-btn.go:hover { box-shadow:0 20px 60px rgba(139, 92, 246, 0.45); transform:translateY(-2px) scale(1.02); }
-  .tp-gen-btn.no { background:rgba(255,255,255,0.03); color:var(--text-muted); cursor:not-allowed; border:1px solid var(--border); }
-  .tp-model-card { padding:11px 12px;border-radius:10px;background:var(--bg-raised);border:1px solid var(--border);cursor:pointer;transition:all 0.13s;margin-bottom:5px; }
-  .tp-model-card.sel { background:rgba(124,111,255,0.14);border-color:var(--border-accent);box-shadow:0 0 0 1px rgba(124,111,255,0.2); }
-  .tp-model-card:hover:not(.sel) { background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.2); }
+  .tp-inp-tab { flex:1;padding:7px 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:9px;transition:all 0.18s;font-family:inherit;background:transparent; }
+  .tp-inp-tab.active { background:#ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.05); }
+  .tp-qual-btn { flex:1;padding:10px 4px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all 0.18s;display:flex;align-items:center;justify-content:center;gap:5px;font-family:inherit; }
+  .tp-gen-btn { width:100%;padding:16px 0;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:0.03em;transition:all 0.22s;font-family:inherit; }
+  .tp-gen-btn.go { background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:#ffffff; box-shadow:0 12px 40px rgba(139,92,246,0.28),0 4px 12px rgba(0,0,0,0.2); }
+  .tp-gen-btn.go:hover { box-shadow:0 18px 55px rgba(139,92,246,0.4),0 6px 16px rgba(0,0,0,0.25); transform:translateY(-2px) scale(1.02); }
+  .tp-gen-btn.no { background:rgba(255,255,255,0.025); color:var(--text-muted); cursor:not-allowed; border:1px solid var(--border); }
+  .tp-model-card { padding:11px 13px;border-radius:11px;background:var(--bg-raised);border:1px solid var(--border);cursor:pointer;transition:all 0.16s;margin-bottom:5px;box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+  .tp-model-card.sel { background:rgba(124,111,255,0.14);border-color:var(--border-accent);box-shadow:0 0 0 1px rgba(124,111,255,0.18),0 2px 8px rgba(124,111,255,0.08); }
+  .tp-model-card:hover:not(.sel) { background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.15);box-shadow:0 2px 8px rgba(0,0,0,0.15); }
   .checker { background-color:#131326;background-image:linear-gradient(45deg,rgba(255,255,255,0.025) 25%,transparent 25%),linear-gradient(-45deg,rgba(255,255,255,0.025) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,rgba(255,255,255,0.025) 75%),linear-gradient(-45deg,transparent 75%,rgba(255,255,255,0.025) 75%);background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0; }
-  .anim-card { border-radius:10px;overflow:hidden;cursor:pointer;transition:all 0.13s; }
-  .anim-card:hover { border-color:rgba(255,255,255,0.22) !important; transform:scale(1.02); }
-  .sec-row { display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 0;user-select:none; }
-  .sec-row span { transition:color 0.13s; }
+  .anim-card { border-radius:11px;overflow:hidden;cursor:pointer;transition:all 0.16s; }
+  .anim-card:hover { border-color:rgba(255,255,255,0.22) !important; transform:scale(1.02);box-shadow:0 4px 12px rgba(0,0,0,0.2); }
+  .sec-row { display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:11px 4px;user-select:none;border-radius:8px;transition:background 0.14s; }
+  .sec-row span { transition:color 0.14s; }
+  .sec-row:hover { background:rgba(255,255,255,0.02); }
   .sec-row:hover span { color:#8a8aaa !important; }
-  .tp-topo-btn { flex:1;padding:8px 4px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.14s;font-family:inherit; }
-  .tp-topo-btn.sel { background:rgba(124,111,255,0.22);color:var(--accent-bright);outline:1.5px solid var(--border-accent); }
+  .tp-topo-btn { flex:1;padding:9px 4px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.16s;font-family:inherit; }
+  .tp-topo-btn.sel { background:rgba(124,111,255,0.2);color:var(--accent-bright);outline:1.5px solid var(--border-accent);box-shadow:0 2px 6px rgba(124,111,255,0.1); }
   .tp-topo-btn:not(.sel) { background:var(--bg-raised);color:var(--text-secondary);outline:1px solid var(--border); }
   .tp-topo-btn:not(.sel):hover { background:rgba(255,255,255,0.07);color:#6a6a8a; }
-  .tex-input-box { border:1.5px solid rgba(108,99,255,0.35);border-radius:12px;overflow:hidden;background:rgba(108,99,255,0.04);margin-bottom:14px; }
-  .tex-tab-bar { display:flex;background:rgba(255,255,255,0.04);padding:4px;gap:3px; }
-  .tex-tab { flex:1;padding:7px 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:all 0.14s;font-family:inherit; }
-  .tex-tab.on { background:rgba(255,255,255,0.14);box-shadow:0 1px 4px rgba(0,0,0,0.3); }
-  .mv-grid { display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px; }
-  .mv-cell { border-radius:8px;aspect-ratio:1/1;border:1.5px dashed rgba(255,255,255,0.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:border-color 0.13s;position:relative; }
-  .mv-cell:hover { border-color:rgba(108,99,255,0.4); }
-  .magic-mode-tab { flex:1;padding:8px 0;border:none;cursor:pointer;font-size:12px;font-weight:600;border-radius:8px;transition:all 0.14s;font-family:inherit; }
-  .magic-mode-tab.on { background:#fff;color:#0a0a1a;box-shadow:0 1px 6px rgba(0,0,0,0.3); }
+  .tex-input-box { border:1.5px solid rgba(139,92,246,0.28);border-radius:14px;overflow:hidden;background:rgba(139,92,246,0.03);margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+  .tex-tab-bar { display:flex;background:rgba(255,255,255,0.05);padding:4px;gap:3px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.15); }
+  .tex-tab { flex:1;padding:7px 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:10px;transition:all 0.18s;font-family:inherit; }
+  .tex-tab.on { background:rgba(255,255,255,0.14);box-shadow:0 2px 6px rgba(0,0,0,0.3); }
+  .mv-grid { display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:11px; }
+  .mv-cell { border-radius:10px;aspect-ratio:1/1;border:1.5px dashed rgba(255,255,255,0.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:border-color 0.16s,box-shadow 0.16s;position:relative; }
+  .mv-cell:hover { border-color:rgba(108,99,255,0.4);box-shadow:0 0 10px rgba(108,99,255,0.06); }
+  .magic-mode-tab { flex:1;padding:8px 0;border:none;cursor:pointer;font-size:12px;font-weight:600;border-radius:11px;transition:all 0.18s;font-family:inherit; }
+  .magic-mode-tab.on { background:#ffffff;color:#0a0a1a;box-shadow:0 2px 8px rgba(0,0,0,0.3); }
   .magic-mode-tab:not(.on) { background:transparent;color:#5a5a7a; }
-  .anim-model-dd { width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);cursor:pointer;display:flex;align-items:center;gap:8px;transition:border-color 0.13s; }
-  .anim-model-dd:hover { border-color:rgba(108,99,255,0.4); }
-  .auto-rig-btn { width:100%;padding:12px 0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:7px;font-family:inherit;transition:all 0.2s; }
-  .auto-rig-btn.ready { background:rgba(255,255,255,0.08);color:#c8c8e0; }
-  .auto-rig-btn.ready:hover { background:rgba(255,255,255,0.12); }
-  .auto-rig-btn.disabled { background:rgba(255,255,255,0.04);color:#1e1e38;cursor:not-allowed; }
+  .anim-model-dd { width:100%;padding:10px 12px;border-radius:11px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);cursor:pointer;display:flex;align-items:center;gap:8px;transition:border-color 0.16s,box-shadow 0.16s; }
+  .anim-model-dd:hover { border-color:rgba(139,92,246,0.35);box-shadow:0 0 10px rgba(139,92,246,0.05); }
+  .auto-rig-btn { width:100%;padding:13px 0;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:7px;font-family:inherit;transition:all 0.2s; }
+  .auto-rig-btn.ready { background:rgba(255,255,255,0.08);color:#c8c8e0;box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+  .auto-rig-btn.ready:hover { background:rgba(255,255,255,0.12);box-shadow:0 4px 12px rgba(0,0,0,0.15); transform:translateY(-1px); }
+  .auto-rig-btn.disabled { background:rgba(255,255,255,0.03);color:#1e1e38;cursor:not-allowed; }
 
   /* ── Model-NA: feature not available with selected model ─────────────
    * Wrapper dims the child UI and blocks all pointer interaction.
@@ -202,7 +208,8 @@ function PBar({ value }) {
 
 /* ─── component ──────────────────────────────────────────────────────── */
 export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
-  const color = selectedModel?.color || "#6c63ff";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const color = selectedModel?.color || "#475569";
   const { user, refreshCredits } = useContext(MyUserContext);
   const userCredits = user?.credits ?? 0;
 
@@ -230,22 +237,23 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const leftW = isMobile ? 48 : isTablet ? 52 : 62;
   // On mobile, secondary and right sidebars are full-width overlays
   const leftSecondaryW = isMobile ? Math.min(window.innerWidth - 48, 320) : isTablet ? 220 : 240;
-  const rightW = isMobile ? Math.min(window.innerWidth - 48, 320) : isTablet ? 220 : 220;
+  const rightW = isMobile ? Math.min(window.innerWidth - 48, 320) : isTablet ? 220 : 280;
 
   // Master Sidebar Sync
   useEffect(() => {
     setLeftOpen(isGlobalOpen);
   }, [isGlobalOpen]);
 
-  // nav
-  const [mode, setMode] = useState("generate");
+  // nav — persist active tab across refresh
+  const [mode, setMode] = useState(() => sessionStorage.getItem("tripo_mode") || "generate");
   const [segSub, setSegSub] = useState("segment");
+  useEffect(() => { sessionStorage.setItem("tripo_mode", mode); }, [mode]);
 
   // generate
   const [genTab, setGenTab] = useState("image");
   const [modelVer, setModelVer] = useState(MODEL_VERSIONS[0].id);
   const [prompt, setPrompt] = useState("");
-  const [negPrompt, setNegPrompt] = useState("");
+  const [negPrompt, setNegPrompt] = useState("floating objects, extra limbs, missing limbs, cut off body, cropped figure, background scenery, fused fingers, warped topology, duplicate figure, two models, inverted normals, texture stretching, melted features, wax skin, plastic doll, artifacts");
   const [makeBetter, setMakeBetter] = useState(true);
   const [imgFile, setImgFile] = useState(null);
   const [imgPrev, setImgPrev] = useState(null);
@@ -306,6 +314,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [rigType, setRigType] = useState("biped");
   const [rigSpec, setRigSpec] = useState("tripo");
   const [detectedRigType, setDetectedRigType] = useState(null);
+  const [detectedRigModelVer, setDetectedRigModelVer] = useState(null);
+  const [detectedRigSpec, setDetectedRigSpec] = useState(null);
   const [prerigcheckResult, setPrerigcheckResult] = useState(null);
   const [animOutFormat, setAnimOutFormat] = useState("glb");
   const [animBakeAnimation, setAnimBakeAnimation] = useState(true);
@@ -341,13 +351,25 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [rightOpen, setRightOpen] = useState(false);
   const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
 
-  // history
+  // model name (optional — auto-filled from first 2 prompt words if empty)
+  const [modelName, setModelName] = useState("");
+
+  // history — persist selected model across refresh
   const [history, setHistory] = useState([]);
-  const [selHistId, setSelHistId] = useState(null);
+  const [selHistId, setSelHistId] = useState(() => sessionStorage.getItem("tripo_sel_hist") || null);
+  useEffect(() => {
+    if (selHistId) sessionStorage.setItem("tripo_sel_hist", selHistId);
+    else sessionStorage.removeItem("tripo_sel_hist");
+  }, [selHistId]);
   const activeH = useMemo(() => history.find(h => h.id === selHistId), [history, selHistId]);
   const activeTaskId = activeH?.taskId || activeH?.task_id || activeH?.id || "";
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [loadingId, setLoadingId] = useState(null);
+  // Pre-set loadingId when a model is expected on mount (URL param or saved session)
+  // so ThreeViewer never mounts and shows the placeholder before the real model loads.
+  const [loadingId, setLoadingId] = useState(() =>
+    (searchParams.get("tripoTaskId") || sessionStorage.getItem("tripo_sel_hist"))
+      ? "__url_pending__" : null
+  );
 
   // texture mode options
   const [texInputTab, setTexInputTab] = useState("image");
@@ -378,6 +400,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const currentTaskId = useRef(null);
   const currentRequestId = useRef(null);
   const userStoppedRef = useRef(false);
+  // Holds a taskId from ?tripoTaskId= URL param until history loads and we can auto-select it
+  const pendingUrlTaskId = useRef(searchParams.get("tripoTaskId") || null);
 
   // ── Backend-driven model capabilities ───────────────────────────────────
   // Fetched once on mount; falls back to null so GeneratePanel uses its own
@@ -525,13 +549,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       case "fill_parts": return !!(fillId.trim() || activeTaskId);
       case "retopo": return !!(retopoId.trim() || activeTaskId);
       case "texture": return !!(texId.trim() || activeTaskId) && (texInputTab === "text" ? !!texPrompt.trim() : texInputTab === "image" ? !!imgToken : multiImages.length > 0);
-      case "texture_edit": return !!(editId.trim() || activeTaskId);
+      case "texture_edit": return !!(editId.trim() || activeTaskId) && (brushMode === "Paint Mode" || !!brushPrompt.trim());
       case "refine": return !!(refineId.trim() || activeTaskId);
       case "stylize": return !!(stylizeId.trim() || activeTaskId);
       case "animate": return !!riggedId && selAnim.size > 0;
       default: return false;
     }
-  }, [isRunning, mode, genTab, prompt, imgToken, batchImages, segId, fillId, retopoId, activeTaskId, texInputTab, texPrompt, multiImages, editId, texId, refineId, stylizeId, riggedId, selAnim]);
+  }, [isRunning, mode, genTab, prompt, imgToken, batchImages, segId, fillId, retopoId, activeTaskId, texInputTab, texPrompt, multiImages, editId, texId, refineId, stylizeId, riggedId, selAnim, brushMode, brushPrompt]);
 
 
 
@@ -611,14 +635,18 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       if (d.status !== "success" && prog - prevProgress > PROGRESS_JUMP_LIMIT) {
         throw Object.assign(new Error(`Auto-stopped: suspicious progress jump (${prevProgress}% → ${prog}%)`), { type: "auto_stop", autoStop: true });
       }
-      if (d.status !== "success" && prog >= 99) {
-        if (!stuckSince) stuckSince = Date.now();
-        else if (Date.now() - stuckSince > STUCK_THRESHOLD_MS) {
-          throw Object.assign(new Error("Auto-stopped: stuck at " + prog + "% for 5min"), { type: "auto_stop", autoStop: true });
+      if (d.status !== "success") {
+        if (prog > 0 && prog === prevProgress) {
+          if (!stuckSince) stuckSince = Date.now();
+          else if (Date.now() - stuckSince > STUCK_THRESHOLD_MS)
+            throw Object.assign(new Error("Auto-stopped: stuck at " + prog + "% for 5min"), { type: "auto_stop", autoStop: true });
+        } else {
+          stuckSince = null;
         }
-      } else { stuckSince = null; }
+      }
       if (d.status !== "success" && d.status !== "failed" && d.status !== "cancelled") {
         const dp = Math.min(prog, 99); setProgress(dp); updatePersistedProgress(dp); prevProgress = prog;
+        if (dp >= 95) setStatusMsg("Finalizing…");
       }
       if (d.status === "success") {
         // prerigcheck tasks don't return a model — they only set rigCheckResult
@@ -628,6 +656,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         await onSuccess(d); return;
       }
       if (d.status === "failed" || d.status === "cancelled") {
+        console.warn("[pollTask] failed rawOutput:", d.rawOutput);
         throw Object.assign(new Error("Task " + d.status), { tripoStatus: d.status, rawOutput: d });
       }
     }
@@ -661,46 +690,71 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   useEffect(() => {
     const persisted = loadPersistedGen();
     if (!persisted) return;
-    console.log("[TripoPanel] Resuming after reload:", persisted.taskId);
-    // Restore rig state if present (validate it's a real UUID, not "auto-detected")
+    // Restore mode and rig state
+    if (persisted.mode && persisted.mode !== "generate") setMode(persisted.mode);
     if (persisted.riggedId && persisted.riggedId !== "auto-detected" && persisted.riggedId.length > 10) {
       setRiggedId(persisted.riggedId);
       setRigStep("rigged");
     }
     const requestId = crypto.randomUUID(); currentRequestId.current = requestId;
     const pt = { cancelled: false }; pollAb.current = pt;
+
+    const opType = persisted.opType ?? "generate";
+
+    // Show appropriate loading state immediately
+    if (opType === "rig") {
+      setRigStep("rigging"); setStatusMsg("Resuming rig…"); setProgress(persisted.lastProgress ?? 0);
+    } else {
+      if (persisted.lastProgress != null && persisted.lastProgress < 100) {
+        setIsRunning(true); setProgress(persisted.lastProgress); setStatusMsg("Resuming…");
+      }
+    }
+
     (async () => {
       try {
         const t = getIdToken ? await getIdToken() : "";
         const headers = { "Content-Type": "application/json", Authorization: "Bearer " + t };
-        // Step 1: Check current task status before deciding what to do
         const res = await fetch(BASE_URL + "/api/tripo/task/" + persisted.taskId, { headers });
+        if (pt.cancelled) return;
         const d = await res.json();
         if (!d.success) throw new Error(d.message ?? "Task check failed");
 
-        if (d.status === "success" && d.modelUrl) {
-          // Task already done — just fetch the model, no polling needed
-          console.log("[TripoPanel] Task already completed, fetching model directly");
-          const blob = await fetchProxy(d.modelUrl, persisted.taskId);
-          if (pt.cancelled) { revokeBlobUrl(blob); return; }
-          revokeBlobUrl(prevUrl.current);
-          setModelUrl(blob); prevUrl.current = blob;
-          setGenStatus("succeeded"); setProgress(100); setStatusMsg(""); setIsRunning(false);
-          currentTaskId.current = null; clearPersistedGen();
-          await saveHist(persisted.taskId, d.modelUrl, { prompt: persisted.prompt ?? "" });
-        } else if (d.status === "failed" || d.status === "cancelled") {
-          // Task already finished with error — clear and show error
-          console.log("[TripoPanel] Task already " + d.status);
-          setIsRunning(false); setProgress(0); setStatusMsg("");
-          currentTaskId.current = null; clearPersistedGen();
-          setGenStatus("failed"); setErrorMsg("Task " + d.status);
-        } else {
-          // Still in progress — resume polling
-          console.log("[TripoPanel] Task still in progress (" + d.status + ", " + (d.progress ?? 0) + "%), resuming poll");
-          setIsRunning(true); setProgress(d.progress ?? persisted.lastProgress ?? 0); setStatusMsg("Resuming generation…");
-          currentTaskId.current = persisted.taskId; userStoppedRef.current = false;
-          await pollTask(persisted.taskId, pt, headers, async (sd) => {
-            if (currentRequestId.current !== requestId) return;
+        // Inline success handler for resume — handles all opTypes
+        const onSuccess = async (sd) => {
+          if (pt.cancelled) return;
+          if (opType === "rig") {
+            const blob = sd.modelUrl ? await fetchProxy(sd.modelUrl, persisted.taskId) : null;
+            if (pt.cancelled) { revokeBlobUrl(blob); return; }
+            if (blob) { revokeBlobUrl(prevUrl.current); setModelUrl(blob); prevUrl.current = blob; }
+            setRiggedId(persisted.taskId); setRigStep("rigged"); setShowRig(true);
+            setStatusMsg(""); setGenStatus("succeeded");
+            if (!persisted.savedToHistory && sd.modelUrl) {
+              markHistorySaved();
+              const _ni = await saveRigHist(persisted.taskId, sd.modelUrl, { prompt: "auto-rig", originalModelTaskId: persisted.mode === "animate" ? persisted.taskId : undefined, rigModelVer: persisted.rigModelVer, rigType: persisted.rigType, rigSpec: persisted.rigSpec });
+              if (_ni) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${persisted.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
+            }
+            currentTaskId.current = null; clearPersistedGen();
+          } else if (opType === "animate") {
+            const animatedModels = Array.isArray(sd.rawOutput?.animated_models) ? sd.rawOutput.animated_models : null;
+            const rawUrl = sd.modelUrl ?? (animatedModels ? animatedModels[0] : null);
+            if (!rawUrl) throw Object.assign(new Error("Content blocked."), { type: "nsfw" });
+            const blob = await fetchProxy(rawUrl, persisted.taskId);
+            if (pt.cancelled) { revokeBlobUrl(blob); return; }
+            revokeBlobUrl(prevUrl.current);
+            setModelUrl(blob); prevUrl.current = blob;
+            setGenStatus("succeeded"); setProgress(100); setStatusMsg(""); setIsRunning(false);
+            setRiggedId(persisted.taskId); setShowRig(true);
+            if (!persisted.savedToHistory) {
+              markHistorySaved();
+              const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "animation", animated: true });
+              if (_ni) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${persisted.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
+            }
+            currentTaskId.current = null; clearPersistedGen();
+          } else if (opType === "segment") {
+            setProgress(100); setStatusMsg(""); setIsRunning(false);
+            currentTaskId.current = null; clearPersistedGen();
+          } else {
+            // generate, retopo, texture, stylize, refine, fill
             const rawUrl = sd.modelUrl;
             if (!rawUrl) throw Object.assign(new Error("Content blocked."), { type: "nsfw" });
             const blob = await fetchProxy(rawUrl, persisted.taskId);
@@ -709,32 +763,100 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             setModelUrl(blob); prevUrl.current = blob;
             setGenStatus("succeeded"); setProgress(100); setStatusMsg(""); setIsRunning(false);
             currentTaskId.current = null; clearPersistedGen();
-            await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "" });
-          });
+            if (!persisted.savedToHistory && rawUrl) {
+              markHistorySaved();
+              const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "" });
+              if (_ni) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${persisted.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
+            }
+          }
+        };
+
+        if (d.status === "success" && (d.modelUrl || opType === "segment")) {
+          await onSuccess(d);
+        } else if (d.status === "failed" || d.status === "cancelled") {
+          setIsRunning(false); setProgress(0); setStatusMsg("");
+          if (opType === "rig") setRigStep("idle");
+          currentTaskId.current = null; clearPersistedGen();
+          setGenStatus("failed"); setErrorMsg("Task " + d.status);
+        } else {
+          if (opType === "rig") {
+            setRigStep("rigging"); setStatusMsg("Resuming rig…");
+          } else {
+            setIsRunning(true); setProgress(d.progress ?? persisted.lastProgress ?? 0);
+            setStatusMsg(`Resuming ${opType}…`);
+          }
+          currentTaskId.current = persisted.taskId; userStoppedRef.current = false;
+          await pollTask(persisted.taskId, pt, headers, onSuccess);
         }
       } catch (e) {
-        setIsRunning(false); setProgress(0); setStatusMsg(""); currentTaskId.current = null; clearPersistedGen();
-        if (!pt.cancelled) { setGenStatus(e.autoStop ? "idle" : "failed"); setErrorMsg(e.message ?? "Resumed generation failed"); }
-        else { setGenStatus(prevUrl.current ? "succeeded" : "idle"); }
+        if (pt.cancelled) { setGenStatus(prevUrl.current ? "succeeded" : "idle"); return; }
+        setIsRunning(false); setProgress(0); setStatusMsg("");
+        if (persisted.opType === "rig") setRigStep("idle");
+        currentTaskId.current = null; clearPersistedGen();
+        setGenStatus(e.autoStop ? "idle" : "failed"); setErrorMsg(e.message ?? "Resumed operation failed");
       }
     })();
+    return () => { pt.cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const saveHist = useCallback(async (taskId, rawUrl, extra = {}) => {
-    const item = { prompt: prompt.trim() || extra.label || mode, status: "succeeded", model_url: rawUrl, source: "tripo", mode, taskId, params: { model_version: modelVer, mode, ...extra }, ts: Date.now() };
-    const { docId } = await saveHistoryToFirestore(userId, item);
-    const ni = { id: docId ?? ("tripo_" + Date.now()), ...item, createdAt: { toDate: () => new Date() } };
-    setHistory(h => [ni, ...h]); setActiveH(ni); histInit.current = true; return ni;
-  }, [userId, prompt, mode, modelVer]);
+    const dedupKey = rawUrl + "|" + taskId;
+    if (_savedUrls.has(dedupKey)) return null;
+    _savedUrls.add(dedupKey);
+    const autoName = (extra.prompt || prompt).trim().split(/\s+/).slice(0, 2).join(" ");
+    const resolvedName = modelName.trim() || extra.name || autoName || null;
+    const item = { prompt: prompt.trim() || extra.label || mode, name: resolvedName, status: "succeeded", model_url: rawUrl, source: "tripo", mode, taskId, params: { model_version: modelVer, mode, ...extra }, ts: Date.now() };
+    const stableDocId = extra.animationIndex != null ? `tripo_${taskId}_${extra.animationIndex}` : `tripo_${taskId}`;
+    const { docId } = await saveHistoryToFirestore(userId, item, stableDocId);
+    const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
+    setHistory(h => [ni, ...h]); setSelHistId(ni.id); histInit.current = true; return ni;
+  }, [userId, prompt, mode, modelVer, modelName]);
 
-  // Save a rigged model to history with mode="animate" (handleAutoRig may run while user is on a different tab)
+  // Save a rigged model to history with mode="rig"
   const saveRigHist = useCallback(async (taskId, rawUrl, extra = {}) => {
-    const item = { prompt: extra.prompt || "auto-rig", status: "succeeded", model_url: rawUrl, source: "tripo", mode: "animate", taskId, params: { mode: "animate", rigged: true, originalModelTaskId: extra.originalModelTaskId, ...extra }, ts: Date.now() };
-    const { docId } = await saveHistoryToFirestore(userId, item);
-    const ni = { id: docId ?? ("tripo_" + Date.now()), ...item, createdAt: { toDate: () => new Date() } };
-    setHistory(h => [ni, ...h]); setActiveH(ni); histInit.current = true; return ni;
-  }, [userId]);
+    const dedupKey = rawUrl + "|" + taskId;
+    if (_savedUrls.has(dedupKey)) return null;
+    _savedUrls.add(dedupKey);
+    const srcPrompt = history.find(h => h.taskId === extra.originalModelTaskId)?.name || history.find(h => h.taskId === extra.originalModelTaskId)?.prompt || extra.prompt || "model";
+    const rigName = extra.aiName || (srcPrompt.split(/\s+/).slice(0, 2).join(" ") + "_rigged");
+    // Explicitly build params — never let extra override mode/rigged/animated
+    const params = { rigModelVer: extra.rigModelVer, rigType: extra.rigType, rigSpec: extra.rigSpec, originalModelTaskId: extra.originalModelTaskId, mode: "rig", rigged: true };
+    const item = { prompt: extra.prompt || "auto-rig", name: rigName, status: "succeeded", model_url: rawUrl, source: "tripo", mode: "rig", taskId, params, ts: Date.now() };
+    const stableDocId = `tripo_${taskId}`;
+    const { docId } = await saveHistoryToFirestore(userId, item, stableDocId);
+    const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
+    setHistory(h => [ni, ...h]); setSelHistId(ni.id); histInit.current = true; return ni;
+  }, [userId, history]);
+
+  const generateAIName = useCallback(async (basePrompt, type, animLabel = "") => {
+    if (!basePrompt?.trim()) return null;
+    try {
+      const tok = await getIdToken();
+      const systemPrompt = "You are a concise 3D asset naming assistant. Reply with ONLY the asset name — no quotes, no explanation, no punctuation at the end. Max 4 words.";
+      const userMsg = type === "rig"
+        ? `Name this rigged character based on: "${basePrompt}". Format: "[Name]: rigged"`
+        : type === "animation"
+          ? `Name this animation based on model: "${basePrompt}", animation: "${animLabel}". Format: "[Name] - [AnimationName]"`
+          : `Name this 3D model based on: "${basePrompt}"`;
+      const res = await fetch(`${BASE_URL}/api/enhance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({
+          model: "llama-3.1-8b-instant",
+          provider: "groq",
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMsg }],
+          max_tokens: 32,
+          temperature: 0.7,
+        }),
+      });
+      const data = await res.json();
+      const name = data?.content?.trim().replace(/^["']|["']$/g, "");
+      return name || null;
+    } catch {
+      return null;
+    }
+  }, [getIdToken]);
 
   const genCost = useMemo(() => {
     if (mode === "texture") return tex4K ? 20 : 10;
@@ -935,10 +1057,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           break;
         case "texture_edit":
           body = {
-            type: "texture_edit",
+            type: "texture_model",
             original_model_task_id: (editId.trim() || srcId),
+            texture_quality: tex4K ? "detailed" : "standard",
             ...(brushPrompt.trim() && { prompt: brushPrompt.trim() }),
-            creativity_strength: creativity,
+            ...(texPbr && { pbr: true }),
             ...(maskToken && { file: { type: "png", file_token: maskToken } }),
           };
           break;
@@ -968,8 +1091,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       }
 
       currentTaskId.current = td.taskId;
-      persistGen({ taskId: td.taskId, requestId, mode, prompt: prompt.trim(), modelVer, lastProgress: 0, lastProgressAt: Date.now(), startedAt: Date.now() });
-      setStatusMsg("Generating…");
+      const opTypeForMode = { generate: "generate", text: "generate", image: "generate", batch: "generate", multi: "generate", retopo: "retopo", texture: "texture", texture_edit: "texture", stylize: "stylize", refine: "refine", animate: "animate", segment: "segment", fill_parts: "fill" };
+      persistGen({ taskId: td.taskId, requestId, mode, prompt: prompt.trim(), modelVer, lastProgress: 0, lastProgressAt: Date.now(), startedAt: Date.now(), opType: opTypeForMode[mode] ?? "generate" });
+      setStatusMsg(mode === "animate" && selAnim.size > 1 ? `Generating ${selAnim.size} animations…` : "Generating…");
       await pollTask(td.taskId, pt, headers, async d => {
         if (pt.cancelled) return;
         if (currentRequestId.current !== requestId) return;
@@ -980,16 +1104,59 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         revokeBlobUrl(prevUrl.current);
         setModelUrl(blob); prevUrl.current = blob;
         setGenStatus("succeeded"); setProgress(100); setStatusMsg(""); setIsRunning(false);
+        
+        // Instant synchronous update to history so activeTaskId updates immediately and viewer renders
+        const mockStableId = `tripo_${td.taskId}`;
+        setHistory(h => h.some(x => x.id === mockStableId) ? h : [{ id: mockStableId, taskId: td.taskId, status: "succeeded", model_url: rawUrl, mode, ts: Date.now() }, ...h]);
+        setSelHistId(mockStableId);
+
         if (mode === "animate") {
           // Animated model is still rigged — keep rig state alive
           setRiggedId(td.taskId); setShowRig(true);
-          const animLabels = [...selAnim].map(id => getAnimById(id)?.label).filter(Boolean);
-          if (!userStoppedRef.current) await saveHist(td.taskId, rawUrl, { prompt: animLabels.join(", ") || "animation", animation: animSlug, animations: animSlugs.length > 1 ? animSlugs : undefined, animated: true, animationName: animLabels.join(", ") });
+          if (!userStoppedRef.current) {
+            const urlsToSave = animatedModels ?? [rawUrl];
+            const total = urlsToSave.length;
+            const srcItem = history.find(h => h.taskId === (riggedId || srcId));
+            const baseNameForAnim = srcItem?.name || srcItem?.prompt?.trim().split(/\s+/).slice(0, 2).join(" ") || "model";
+            const basePromptForAnim = srcItem?.prompt?.trim() || prompt.trim() || baseNameForAnim;
+            const animLabelsForName = urlsToSave.map((_, i) => {
+              const sl = animSlugs[i] ?? animSlugs[0] ?? null;
+              return getAnimById([...selAnim][i])?.label ?? sl ?? "animation";
+            });
+            const aiAnimNames = await Promise.all(
+              animLabelsForName.map(lbl => generateAIName(basePromptForAnim, "animation", lbl))
+            );
+            let firstEntry = null;
+            for (let i = 0; i < total; i++) {
+              const url = urlsToSave[i];
+              if (!url) continue;
+              if (total > 1) setStatusMsg(`Animation ${i + 1}/${total} saving…`);
+              const singleSlug = animSlugs[i] ?? animSlugs[0] ?? null;
+              const singleLabel = animLabelsForName[i];
+              const animSuffix = (singleSlug || singleLabel || "anim").split(":").pop().toLowerCase();
+              const entry = await saveHist(td.taskId, url, {
+                prompt: singleLabel,
+                name: aiAnimNames[i] ?? `${baseNameForAnim}_${animSuffix}`,
+                animation: singleSlug,
+                animated: true,
+                animationName: singleLabel,
+                animations: total > 1 ? animSlugs : undefined,
+                animationIndex: i,
+                originalModelTaskId: riggedId || srcId || null,
+              });
+              if (entry) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${td.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
+              if (i === 0) firstEntry = entry;
+            }
+            setStatusMsg("");
+            markHistorySaved();
+            if (firstEntry) setSelHistId(firstEntry.id);
+          }
         } else {
           setRigStep("idle"); setRiggedId(null); setShowRig(false);
-          if (!userStoppedRef.current) await saveHist(td.taskId, rawUrl, { prompt: prompt.trim() });
+          if (!userStoppedRef.current) { const aiName = await generateAIName(prompt.trim(), "model"); const _ni3 = await saveHist(td.taskId, rawUrl, { prompt: prompt.trim(), name: aiName ?? undefined }); markHistorySaved(); if (_ni3) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${td.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { })); }
         }
         currentTaskId.current = null; clearPersistedGen();
+        setModelName("");
         refreshCredits?.();
       });
     } catch (e) {
@@ -1007,7 +1174,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setErrorMsg(e.message ?? "Network error");
       refreshCredits?.();
     }
-  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, modelUrl, pollTask, fetchProxy, revokeBlobUrl, saveHist, activeTaskId, refreshCredits, userCredits, genCost, refineId, stylizeId, stylizeStyle, getMaskBlob, getIdToken]);
+  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, modelUrl, pollTask, fetchProxy, revokeBlobUrl, saveHist, activeTaskId, refreshCredits, userCredits, genCost, refineId, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history]);
 
   const handlePrerigcheck = useCallback(async () => {
     if (!activeTaskId && !animId) return;
@@ -1027,25 +1194,34 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const handleAutoRig = useCallback(async () => {
     if (!activeTaskId && !animId) return;
     setErrorMsg(""); setRigStep("rigging");
+    setDetectedRigModelVer(null); setDetectedRigType(null); setDetectedRigSpec(null);
     if (pollAb.current) pollAb.current.cancelled = true;
     const pt = { cancelled: false }; pollAb.current = pt;
     const srcId = animId.trim() || activeTaskId;
     try {
       const headers = await authH();
       setStatusMsg("Rigging…");
-      const rr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify({ type: "animate_rig", original_model_task_id: srcId, spec: rigSpec, out_format: animOutFormat, rig_type: rigType, bake_animation: animBakeAnimation, export_geometry: animExportGeometry, animate_in_place: animAnimateInPlace }) });
+      const rr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify({ type: "animate_rig", original_model_task_id: srcId, spec: rigSpec, out_format: animOutFormat, rig_type: rigType, bake_animation: animBakeAnimation, export_with_geometry: animExportGeometry, animate_in_place: animAnimateInPlace }) });
       const rd = await rr.json(); if (!rd.success) throw new Error(rd.message);
       await pollTask(rd.taskId, pt, headers, async d => {
         if (pt.cancelled) return;
         const blob = d.modelUrl ? await fetchProxy(d.modelUrl, rd.taskId) : null;
         if (pt.cancelled) { revokeBlobUrl(blob); return; }
         if (blob) { revokeBlobUrl(prevUrl.current); setModelUrl(blob); prevUrl.current = blob; }
+        const actualRigType = d.rigType || rigType;
         setRiggedId(rd.taskId); setRigStep("rigged"); setShowRig(true); setStatusMsg(""); setGenStatus("succeeded");
-        persistGen({ taskId: rd.taskId, requestId: rd.taskId, mode: "animate", prompt: "auto-rig", modelVer: "", lastProgress: 100, lastProgressAt: Date.now(), startedAt: Date.now(), riggedId: rd.taskId });
-        await saveRigHist(rd.taskId, d.modelUrl, { prompt: "auto-rig", originalModelTaskId: srcId });
+        setDetectedRigModelVer(animModelVer); setDetectedRigType(actualRigType); setDetectedRigSpec(rigSpec);
+
+        // Instant synchronous update to history so activeTaskId updates immediately and viewer renders
+        const mockStableId = `tripo_${rd.taskId}`;
+        setHistory(h => h.some(x => x.id === mockStableId) ? h : [{ id: mockStableId, taskId: rd.taskId, status: "succeeded", model_url: d.modelUrl, mode: "rig", params: { rigModelVer: animModelVer, rigType: actualRigType, rigSpec, rigged: true }, ts: Date.now() }, ...h]);
+        setSelHistId(mockStableId);
+
+        persistGen({ taskId: rd.taskId, requestId: rd.taskId, mode: "animate", prompt: "auto-rig", modelVer: "", lastProgress: 100, lastProgressAt: Date.now(), startedAt: Date.now(), riggedId: rd.taskId, opType: "rig", rigModelVer: animModelVer, rigType: actualRigType, rigSpec });
+        const srcItemForRig = history.find(h => h.taskId === srcId); const rigBasePrompt = srcItemForRig?.prompt?.trim() || srcItemForRig?.name?.trim() || prompt.trim(); const aiRigName = await generateAIName(rigBasePrompt, "rig"); const _ni4 = await saveRigHist(rd.taskId, d.modelUrl, { prompt: "auto-rig", originalModelTaskId: srcId, aiName: aiRigName ?? undefined, rigModelVer: animModelVer, rigType: actualRigType, rigSpec }); markHistorySaved(); if (_ni4) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${rd.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
       });
     } catch (e) { if (pt.cancelled) return; setRigStep("idle"); setRiggedId(null); setShowRig(false); setErrorMsg(e.message); setStatusMsg(""); }
-  }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl, saveRigHist, rigSpec, animOutFormat, rigType, animBakeAnimation, animExportGeometry, animAnimateInPlace]);
+  }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl, saveRigHist, rigSpec, animOutFormat, rigType, animModelVer, animBakeAnimation, animExportGeometry, animAnimateInPlace]);
 
   const handleStop = useCallback(async () => {
     userStoppedRef.current = true;
@@ -1068,6 +1244,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (histAbort.current) histAbort.current.cancelled = true;
     const t = { cancelled: false }; histAbort.current = t;
     setLoadingId(item.id); setSelHistId(item.id); setGenStatus(item.status);
+    if (item?.taskId) setSearchParams(prev => { const n = new URLSearchParams(prev); n.set("tripoTaskId", item.taskId); return n; }, { replace: true });
+    else setSearchParams(prev => { const n = new URLSearchParams(prev); n.delete("tripoTaskId"); return n; }, { replace: true });
     // Show textures by default when loading from archive (base color mode)
     setViewMode("uv");
     // Populate ALL mode-specific IDs so segment/retopo/texture/etc. work immediately
@@ -1077,10 +1255,19 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setRefineId(item.taskId); setStylizeId(item.taskId);
     }
     // Restore rig state when loading a rigged history item
-    if (item?.params?.rigged || item?.mode === "animate") {
-      setRiggedId(item.taskId || null);
+    const isRigItem = item?.mode === "rig" || item?.params?.rigged === true || item?.params?.type === "animate_rig";
+    const isAnimItem = item?.params?.animated === true || item?.params?.type === "animate_retarget";
+    if (isRigItem || isAnimItem) {
+      // For animation items the riggedId points to the source rig, not the animation task itself
+      const rigId = isAnimItem
+        ? (item.params?.originalModelTaskId || item.taskId)
+        : item.taskId;
+      setRiggedId(rigId || null);
       setRigStep("rigged");
       setShowRig(true);
+      setDetectedRigModelVer(item.params?.rigModelVer ?? null);
+      setDetectedRigType(item.params?.rigType ?? null);
+      setDetectedRigSpec(item.params?.rigSpec ?? null);
       // Restore animation selection if this is an animated model
       if (item?.params?.animations && item.params.animations.length > 0) {
         // Multi-animation restore
@@ -1100,6 +1287,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setRigStep("idle");
       setShowRig(false);
       setSelAnim(new Set());
+      setDetectedRigModelVer(null);
+      setDetectedRigType(null);
+      setDetectedRigSpec(null);
     }
     if (item.model_url) {
       try {
@@ -1112,7 +1302,23 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       }
     }
     if (!t.cancelled) setLoadingId(null);
-  }, [fetchProxy, revokeBlobUrl]);
+  }, [fetchProxy, revokeBlobUrl, setSearchParams]);
+
+  // Called by Shared3DHistory once when the first Firestore snapshot arrives.
+  // Restores the previously selected item from URL param or saved sessionStorage id.
+  const onHistoryLoad = useCallback((items) => {
+    // URL param takes priority over sessionStorage
+    const urlTaskId = pendingUrlTaskId.current;
+    const savedHistId = sessionStorage.getItem("tripo_sel_hist");
+    const item = urlTaskId
+      ? items.find(i => i.taskId === urlTaskId || i.id === urlTaskId)
+      : savedHistId
+        ? items.find(i => i.id === savedHistId)
+        : null;
+    if (!item) { setLoadingId(null); return; }
+    pendingUrlTaskId.current = null;
+    selHist(item);
+  }, [selHist]);
 
   const reuse = useCallback((item) => {
     if (item?.prompt) setPrompt(item.prompt);
@@ -1126,11 +1332,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   // Rig auto-detection callback — passed to TripoWorkspaceWrapper so it can access riggedIdRef
   const onRigDetected = useCallback((count) => {
-    console.log(`[TripoPanel] Rig detected: ${count} bones`);
     if (riggedIdRef && !riggedIdRef.current && activeTaskId) {
       setRiggedId(activeTaskId);
     }
-  }, [activeTaskId]);
+  }, [activeTaskId, detectedRigModelVer, detectedRigType, detectedRigSpec, animModelVer, rigType, rigSpec]);
 
 
 
@@ -1220,7 +1425,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               {mode === "retopo" && <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={color} />}
               {mode === "texture" && <Texture mode={mode} activeTaskId={activeTaskId} texInputTab={texInputTab} setTexInputTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt} imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} multiImages={multiImages} setMultiImages={setMultiImages} tex4K={tex4K} setTex4K={setTex4K} pbrOn={texPbr} setPbrOn={setTexPbr} texAlignment={texAlignment} setTexAlignment={setTexAlignment} color={color} />}
               {mode === "texture_edit" && <Texture mode={mode} activeTaskId={activeTaskId} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} brushSize={brushSize} setBrushSize={setBrushSize} canvasRef={canvasRef} color={color} />}
-              {mode === "animate" && <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} handleAutoRig={handleAutoRig} rigType={rigType} setRigType={setRigType} rigSpec={rigSpec} setRigSpec={setRigSpec} detectedRigType={detectedRigType} prerigcheckResult={prerigcheckResult} handlePrerigcheck={handlePrerigcheck} animOutFormat={animOutFormat} setAnimOutFormat={setAnimOutFormat} animBakeAnimation={animBakeAnimation} setAnimBakeAnimation={setAnimBakeAnimation} animExportGeometry={animExportGeometry} setAnimExportGeometry={setAnimExportGeometry} animAnimateInPlace={animAnimateInPlace} setAnimAnimateInPlace={setAnimAnimateInPlace} color={color} />}
+              {mode === "animate" && <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} handleAutoRig={handleAutoRig} rigType={rigType} setRigType={setRigType} rigSpec={rigSpec} setRigSpec={setRigSpec} detectedRigType={detectedRigType} detectedRigModelVer={detectedRigModelVer} detectedRigSpec={detectedRigSpec} prerigcheckResult={prerigcheckResult} handlePrerigcheck={handlePrerigcheck} animOutFormat={animOutFormat} setAnimOutFormat={setAnimOutFormat} animBakeAnimation={animBakeAnimation} setAnimBakeAnimation={setAnimBakeAnimation} animExportGeometry={animExportGeometry} setAnimExportGeometry={setAnimExportGeometry} animAnimateInPlace={animAnimateInPlace} setAnimAnimateInPlace={setAnimAnimateInPlace} color={color} />}
               {mode === "refine" && (
                 <div>
                   {activeTaskId && (
@@ -1277,7 +1482,16 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 </div>
               )}
             </div>
-            <div className="p-4 py-6 border-t border-white/5 bg-black/20">
+            <div className="px-4 pt-4 pb-0 border-t border-white/5 bg-black/20">
+              <input
+                className="tp-input"
+                placeholder={prompt ? prompt.trim().split(/\s+/).slice(0, 2).join(" ") || "Model neve…" : "Model neve…"}
+                value={modelName}
+                onChange={e => setModelName(e.target.value)}
+                style={{ width: "100%", marginBottom: 10, fontSize: 11, height: 36, borderRadius: 10 }}
+              />
+            </div>
+            <div className="p-4 pt-2 border-white/0 bg-black/20">
               {isRunning ? (
                 <div className="fade-up">
                   <div className="flex flex-col items-center mb-4">
@@ -1324,6 +1538,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             refreshTrigger={refreshTrigger}
             onSelect={selHist}
             onReuse={reuse}
+            onHistoryLoad={onHistoryLoad}
             onDownload={async (i) => {
               try { const b = await fetchProxy(i.model_url, i.taskId); setDlItem({ blobUrl: b, item: i }); setDlOpen(true); }
               catch (e) { alert(e.message); }
@@ -1382,6 +1597,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         handleDlClose={handleDlClose}
         activeH={activeH}
         onRigDetected={onRigDetected}
+        // 3D Paint
+        paintMode={mode === "texture_edit" && brushMode === "Paint Mode"}
+        paintColor={brushColor}
+        paintSize={brushSize}
+        paintCanvasRef={canvasRef}
       />
     </StudioLayout>
   );
@@ -1400,38 +1620,40 @@ function TripoWorkspaceWrapper({
   autoSpin, setAutoSpin,
   loadingId, isRunning, statusMsg, progress, camP, sceneRef,
   dlItem, setDlItem, setDlOpen, dlOpen, handleDlClose, activeH,
-  onRigDetected
+  onRigDetected,
+  // 3D Paint
+  paintMode, paintColor, paintSize, paintCanvasRef
 }) {
   const { smoothL, smoothR } = useContext(StudioLayoutContext);
 
   return (
-    <div className="flex flex-col h-full bg-transparent overflow-hidden">
+    <div className="relative isolate flex flex-col h-full bg-transparent">
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
       {/* top hud */}
       <motion.div
         style={{ paddingLeft: smoothL, paddingRight: smoothR }}
-        className="flex items-center justify-between h-12 flex-shrink-0 border-b border-white/5 bg-[#0a0a0f] gap-2 relative z-40 px-3 overflow-hidden"
+        className="flex items-center justify-between h-12 flex-shrink-0 border-b border-white/5 gap-2 relative z-[60] px-3 bg-[#0a0a0f]/90 backdrop-blur-xl"
       >
-        <div className="flex items-center gap-1.5 flex-shrink-0 overflow-x-auto no-scrollbar min-w-0">
-          <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] italic mr-2 hidden sm:inline">View Context</span>
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 min-w-0" style={{ flexWrap: 'wrap' }}>
+          <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] italic mr-1 sm:mr-2 hidden sm:inline">View Context</span>
           {VIEW_MODES.map(v => (
             <Tooltip key={v.id} text={v.tip} side="bottom">
               <button
                 onClick={() => setViewMode(v.id)}
-                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${viewMode === v.id ? 'bg-primary/20 text-white border border-primary/30 shadow-primary-glow' : 'text-zinc-600 hover:text-zinc-400'}`}
+                className={`px-2 sm:px-3 py-1 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${viewMode === v.id ? 'bg-primary/20 text-white border border-primary/30 shadow-primary-glow' : 'text-zinc-600 hover:text-zinc-400'}`}
               >
                 {v.label}
               </button>
             </Tooltip>
           ))}
-          <div className="w-px h-5 bg-white/5 mx-1 hidden sm:block" />
+          <div className="w-px h-5 bg-white/5 mx-0.5 sm:mx-1 hidden sm:block" />
           {modelUrl && <WireframeControl active={wireOv} onToggle={() => setWireOv(v => !v)} opacity={wireOp} onOpacityChange={setWireOp} color={wireC} onColorChange={setWireC} accentColor={color} />}
           {modelUrl && <RigControl active={showRig} onToggle={() => setShowRig(v => !v)} rigged={!!riggedId} />}
         </div>
-        <div className="flex items-center gap-3 flex-shrink-0 overflow-x-auto no-scrollbar min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0 min-w-0" style={{ flexWrap: 'wrap' }}>
           <BgColorPicker value={bgColor} onChange={setBgColor} />
-          <div className="w-px h-5 bg-white/5 hidden sm:block" />
+          <div className="w-px h-5 bg-white/5 hidden sm:block mx-0" />
           <LightingControls viewMode={viewMode} lightMode={lightMode} setLightMode={setLightMode} lightStrength={lStr} setLightStrength={setLStr} lightRotation={lRot} setLightRotation={setLRot} lightAutoRotate={lAutoR} setLightAutoRotate={setLAutoR} lightAutoRotateSpeed={lAutoS} setLightAutoRotateSpeed={setLAutoS} dramaticColor={dramC} setDramaticColor={setDramC} gridColor1={gc1} setGridColor1={setGc1} gridColor2={gc2} setGridColor2={setGc2} color={color} />
           <div className="w-px h-5 bg-white/5 hidden sm:block" />
           <IconBtn icon={<Grid3x3 className="w-4 h-4" />} tip="Grid" active={showGrid} color={color} onClick={() => setShowGrid(v => !v)} />
@@ -1439,36 +1661,47 @@ function TripoWorkspaceWrapper({
       </motion.div>
 
       {/* viewport main */}
-      <div className="flex-1 relative overflow-hidden">
-        <ThreeViewer
-          color={color}
-          viewMode={viewMode}
-          lightMode={lightMode}
-          showGrid={showGrid}
-          modelUrl={modelUrl}
-          lightStrength={lStr}
-          lightRotation={lRot}
-          lightAutoRotate={lAutoR}
-          lightAutoRotateSpeed={lAutoS}
-          dramaticColor={dramC}
-          wireframeOverlay={wireOv}
-          wireOpacity={wireOp}
-          wireHexColor={wireC.replace("#", "0x")}
-          showRig={showRig && !!riggedId}
-          onRigDetected={onRigDetected}
-          autoSpin={autoSpin}
-          bgColor={bgColor}
-          gridColor1={gc1}
-          gridColor2={gc2}
-          onSpinStop={() => setAutoSpin(false)}
-          onReady={s => { sceneRef.current = s; }}
-        />
+      <div className="flex-1 relative tp-viewport" style={{ minHeight: 0 }}>
+        <div className="absolute inset-0">
+          {(loadingId === "__url_pending__" && !modelUrl) ? (
+            <div className="absolute inset-0 bg-black" />
+          ) : (
+          <ThreeViewer
+            color={color}
+            viewMode={viewMode}
+            lightMode={lightMode}
+            showGrid={showGrid}
+            modelUrl={modelUrl}
+            lightStrength={lStr}
+            lightRotation={lRot}
+            lightAutoRotate={lAutoR}
+            lightAutoRotateSpeed={lAutoS}
+            dramaticColor={dramC}
+            wireframeOverlay={wireOv}
+            wireOpacity={wireOp}
+            wireHexColor={wireC.replace("#", "0x")}
+            showRig={showRig && !!riggedId}
+            onRigDetected={onRigDetected}
+            autoSpin={autoSpin}
+            bgColor={bgColor}
+            gridColor1={gc1}
+            gridColor2={gc2}
+            onSpinStop={() => setAutoSpin(false)}
+            onReady={s => { sceneRef.current = s; }}
+            // 3D Paint
+            paintMode={paintMode}
+            paintColor={paintColor}
+            paintSize={paintSize}
+            paintCanvasRef={paintCanvasRef}
+          />
+          )}
+        </div>
 
         <AnimatePresence>
           {(loadingId && !isRunning) && (
             <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-2xl"
+              initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black backdrop-blur-2xl"
             >
               <Loader2 className="w-8 h-8 text-primary anim-spin mb-4" />
               <p className="text-[11px] font-black text-white uppercase tracking-[0.3em] italic">Fetching Spatial Voxel Map</p>
@@ -1491,6 +1724,12 @@ function TripoWorkspaceWrapper({
                 <Loader2 className="w-4 h-4 text-emerald anim-spin" />
                 <p className="text-zinc-400 text-[11px] font-bold tracking-wider">Applying skeleton bones…</p>
               </div>
+              {progress > 0 && (
+                <div style={{ width: 200, marginTop: 16 }}>
+                  <PBar value={progress} />
+                  <p className="text-[11px] font-mono text-white mt-2 text-center tracking-widest">{progress}%</p>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -1530,32 +1769,32 @@ function TripoWorkspaceWrapper({
       {/* bottom hud */}
       <motion.div
         style={{ paddingLeft: smoothL, paddingRight: smoothR }}
-        className="h-14 flex items-center justify-between flex-shrink-0 border-t border-white/5 bg-[#0a0a14]/60 backdrop-blur-3xl relative z-40 px-3 overflow-x-auto gap-2"
+        className="h-14 flex items-center justify-between flex-shrink-0 border-t border-white/5 bg-[#0a0a14]/80 backdrop-blur-xl relative z-[60] px-2 sm:px-3 overflow-x-auto gap-1.5 sm:gap-2"
       >
-        <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
-          <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] italic mr-2 hidden sm:inline">Orbital Controls</span>
-          <div className="flex items-center gap-1.5 p-1.5 px-2 rounded-2xl bg-white/5 border border-white/5">
-            <IconBtn icon={<RotateCcw className="w-4 h-4" />} tip="C-Reset" onClick={() => camP("reset")} />
-            <IconBtn icon={<Camera className="w-4 h-4" />} tip="Front" onClick={() => camP("front")} />
-            <IconBtn icon={<Move3d className="w-4 h-4" />} tip="Side" onClick={() => camP("side")} />
-            <IconBtn icon={<Layers className="w-4 h-4" />} tip="Top" onClick={() => camP("top")} />
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 min-w-0">
+          <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] italic mr-1 sm:mr-2 hidden sm:inline">Orbital Controls</span>
+          <div className="flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 px-1.5 sm:px-2 rounded-2xl bg-white/5 border border-white/5">
+            <IconBtn icon={<RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} tip="C-Reset" onClick={() => camP("reset")} />
+            <IconBtn icon={<Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} tip="Front" onClick={() => camP("front")} />
+            <IconBtn icon={<Move3d className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} tip="Side" onClick={() => camP("side")} />
+            <IconBtn icon={<Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />} tip="Top" onClick={() => camP("top")} />
           </div>
-          <div className="w-px h-5 bg-white/5 mx-1 hidden sm:block" />
+          <div className="w-px h-5 bg-white/5 mx-0.5 sm:mx-1 hidden sm:block" />
           <button
             onClick={() => setAutoSpin(v => !v)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${autoSpin ? 'bg-primary text-white shadow-primary-glow' : 'bg-white/5 text-zinc-600 border border-white/5 hover:text-zinc-400'}`}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${autoSpin ? 'bg-primary text-white shadow-primary-glow' : 'bg-white/5 text-zinc-600 border border-white/5 hover:text-zinc-400'}`}
           >
-            {autoSpin ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+            {autoSpin ? <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current" /> : <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current" />}
             <span className="hidden sm:inline">{autoSpin ? "Spin Active" : "Start Spinner"}</span>
           </button>
         </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           {modelUrl && (
             <button
               onClick={() => { setDlItem(null); setDlOpen(true); }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-[11px] font-black uppercase tracking-widest shadow-primary-heavy hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl bg-primary text-white text-[10px] sm:text-[11px] font-black uppercase tracking-widest shadow-primary-heavy hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
             >
-              <Download className="w-4 h-4" /> <span className="hidden sm:inline">Production Export</span><span className="sm:hidden">Export</span>
+              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Production Export</span><span className="sm:hidden">Export</span>
             </button>
           )}
         </div>

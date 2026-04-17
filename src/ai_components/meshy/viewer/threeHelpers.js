@@ -5,12 +5,13 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 export const hexToInt = (h) => (h ? parseInt(h.replace("#", ""), 16) : null);
 
 export function syncCamera(camera, c) {
+  const pz = c.panZ ?? 0;
   camera.position.set(
     c.panX + c.radius * Math.sin(c.phi) * Math.sin(c.theta),
     c.panY + c.radius * Math.cos(c.phi),
-    c.radius * Math.sin(c.phi) * Math.cos(c.theta),
+    pz + c.radius * Math.sin(c.phi) * Math.cos(c.theta),
   );
-  camera.lookAt(c.panX, c.panY, 0);
+  camera.lookAt(c.panX, c.panY, pz);
 }
 
 export function buildPlaceholder(THREE, color) {
@@ -61,6 +62,7 @@ export function setSceneBg(s, bgColor) {
     default: null,
     black: 0x050508,
     darkgray: 0x0d0d14,
+    deep: 0x0a0a12,
     grayish: 0x1a1a24,
     white: 0xeeeeee
   };
@@ -100,16 +102,16 @@ export function applyLights(s, mode, color, strength = 1, rotation = 0, dramatic
 
   const k = strength;
   if (mode === "studio") {
-    lightGroup.add(new THREE.AmbientLight(0xffffff, 0.4 * k));
-    const key = new THREE.DirectionalLight(0xffffff, 1.4 * k);
+    lightGroup.add(new THREE.AmbientLight(0xffffff, 0.35 * k));
+    const key = new THREE.DirectionalLight(0xffffff, 1.0 * k);
     key.position.set(4, 6, 4); key.castShadow = true; lightGroup.add(key);
-    const fill = new THREE.DirectionalLight(0xddeeff, 0.5 * k);
+    const fill = new THREE.DirectionalLight(0xddeeff, 0.45 * k);
     fill.position.set(-4, 2, -2); lightGroup.add(fill);
-    const rim = new THREE.DirectionalLight(hexToInt(color) || 0x7c3aed, 0.6 * k);
+    const rim = new THREE.DirectionalLight(hexToInt(color) || 0x7c3aed, 0.5 * k);
     rim.position.set(-2, -1, -5); lightGroup.add(rim);
   } else if (mode === "outdoor") {
-    lightGroup.add(new THREE.HemisphereLight(0x87ceeb, 0x3a3020, 0.9 * k));
-    const sun = new THREE.DirectionalLight(0xfff5e0, 1.6 * k);
+    lightGroup.add(new THREE.HemisphereLight(0x87ceeb, 0x3a3020, 0.8 * k));
+    const sun = new THREE.DirectionalLight(0xfff5e0, 1.1 * k);
     sun.position.set(8, 12, 6); sun.castShadow = true; lightGroup.add(sun);
   } else if (mode === "dramatic") {
     lightGroup.add(new THREE.AmbientLight(0x111133, 0.15 * k));
@@ -348,6 +350,13 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     model.traverse((n) => {
       if (n.isMesh) {
         if (n.geometry && !n.geometry.attributes.normal) n.geometry.computeVertexNormals();
+        const mats = Array.isArray(n.material) ? n.material : [n.material];
+        mats.forEach((m) => {
+          if (m?.isMeshStandardMaterial) {
+            if (!m.roughnessMap) m.roughness = Math.max(m.roughness, 0.8);
+            m.envMapIntensity = 0.6;
+          }
+        });
         s.origMaterials.set(n.uuid, n.material);
       }
     });
@@ -355,7 +364,8 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     scene.add(model);
     s.model = model;
     s.cam.radius = 7;
-    s.cam.panY = 0;
+    s.cam.panX = 0; s.cam.panY = 0; s.cam.panZ = 0;
+    if (s.camTarget) { s.camTarget.radius = 7; s.camTarget.panX = 0; s.camTarget.panY = 0; s.camTarget.panZ = 0; }
     syncCamera(s.camera, s.cam);
 
     // ── ANIMATION PLAYBACK ──────────────────────────────────────────────
@@ -439,12 +449,49 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
 export function setCameraPreset(s, preset) {
   if (!s) return;
   s.autoSpin = false;
-  if (preset === "reset") { s.cam.theta = 0.4; s.cam.phi = Math.PI / 3; s.cam.panX = 0; s.cam.panY = 0; }
-  if (preset === "front") { s.cam.theta = 0; s.cam.phi = Math.PI / 2; }
-  if (preset === "side") { s.cam.theta = Math.PI / 2; s.cam.phi = Math.PI / 2; }
-  if (preset === "top") { s.cam.theta = 0; s.cam.phi = 0.05; }
-  syncCamera(s.camera, s.cam);
+  const t = s.camTarget ?? s.cam;
+  if (preset === "reset") { t.theta = 0.4; t.phi = Math.PI / 3; t.panX = 0; t.panY = 0; t.panZ = 0; }
+  if (preset === "front") { t.theta = 0; t.phi = Math.PI / 2; }
+  if (preset === "side") { t.theta = Math.PI / 2; t.phi = Math.PI / 2; }
+  if (preset === "top") { t.theta = 0; t.phi = 0.05; }
   s.markDirty?.();
+}
+
+export function applyExponentialZoom(camTarget, deltaY, min = 0.5, max = 30) {
+  const factor = deltaY > 0 ? 1.12 : 1 / 1.12;
+  camTarget.radius = Math.max(min, Math.min(max, camTarget.radius * factor));
+}
+
+export function focusOnHit(s, ndcX, ndcY) {
+  if (!s?.raycaster || !s.camera || !s.scene) return false;
+
+  const mouse = new THREE.Vector2(ndcX, ndcY);
+  s.raycaster.setFromCamera(mouse, s.camera);
+
+  const targets = [];
+  const root = s.model || s.placeholder;
+  if (!root) return false;
+  root.traverse(node => {
+    if (node.isMesh && !node.userData.isGround && !node.userData.isWireframeOverlay
+        && !node.userData.isRigOverlay && !node.userData.isPaintOverlay) {
+      targets.push(node);
+    }
+  });
+  if (targets.length === 0) return false;
+
+  const intersects = s.raycaster.intersectObjects(targets, false);
+  if (intersects.length === 0) return false;
+
+  const hit = intersects[0].point;
+  s.camTarget.panX = hit.x;
+  s.camTarget.panY = hit.y;
+  s.camTarget.panZ = hit.z;
+
+  const distToHit = s.camera.position.distanceTo(hit);
+  s.camTarget.radius = Math.max(0.5, Math.min(30, distToHit * 0.6));
+
+  s.markDirty?.();
+  return true;
 }
 
 // ── modelHasTextures ────────────────────────────────────────────────────────

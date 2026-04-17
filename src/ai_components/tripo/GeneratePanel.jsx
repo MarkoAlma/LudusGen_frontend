@@ -155,9 +155,10 @@ function Collapsible({ label, children, border = true, extra }) {
       <div className="sec-row" onClick={() => setOpen(v => !v)}
         style={{
           borderTop: "1px solid rgba(255,255,255,0.05)",
-          borderBottom: border && open ? "1px solid rgba(255,255,255,0.05)" : "none",
+      borderTop: "1px solid rgba(255,255,255,0.06)",
+          borderBottom: border && open ? "1px solid rgba(255,255,255,0.06)" : "none",
         }}>
-        <span style={{ color: "#4a4a68", fontSize: 13, fontWeight: 500 }}>{label}</span>
+        <span style={{ color: "#525270", fontSize: 13, fontWeight: 500 }}>{label}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {extra}
           {open
@@ -165,7 +166,7 @@ function Collapsible({ label, children, border = true, extra }) {
             : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2d2d48" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>}
         </div>
       </div>
-      {open && <div style={{ padding: "10px 0 2px", animation: "fadeUp 0.15s ease" }}>{children}</div>}
+      {open && <div style={{ padding: "12px 2px 4px", animation: "fadeUp 0.15s ease" }}>{children}</div>}
     </div>
   );
 }
@@ -330,8 +331,8 @@ function ModelDropdown({ modelVer, setModelVer }) {
       <button
         onClick={() => setOpen(v => !v)}
         style={{
-          width: "100%", padding: "9px 12px", borderRadius: 10,
-          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+          width: "100%", padding: "9px 12px", borderRadius: 8,
+          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           cursor: "pointer", fontFamily: "inherit",
         }}
@@ -349,8 +350,8 @@ function ModelDropdown({ modelVer, setModelVer }) {
         <div style={{
           position: "absolute", left: 0, right: 0, bottom: "calc(100% + 4px)",
           background: "#131327", border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: 10, overflow: "hidden", zIndex: 50,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+          borderRadius: 12, overflow: "hidden", zIndex: 50,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)",
         }}>
           {MODEL_VERSIONS.map((v, i) => (
             <button
@@ -386,17 +387,17 @@ function ModelDropdown({ modelVer, setModelVer }) {
  * prompt at submission time. Only ONE style can be active at a time.
  * ─────────────────────────────────────────────────────────────────────── */
 export const STYLE_PREFIX = [
-  { id: "photo",    label: "Photo",    icon: "📷", prefix: "photorealistic, high detail photography, " },
-  { id: "voxel",    label: "Voxel",    icon: "🧊", prefix: "voxel art style, blocky 3D pixel art, minecraft-like cubic geometry, " },
-  { id: "pixel",    label: "Pixel",    icon: "👾", prefix: "pixel art style, 2D sprite aesthetic converted to 3D, retro game graphics, " },
-  { id: "clay",     label: "Clay",     icon: "🏺", prefix: "claymation style, soft clay material, hand-sculpted look, plasticine texture, " },
-  { id: "lowpoly",  label: "Low Poly", icon: "🔺", prefix: "low poly, flat shaded, minimalist geometric style, clean triangles, " },
-  { id: "cartoon",  label: "Cartoon",  icon: "🎨", prefix: "cartoon style, stylized proportions, bold colors, exaggerated features, " },
-  { id: "anime",    label: "Anime",    icon: "✨", prefix: "anime style, cel-shaded, vibrant colors, Japanese animation aesthetic, " },
-  { id: "chibi",    label: "Chibi",    icon: "🧸", prefix: "chibi style, oversized head, cute proportions, kawaii aesthetic, " },
-  { id: "sculpt",   label: "Sculpt",   icon: "🗿", prefix: "realistic marble sculpture, classical art style, stone texture, museum piece, " },
-  { id: "mini",     label: "Mini",     icon: "🎲", prefix: "miniature figurine, tabletop game piece scale, painted model, " },
+  { id: "photo", label: "Photo", icon: "📷", prefix: "photorealistic, high detail photography, professional 3D render, cinematic lighting, 8k resolution, ultra-detailed textures, realistic materials, " },
+  { id: "voxel", label: "Voxel", icon: "🧊", prefix: "precise voxel art style, cubic voxel grid construction, blocky 3D modular design, clean voxel geometry, isometric voxel aesthetic, " },
+  { id: "pixel", label: "Pixel", icon: "👾", prefix: "retro 32-bit pixel art style, conversion of 2D sprite to 3D volume, stylized jagged edges, vibrant limited palette, nostalgic game aesthetic, " },
+  { id: "clay", label: "Clay", icon: "🏺", prefix: "claymation style, authentic clay surface with fingerprints, hand-sculpted plasticine texture, soft rounded organic forms, stop-motion aesthetic, " },
+  { id: "cartoon", label: "Cartoon", icon: "🎨", prefix: "stylized 3D cartoon, expressive proportions, clean toon shaded surfaces, vibrant saturated colors, high-quality animation style, " },
+  { id: "anime", label: "Anime", icon: "✨", prefix: "high-quality anime 3D model, cel-shaded aesthetics, crisp outlines, vibrant anime palette, Japanese studio animation style, " },
+  { id: "chibi", label: "Chibi", icon: "🧸", prefix: "adorable chibi style, stylized super-deformed proportions, large expressive eyes, small cute body, toy-like aesthetic, kawaii character design, " },
+  { id: "sculpt", label: "Sculpt", icon: "🗿", prefix: "masterpiece marble sculpture, high-detail museum quality stonework, realistic chiseled surfaces, classical art aesthetic, white marble texture, " },
+  { id: "mini", label: "Mini", icon: "🎲", prefix: "highly detailed tabletop miniature, custom 3D printed figurine style, hand-painted gaming piece scale, macro photography of a scale model, " },
 ];
+
 
 /* ─── GeneratePanel ───────────────────────────────────────────────────── */
 export default function GeneratePanel({
@@ -436,7 +437,7 @@ export default function GeneratePanel({
   backendCaps = null,
   // Style prefix state — managed by parent (TripoPanel)
   activeStyles = [],
-  onStyleToggle = () => {},
+  onStyleToggle = () => { },
 }) {
   const MV_SLOTS = ["Front", "Left", "Right", "Back"];
   const batchInputRef = useRef(null);
@@ -493,68 +494,54 @@ export default function GeneratePanel({
   const isModernModel = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
 
   /* ─── Enhancer prompts ────────────────────────────────────────────── */
-  const TRIPO_ENHANCE_PROMPT = `You are a 3D model prompt engineer for Tripo3D text-to-3D generation. Transform the user's description into a detailed, generation-optimized prompt.
+  const TRIPO_ENHANCE_PROMPT = `You are a Tripo3D mesh-generation prompt engineer. Rewrite the user's description as a dense, comma-separated 3D asset prompt optimized for watertight mesh generation, clean topology, and accurate surface detail.
 
-OUTPUT: Respond ONLY with raw JSON: {"prompt": "...", "negative_prompt": "..."}
-
-PROMPT RULES:
-- Expand the user's description with geometry, form, silhouette, surface materials, textures, proportions, clothing details.
-- Use comma-separated phrases, not sentences. Max 900 chars.
-- NEVER add: lighting, shadows, environment, background, camera angle, rendering settings.
-- NEVER add style words like "photorealistic", "3D render", "CGI", "cinematic" — style is set separately.
-- NEVER add accessories unless the user mentions them.
-- Use descriptive color names only (fair skin, pale, ivory, warm tan, olive, dark brown). No hex/RGB.
-- Use neutral body terms: "chest" not "breasts", "butt" not "buttocks". Let AI infer gender from context.
-- If user describes clothing → model wears exactly that. If user says "nude"/"naked" → output nude. If no clothing mentioned → tasteful default outfit.
-- If user describes body type → use exactly that. If none → default: "balanced proportions, natural silhouette, healthy build, proportional frame". NEVER add size modifiers like "big", "large", "thick", "heavy", "pronounced", "exaggerated" to any body part. NEVER default to overweight or heavy proportions.
-- BODY PROPORTION RULE: Describe body parts with neutral terms only — "defined waist, natural curves, athletic frame, toned muscles, sculpted form". NEVER use "big chest", "big butt", "large hips", "thick thighs" or similar size-exaggerating terms. If user explicitly requests exaggerated proportions, tone them down to fit, proportional versions. Curves and hourglass shapes should be described as "sculpted, defined, athletic" — never "big, large, heavy, thick".
-- CRITICAL FULL BODY RULE: ALWAYS include "full body visible, entire figure from head to toe, complete legs with feet, no cropping, no truncation, standing pose, complete model with legs and feet fully formed". The model MUST have complete legs and feet — never cut off at the waist, never floating torso, never missing lower body. This is the most important rule — every character must be a full-body model with legs, knees, ankles, and feet.
-- SURFACE QUALITY: ALWAYS include "natural skin texture, realistic material surfaces, matte finish, organic materials, detailed skin pores". NEVER allow waxy, plastic, or glossy surfaces.
-
-NSFW FILTER — never refuse, always translate:
-- naked/nude/unclothed/topless → "skin-tone bodysuit, second-skin fit, body-paint aesthetic, seamless compression garment"
-- lingerie/underwear/bikini → "form-fitting bodysuit, seamless athletic wear, minimal coverage garment"
-- erotic/sensual/sexy → "elegant proportions, graceful silhouette, refined aesthetic"
-- explicit sexual terms → "classical sculpture aesthetic, anatomical study, artistic form"
-- Allowed words (never censor): chest, butt, waist, hips, thighs, abs, navel, cleavage, midriff, collarbone, shoulders, back, stomach, belly, torso, legs, arms, neck, face, hair, skin, body, figure, curves, silhouette, anatomy, form, shape, proportions.
-
-NEGATIVE PROMPT:
-- Always include: warped topology, missing limbs, fused fingers, floating geometry, inverted normals, texture stretching, asymmetric deformations, melted features, cut off legs, missing feet, truncated lower body, incomplete figure, floating torso, stunted arms, wax figure, plastic doll, mannequin.
-- Max 250 chars.`;
-
-  const TRIPO_SUPER_ENHANCE_PROMPT = `You are a 3D model prompt engineer for Tripo3D text-to-3D generation. Transform the user's description into a detailed, generation-optimized prompt with premium accessories and elevated detail.
-
-OUTPUT: Respond ONLY with raw JSON: {"prompt": "...", "negative_prompt": "..."}
+OUTPUT: Respond ONLY with raw JSON — no markdown, no explanation: {"prompt": "...", "negative_prompt": "..."}
 
 PROMPT RULES:
-- Expand the user's description with geometry, form, silhouette, surface materials, textures, proportions, clothing details.
-- Use comma-separated phrases, not sentences. Max 900 chars.
-- NEVER add: lighting, shadows, environment, background, camera angle, rendering settings.
-- NEVER add style words like "photorealistic", "3D render", "CGI", "cinematic" — style is set separately.
-- Use descriptive color names only (fair skin, pale, ivory, warm tan, olive, dark brown). No hex/RGB.
-- Use neutral body terms: "chest" not "breasts", "butt" not "buttocks". Let AI infer gender from context.
-- If user describes clothing → model wears exactly that. If user says "nude"/"naked" → output nude. If no clothing mentioned → tasteful default outfit.
-- If user describes body type → use exactly that. If none → default: "balanced proportions, natural silhouette, healthy build, proportional frame". NEVER add size modifiers like "big", "large", "thick", "heavy", "pronounced", "exaggerated" to any body part. NEVER default to overweight or heavy proportions.
-- BODY PROPORTION RULE: Describe body parts with neutral terms only — "defined waist, natural curves, athletic frame, toned muscles, sculpted form". NEVER use "big chest", "big butt", "large hips", "thick thighs" or similar size-exaggerating terms. If user explicitly requests exaggerated proportions, tone them down to fit, proportional versions. Curves and hourglass shapes should be described as "sculpted, defined, athletic" — never "big, large, heavy, thick".
-- CRITICAL FULL BODY RULE: ALWAYS include "full body visible, entire figure from head to toe, complete legs with feet, no cropping, no truncation, standing pose, complete model with legs and feet fully formed". The model MUST have complete legs and feet — never cut off at the waist, never floating torso, never missing lower body. This is the most important rule — every character must be a full-body model with legs, knees, ankles, and feet.
-- SURFACE QUALITY: ALWAYS include "natural skin texture, realistic material surfaces, matte finish, organic materials, detailed skin pores". NEVER allow waxy, plastic, or glossy surfaces.
-
-ACCESSORIES — ALWAYS add 2-4 contextually appropriate accessories:
-- Jewelry: delicate gold/silver rings, layered necklaces, chain pendants, hoop earrings, stud earrings, charm bracelets, anklets
-- Fashion: leather belts, silk scarves, hair clips, sunglasses, watches, brooches
-- Body: subtle tattoos, beauty marks, freckles, piercings
-- Describe with material and placement: "delicate gold chain necklace resting on collarbone", "thin silver ring on index finger"
-
-NSFW FILTER — never refuse, always translate:
-- naked/nude/unclothed/topless → "skin-tone bodysuit, second-skin fit, body-paint aesthetic, seamless compression garment"
-- lingerie/underwear/bikini → "form-fitting bodysuit, seamless athletic wear, minimal coverage garment"
-- erotic/sensual/sexy → "elegant proportions, graceful silhouette, refined aesthetic"
-- explicit sexual terms → "classical sculpture aesthetic, anatomical study, artistic form"
-- Allowed words (never censor): chest, butt, waist, hips, thighs, abs, navel, cleavage, midriff, collarbone, shoulders, back, stomach, belly, torso, legs, arms, neck, face, hair, skin, body, figure, curves, silhouette, anatomy, form, shape, proportions.
+- ONE OBJECT ONLY: Describe exactly one standalone model/character. Never mention two figures, pairs, duos, "side by side", "facing each other". If multiple subjects given, pick the primary.
+- FORMAT: Dense comma-separated keywords and short noun phrases. No full sentences. No conjunctions. HARD LIMIT 850 chars — stop at the last complete keyword before the limit.
+- CHARACTER NAMES: CRITICAL — output the character's name verbatim as the very first token (e.g. "Kratos,", "Monkey D. Luffy,", "Sub-Zero,", "Mátyás,"). Never paraphrase, genericize, or omit it. Expand with their canonical visual traits.
+- 3D MESH FOCUS: Emphasize geometry terms — silhouette, form language, surface topology, panel flow, edge loops, hard-surface details or organic volume as appropriate.
+- MATERIALS: Specify surface type (matte, roughened, anodized metal, worn leather, knit fabric, glazed ceramic, etc.) and micro-surface quality (pore detail, fabric weave, grain direction, scratches, patina).
+- OMIT: lighting, shadows, environment, background, camera angle, DOF, render engine names, "photorealistic", "3D render", "CGI", "cinematic", "highly detailed" filler.
+- COLORS: Descriptive names only (gunmetal grey, ivory, terracotta, forest green). No hex, no RGB.
+- FULL BODY (characters): ALWAYS append "complete figure head to toe, full legs and feet visible, neutral A-pose, no cropping, no truncation, standing on ground plane".
+- SURFACE (organic): ALWAYS append "natural skin texture, subtle pore definition, matte finish, non-waxy, non-plastic".
+- BODY PROPORTIONS: Neutral terms only — "athletic build, defined waist, proportional limbs". Never size-exaggerate any body part. Default: "balanced proportions, natural silhouette".
+- CLOTHING: Match user exactly; if none specified use canonical default outfit. Never add jewelry or accessories unless explicitly requested.
 
 NEGATIVE PROMPT:
-- Always include: warped topology, missing limbs, fused fingers, floating geometry, inverted normals, texture stretching, asymmetric deformations, melted features, cut off legs, missing feet, truncated lower body, incomplete figure, floating torso, stunted arms, wax figure, plastic doll, mannequin.
-- Max 250 chars.`;
+- Dense comma-separated list. MAX 250 chars.
+- Always include: floating objects, disconnected parts, extra limbs, missing limbs, cut-off torso, cropped figure, background scenery, fused fingers, duplicate model, two figures, inverted normals, texture stretching, melted features, wax skin, plastic doll, side artifacts, asymmetric deformation.`;
+
+  const TRIPO_SUPER_ENHANCE_PROMPT = `You are an expert Tripo3D mesh-generation prompt engineer. Rewrite the user's description as a maximally detailed, comma-separated 3D asset prompt, adding professional-grade surface and construction details the user didn't specify.
+
+OUTPUT: Respond ONLY with raw JSON — no markdown, no explanation: {"prompt": "...", "negative_prompt": "..."}
+
+PROMPT RULES:
+- ONE OBJECT ONLY: Describe exactly one standalone model/character. Never mention two figures, pairs, duos. If multiple subjects given, pick the primary.
+- FORMAT: Dense comma-separated keywords and short noun phrases. No full sentences. HARD LIMIT 850 chars — stop at the last complete keyword before the limit.
+- CHARACTER NAMES: CRITICAL — output the character's name verbatim as the very first token (e.g. "Kratos,", "Monkey D. Luffy,", "Sub-Zero,", "Mátyás,"). Never paraphrase, genericize, or omit it. Expand with their canonical visual traits.
+- 3D MESH FOCUS: Lead with form language, silhouette read, primary geometry, then layer materials and micro-surface.
+- OMIT: lighting, shadows, environment, background, camera, DOF, render engine names, filler adjectives ("highly detailed", "ultra realistic", "4K", "cinematic").
+- COLORS: Descriptive names only. No hex, no RGB.
+- FULL BODY (characters): ALWAYS append "complete figure head to toe, full legs and feet visible, neutral A-pose, no cropping, no truncation, standing on ground plane".
+- SURFACE (organic): ALWAYS append "natural skin texture, subtle pore definition, matte finish, non-waxy, non-plastic".
+- BODY PROPORTIONS: Neutral terms only. Never exaggerate any body part. Default: "balanced proportions, natural silhouette, athletic build".
+- CLOTHING: Match user exactly; enhance with material and construction detail. Never add jewelry or accessories unless user mentioned them.
+
+SUPER ENHANCE — add details the user did NOT mention:
+- Fabric: weave pattern, thread count, seam placement, stitching type, wear stress points, fabric drape physics
+- Leather/hard-surface: grain direction, panel flow, rivet placement, edge chamfer, anodize finish, scratch micro-pattern
+- Skin/organic: pore variation across body zones, knuckle crease, nail lunula, lip philtrum, ear cartilage fold
+- Hair: strand clumping, volume root-to-tip gradient, cuticle catch-light zones, scalp transition
+- Footwear: sole tread geometry, foxing tape, toe box volume, counter stiffener, lace tension
+- Pose: natural weight shift, relaxed hand curl, subtle spine curvature — never exaggerated
+
+NEGATIVE PROMPT:
+- Dense comma-separated list. MAX 250 chars.
+- Always include: floating objects, disconnected parts, extra limbs, missing limbs, cut-off torso, cropped figure, background scenery, fused fingers, duplicate model, two figures, inverted normals, texture stretching, melted features, wax skin, plastic doll, side artifacts, asymmetric deformation.`;
 
   const TRIPO_SIMPLIFY_PROMPT = `You are a 3D model prompt engineer.
 The user gives you a long or complex prompt. Simplify it to a clear, concise English description under 200 characters, keeping the essential object and style.
@@ -564,7 +551,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
   return (
     <>
       {/* ── Tab bar ── */}
-      <div style={{ display: "flex", gap: 3, padding: "3px", background: "rgba(255,255,255,0.06)", borderRadius: 11, marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 3, padding: "4px", background: "rgba(255,255,255,0.05)", borderRadius: 13, marginBottom: 14, boxShadow: "inset 0 1px 2px rgba(0,0,0,0.15)" }}>
         {GEN_TABS.map(t => {
           const tabCap = { image: true, text: true, multi: caps.multiview, batch: caps.batch };
           const disabled = !tabCap[t.id];
@@ -612,12 +599,12 @@ Respond ONLY with plain text, no JSON, no explanation.`;
                     title={s.prefix}
                     style={{
                       display: "flex", alignItems: "center", gap: 5,
-                      padding: "6px 12px", borderRadius: 10,
+                      padding: "7px 13px", borderRadius: 11,
                       fontSize: 12, fontWeight: 600,
                       cursor: "pointer",
-                      border: active ? "1px solid rgba(108,99,255,0.45)" : "1px solid rgba(255,255,255,0.07)",
-                      background: active ? "rgba(108,99,255,0.18)" : "rgba(255,255,255,0.04)",
-                      color: active ? "#b0aaff" : "#5a5a78",
+                      border: active ? "1px solid rgba(139,92,246,0.35)" : "1px solid rgba(255,255,255,0.06)",
+                      background: active ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.035)",
+                      color: active ? "#b5b0ff" : "#5a5a78",
                       transition: "all 0.15s ease",
                       fontFamily: "'SF Pro Text', system-ui, sans-serif",
                     }}
@@ -698,7 +685,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
 
       {/* ── Multi-view tab ── */}
       {genTab === "multi" && (
-        <div style={{ border: "1.5px solid rgba(108,99,255,0.35)", borderRadius: 12, overflow: "hidden", background: "rgba(108,99,255,0.04)", marginBottom: 14 }}>
+        <div style={{ border: "1.5px solid rgba(139,92,246,0.3)", borderRadius: 14, overflow: "hidden", background: "rgba(139,92,246,0.03)", marginBottom: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
           <div className="mv-grid">
             {MV_SLOTS.map((slot, i) => {
               const prev = multiImages?.[i]?.preview;
@@ -753,8 +740,8 @@ Respond ONLY with plain text, no JSON, no explanation.`;
           onDragOver={e => e.preventDefault()}
           onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImg(f); }}
           style={{
-            width: "100%", aspectRatio: "1/1", borderRadius: 12,
-            border: "1.5px dashed rgba(255,255,255,0.1)",
+            width: "100%", aspectRatio: "1/1", borderRadius: 14,
+            border: "1.5px dashed rgba(255,255,255,0.08)",
             cursor: imgUploading ? "wait" : "pointer", overflow: "hidden",
             marginBottom: 14, position: "relative",
             display: "flex", alignItems: "center", justifyContent: "center",

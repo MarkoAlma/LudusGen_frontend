@@ -148,6 +148,7 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
           userId={userId}
           getIdToken={getIdToken}
           color="#60a5fa"
+          defaultTab="trellis"
           activeItemId={activeItem?.id}
           refreshTrigger={refreshTrigger}
           onSelect={(item) => {

@@ -10,6 +10,7 @@ import {
   createSunLight,
   applyLights, applyViewMode, applyWireframeOverlay, applyRigSkeletonOverlay,
   setSceneBg, setGridColor, loadGLB,
+  focusOnHit, applyExponentialZoom,
 } from './threeHelpers';
 
 export default function ThreeViewer({
@@ -33,6 +34,11 @@ export default function ThreeViewer({
   bgColor = 'default',
   gridColor1 = '#1e1e3a',
   gridColor2 = '#111128',
+  // 3D Paint Props
+  paintMode = false,
+  paintColor = '#ffffff',
+  paintSize = 10,
+  paintCanvasRef = null,
 }) {
   const mountRef = useRef(null);
   const S = useRef(null);
@@ -41,6 +47,11 @@ export default function ThreeViewer({
   useEffect(() => {
     lightParamsRef.current = { lightMode, color, lightStrength, lightRotation, dramaticColor };
   }, [lightMode, color, lightStrength, lightRotation, dramaticColor]);
+
+  const paintRef = useRef({ paintMode, paintColor, paintSize, paintCanvasRef });
+  useEffect(() => {
+    paintRef.current = { paintMode, paintColor, paintSize, paintCanvasRef };
+  }, [paintMode, paintColor, paintSize, paintCanvasRef]);
 
   useEffect(() => {
     const el = mountRef.current;
@@ -60,8 +71,8 @@ export default function ThreeViewer({
         stencil: false,
       });
       renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.NeutralToneMapping;
-      renderer.toneMappingExposure = 1.2;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
       renderer.setSize(W, H);
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
       renderer.shadowMap.enabled = true;
@@ -102,7 +113,7 @@ export default function ThreeViewer({
       scene.add(lightGroup);
       const sunLight = createSunLight(THREE, scene);
 
-      const cam = { theta: 0.4, phi: Math.PI / 3, radius: 8, panX: 0, panY: 0 };
+      const cam = { theta: 0.4, phi: Math.PI / 3, radius: 8, panX: 0, panY: 0, panZ: 0 };
       syncCamera(camera, cam);
 
       // ── DEMAND-BASED RENDERING ──────────────────────────────────────────────
@@ -127,6 +138,14 @@ export default function ThreeViewer({
         _wireCache: new Map(), _clayMats: new Map(), _uvMats: new Map(),
         autoSpin, lightAutoRotate, lightAutoRotateSpeed,
         drag: { active: false, mode: 'orbit', x: 0, y: 0 },
+        // 3D Paint
+        raycaster: new THREE.Raycaster(),
+        mouse: new THREE.Vector2(),
+        paintTexture: null,
+        paintOverlay: null,
+        // Smooth camera targets
+        camTarget: { ...cam },
+        lerpFactor: 0.08,
         frame: null,
         markDirty,
         pmremGenerator, envTexture,
@@ -144,13 +163,65 @@ export default function ThreeViewer({
         const spinning = S.current.autoSpin && !S.current.drag.active;
         const lightMoving = S.current.lightAutoRotate;
 
+        // ── CAMERA INERTIA (LERP) ───────────────────────────────────────────
+        const { cam, camTarget, lerpFactor } = S.current;
+        let camChanged = false;
+
+        // Smoothly interpolate current camera values toward targets
+        const lerp = (cur, tar, f) => {
+          const delta = tar - cur;
+          if (Math.abs(delta) < 0.0001) return tar;
+          camChanged = true;
+          return cur + delta * f;
+        };
+
         if (spinning) {
-          S.current.cam.theta += 0.004;
-          // FIX: normalize theta to prevent floating-point drift during long sessions
-          if (S.current.cam.theta > Math.PI * 2) S.current.cam.theta -= Math.PI * 2;
-          syncCamera(camera, S.current.cam);
+          camTarget.theta += 0.004;
+          if (camTarget.theta > Math.PI * 2) camTarget.theta -= Math.PI * 2;
+        }
+
+        cam.theta = lerp(cam.theta, camTarget.theta, lerpFactor);
+        cam.phi = lerp(cam.phi, camTarget.phi, lerpFactor);
+        cam.radius = lerp(cam.radius, camTarget.radius, lerpFactor);
+        cam.panX = lerp(cam.panX, camTarget.panX, lerpFactor);
+        cam.panY = lerp(cam.panY, camTarget.panY, lerpFactor);
+        cam.panZ = lerp(cam.panZ ?? 0, camTarget.panZ ?? 0, lerpFactor);
+
+        if (camChanged) {
+          syncCamera(camera, cam);
           _dirty = true;
         }
+
+        const { paintMode: _pm } = paintRef.current;
+        if (_pm && S.current.model && !S.current.paintOverlay) {
+          // Create overlay shell Mesh for painting
+          const overlay = S.current.model.clone();
+          const paintMat = new THREE.MeshBasicMaterial({
+            map: S.current.paintTexture,
+            transparent: true,
+            opacity: 0.9,
+            depthTest: true,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
+            side: THREE.DoubleSide
+          });
+          overlay.traverse(node => {
+            if (node.isMesh) {
+              node.material = paintMat;
+              node.userData.isPaintOverlay = true;
+            }
+          });
+          scene.add(overlay);
+          S.current.paintOverlay = overlay;
+          _dirty = true;
+        } else if (!_pm && S.current.paintOverlay) {
+          scene.remove(S.current.paintOverlay);
+          S.current.paintOverlay = null; // We keep the texture for next time
+          _dirty = true;
+        }
+
         if (lightMoving) {
           S.current.lightGroup.rotation.y += S.current.lightAutoRotateSpeed * dt;
           _dirty = true;
@@ -195,6 +266,7 @@ export default function ThreeViewer({
       if (S.current?._mixer) { S.current._mixer.stopAllAction(); S.current._mixer = null; }
       if (S.current?.pmremGenerator) S.current.pmremGenerator.dispose();
       if (S.current?.envTexture) S.current.envTexture.dispose();
+      if (S.current?.paintTexture) S.current.paintTexture.dispose();
       if (S.current?.renderer) {
         S.current.renderer.dispose();
         if (el.contains(S.current.renderer.domElement)) el.removeChild(S.current.renderer.domElement);
@@ -269,13 +341,12 @@ export default function ThreeViewer({
     const el = mountRef.current;
     if (!el) return;
     const handler = (e) => {
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
       if (!S.current) return;
-      const delta = e.deltaY > 0 ? 0.5 : -0.5;
-      S.current.cam.radius = Math.max(0.5, Math.min(30, S.current.cam.radius + delta));
-      syncCamera(S.current.camera, S.current.cam);
-      S.current.markDirty?.();
+      applyExponentialZoom(S.current.camTarget, e.deltaY, 0.5, 30);
       if (S.current.autoSpin) { S.current.autoSpin = false; if (onSpinStop) onSpinStop(); }
+      S.current.markDirty?.();
     };
     el.addEventListener('wheel', handler, { passive: false });
     return () => el.removeEventListener('wheel', handler);
@@ -331,30 +402,83 @@ export default function ThreeViewer({
   }, [onSpinStop]);
 
   const onPointerMove = useCallback((e) => {
-    if (!S.current?.drag.active) return;
-    const dx = e.clientX - S.current.drag.x;
-    const dy = e.clientY - S.current.drag.y;
-    S.current.drag.x = e.clientX;
-    S.current.drag.y = e.clientY;
-    const { mode } = S.current.drag;
+    if (!S.current) return;
+    const { raycaster, mouse, camera, scene, model, drag } = S.current;
+
+    // Update mouse position for raycasting
+    const rect = mountRef.current.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    const { paintMode: pm, paintColor: pc, paintSize: ps, paintCanvasRef: pcRef } = paintRef.current;
+    if (pm && drag.active && drag.mode === 'orbit') {
+      raycaster.setFromCamera(mouse, camera);
+      const root = model || S.current.placeholder;
+      if (root) {
+        const meshes = [];
+        root.traverse(node => {
+          if (node.isMesh && !node.userData.isGround && !node.userData.isWireframeOverlay
+              && !node.userData.isRigOverlay && !node.userData.isPaintOverlay) {
+            meshes.push(node);
+          }
+        });
+        const intersects = raycaster.intersectObjects(meshes, false);
+        if (intersects.length > 0 && intersects[0].uv && pcRef?.current) {
+          const hit = intersects[0];
+          const cvs = pcRef.current;
+          const ctx2d = cvs.getContext('2d');
+          const x = hit.uv.x * cvs.width;
+          const y = (1 - hit.uv.y) * cvs.height;
+
+          ctx2d.fillStyle = pc;
+          ctx2d.beginPath();
+          ctx2d.arc(x, y, ps, 0, Math.PI * 2);
+          ctx2d.fill();
+
+          if (!S.current.paintTexture) {
+            S.current.paintTexture = new THREE.CanvasTexture(cvs);
+            S.current.paintTexture.colorSpace = THREE.SRGBColorSpace;
+          }
+          S.current.paintTexture.needsUpdate = true;
+          S.current.markDirty();
+        }
+      }
+    }
+
+    if (!drag.active) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    const { mode } = drag;
+    const { camTarget } = S.current;
+
     if (mode === 'model') {
-      const target = S.current.model || S.current.placeholder;
-      if (target) target.rotation.y += dx * 0.012;
+      const targetMesh = S.current.model || S.current.placeholder;
+      if (targetMesh) targetMesh.rotation.y += dx * 0.012;
     } else if (mode === 'pan') {
       const spd = S.current.cam.radius * 0.0018;
-      S.current.cam.panY -= dy * spd;
-      S.current.cam.panX -= dx * spd * Math.cos(S.current.cam.theta);
-      syncCamera(S.current.camera, S.current.cam);
+      const { theta } = S.current.cam;
+      camTarget.panX -= dx * spd * Math.cos(theta);
+      camTarget.panZ = (camTarget.panZ ?? 0) - dx * spd * Math.sin(theta);
+      camTarget.panY -= dy * spd;
     } else {
-      S.current.cam.theta -= dx * 0.007;
-      S.current.cam.phi = Math.max(0.05, Math.min(Math.PI - 0.05, S.current.cam.phi - dy * 0.007));
-      syncCamera(S.current.camera, S.current.cam);
+      camTarget.theta -= dx * 0.007;
+      camTarget.phi = Math.max(0.05, Math.min(Math.PI - 0.05, camTarget.phi - dy * 0.007));
     }
     S.current.markDirty?.();
   }, []);
 
   const onPointerUp = useCallback(() => {
     if (S.current) S.current.drag.active = false;
+  }, []);
+
+  const onDoubleClick = useCallback((e) => {
+    if (!S.current || !mountRef.current) return;
+    const rect = mountRef.current.getBoundingClientRect();
+    const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    focusOnHit(S.current, ndcX, ndcY);
   }, []);
 
   const getCursor = () => {
@@ -366,11 +490,13 @@ export default function ThreeViewer({
     <div
       ref={mountRef}
       className="w-full h-full"
-      style={{ cursor: getCursor(), touchAction: 'none', userSelect: 'none' }}
+      style={{ cursor: getCursor(), touchAction: 'none', userSelect: 'none', position: 'relative', zIndex: 0 }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerUp}
+      onDoubleClick={onDoubleClick}
+      onContextMenu={e => e.preventDefault()}
     />
   );
 }

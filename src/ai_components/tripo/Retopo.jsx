@@ -100,15 +100,15 @@ export default function Retopo({
     <>
       {/* Selected model badge */}
       {activeTaskId && (
-        <div style={{ padding: "8px 10px", borderRadius: 9, background: "rgba(108,99,255,0.08)", border: "1px solid rgba(108,99,255,0.25)", marginBottom: 14 }}>
-          <p style={{ color: "#a5a0ff", fontSize: 11, fontWeight: 600, margin: 0 }}>Selected model</p>
-          <p style={{ color: "#2d2d48", fontSize: 9, margin: "2px 0 0", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeTaskId}</p>
+        <div style={{ padding: "8px 12px", borderRadius: 12, background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.2)", marginBottom: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+          <p style={{ color: "#b5b0ff", fontSize: 11, fontWeight: 600, margin: 0 }}>Selected model</p>
+          <p style={{ color: "#2d2d48", fontSize: 10, margin: "2px 0 0", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeTaskId}</p>
         </div>
       )}
 
       {/* Rigged model warning */}
       {isRiggedInput && (
-        <div style={{ padding: "6px 9px", borderRadius: 8, background: "rgba(245,197,24,0.06)", border: "1px solid rgba(245,197,24,0.15)", display: "flex", gap: 6, marginBottom: 12 }}>
+        <div style={{ padding: "6px 10px", borderRadius: 10, background: "rgba(245,197,24,0.06)", border: "1px solid rgba(245,197,24,0.15)", display: "flex", gap: 6, marginBottom: 12 }}>
           <span style={{ color: "#f5c518", fontSize: 9, marginTop: 1, flexShrink: 0 }}>⚠</span>
           <p style={{ color: "#fcd34d", fontSize: 10, margin: 0, lineHeight: 1.5 }}>
             Rigged model: OBJ and STL export are not supported. Use GLB or FBX.
@@ -162,7 +162,7 @@ export default function Retopo({
 
       {/* Quad warning */}
       {quad && (
-        <div style={{ padding: "6px 9px", borderRadius: 8, background: "rgba(245,197,24,0.06)", border: "1px solid rgba(245,197,24,0.15)", display: "flex", gap: 6, marginBottom: 10 }}>
+        <div style={{ padding: "6px 10px", borderRadius: 10, background: "rgba(245,197,24,0.06)", border: "1px solid rgba(245,197,24,0.15)", display: "flex", gap: 6, marginBottom: 10 }}>
           <span style={{ color: "#f5c518", fontSize: 9, marginTop: 1, flexShrink: 0 }}>⚠</span>
           <p style={{ color: "#fcd34d", fontSize: 10, margin: 0, lineHeight: 1.5 }}>
             Quad forces FBX output. {!smartLowPoly && "Default face limit: 10 000."}
@@ -181,8 +181,8 @@ export default function Retopo({
             disabled={quad}
             onClick={() => !quad && setFmtOpen(v => !v)}
             style={{
-              width: "100%", padding: "8px 12px", borderRadius: 9,
-              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+              width: "100%", padding: "9px 12px", borderRadius: 10,
+              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
               display: "flex", alignItems: "center", justifyContent: "space-between",
               cursor: quad ? "not-allowed" : "pointer",
               fontFamily: "inherit", opacity: quad ? 0.5 : 1,
@@ -198,8 +198,8 @@ export default function Retopo({
           {fmtOpen && !quad && (
             <div style={{
               position: "absolute", left: 0, right: 0, bottom: "calc(100% + 4px)", zIndex: 50,
-              background: "#131327", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10,
-              overflow: "hidden", boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+              background: "#131327", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12,
+              overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)",
             }}>
               {CONVERT_FORMATS.map((f, i) => {
                 const unsupported = isRiggedInput && RIGGED_UNSUPPORTED_FORMATS.has(f.id);

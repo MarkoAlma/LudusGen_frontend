@@ -137,7 +137,7 @@ export function useTrellisLogic(userId, getIdToken) {
           ],
           temperature: 0.4,
           top_p: 0.9,
-          max_tokens: 10000
+          max_tokens: 1000
         }),
       });
       if (!res.ok) {

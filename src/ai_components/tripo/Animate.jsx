@@ -40,7 +40,7 @@ function AnimCard({ anim, isSelected, selCount, onSelect }) {
     <div
       className="anim-card"
       onClick={onSelect}
-      style={{ border: "1px solid " + (isSelected ? "rgba(108,99,255,0.5)" : "rgba(255,255,255,0.07)"), background: isSelected ? "rgba(108,99,255,0.08)" : "#111122" }}
+      style={{ border: "1px solid " + (isSelected ? "rgba(139,92,246,0.35)" : "rgba(255,255,255,0.07)"), background: isSelected ? "rgba(139,92,246,0.08)" : "#111122" }}
     >
       <div style={{ aspectRatio: "1/1", display: "flex", alignItems: "center", justifyContent: "center", background: "#111122", position: "relative", overflow: "hidden" }}>
         {!err
@@ -94,6 +94,8 @@ export default function Animate({
   rigType, setRigType,
   rigSpec, setRigSpec,
   detectedRigType,
+  detectedRigModelVer,
+  detectedRigSpec,
   animSearch, setAnimSearch,
   animCat, setAnimCat,
   filtAnims,
@@ -110,22 +112,26 @@ export default function Animate({
   const rigTypeInfo = RIG_TYPES.find(r => r.id === rigType);
   const rigSpecInfo = RIG_SPECS.find(s => s.id === rigSpec);
 
-  // Use detected rig type if available (from prerigcheck or history), otherwise fall back to manual selection
-  const effectiveRigType = detectedRigType || rigType;
-  const effectiveModelVer = detectedRigType ? "v1" : animModelVer;
+  // detectedRigModelVer is only set when a rigged model is actively selected or just rigged.
+  // null + rigStep !== "rigged"  → no rig loaded, show all, UI dropdown controls new rigs
+  // null + rigStep === "rigged"  → old item without metadata, show all (can't know version)
+  // set                          → filter by saved rig version, ignore UI dropdown
 
-  // Filter filtAnims by model version
-  const effectiveAnims = effectiveModelVer === "v1"
-    ? filtAnims.filter(a => a.rigVersion === "v1")
-    : filtAnims.filter(a => a.rigVersion === "v2");
-
-  // Determine which categories to show based on model version
   const v1Cats = ["all", ...ANIM_CATEGORIES.filter(c => !["all", "basic", "interactive", "v2_only"].includes(c))];
   const v2Cats = ["all", "idle", "walking", "running", "combat", "action", "other"];
-  const visibleCats = effectiveModelVer === "v1" ? v1Cats : v2Cats;
 
-  // Reset category if current one is not available
-  if (effectiveModelVer === "v2" && !v2Cats.includes(animCat)) {
+  // savedRigLibVer: "v1" | "v2" | null (null = show all)
+  const savedRigLibVer = !detectedRigModelVer
+    ? null
+    : detectedRigModelVer.startsWith("v1") ? "v1" : "v2";
+
+  const effectiveAnims = savedRigLibVer === null
+    ? filtAnims
+    : filtAnims.filter(a => a.rigVersion === savedRigLibVer);
+
+  const visibleCats = savedRigLibVer === "v1" ? v1Cats : v2Cats;
+
+  if (savedRigLibVer === "v2" && !v2Cats.includes(animCat)) {
     setAnimCat("all");
   }
 
@@ -145,7 +151,7 @@ export default function Animate({
             <ChevronDown style={{ width: 14, height: 14, color: "#2d2d48", transform: animModelDD ? "rotate(180deg)" : "none", transition: "transform 0.14s" }} />
           </button>
           {animModelDD && (
-            <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 80, background: "#0f0f1e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, overflow: "hidden", boxShadow: "0 12px 40px rgba(0,0,0,0.6)" }}>
+            <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 80, background: "#0f0f1e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)" }}>
               {ANIM_MODEL_VERSIONS.map(v => (
                 <button key={v.id}
                   onClick={() => { setAnimModelVer(v.id); setAnimModelDD(false); }}
@@ -179,7 +185,7 @@ export default function Animate({
               <ChevronDown style={{ width: 14, height: 14, color: "#2d2d48", transform: rigTypeDD ? "rotate(180deg)" : "none", transition: "transform 0.14s" }} />
             </button>
             {rigTypeDD && (
-              <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 80, background: "#0f0f1e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, overflow: "hidden", boxShadow: "0 12px 40px rgba(0,0,0,0.6)" }}>
+              <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 80, background: "#0f0f1e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)" }}>
                 {RIG_TYPES.map(r => (
                   <button key={r.id}
                     onClick={() => { setRigType(r.id); setRigTypeDD(false); }}
@@ -214,7 +220,7 @@ export default function Animate({
               <ChevronDown style={{ width: 14, height: 14, color: "#2d2d48", transform: rigSpecDD ? "rotate(180deg)" : "none", transition: "transform 0.14s" }} />
             </button>
             {rigSpecDD && (
-              <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 80, background: "#0f0f1e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, overflow: "hidden", boxShadow: "0 12px 40px rgba(0,0,0,0.6)" }}>
+              <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 80, background: "#0f0f1e", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)" }}>
                 {RIG_SPECS.map(s => (
                   <button key={s.id}
                     onClick={() => { setRigSpec(s.id); setRigSpecDD(false); }}
@@ -249,7 +255,7 @@ export default function Animate({
       {/* Prerigcheck result */}
       {prerigcheckResult && (
         <div style={{
-          display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 9, marginBottom: 12,
+          display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 11, marginBottom: 12,
           background: prerigcheckResult.riggable ? "rgba(34,197,94,0.07)" : "rgba(239,68,68,0.07)",
           border: "1px solid " + (prerigcheckResult.riggable ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"),
         }}>
@@ -278,7 +284,7 @@ export default function Animate({
 
       {/* Rigged confirmation */}
       {rigStep === "rigged" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 9, background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.2)", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 11, background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.2)", marginBottom: 12 }}>
           <Check style={{ width: 11, height: 11, color: "#22c55e", flexShrink: 0 }} />
           <span style={{ fontSize: 11, color: "#86efac" }}>Rigged — select an animation below</span>
         </div>

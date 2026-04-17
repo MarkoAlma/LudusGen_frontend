@@ -164,7 +164,7 @@ export default function LightingControls({
 
       {open && (
         <div style={{
-          position: 'fixed', top: 'auto', bottom: 16, right: 16, left: 'auto', zIndex: 999,
+          position: 'absolute', top: 'calc(100% + 8px)', bottom: 'auto', right: 0, left: 'auto', zIndex: 9999,
           width: 'min(240px, calc(100vw - 32px))', borderRadius: 14, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto',
           background: '#0f0f23', border: '1px solid rgba(255,255,255,0.12)',
           boxShadow: '0 16px 48px rgba(0,0,0,0.6)', padding: 14,
