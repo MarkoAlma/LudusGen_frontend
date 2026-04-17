@@ -16,6 +16,7 @@ const LS_KEY = "tripo_active_gen";
  *   prompt: string,
  *   modelVer: string,
  *   riggedId: string | null,
+ *   opType: string | undefined,
  * }} PersistedGen
  */
 
@@ -53,4 +54,12 @@ export function updatePersistedProgress(progress) {
 
 export function clearPersistedGen() {
   try { localStorage.removeItem(LS_KEY); } catch {}
+}
+
+export function markHistorySaved() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    localStorage.setItem(LS_KEY, JSON.stringify({ ...JSON.parse(raw), savedToHistory: true }));
+  } catch {}
 }

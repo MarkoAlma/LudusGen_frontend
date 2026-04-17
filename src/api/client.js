@@ -181,7 +181,7 @@ export async function enhancePrompt({
   userPrompt,
   temperature = 0.4,
   top_p = 0.9,
-  max_tokens = 10000,
+  max_tokens = 1000,
   model = 'openai/gpt-oss-120b',
   provider = 'groq',
   getIdTokenOrToken,

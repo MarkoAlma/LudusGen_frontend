@@ -27,10 +27,9 @@ function hslToHex(h, s, l) {
  *          pbr=true OVERRIDES texture=true — the API treats them as exclusive.
  *    NOTE: texture_alignment: "original_image" (default) | "geometry"
  *
- *  mode="texture_edit" → Magic Brush (view-based inpainting, frontend-driven)
- *    Uses creativity_strength (0–1) and a mask painted on the 3D viewport.
- *    Gen Mode: prompt-based regeneration of painted region.
- *    Paint Mode: direct color painting.
+ *  mode="texture_edit" → task type: "texture_model" (with painted mask as reference image)
+ *    Gen Mode: prompt-based regeneration via texture_model with mask file.
+ *    Paint Mode: direct color painting on 3D viewport, canvas sent as mask.
  *
  *  REMOVED modes (not available as separate Tripo API v2 tasks):
  *    texture_upscale → no such task exists
@@ -56,9 +55,9 @@ function CoinIcon({ size = 15 }) {
 function SelectedModelBadge({ activeTaskId }) {
   if (!activeTaskId) return null;
   return (
-    <div style={{ padding: "8px 10px", borderRadius: 9, background: "rgba(108,99,255,0.08)", border: "1px solid rgba(108,99,255,0.25)", marginBottom: 14 }}>
-      <p style={{ color: "#a5a0ff", fontSize: 11, fontWeight: 600, margin: 0 }}>Selected model</p>
-      <p style={{ color: "#2d2d48", fontSize: 9, margin: "2px 0 0", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+    <div style={{ padding: "8px 12px", borderRadius: 12, background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.2)", marginBottom: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+      <p style={{ color: "#b5b0ff", fontSize: 11, fontWeight: 600, margin: 0 }}>Selected model</p>
+      <p style={{ color: "#2d2d48", fontSize: 10, margin: "2px 0 0", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {activeTaskId}
       </p>
     </div>
@@ -207,6 +206,7 @@ function MagicBrushPanel({
   brushColor, setBrushColor,
   brushSize, setBrushSize,
   canvasRef,
+  onUndo,
 }) {
   const spectrumRef = useRef(null);
   const [spectrumPct, setSpectrumPct] = useState(50);
@@ -242,21 +242,34 @@ function MagicBrushPanel({
 
   return (
     <div>
-      {/* Mode switcher */}
-      <div style={{ display: "flex", gap: 3, padding: "3px", background: "rgba(255,255,255,0.06)", borderRadius: 11, marginBottom: 16 }}>
-        {["Gen Mode", "Paint Mode"].map(m => (
+      {/* Mode switcher & Undo */}
+      <div style={{ display: "flex", gap: 3, marginBottom: 16 }}>
+        <div style={{ display: "flex", flex: 1, gap: 3, padding: "4px", background: "rgba(255,255,255,0.05)", borderRadius: 13, boxShadow: "inset 0 1px 2px rgba(0,0,0,0.15)" }}>
+          {["Gen Mode", "Paint Mode"].map(m => (
+            <button
+              key={m}
+              className={"magic-mode-tab" + (brushMode === m ? " on" : "")}
+              onClick={() => setBrushMode(m)}
+            >{m}</button>
+          ))}
+        </div>
+        {brushMode === "Paint Mode" && onUndo && (
           <button
-            key={m}
-            className={"magic-mode-tab" + (brushMode === m ? " on" : "")}
-            onClick={() => setBrushMode(m)}
-          >{m}</button>
-        ))}
+            onClick={onUndo}
+            title="Undo last stroke"
+            style={{ width: 42, padding: "4px", background: "rgba(255,255,255,0.05)", borderRadius: 13, border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+          >
+            <div style={{ transform: "rotate(-45deg)" }}>
+              <Zap style={{ width: 14, height: 14, color: "#a5a0ff" }} />
+            </div>
+          </button>
+        )}
       </div>
 
       {/* Gen Mode — prompt-based inpainting */}
       {brushMode === "Gen Mode" && (
         <>
-          <div style={{ borderRadius: 12, border: "1px solid rgba(255,255,255,0.09)", background: "rgba(255,255,255,0.03)", marginBottom: 16, overflow: "hidden" }}>
+          <div style={{ borderRadius: 13, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", marginBottom: 16, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
             <textarea
               className="tp-ta"
               value={brushPrompt}
@@ -297,39 +310,35 @@ function MagicBrushPanel({
         </>
       )}
 
-      {/* Paint Mode — direct color painting on canvas */}
+      {/* Paint Mode — direct 3D painting on viewport model */}
       {brushMode === "Paint Mode" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {/* Drawing canvas */}
-          <div style={{ borderRadius: 12, overflow: "hidden", position: "relative", border: "1px solid rgba(255,255,255,0.09)" }}>
-            <canvas
-              ref={canvasRef}
-              width={512}
-              height={512}
-              style={{ width: "100%", aspectRatio: "1/1", display: "block", cursor: "crosshair", background: "#1a1a2e" }}
-            />
-            <div style={{ position: "absolute", top: 6, right: 6, display: "flex", gap: 4 }}>
-              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", background: "rgba(0,0,0,0.5)", borderRadius: 4, padding: "2px 6px" }}>
-                Paint mask
-              </span>
+          {/* Instruction banner */}
+          <div style={{ borderRadius: 13, overflow: "hidden", position: "relative", border: "1px solid rgba(139,92,246,0.2)", background: "rgba(139,92,246,0.05)", padding: "16px 14px", textAlign: "center" }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(139,92,246,0.12)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
+              <Pencil style={{ width: 18, height: 18, color: "#a78bfa" }} />
             </div>
+            <p style={{ color: "#c4b5fd", fontSize: 12, fontWeight: 600, margin: "0 0 4px" }}>Paint directly on the 3D model</p>
+            <p style={{ color: "#6d6d8e", fontSize: 10, margin: 0, lineHeight: 1.5 }}>
+              Left-click and drag on the model to paint. Use Shift+drag to orbit, right-click to pan.
+            </p>
           </div>
 
           {/* Brush size */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
               <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Brush Size</span>
-              <span style={{ marginLeft: "auto", color: "#2d2d48", fontSize: 9, fontFamily: "monospace" }}>1 – 50</span>
+              <span style={{ marginLeft: "auto", color: "#2d2d48", fontSize: 9, fontFamily: "monospace" }}>1 – 120</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <input
-                type="range" min={1} max={50} step={1}
+                type="range" min={1} max={120} step={1}
                 value={brushSize}
                 onChange={e => setBrushSize(Number(e.target.value))}
                 style={{ flex: 1, accentColor: "#6c63ff" }}
               />
               <div style={{ width: 40, height: 40, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.05)" }}>
-                <div style={{ width: Math.max(4, Math.min(32, brushSize)), height: Math.max(4, Math.min(32, brushSize)), borderRadius: "50%", background: brushColor }} />
+                <div style={{ width: Math.max(4, Math.min(36, brushSize * 0.3)), height: Math.max(4, Math.min(36, brushSize * 0.3)), borderRadius: "50%", background: brushColor }} />
               </div>
             </div>
           </div>
@@ -366,8 +375,8 @@ function MagicBrushPanel({
  *                   supports image / multi-view / text input
  *                   options: pbr, tex4K (texture_quality "HD"), texture_seed
  *
- *  "texture_edit" → Magic Brush viewport inpainting
- *                   creativity_strength 0–1, Gen Mode / Paint Mode
+ *  "texture_edit" → texture_model API task (with painted mask as file reference)
+ *                   Gen Mode / Paint Mode
  *
  *  REMOVED: "texture_upscale" — no such Tripo API v2 task
  *  REMOVED: "texture_pbr"    — use mode="texture" with pbrOn=true instead
@@ -391,6 +400,7 @@ export default function Texture({
   brushColor, setBrushColor,
   brushSize, setBrushSize,                   // brush radius in pixels
   canvasRef,                                 // ref for the paint canvas element
+  onUndo,                                    // undo trigger
 }) {
   return (
     <>
@@ -487,6 +497,7 @@ export default function Texture({
             brushColor={brushColor} setBrushColor={setBrushColor}
             brushSize={brushSize} setBrushSize={setBrushSize}
             canvasRef={canvasRef}
+            onUndo={onUndo}
           />
         </>
       )}

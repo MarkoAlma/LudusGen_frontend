@@ -25,6 +25,10 @@ export const BG_OPTIONS = [
     render: () => <div style={{ width: 14, height: 14, borderRadius: 3, background: '#111118', border: '1px solid rgba(255,255,255,0.1)' }} />,
   },
   {
+    id: 'deep', label: 'Mély sötét',
+    render: () => <div style={{ width: 14, height: 14, borderRadius: 3, background: '#0a0a12', border: '1px solid rgba(255,255,255,0.1)' }} />,
+  },
+  {
     id: 'grayish', label: 'Szürkés',
     render: () => <div style={{ width: 14, height: 14, borderRadius: 3, background: '#24242e', border: '1px solid rgba(255,255,255,0.1)' }} />,
   },
@@ -92,13 +96,6 @@ export const STYLE_OPTIONS = [
     tip: 'Voxel — sűrűbb pixelrács, lépcsőzetes blokkforma'
   },
 
-  { 
-    id: 'lowpoly', 
-    label: 'Low-poly',
-    emoji: '🔷',
-    prefix: 'Low-poly 3D model, reduced polygon count, clearly visible polygon facets, flat shaded surfaces, angular simplified geometry, ',
-    tip: 'Low-poly — kevés polygon, jól látható facet élek'
-  },
 
   { 
     id: 'hard_surface', 

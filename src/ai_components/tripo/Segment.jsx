@@ -28,7 +28,7 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput }) {
 
           {/* Rigged model blocker */}
           {isRiggedInput && (
-            <div style={{ width: "100%", padding: "8px 10px", borderRadius: 9, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", marginBottom: 14, textAlign: "left", display: "flex", gap: 8 }}>
+            <div style={{ width: "100%", padding: "8px 12px", borderRadius: 11, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", marginBottom: 14, textAlign: "left", display: "flex", gap: 8 }}>
               <AlertTriangle style={{ width: 13, height: 13, color: "#f87171", flexShrink: 0, marginTop: 1 }} />
               <div>
                 <p style={{ color: "#f87171", fontSize: 11, fontWeight: 600, margin: 0 }}>Incompatible model</p>
@@ -42,7 +42,7 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput }) {
           {activeTaskId ? (
             /* ── Selected model — Ready state ── */
             <div style={{ width: "100%" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)", marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)", marginBottom: 14 }}>
                 <Check style={{ width: 14, height: 14, color: "#22c55e", flexShrink: 0 }} />
                 <span style={{ color: "#86efac", fontSize: 12, fontWeight: 700 }}>Ready to Segment</span>
               </div>
@@ -64,18 +64,18 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput }) {
               </p>
 
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24, opacity: 0.7 }}>
-                <div style={{ width: 90, height: 90, borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 90, height: 90, borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Scissors style={{ width: 28, height: 28, color: "#3a3a58" }} />
                 </div>
                 <div style={{ width: 20, height: 20, borderRadius: "50%", background: "rgba(108,99,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <ChevronRight style={{ width: 11, height: 11, color: "#6c63ff" }} />
                 </div>
-                <div style={{ width: 90, height: 90, borderRadius: 10, background: "rgba(108,99,255,0.06)", border: "1px solid rgba(108,99,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 90, height: 90, borderRadius: 12, background: "rgba(139,92,246,0.04)", border: "1px solid rgba(139,92,246,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Scissors style={{ width: 28, height: 28, color: "#6c63ff", opacity: 0.5 }} />
                 </div>
               </div>
 
-              <div style={{ width: "100%", padding: "6px 9px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", textAlign: "left", marginBottom: 10 }}>
+              <div style={{ width: "100%", padding: "6px 10px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", textAlign: "left", marginBottom: 10 }}>
                 <p style={{ color: "#2d2d48", fontSize: 9, margin: 0, lineHeight: 1.6 }}>
                   Valid sources: text/image/multiview generation, imported models, retopo outputs.
                 </p>
@@ -91,7 +91,7 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput }) {
 
           {/* Rigged model blocker */}
           {isRiggedInput && (
-            <div style={{ width: "100%", padding: "8px 10px", borderRadius: 9, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", marginBottom: 14, textAlign: "left", display: "flex", gap: 8 }}>
+            <div style={{ width: "100%", padding: "8px 12px", borderRadius: 11, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", marginBottom: 14, textAlign: "left", display: "flex", gap: 8 }}>
               <AlertTriangle style={{ width: 13, height: 13, color: "#f87171", flexShrink: 0, marginTop: 1 }} />
               <div>
                 <p style={{ color: "#f87171", fontSize: 11, fontWeight: 600, margin: 0 }}>Incompatible model</p>
@@ -105,7 +105,7 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput }) {
           {activeTaskId ? (
             /* ── Selected model — Ready state ── */
             <div style={{ width: "100%" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)", marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)", marginBottom: 14 }}>
                 <Check style={{ width: 14, height: 14, color: "#22c55e", flexShrink: 0 }} />
                 <span style={{ color: "#86efac", fontSize: 12, fontWeight: 700 }}>Ready for Part Completion</span>
               </div>
@@ -127,18 +127,18 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput }) {
               </p>
 
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24, opacity: 0.7 }}>
-                <div style={{ width: 90, height: 90, borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 90, height: 90, borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Boxes style={{ width: 28, height: 28, color: "#3a3a58" }} />
                 </div>
                 <div style={{ width: 20, height: 20, borderRadius: "50%", background: "rgba(108,99,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <ChevronRight style={{ width: 11, height: 11, color: "#6c63ff" }} />
                 </div>
-                <div style={{ width: 90, height: 90, borderRadius: 10, background: "rgba(108,99,255,0.06)", border: "1px solid rgba(108,99,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 90, height: 90, borderRadius: 12, background: "rgba(139,92,246,0.04)", border: "1px solid rgba(139,92,246,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Box style={{ width: 28, height: 28, color: "#6c63ff", opacity: 0.5 }} />
                 </div>
               </div>
 
-              <div style={{ width: "100%", padding: "6px 9px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", textAlign: "left", marginBottom: 10 }}>
+              <div style={{ width: "100%", padding: "6px 10px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", textAlign: "left", marginBottom: 10 }}>
                 <p style={{ color: "#2d2d48", fontSize: 9, margin: 0, lineHeight: 1.6 }}>
                   Source must be a segmented model (mesh_segmentation output).
                 </p>

@@ -2,6 +2,7 @@ import { db } from '../../firebase/firebaseApp';
 import { STYLE_OPTIONS } from './Constants';
 import {
   collection,
+  doc,
   query,
   where,
   orderBy,
@@ -9,6 +10,7 @@ import {
   startAfter,
   getDocs,
   addDoc,
+  setDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 
@@ -267,14 +269,20 @@ export async function loadHistoryPageFromFirestore(userId, { limit = 10, startAf
 // ezzel a mezővel automatikus törléshez (ha engedélyezve van).
 // ────────────────────────────────────────────────────────────────────────────
 
-export async function saveHistoryToFirestore(userId, itemData) {
+export async function saveHistoryToFirestore(userId, itemData, docId = null) {
   const now = Date.now();
-  const docRef = await addDoc(collection(db, 'trellis_history'), {
+  const data = {
     userId,
     ...itemData,
-    createdAt: serverTimestamp(),          // Firestore index + load
-    ts: itemData.ts ?? now,               // client-side rendezés
-    expiresAt: now + HISTORY_TTL_MS,      // TTL: 7 nap — Firestore TTL policy használható
-  });
+    createdAt: serverTimestamp(),
+    ts: itemData.ts ?? now,
+    expiresAt: now + HISTORY_TTL_MS,
+  };
+  if (docId) {
+    const docRef = doc(db, 'trellis_history', docId);
+    await setDoc(docRef, data, { merge: true });
+    return { docId };
+  }
+  const docRef = await addDoc(collection(db, 'trellis_history'), data);
   return { docId: docRef.id };
 }
