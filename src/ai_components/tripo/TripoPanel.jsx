@@ -11,7 +11,7 @@ import {
 
 import StudioLayout, { StudioLayoutContext } from "../../components/shared/StudioLayout";
 import ThreeViewer from "../meshy/viewer/ThreeViewer";
-import { setCameraPreset } from "../meshy/viewer/threeHelpers";
+import { setCameraPreset, switchAnimationClip } from "../meshy/viewer/threeHelpers";
 import { IconBtn, Tooltip } from "../meshy/ui/Primitives";
 import LightingControls from "../meshy/viewer/LightingControls";
 import {
@@ -319,7 +319,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [prerigcheckResult, setPrerigcheckResult] = useState(null);
   const [animOutFormat, setAnimOutFormat] = useState("glb");
   const [animBakeAnimation, setAnimBakeAnimation] = useState(true);
-  const [animExportGeometry, setAnimExportGeometry] = useState(false);
+  const [animExportGeometry, setAnimExportGeometry] = useState(true);
   const [animAnimateInPlace, setAnimAnimateInPlace] = useState(false);
 
   // gen state
@@ -338,6 +338,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [wireOp, setWireOp] = useState(0.22);
   const [wireC, setWireC] = useState("#ffffff");
   const [showRig, setShowRig] = useState(false);
+  const [animClips, setAnimClips] = useState([]);
+  const [activeClipIdx, setActiveClipIdx] = useState(0);
   const [lStr, setLStr] = useState(1.0);
   const [lRot, setLRot] = useState(0);
   const [lAutoR, setLAutoR] = useState(false);
@@ -356,6 +358,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   // history — persist selected model across refresh
   const [history, setHistory] = useState([]);
+  const [optimisticItems, setOptimisticItems] = useState([]);
   const [selHistId, setSelHistId] = useState(() => sessionStorage.getItem("tripo_sel_hist") || null);
   useEffect(() => {
     if (selHistId) sessionStorage.setItem("tripo_sel_hist", selHistId);
@@ -470,76 +473,17 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     return mc && ms;
   }), [animSearch, animCat]);
 
-  /* ── Canvas painting setup for Magic Brush ──────────────────────────── */
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+  // NOTE: sidebar canvas event bindings removed — painting happens directly on the
+  // 3D viewport via ThreeViewer's raycaster and _paintCanvas.
 
-    const getPos = (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      return {
-        x: (e.clientX - rect.left) * scaleX,
-        y: (e.clientY - rect.top) * scaleY,
-      };
-    };
-
-    const drawDot = (x, y) => {
-      ctx.fillStyle = brushColor;
-      ctx.beginPath();
-      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
-      ctx.fill();
-    };
-
-    const drawLine = (from, to) => {
-      ctx.strokeStyle = brushColor;
-      ctx.lineWidth = brushSize;
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x, to.y);
-      ctx.stroke();
-    };
-
-    let lastPos = null;
-
-    const onPointerDown = (e) => {
-      isDrawingRef.current = true;
-      lastPos = getPos(e);
-      drawDot(lastPos.x, lastPos.y);
-    };
-    const onPointerMove = (e) => {
-      if (!isDrawingRef.current) return;
-      const pos = getPos(e);
-      drawLine(lastPos, pos);
-      lastPos = pos;
-    };
-    const onPointerUp = () => { isDrawingRef.current = false; lastPos = null; };
-
-    canvas.addEventListener("pointerdown", onPointerDown);
-    canvas.addEventListener("pointermove", onPointerMove);
-    canvas.addEventListener("pointerup", onPointerUp);
-    canvas.addEventListener("pointerleave", onPointerUp);
-
-    return () => {
-      canvas.removeEventListener("pointerdown", onPointerDown);
-      canvas.removeEventListener("pointermove", onPointerMove);
-      canvas.removeEventListener("pointerup", onPointerUp);
-      canvas.removeEventListener("pointerleave", onPointerUp);
-    };
-  }, [canvasRef, brushColor, brushSize]);
-
-  /* ── Helper: get mask blob from canvas ─────────────────────────────── */
+  /* ── Helper: get mask blob from ThreeViewer's internal paint canvas ── */
   const getMaskBlob = useCallback(() => {
-    const canvas = canvasRef.current;
+    const canvas = sceneRef.current?._paintCanvas;
     if (!canvas) return null;
     return new Promise((resolve) => {
       canvas.toBlob((blob) => resolve(blob), "image/png");
     });
-  }, [canvasRef]);
+  }, [sceneRef]);
 
   const canGen = useMemo(() => {
     if (isRunning) return false;
@@ -621,7 +565,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, [getIdToken]);
 
-  const pollTask = useCallback(async (taskId, pt, headers, onSuccess) => {
+  const pollTask = useCallback(async (taskId, pt, headers, onSuccess, { skipJumpCheck = false } = {}) => {
     let n = 0, prevProgress = 0, stuckSince = null;
     while (n < POLL_MAX) {
       if (pt.cancelled) return;
@@ -632,7 +576,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       const d = await res.json();
       if (!d.success) throw new Error(d.message ?? "Poll error");
       const prog = d.progress ?? 0;
-      if (d.status !== "success" && prog - prevProgress > PROGRESS_JUMP_LIMIT) {
+      if (!skipJumpCheck && d.status !== "success" && prog - prevProgress > PROGRESS_JUMP_LIMIT) {
         throw Object.assign(new Error(`Auto-stopped: suspicious progress jump (${prevProgress}% → ${prog}%)`), { type: "auto_stop", autoStop: true });
       }
       if (d.status !== "success") {
@@ -786,7 +730,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             setStatusMsg(`Resuming ${opType}…`);
           }
           currentTaskId.current = persisted.taskId; userStoppedRef.current = false;
-          await pollTask(persisted.taskId, pt, headers, onSuccess);
+          await pollTask(persisted.taskId, pt, headers, onSuccess, { skipJumpCheck: opType === "animate" || opType === "rig" });
         }
       } catch (e) {
         if (pt.cancelled) { setGenStatus(prevUrl.current ? "succeeded" : "idle"); return; }
@@ -810,6 +754,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const stableDocId = extra.animationIndex != null ? `tripo_${taskId}_${extra.animationIndex}` : `tripo_${taskId}`;
     const { docId } = await saveHistoryToFirestore(userId, item, stableDocId);
     const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
+    setOptimisticItems(prev => prev.filter(o => o.id !== stableDocId));
     setHistory(h => [ni, ...h]); setSelHistId(ni.id); histInit.current = true; return ni;
   }, [userId, prompt, mode, modelVer, modelName]);
 
@@ -826,6 +771,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const stableDocId = `tripo_${taskId}`;
     const { docId } = await saveHistoryToFirestore(userId, item, stableDocId);
     const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
+    setOptimisticItems(prev => prev.filter(o => o.id !== stableDocId));
     setHistory(h => [ni, ...h]); setSelHistId(ni.id); histInit.current = true; return ni;
   }, [userId, history]);
 
@@ -1069,10 +1015,18 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         case "stylize": body = { type: "stylize_model", original_model_task_id: (stylizeId.trim() || srcId), style: stylizeStyle }; break;
         case "animate": {
           const baseModelId = riggedId || activeH?.params?.originalModelTaskId || activeTaskId;
+          const commonParams = {
+            type: "animate_retarget",
+            original_model_task_id: baseModelId,
+            out_format: animOutFormat || "glb",
+            bake_animation: animBakeAnimation,
+            animate_in_place: animAnimateInPlace,
+            export_with_geometry: animExportGeometry,
+          };
           if (animSlugs.length > 1) {
-            body = { type: "animate_retarget", original_model_task_id: baseModelId, animations: animSlugs, out_format: "glb" };
+            body = { ...commonParams, animations: animSlugs };
           } else {
-            body = { type: "animate_retarget", original_model_task_id: baseModelId, animation: animSlugs[0], out_format: "glb" };
+            body = { ...commonParams, animation: animSlugs[0] };
           }
           break;
         }
@@ -1098,6 +1052,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         if (pt.cancelled) return;
         if (currentRequestId.current !== requestId) return;
         const animatedModels = Array.isArray(d.rawOutput?.animated_models) ? d.rawOutput.animated_models : null;
+        if (mode === "animate") console.log("[TripoPanel] animate_retarget result:", { taskId: td.taskId, modelUrl: d.modelUrl, animated_models: animatedModels, animated_models_count: animatedModels?.length ?? 0, rawOutputKeys: Object.keys(d.rawOutput ?? {}) });
         const rawUrl = d.modelUrl ?? (animatedModels ? animatedModels[0] : null);
         if (!rawUrl) throw Object.assign(new Error("Generation blocked: content policy or empty output. Credits were not charged."), { type: "nsfw" }); const blob = await fetchProxy(rawUrl, td.taskId);
         if (pt.cancelled) { revokeBlobUrl(blob); return; }
@@ -1105,9 +1060,19 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         setModelUrl(blob); prevUrl.current = blob;
         setGenStatus("succeeded"); setProgress(100); setStatusMsg(""); setIsRunning(false);
         
-        // Instant synchronous update to history so activeTaskId updates immediately and viewer renders
+        // Instant optimistic entry so the HistoryCard shows immediately with full data
         const mockStableId = `tripo_${td.taskId}`;
-        setHistory(h => h.some(x => x.id === mockStableId) ? h : [{ id: mockStableId, taskId: td.taskId, status: "succeeded", model_url: rawUrl, mode, ts: Date.now() }, ...h]);
+        const autoName = prompt.trim().split(/\s+/).slice(0, 3).join(" ") || mode;
+        const optimisticEntry = {
+          id: mockStableId, taskId: td.taskId, status: "succeeded",
+          model_url: rawUrl, source: "tripo", mode, ts: Date.now(),
+          prompt: prompt.trim() || mode,
+          name: modelName.trim() || autoName,
+          params: { model_version: modelVer, mode },
+          createdAt: { toDate: () => new Date() },
+        };
+        setOptimisticItems(prev => [optimisticEntry, ...prev.filter(o => o.id !== mockStableId)]);
+        setHistory(h => h.some(x => x.id === mockStableId) ? h : [optimisticEntry, ...h]);
         setSelHistId(mockStableId);
 
         if (mode === "animate") {
@@ -1158,7 +1123,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         currentTaskId.current = null; clearPersistedGen();
         setModelName("");
         refreshCredits?.();
-      });
+      }, { skipJumpCheck: mode === "animate" });
     } catch (e) {
       setIsRunning(false); setProgress(0); setStatusMsg(""); setRigStep("idle"); setRiggedId(null); setShowRig(false); currentTaskId.current = null; clearPersistedGen();
       if (pt.cancelled) { setModelUrl(prevUrl.current); setGenStatus(prevUrl.current ? "succeeded" : "idle"); return; }
@@ -1187,7 +1152,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       await pollTask(rd.taskId, { cancelled: false }, headers, d => {
         setPrerigcheckResult({ riggable: true, rigType: d.detectedRigType || "biped" });
         if (d.detectedRigType) setDetectedRigType(d.detectedRigType);
-      });
+      }, { skipJumpCheck: true });
     } catch (e) { setErrorMsg(e.message); }
   }, [activeTaskId, animId, authH, pollTask]);
 
@@ -1197,12 +1162,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     setDetectedRigModelVer(null); setDetectedRigType(null); setDetectedRigSpec(null);
     if (pollAb.current) pollAb.current.cancelled = true;
     const pt = { cancelled: false }; pollAb.current = pt;
+    userStoppedRef.current = false;
     const srcId = animId.trim() || activeTaskId;
     try {
       const headers = await authH();
       setStatusMsg("Rigging…");
       const rr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify({ type: "animate_rig", original_model_task_id: srcId, spec: rigSpec, out_format: animOutFormat, rig_type: rigType, bake_animation: animBakeAnimation, export_with_geometry: animExportGeometry, animate_in_place: animAnimateInPlace }) });
       const rd = await rr.json(); if (!rd.success) throw new Error(rd.message);
+      currentTaskId.current = rd.taskId;
       await pollTask(rd.taskId, pt, headers, async d => {
         if (pt.cancelled) return;
         const blob = d.modelUrl ? await fetchProxy(d.modelUrl, rd.taskId) : null;
@@ -1212,21 +1179,31 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         setRiggedId(rd.taskId); setRigStep("rigged"); setShowRig(true); setStatusMsg(""); setGenStatus("succeeded");
         setDetectedRigModelVer(animModelVer); setDetectedRigType(actualRigType); setDetectedRigSpec(rigSpec);
 
-        // Instant synchronous update to history so activeTaskId updates immediately and viewer renders
         const mockStableId = `tripo_${rd.taskId}`;
-        setHistory(h => h.some(x => x.id === mockStableId) ? h : [{ id: mockStableId, taskId: rd.taskId, status: "succeeded", model_url: d.modelUrl, mode: "rig", params: { rigModelVer: animModelVer, rigType: actualRigType, rigSpec, rigged: true }, ts: Date.now() }, ...h]);
+        const rigOptEntry = {
+          id: mockStableId, taskId: rd.taskId, status: "succeeded",
+          model_url: d.modelUrl, source: "tripo", mode: "rig", ts: Date.now(),
+          prompt: "auto-rig",
+          name: (history.find(h => h.taskId === srcId)?.name || "model") + "_rigged",
+          params: { rigModelVer: animModelVer, rigType: actualRigType, rigSpec, rigged: true, mode: "rig" },
+          createdAt: { toDate: () => new Date() },
+        };
+        setOptimisticItems(prev => [rigOptEntry, ...prev.filter(o => o.id !== mockStableId)]);
+        setHistory(h => h.some(x => x.id === mockStableId) ? h : [rigOptEntry, ...h]);
         setSelHistId(mockStableId);
 
+        currentTaskId.current = null;
         persistGen({ taskId: rd.taskId, requestId: rd.taskId, mode: "animate", prompt: "auto-rig", modelVer: "", lastProgress: 100, lastProgressAt: Date.now(), startedAt: Date.now(), riggedId: rd.taskId, opType: "rig", rigModelVer: animModelVer, rigType: actualRigType, rigSpec });
         const srcItemForRig = history.find(h => h.taskId === srcId); const rigBasePrompt = srcItemForRig?.prompt?.trim() || srcItemForRig?.name?.trim() || prompt.trim(); const aiRigName = await generateAIName(rigBasePrompt, "rig"); const _ni4 = await saveRigHist(rd.taskId, d.modelUrl, { prompt: "auto-rig", originalModelTaskId: srcId, aiName: aiRigName ?? undefined, rigModelVer: animModelVer, rigType: actualRigType, rigSpec }); markHistorySaved(); if (_ni4) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${rd.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
-      });
-    } catch (e) { if (pt.cancelled) return; setRigStep("idle"); setRiggedId(null); setShowRig(false); setErrorMsg(e.message); setStatusMsg(""); }
+      }, { skipJumpCheck: true });
+    } catch (e) { currentTaskId.current = null; if (pt.cancelled) return; setRigStep("idle"); setRiggedId(null); setShowRig(false); setErrorMsg(e.message); setStatusMsg(""); }
   }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl, saveRigHist, rigSpec, animOutFormat, rigType, animModelVer, animBakeAnimation, animExportGeometry, animAnimateInPlace]);
 
   const handleStop = useCallback(async () => {
     userStoppedRef.current = true;
     if (pollAb.current) pollAb.current.cancelled = true;
     setIsRunning(false); setProgress(0); setStatusMsg(""); clearPersistedGen();
+    setRigStep("idle");
     const taskId = currentTaskId.current;
     if (taskId) {
       currentTaskId.current = null;
@@ -1343,6 +1320,18 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (sceneRef.current) { setCameraPreset(sceneRef.current, p); setAutoSpin(p === "reset"); sceneRef.current.autoSpin = p === "reset"; }
   }, []);
 
+  const handleAnimClipsDetected = useCallback((clips) => {
+    setAnimClips(clips);
+    setActiveClipIdx(0);
+  }, []);
+
+  const handleSwitchClip = useCallback((idx) => {
+    if (sceneRef.current) {
+      switchAnimationClip(sceneRef.current, idx);
+      setActiveClipIdx(idx);
+    }
+  }, []);
+
   const genLabel = useMemo(() => ({
     generate: "Generate Model", segment: "Start Segmenting", fill_parts: "Part Completion",
     retopo: "Retopology", texture: "Generate Texture", texture_edit: "Apply Magic Brush",
@@ -1424,7 +1413,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               {(mode === "segment" || mode === "fill_parts") && <Segment segSub={mode === "fill_parts" ? "fill_parts" : segSub} activeTaskId={activeTaskId} isRiggedInput={isRiggedInput} color={color} />}
               {mode === "retopo" && <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={color} />}
               {mode === "texture" && <Texture mode={mode} activeTaskId={activeTaskId} texInputTab={texInputTab} setTexInputTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt} imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} multiImages={multiImages} setMultiImages={setMultiImages} tex4K={tex4K} setTex4K={setTex4K} pbrOn={texPbr} setPbrOn={setTexPbr} texAlignment={texAlignment} setTexAlignment={setTexAlignment} color={color} />}
-              {mode === "texture_edit" && <Texture mode={mode} activeTaskId={activeTaskId} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} brushSize={brushSize} setBrushSize={setBrushSize} canvasRef={canvasRef} color={color} />}
+              {mode === "texture_edit" && <Texture mode={mode} activeTaskId={activeTaskId} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} brushSize={brushSize} setBrushSize={setBrushSize} canvasRef={canvasRef} color={color} onUndo={() => sceneRef.current?.undoPaint()} />}
               {mode === "animate" && <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} handleAutoRig={handleAutoRig} rigType={rigType} setRigType={setRigType} rigSpec={rigSpec} setRigSpec={setRigSpec} detectedRigType={detectedRigType} detectedRigModelVer={detectedRigModelVer} detectedRigSpec={detectedRigSpec} prerigcheckResult={prerigcheckResult} handlePrerigcheck={handlePrerigcheck} animOutFormat={animOutFormat} setAnimOutFormat={setAnimOutFormat} animBakeAnimation={animBakeAnimation} setAnimBakeAnimation={setAnimBakeAnimation} animExportGeometry={animExportGeometry} setAnimExportGeometry={setAnimExportGeometry} animAnimateInPlace={animAnimateInPlace} setAnimAnimateInPlace={setAnimAnimateInPlace} color={color} />}
               {mode === "refine" && (
                 <div>
@@ -1536,6 +1525,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             activeItemId={activeH?.id}
             loadingId={loadingId}
             refreshTrigger={refreshTrigger}
+            optimisticItems={optimisticItems}
             onSelect={selHist}
             onReuse={reuse}
             onHistoryLoad={onHistoryLoad}
@@ -1597,6 +1587,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         handleDlClose={handleDlClose}
         activeH={activeH}
         onRigDetected={onRigDetected}
+        onAnimClipsDetected={handleAnimClipsDetected}
+        animClips={animClips}
+        activeClipIdx={activeClipIdx}
+        onSwitchClip={handleSwitchClip}
         // 3D Paint
         paintMode={mode === "texture_edit" && brushMode === "Paint Mode"}
         paintColor={brushColor}
@@ -1621,6 +1615,8 @@ function TripoWorkspaceWrapper({
   loadingId, isRunning, statusMsg, progress, camP, sceneRef,
   dlItem, setDlItem, setDlOpen, dlOpen, handleDlClose, activeH,
   onRigDetected,
+  onAnimClipsDetected,
+  animClips, activeClipIdx, onSwitchClip,
   // 3D Paint
   paintMode, paintColor, paintSize, paintCanvasRef
 }) {
@@ -1682,6 +1678,7 @@ function TripoWorkspaceWrapper({
             wireHexColor={wireC.replace("#", "0x")}
             showRig={showRig && !!riggedId}
             onRigDetected={onRigDetected}
+            onAnimClipsDetected={onAnimClipsDetected}
             autoSpin={autoSpin}
             bgColor={bgColor}
             gridColor1={gc1}
@@ -1713,7 +1710,7 @@ function TripoWorkspaceWrapper({
           {rigStep === "rigging" && (
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/70 backdrop-blur-3xl pointer-events-none"
+              className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/70 backdrop-blur-3xl"
             >
               <div className="w-20 h-20 rounded-[1.5rem] bg-emerald/10 border-2 border-emerald/20 flex items-center justify-center mb-6 shadow-emerald-heavy animate-pulse">
                 <PersonStanding className="w-9 h-9 text-emerald shadow-emerald-glow" />
@@ -1730,6 +1727,12 @@ function TripoWorkspaceWrapper({
                   <p className="text-[11px] font-mono text-white mt-2 text-center tracking-widest">{progress}%</p>
                 </div>
               )}
+              <button
+                className="mt-6 px-8 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[11px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all"
+                onClick={handleStop}
+              >
+                Terminálás
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1762,6 +1765,27 @@ function TripoWorkspaceWrapper({
               <h3 className="text-emerald font-black text-[22px] tracking-[0.4em] uppercase italic mb-2">Awaiting Directive</h3>
               <p className="text-zinc-900/40 text-[9px] font-black uppercase tracking-[0.5em] italic">Inhabit the viewport via spatial forge</p>
             </div>
+          </div>
+        )}
+
+        {/* Animation clip picker — visible when GLB has 2+ clips */}
+        {animClips.length > 1 && modelUrl && !isRunning && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-black/70 backdrop-blur-xl border border-white/10 shadow-2xl">
+            <Play className="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" />
+            {animClips.map((clip, i) => (
+              <button
+                key={i}
+                onClick={() => onSwitchClip(i)}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
+                  activeClipIdx === i
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,229,255,0.15)]'
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+                }`}
+              >
+                {clip.name || `Clip ${i + 1}`}
+              </button>
+            ))}
+            <span className="text-[9px] text-zinc-600 font-bold ml-1 tracking-wider">{animClips[activeClipIdx]?.duration?.toFixed(1)}s</span>
           </div>
         )}
       </div>

@@ -181,7 +181,7 @@ const itemVariants = {
 export default function Shared3DHistory({
   userId, getIdToken, color = "#a78bfa",
   onSelect, onReuse, onDownload, onHistoryLoad, activeItemId, loadingId,
-  refreshTrigger = 0, defaultTab = 'tripo',
+  refreshTrigger = 0, defaultTab = 'tripo', optimisticItems = [],
 }) {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [subTab, setSubTab] = useState('all');
@@ -274,7 +274,14 @@ export default function Shared3DHistory({
     } catch (e) { toast.error("Törlés sikertelen: " + e.message); } finally { setClearing(false); }
   }, [activeTab, getIdToken]);
 
-  const filtHist = useMemo(() => history.filter(item => {
+  const mergedHistory = useMemo(() => {
+    if (!optimisticItems.length) return history;
+    const fsIds = new Set(history.map(i => i.id));
+    const pending = optimisticItems.filter(o => !fsIds.has(o.id));
+    return pending.length ? [...pending, ...history] : history;
+  }, [history, optimisticItems]);
+
+  const filtHist = useMemo(() => mergedHistory.filter(item => {
     if (histQ && !(item.prompt || "").toLowerCase().includes(histQ.toLowerCase())) return false;
     const src = item.source || "trellis";
     if (activeTab === 'tripo') {
@@ -289,15 +296,15 @@ export default function Shared3DHistory({
     if (activeTab === 'trellis') return src === 'trellis';
     if (activeTab === 'upload') return src === 'upload';
     return false;
-  }), [history, histQ, activeTab, subTab]);
+  }), [mergedHistory, histQ, activeTab, subTab]);
 
   const getDisplayName = useCallback((item) => {
-    const origPrompt = history.find(h => h.taskId === item.params?.originalModelTaskId)?.prompt;
+    const origPrompt = mergedHistory.find(h => h.taskId === item.params?.originalModelTaskId)?.prompt;
     const base = origPrompt ?? item.prompt ?? "Model";
     if (item.params?.animated) { const slug = item.params?.animation ?? ""; const l = slug.split(":").pop() || slug; return l ? `${base}_${l}` : base; }
     if (item.params?.rigged) return `${base}_rigged`;
     return base;
-  }, [history]);
+  }, [mergedHistory]);
 
   const tripoSections = useMemo(() => {
     if (activeTab !== 'tripo') return null;
