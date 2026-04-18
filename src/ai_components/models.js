@@ -9,7 +9,7 @@ export const MODEL_GROUPS = [
         label: "Chat",
         emoji: "💬",
         color: "#8b5cf6",
-        defaultOpen: true,    
+        defaultOpen: true,
         categories: [
             {
                 id: "chat_anthropic",
@@ -138,31 +138,31 @@ export const MODEL_GROUPS = [
                     { id: "groq-gpt120b", name: "GPT OSS 120B", apiModel: "openai/gpt-oss-120b", provider: "groq", color: "#10a37f", gradient: "from-teal-400 to-emerald-500", panelType: "chat" },
                     { id: "groq-qwen3", name: "Qwen3 32B", apiModel: "qwen/qwen3-32b", provider: "groq", color: "#9333ea", gradient: "from-purple-400 to-indigo-500", panelType: "chat" },
                     { id: "groq-llama70b", name: "Llama 3.3 70B", apiModel: "llama-3.3-70b-versatile", provider: "groq", color: "#f55036", gradient: "from-orange-500 to-red-600", panelType: "chat" },
-                    { id: "cerebras-llama8b",   name: "Llama 3.1 8B (Cerebras)",      apiModel: "llama3.1-8b",                   provider: "cerebras", color: "#818cf8", gradient: "from-indigo-400 to-blue-500", panelType: "chat" },
-                    { id: "mistral-large",   name: "Mistral Large (Mistral)",    apiModel: "mistral-large-latest",    provider: "mistral", color: "#f97316", gradient: "from-orange-400 to-red-500", defaultTemperature: 0.2, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat"  },
-                    { id: "nvidia-glm4.7",   name: "Z.ai GLM 4.7 (NVIDIA)",    apiModel: "z-ai/glm4.7",    provider: "nvidia", color: "#16f921", gradient: "from-lime-400 to-green-500", defaultTemperature: 0.7, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat" },
+                    { id: "cerebras-llama8b", name: "Llama 3.1 8B (Cerebras)", apiModel: "llama3.1-8b", provider: "cerebras", color: "#818cf8", gradient: "from-indigo-400 to-blue-500", panelType: "chat" },
+                    { id: "mistral-large", name: "Mistral Large (Mistral)", apiModel: "mistral-large-latest", provider: "mistral", color: "#f97316", gradient: "from-orange-400 to-red-500", defaultTemperature: 0.2, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat" },
+                    { id: "nvidia-glm4.7", name: "Z.ai GLM 4.7 (NVIDIA)", apiModel: "z-ai/glm4.7", provider: "nvidia", color: "#16f921", gradient: "from-lime-400 to-green-500", defaultTemperature: 0.7, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat" },
                     { id: "deepseek-v3.2", name: "DeepSeek v3.2 (NVIDIA)", apiModel: "deepseek-ai/deepseek-v3.2", provider: "nvidia", color: "#3b82f6", gradient: "from-blue-500 to-indigo-600", defaultTemperature: 0.3, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
                     { id: "google-gemma-3-27b-it", name: "(img) Gemma 3 27B IT (NVIDIA)", apiModel: "google/gemma-3-27b-it", provider: "nvidia", color: "#4285f4", gradient: "from-blue-400 to-red-400", supportsVision: true, defaultTemperature: 0.8, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
-                    
-                    
-//                     {
-//                         id: "deepseek_coder",
-//                         name: "DeepSeek Coder V3",
-//                         tier: "lite", tierLabel: "Gyors",
-//                         description: "Specializált kód modell, ingyenes",
-//                         badge: "Ingyenes",
-//                         apiModel: "deepseek/deepseek-coder-v2-instruct",
-//                         provider: "deepseek-chat",
-//                         color: "#3b82f6",
-//                         gradient: "from-blue-400 to-indigo-400",
-//                         panelType: "chat",
-//                         defaultSystemPrompt: `You are an expert programmer and software architect. 
-// - Write clean, efficient, well-documented code
-// - Follow best practices and design patterns
-// - Explain your code clearly
-// - Point out potential issues or improvements
-// - Respond in the same language the user writes in`,
-//                     },
+
+
+                    //                     {
+                    //                         id: "deepseek_coder",
+                    //                         name: "DeepSeek Coder V3",
+                    //                         tier: "lite", tierLabel: "Gyors",
+                    //                         description: "Specializált kód modell, ingyenes",
+                    //                         badge: "Ingyenes",
+                    //                         apiModel: "deepseek/deepseek-coder-v2-instruct",
+                    //                         provider: "deepseek-chat",
+                    //                         color: "#3b82f6",
+                    //                         gradient: "from-blue-400 to-indigo-400",
+                    //                         panelType: "chat",
+                    //                         defaultSystemPrompt: `You are an expert programmer and software architect. 
+                    // - Write clean, efficient, well-documented code
+                    // - Follow best practices and design patterns
+                    // - Explain your code clearly
+                    // - Point out potential issues or improvements
+                    // - Respond in the same language the user writes in`,
+                    //                     },
                     {
                         id: "gpt4o_code",
                         name: "GPT-4o Code",
@@ -199,18 +199,6 @@ export const MODEL_GROUPS = [
                 id: "img_gen",
                 label: null,
                 models: [
-                    {
-                        id: "gemini-image",
-                        name: "Gemini Image Gen",
-                        apiModel: "gemini-2.5-flash-image",
-                        provider: "google-image",
-                        color: "#4285f4",
-                        badge: "Google",
-                        badgeDetail: "Gemini 2.5 Flash képgenerálás",
-                        description: "Google Gemini képgeneráló",
-                        tier: "pro", tierLabel: "Pro",
-                        panelType: "image",
-                    },
                     {
                         id: "cf-sdxl",
                         name: "Stable Diffusion XL (Cloudflare)",
@@ -332,37 +320,37 @@ export const MODEL_GROUPS = [
                 label: "Szöveg → Hang",
                 models: [
                     {
-    id: "nvidia_magpie_tts",
-    name: "Magpie TTS",
-    tier: "pro", tierLabel: "Multilingual",
-    description: "NVIDIA Riva — expressív többnyelvű TTS",
-    badge: "NVIDIA NIM",
-    priceNote: "~1-2 sec",
-    apiModel: "magpie-tts-multilingual",
-    provider: "nvidia-riva",
-    color: "#76b900",  // NVIDIA zöld
-    gradient: "from-lime-500 to-green-600",
-    panelType: "audio",
-    audioType: "tts",
-    voices: [
-        { id: "Magpie-Multilingual.EN-US.Aria", label: "Aria (EN)", lang: "en-US" },
-        { id: "Magpie-Multilingual.EN-US.Mia",  label: "Mia (EN)",  lang: "en-US" },
-        { id: "Magpie-Multilingual.EN-US.James", label: "James (EN)", lang: "en-US" },
-        { id: "Magpie-Multilingual.DE-DE.Karl",  label: "Karl (DE)", lang: "de-DE" },
-        { id: "Magpie-Multilingual.ES-ES.Alba",  label: "Alba (ES)", lang: "es-ES" },
-        { id: "Magpie-Multilingual.FR-FR.Lea",   label: "Lea (FR)",  lang: "fr-FR" },
-        { id: "Magpie-Multilingual.ZH-CN.Mei",   label: "Mei (ZH)",  lang: "zh-CN" },
-    ],
-    emotions: ["Neutral", "Happy", "Sad", "Angry", "Fearful", "Disgust", "Surprised"],
-    languages: [
-        { code: "en-US", label: "English (US)" },
-        { code: "de-DE", label: "German" },
-        { code: "es-ES", label: "Spanish" },
-        { code: "fr-FR", label: "French" },
-        { code: "zh-CN", label: "Chinese" },
-        { code: "ja-JP", label: "Japanese" },
-    ],
-},
+                        id: "nvidia_magpie_tts",
+                        name: "Magpie TTS",
+                        tier: "pro", tierLabel: "Multilingual",
+                        description: "NVIDIA Riva — expressív többnyelvű TTS",
+                        badge: "NVIDIA NIM",
+                        priceNote: "~1-2 sec",
+                        apiModel: "magpie-tts-multilingual",
+                        provider: "nvidia-riva",
+                        color: "#76b900",  // NVIDIA zöld
+                        gradient: "from-lime-500 to-green-600",
+                        panelType: "audio",
+                        audioType: "tts",
+                        voices: [
+                            { id: "Magpie-Multilingual.EN-US.Aria", label: "Aria (EN)", lang: "en-US" },
+                            { id: "Magpie-Multilingual.EN-US.Mia", label: "Mia (EN)", lang: "en-US" },
+                            { id: "Magpie-Multilingual.EN-US.James", label: "James (EN)", lang: "en-US" },
+                            { id: "Magpie-Multilingual.DE-DE.Karl", label: "Karl (DE)", lang: "de-DE" },
+                            { id: "Magpie-Multilingual.ES-ES.Alba", label: "Alba (ES)", lang: "es-ES" },
+                            { id: "Magpie-Multilingual.FR-FR.Lea", label: "Lea (FR)", lang: "fr-FR" },
+                            { id: "Magpie-Multilingual.ZH-CN.Mei", label: "Mei (ZH)", lang: "zh-CN" },
+                        ],
+                        emotions: ["Neutral", "Happy", "Sad", "Angry", "Fearful", "Disgust", "Surprised"],
+                        languages: [
+                            { code: "en-US", label: "English (US)" },
+                            { code: "de-DE", label: "German" },
+                            { code: "es-ES", label: "Spanish" },
+                            { code: "fr-FR", label: "French" },
+                            { code: "zh-CN", label: "Chinese" },
+                            { code: "ja-JP", label: "Japanese" },
+                        ],
+                    },
                 ],
             },
             {
@@ -397,7 +385,7 @@ export const MODEL_GROUPS = [
                         panelType: "audio",
                         audioType: "music",
                     },
-                    
+
                 ],
             },
         ],

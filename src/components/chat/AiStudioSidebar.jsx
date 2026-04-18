@@ -1,8 +1,13 @@
 import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wand2, X, ChevronDown, Zap, Sparkles, Home } from 'lucide-react';
-import { MODEL_GROUPS, getModel, findModelGroup } from '../../ai_components/models';
+import { Wand2, X, ChevronDown, Zap, Sparkles, Home, ImageIcon, Pencil } from 'lucide-react';
+import { MODEL_GROUPS, ALL_MODELS, getModel, findModelGroup } from '../../ai_components/models';
+
+// Kép generáló modellek (nem szerkesztők)
+const IMAGE_GEN_MODELS = ALL_MODELS.filter(m => m.panelType === 'image' && !m.needsInputImage);
+// Kép szerkesztő modellek (needsInputImage: true)
+const IMAGE_EDIT_MODELS = ALL_MODELS.filter(m => m.panelType === 'image' && m.needsInputImage);
 import bgChat from '../../assets/bg-chat.png';
 import bgCode from '../../assets/bg-code.png';
 import bgAudio from '../../assets/bg-audio.png';
@@ -24,11 +29,11 @@ function CoinIcon({ size = 26 }) {
     <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: size, height: size }}>
       {/* Dynamic Glow Background */}
       <div className="absolute inset-0 rounded-full bg-primary/20 blur-[6px] animate-pulse" />
-      
+
       {/* The Neural Coin Asset */}
-      <img 
-        src={neuralCoin} 
-        alt="Credits" 
+      <img
+        src={neuralCoin}
+        alt="Credits"
         className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_8px_rgba(139,92,246,0.3)]"
       />
     </div>
@@ -221,17 +226,24 @@ export default function AiStudioSidebar({
                     const firstCodeModel = group.categories[0]?.models[0];
                     if (firstCodeModel) handleSelectModel(firstCodeModel.id);
                   }}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.06] transition-all duration-300 cursor-pointer"
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border transition-all duration-300 cursor-pointer ${
+                    hasActive
+                      ? 'bg-white/[0.04] border-white/10'
+                      : 'bg-transparent border-transparent hover:bg-white/[0.02]'
+                  }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base bg-white/[0.06]">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-all ${
+                      hasActive ? 'bg-white/[0.06] scale-100' : 'bg-transparent opacity-40 scale-90'
+                    }`}>
                       {group.emoji}
                     </div>
-                    <span className="text-[12px] font-black uppercase tracking-[0.15em] text-white">
+                    <span className={`text-[12px] font-black uppercase tracking-[0.15em] transition-colors ${
+                      hasActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}>
                       {group.label}
                     </span>
                   </div>
-                  
                 </button>
               )}
 
@@ -243,87 +255,120 @@ export default function AiStudioSidebar({
                   transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                   className="overflow-hidden"
                 >
-                  <div className="pt-3 pb-1 space-y-4">
-                    {group.categories.map((cat) => (
-                      <div key={cat.id} className="space-y-1.5">
-                        {/* Provider Label */}
-                        {cat.label && (
-                          <div className="flex items-center gap-3 px-1">
-                            <span className="text-[8px] font-black uppercase tracking-[0.3em] text-zinc-600">
-                              {cat.label}
-                            </span>
-                            <div className="flex-1 h-px bg-white/5" />
-                          </div>
-                        )}
-
-                        {/* Model List */}
-                        {cat.models.map((model) => {
-                          const isActive = selectedAI === model.id;
-
-                          if (isActive) {
+                  {/* Kép group: csak 2 gomb */}
+                  {group.id === 'image' ? (
+                    <div className="pt-3 pb-1 space-y-1.5">
+                      {[
+                        {
+                          label: 'Képgenerálás',
+                          icon: <ImageIcon className="w-4 h-4" />,
+                          models: IMAGE_GEN_MODELS,
+                          defaultId: IMAGE_GEN_MODELS[0]?.id,
+                        },
+                        {
+                          label: 'Képszerkesztés',
+                          icon: <Pencil className="w-4 h-4" />,
+                          models: IMAGE_EDIT_MODELS,
+                          defaultId: IMAGE_EDIT_MODELS[0]?.id,
+                        },
+                      ].map((item) => {
+                        const isActive = item.models.some(m => m.id === selectedAI);
+                        const activeModel = isActive ? getModel(selectedAI) : null;
+                        const color = activeModel?.color || '#f59e0b';
+                        return (
+                          <button
+                            key={item.label}
+                            onClick={() => item.defaultId && handleSelectModel(item.defaultId)}
+                            className={`w-full relative rounded-2xl border overflow-hidden transition-all duration-300 group/item ${isActive
+                                ? 'border-white/10'
+                                : 'border-transparent hover:border-white/5 hover:bg-white/[0.02]'
+                              }`}
+                            style={isActive ? { background: 'rgba(255,255,255,0.06)' } : {}}
+                          >
+                            {isActive && (
+                              <div
+                                className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full"
+                                style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}60` }}
+                              />
+                            )}
+                            <div className="flex items-center gap-3 pl-5 pr-4 py-3">
+                              <span
+                                className="flex-shrink-0"
+                                style={{ color: isActive ? color : '#52525b' }}
+                              >
+                                {item.icon}
+                              </span>
+                              <span
+                                className={`text-[12px] font-black uppercase tracking-tight transition-colors ${isActive ? 'text-white italic' : 'text-zinc-500 group-hover/item:text-zinc-300'
+                                  }`}
+                              >
+                                {item.label}
+                              </span>
+                              <span className="ml-auto text-[8px] font-bold text-zinc-700 uppercase tracking-widest">
+                                {item.models.length} modell
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="pt-3 pb-1 space-y-4">
+                      {group.categories.map((cat) => (
+                        <div key={cat.id} className="space-y-1.5">
+                          {cat.label && (
+                            <div className="flex items-center gap-3 px-1">
+                              <span className="text-[8px] font-black uppercase tracking-[0.3em] text-zinc-600">
+                                {cat.label}
+                              </span>
+                              <div className="flex-1 h-px bg-white/5" />
+                            </div>
+                          )}
+                          {cat.models.map((model) => {
+                            const isActive = selectedAI === model.id;
+                            if (isActive) {
+                              return (
+                                <button
+                                  key={model.id}
+                                  onClick={() => handleSelectModel(model.id)}
+                                  className="w-full relative rounded-2xl border border-white/10 overflow-hidden transition-all duration-300 group/item"
+                                  style={{ background: 'rgba(255,255,255,0.06)' }}
+                                >
+                                  <div className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full"
+                                    style={{ backgroundColor: model.color, boxShadow: `0 0 8px ${model.color}60` }}
+                                  />
+                                  <div className="absolute left-[14px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: model.color, boxShadow: `0 0 10px ${model.color}` }}
+                                  />
+                                  <div className="flex items-center justify-between pl-8 pr-4 py-3">
+                                    <span className="text-[12px] font-black text-white italic uppercase tracking-tight">{model.name}</span>
+                                    {model.badge && (
+                                      <span className="px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest bg-white/[0.08] text-zinc-300 border border-white/10">{model.badge}</span>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            }
                             return (
                               <button
                                 key={model.id}
                                 onClick={() => handleSelectModel(model.id)}
-                                className="w-full relative rounded-2xl border border-white/10 overflow-hidden transition-all duration-300 group/item"
-                                style={{
-                                  background: 'rgba(255,255,255,0.06)',
-                                }}
+                                className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-300 group/item"
                               >
-                                {/* Left accent bar */}
-                                <div
-                                  className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full"
-                                  style={{
-                                    backgroundColor: model.color,
-                                    boxShadow: `0 0 8px ${model.color}60`
-                                  }}
-                                />
-                                {/* Active dot */}
-                                <div
-                                  className="absolute left-[14px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full"
-                                  style={{
-                                    backgroundColor: model.color,
-                                    boxShadow: `0 0 10px ${model.color}`
-                                  }}
-                                />
-
-                                <div className="flex items-center justify-between pl-8 pr-4 py-3">
-                                  <span className="text-[12px] font-black text-white italic uppercase tracking-tight">
-                                    {model.name}
-                                  </span>
-                                  {model.badge && (
-                                    <span className="px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest bg-white/[0.08] text-zinc-300 border border-white/10">
-                                      {model.badge}
-                                    </span>
-                                  )}
+                                <div className="flex items-center gap-3">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+                                  <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight group-hover/item:text-zinc-300 transition-colors">{model.name}</span>
                                 </div>
+                                {model.badge && (
+                                  <span className="px-2 py-0.5 rounded-md text-[7px] font-black uppercase tracking-widest bg-white/[0.03] text-zinc-700 border border-white/5">{model.badge}</span>
+                                )}
                               </button>
                             );
-                          }
-
-                          return (
-                            <button
-                              key={model.id}
-                              onClick={() => handleSelectModel(model.id)}
-                              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-300 group/item"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
-                                <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight group-hover/item:text-zinc-300 transition-colors">
-                                  {model.name}
-                                </span>
-                              </div>
-                              {model.badge && (
-                                <span className="px-2 py-0.5 rounded-md text-[7px] font-black uppercase tracking-widest bg-white/[0.03] text-zinc-700 border border-white/5">
-                                  {model.badge}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </motion.div>
               )}
 

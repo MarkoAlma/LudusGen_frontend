@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings2, PanelLeftClose, PanelLeftOpen, Sparkles, Layers, Box } from 'lucide-react';
+import { Settings2, PanelLeftClose, PanelLeftOpen, Sparkles, Layers, Box, Pencil } from 'lucide-react';
 import ImageControls from './ImageControls';
 import ImageWorkspace from './ImageWorkspace';
 import ImageStudioBG from '../../assets/image_studio_v2.png';
 import BackgroundFilters from '../chat/BackgroundFilters';
 import StudioLayout from '../shared/StudioLayout';
 import { useSidebarState } from '../../hooks/useSidebarState';
+import { ALL_MODELS } from '../../ai_components/models';
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const ENHANCING_PROMPT_EDIT = `
@@ -400,10 +401,13 @@ const getNvidiaType = (apiId = "") => {
   return "other";
 };
 
-export default function ImageGenerator({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+export default function ImageGenerator({ selectedModel, onModelChange, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState([]);
   const [error, setError] = useState(null);
+  const [genProgress, setGenProgress] = useState(0);
+  const [genStatus, setGenStatus] = useState('');
+  const [genElapsed, setGenElapsed] = useState(0);
   const [inputImages, setInputImages] = useState([]);
   const [isEnhancerBusy, setIsEnhancerBusy] = useState(false);
   const [prompt, setPrompt] = useState("");
@@ -483,6 +487,9 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken, isGl
 
     setIsGenerating(true);
     setError(null);
+    setGenProgress(0);
+    setGenStatus('');
+    setGenElapsed(0);
 
     try {
       const token = await getIdToken();
@@ -512,16 +519,47 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken, isGl
         }),
       });
 
-      const data = await res.json();
-      if (!data.success) throw new Error(data.message || "Hiba történt");
-      const images = (data.images || []).map(img =>
-        typeof img === 'string' ? img : (img.url || img.b64_json || img.image_url)
-      ).filter(Boolean);
-      setGeneratedImages(images);
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.message || `HTTP ${res.status}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let event;
+          try { event = JSON.parse(line.slice(6)); } catch { continue; }
+          if (event.type === 'status') {
+            setGenProgress(event.progress ?? 0);
+            setGenStatus(event.status ?? '');
+            setGenElapsed(event.elapsed ?? 0);
+          } else if (event.type === 'done') {
+            const images = (event.images || []).map(img =>
+              typeof img === 'string' ? img : (img.url || img.b64_json || img.image_url)
+            ).filter(Boolean);
+            setGeneratedImages(images);
+            setGenProgress(100);
+          } else if (event.type === 'error') {
+            throw new Error(event.message || 'Hiba történt');
+          }
+        }
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setIsGenerating(false);
+      setGenStatus('');
+      setGenProgress(0);
+      setGenElapsed(0);
     }
   };
 
@@ -540,41 +578,60 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken, isGl
       leftSecondarySidebar={
         <div className="h-full flex flex-row overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
           {/* Tool Strip (72px) */}
-          <div className="w-[72px] h-full flex flex-col items-center pt-6 space-y-4 border-r border-white/5 bg-[#030308]">
+          {/* Tool Strip (72px) — 2 mód gomb */}
+          <div className="w-[72px] h-full flex flex-col items-center pt-6 space-y-3 border-r border-white/5 bg-[#030308]">
             {[
-              { id: 'generate', label: 'GENERATE', icon: <Sparkles className="w-5 h-5" />, color: themeColor },
-              { id: 'control', label: 'CONTROL', icon: <Settings2 className="w-5 h-5" />, color: '#94a3b8' },
-              { id: 'style', label: 'STYLE', icon: <Layers className="w-5 h-5" />, color: '#94a3b8' },
-              { id: 'upscale', label: 'UPSCALE', icon: <Box className="w-5 h-5" />, color: '#94a3b8' },
-            ].map((tool, idx) => (
+              {
+                id: 'generate',
+                label: 'GENERATE',
+                icon: <Sparkles className="w-5 h-5" />,
+                isActive: !selectedModel.needsInputImage,
+                onClick: () => {
+                  const first = ALL_MODELS.find(m => m.panelType === 'image' && !m.needsInputImage);
+                  if (first) onModelChange?.(first);
+                },
+              },
+              {
+                id: 'edit',
+                label: 'EDIT',
+                icon: <Pencil className="w-5 h-5" />,
+                isActive: !!selectedModel.needsInputImage,
+                onClick: () => {
+                  const first = ALL_MODELS.find(m => m.panelType === 'image' && m.needsInputImage);
+                  if (first) onModelChange?.(first);
+                },
+              },
+            ].map((tool) => (
               <button
                 key={tool.id}
-                className={`group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer ${idx === 0 ? 'mb-4' : ''}`}
+                onClick={tool.onClick}
+                title={tool.label}
+                className="group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer"
               >
                 <div
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${idx === 0
-                    ? "bg-white/5 border-white/10 shadow-xl"
-                    : "bg-transparent border-transparent"
-                    }`}
-                  style={idx === 0 ? { borderColor: `${tool.color}40`, color: tool.color } : { color: '#52525b' }}
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${
+                    tool.isActive
+                      ? 'bg-white/5 border-white/10 shadow-xl'
+                      : 'bg-transparent border-transparent hover:bg-white/[0.03] hover:border-white/5'
+                  }`}
+                  style={tool.isActive ? { borderColor: `${themeColor}40`, color: themeColor } : { color: '#52525b' }}
                 >
                   {tool.icon}
                 </div>
-                <span className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 ${idx === 0 ? 'text-white' : 'text-zinc-700'}`}>
+                <span className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 ${
+                  tool.isActive ? 'text-white' : 'text-zinc-700 group-hover:text-zinc-500'
+                }`}>
                   {tool.label}
                 </span>
               </button>
             ))}
-
             <div className="flex-1" />
-
-
           </div>
 
-          {/* Controls Area (320px) */}
           <div className="flex-1 h-full overflow-hidden">
             <ImageControls
               selectedModel={selectedModel}
+              onModelChange={onModelChange}
               prompt={prompt} setPrompt={setPrompt}
               negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
               aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
@@ -646,6 +703,9 @@ export default function ImageGenerator({ selectedModel, userId, getIdToken, isGl
             images={generatedImages}
             error={error}
             selectedModel={selectedModel}
+            genProgress={genProgress}
+            genStatus={genStatus}
+            genElapsed={genElapsed}
           />
         </div>
       </div>

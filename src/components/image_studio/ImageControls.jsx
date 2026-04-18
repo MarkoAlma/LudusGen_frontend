@@ -1,10 +1,12 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ImageIcon, Wand2, Plus, X, Trash2, Zap, Settings2, Info, ArrowUpRight, Sparkles, Cpu, Activity, Layers, Target, Maximize2 } from 'lucide-react';
+import { ImageIcon, Wand2, Plus, X, Trash2, Zap, Settings2, Info, ArrowUpRight, Sparkles, Cpu, Activity, Layers, Target, Maximize2, ChevronDown, Pencil } from 'lucide-react';
 import Enhancer from '../../ai_components/Enhancer';
+import { ALL_MODELS } from '../../ai_components/models';
 
 export default function ImageControls({
   selectedModel,
+  onModelChange,
   prompt, setPrompt,
   negativePrompt, setNegativePrompt,
   aspectRatio, setAspectRatio,
@@ -25,7 +27,27 @@ export default function ImageControls({
   getIdToken
 }) {
   const fileInputRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const color = selectedModel.color || "#7c3aed";
+
+  // Generáló vs szerkesztő mód
+  const isEditMode = !!selectedModel.needsInputImage;
+  const availableModels = ALL_MODELS.filter(
+    m => m.panelType === 'image' && !!m.needsInputImage === isEditMode
+  );
+
+  // Dropdown bezárása külső kattintásra
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [dropdownOpen]);
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files || []).slice(0, 3 - inputImages.length);
@@ -60,19 +82,107 @@ export default function ImageControls({
 
   return (
     <div className="flex flex-col h-full bg-[#0a0618]/30 backdrop-blur-[60px] relative border-r border-white/5 shadow-[20px_0_40px_rgba(0,0,0,0.3)] overflow-hidden">
-      {/* Studio Identity Header */}
+      {/* Model Dropdown Header */}
       <div className="pt-4 border-b border-white/5 relative z-20 bg-white/[0.02] backdrop-blur-3xl">
-        <div className="h-16 px-6 flex items-center gap-4">
-          <div 
-            className="w-10 h-10 rounded-2xl flex items-center justify-center border shadow-lg"
-            style={{ backgroundColor: `${color}15`, borderColor: `${color}30`, color }}
+        <div className="h-16 px-4 flex items-center" ref={dropdownRef}>
+          <button
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            className="flex items-center gap-3 w-full pl-2 pr-3 py-2 rounded-xl bg-white/[0.04] border border-white/8 hover:bg-white/[0.06] hover:border-white/15 transition-all duration-300"
           >
-            <ImageIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-white font-black text-[10px] uppercase tracking-[0.4em] italic leading-none">Neural Forge</h3>
-            <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest mt-1.5">Image Generator v4.0</p>
-          </div>
+            {/* Mode icon */}
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: `${color}20`, color }}
+            >
+              {isEditMode
+                ? <Pencil className="w-3.5 h-3.5" />
+                : <ImageIcon className="w-3.5 h-3.5" />}
+            </div>
+
+            {/* Model name */}
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.25em] leading-none mb-0.5">
+                {isEditMode ? 'Képszerkesztés' : 'Képgenerálás'}
+              </p>
+              <p className="text-[12px] font-black text-white truncate leading-none">
+                {selectedModel.name}
+              </p>
+            </div>
+
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-zinc-500 flex-shrink-0 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {/* Dropdown panel */}
+          <AnimatePresence>
+            {dropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-full left-4 right-4 mt-1 rounded-xl border border-white/10 bg-[#0d0d14]/98 backdrop-blur-xl shadow-2xl z-50 overflow-hidden"
+              >
+                {/* Header */}
+                <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
+                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">
+                    {isEditMode ? 'Szerkesztő modellek' : 'Generáló modellek'}
+                  </span>
+                  <span className="text-[8px] text-zinc-600 font-bold">{availableModels.length} modell</span>
+                </div>
+
+                {/* Model list */}
+                <div className="max-h-72 overflow-y-auto py-1">
+                  {availableModels.map(model => {
+                    const isActive = selectedModel?.id === model.id;
+                    return (
+                      <button
+                        key={model.id}
+                        onClick={() => {
+                          onModelChange?.(model);
+                          setDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all ${
+                          isActive ? 'bg-white/[0.05]' : 'hover:bg-white/[0.02]'
+                        }`}
+                      >
+                        {/* Color dot */}
+                        <div
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{
+                            backgroundColor: model.color,
+                            boxShadow: isActive ? `0 0 8px ${model.color}80` : 'none',
+                          }}
+                        />
+                        {/* Name + provider */}
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[12px] font-bold text-white truncate block">{model.name}</span>
+                          <span className="text-[9px] text-zinc-600 font-medium">{model.provider}</span>
+                        </div>
+                        {/* Badge */}
+                        {model.badge && (
+                          <span
+                            className="text-[8px] font-bold px-2 py-0.5 rounded-md flex-shrink-0 border"
+                            style={{
+                              color: isActive ? model.color : '#6b7280',
+                              borderColor: isActive ? `${model.color}40` : 'rgba(255,255,255,0.06)',
+                              backgroundColor: isActive ? `${model.color}12` : 'rgba(255,255,255,0.02)',
+                            }}
+                          >
+                            {model.badge}
+                          </span>
+                        )}
+                        {isActive && (
+                          <span className="text-[8px] font-black text-emerald-500 uppercase flex-shrink-0">Aktív</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
