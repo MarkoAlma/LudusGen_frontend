@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useJobs } from '../context/JobsContext';
 import toast from "react-hot-toast";
 import {
   Music, Play, Pause, Download, Loader2, XCircle, Mic,
@@ -152,6 +153,13 @@ const MiniWaveform = ({ color, isPlaying }) => (
 );
 
 export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+  const { addJob, updateJob, markJobDone, markJobError } = useJobs();
+  const startJob = (kind, title, targetTab) => {
+    const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    addJob({ id, kind, panelType: 'audio', modelId: selectedModel.id, title, status: 'running', progress: 0, createdAt: Date.now(), updatedAt: Date.now(), errorMessage: null, completedAt: null, seenAt: null, targetTab });
+    return id;
+  };
+
   const { registerPanel, unregisterPanel } = useStudioPanels();
 
   // Register panels (Audio only has L1 + L2, no archive)
@@ -270,6 +278,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
     setError(null);
     setAudioUrl(null);
     setIsPlaying(false);
+    const jobId = startJob(isTTS ? 'audio' : 'music', (content || 'Audio generation').slice(0, 48), 'audio');
 
     try {
       const token = getIdToken ? await getIdToken() : null;
@@ -307,6 +316,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
       if (!data.success) throw new Error(data.message);
 
       setAudioUrl(data.audioUrl);
+      markJobDone(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now() });
 
       if (userId) {
         try {
@@ -329,6 +339,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
       }
     } catch (err) {
       setError(err.message || "Generálási hiba");
+      markJobError(jobId, err.message || 'Generálási hiba');
     } finally {
       setIsGenerating(false);
     }

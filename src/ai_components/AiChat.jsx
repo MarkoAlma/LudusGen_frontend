@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useContext, useEffect } from "react";
+import React, { useState, useCallback, useContext, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence, useSpring } from "framer-motion";
 import { ALL_MODELS, getModel, findModelGroup, findModelCat } from "./models";
@@ -18,7 +18,46 @@ import { API_BASE } from "../api/client";
 
 export default function AIChat({ user, getIdToken }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedAI, setSelectedAI] = useState("claude_sonnet");
+  const getTabForModel = useCallback((model) => {
+    if (!model) return "chat";
+    if (model.panelType === "image") return "image";
+    if (model.panelType === "audio") return "audio";
+    if (["threed", "trellis", "tripo", "meshy"].includes(model.panelType)) return "3d";
+    return "chat";
+  }, []);
+
+  const getFirstModelForTab = useCallback((tab) => {
+    return ALL_MODELS.find(m => {
+      if (tab === "image") return m.panelType === "image";
+      if (tab === "audio") return m.panelType === "audio";
+      if (tab === "3d") return ["threed", "trellis", "tripo", "meshy"].includes(m.panelType);
+      return m.panelType === "chat";
+    }) || ALL_MODELS[0];
+  }, []);
+
+  const resolveTargetModel = useCallback((tab, modelParam) => {
+    if (modelParam && getModel(modelParam)) return modelParam;
+    const remembered = sessionStorage.getItem(`ludusgen_last_model:${tab}`);
+    if (remembered && getModel(remembered)) return remembered;
+    return getFirstModelForTab(tab).id;
+  }, [getFirstModelForTab]);
+
+  const [selectedAI, setSelectedAI] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab") || "chat";
+    return resolveTargetModel(tab, params.get("model"));
+  });
+
+  const [openGroups, setOpenGroups] = useState(() => {
+    const gId = findModelGroup(selectedAI);
+    return new Set(gId ? [gId] : ["chat"]);
+  });
+
+  const [openCats, setOpenCats] = useState(() => {
+    const cId = findModelCat(selectedAI);
+    return new Set(cId ? [cId] : ["chat_anthropic"]);
+  });
+
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -27,7 +66,7 @@ export default function AIChat({ user, getIdToken }) {
     const saved = localStorage.getItem('desktop_sidebar_open');
     return saved !== null ? JSON.parse(saved) : true;
   });
-  
+
   const smoothWidth = useSpring(desktopSidebarOpen ? 320 : 0, { damping: 38, stiffness: 180 });
 
   useEffect(() => {
@@ -42,95 +81,79 @@ export default function AIChat({ user, getIdToken }) {
     });
   }, []);
 
-  const [openGroups, setOpenGroups] = useState(() => new Set(["chat"]));
-  const [openCats, setOpenCats] = useState(() => new Set(["chat_anthropic"]));
   const { navHeight } = useContext(MyUserContext);
 
+  // 1. URL -> State Sync (Navigation driven)
   useEffect(() => {
-    const tab = searchParams.get("tab");
+    const tab = searchParams.get("tab") || "chat";
     const modelParam = searchParams.get("model");
+    const targetModelId = resolveTargetModel(tab, modelParam);
 
-    let modelId = modelParam;
-
-    // If specific model not in URL, use tab defaults
-    if (!modelId && tab) {
-      if (tab === "image") modelId = "gemini-image";
-      else if (tab === "audio") modelId = "nvidia_magpie_tts";
-      else if (tab === "3d") modelId = "nvidia_trellis";
-      else modelId = "claude_sonnet";
+    if (targetModelId !== selectedAI) {
+      setSelectedAI(targetModelId);
+      const gId = findModelGroup(targetModelId);
+      const cId = findModelCat(targetModelId);
+      if (gId) setOpenGroups(prev => new Set([...prev, gId]));
+      if (cId) setOpenCats(prev => new Set([...prev, cId]));
     }
-
-    // Default fallback
-    if (!modelId) modelId = "claude_sonnet";
-
-    setSelectedAI(modelId);
-
-    const gId = findModelGroup(modelId);
-    const cId = findModelCat(modelId);
-    if (gId) setOpenGroups(new Set([gId]));
-    if (cId) setOpenCats(new Set([cId]));
-  }, [searchParams]);
+  }, [searchParams, resolveTargetModel, selectedAI]);
 
   const selectedModel = getModel(selectedAI) || ALL_MODELS[0];
+
+  // 2. State -> SessionStorage Persistence
+  useEffect(() => {
+    if (selectedAI && selectedModel) {
+      const tab = getTabForModel(selectedModel);
+      sessionStorage.setItem(`ludusgen_last_model:${tab}`, selectedAI);
+
+      // Granular image sub-mode persistence
+      if (tab === "image") {
+        const subKey = selectedModel.needsInputImage ? "image_edit" : "image_gen";
+        sessionStorage.setItem(`ludusgen_last_model:${subKey}`, selectedAI);
+      }
+    }
+  }, [selectedAI, selectedModel]);
 
   const handleSelectModel = useCallback((modelId) => {
     const oldModel = getModel(selectedAI);
     const newModel = getModel(modelId);
+    const tab = getTabForModel(newModel);
+
+    // Update session storage immediately to avoid race conditions
+    sessionStorage.setItem(`ludusgen_last_model:${tab}`, modelId);
+    if (tab === "image" && newModel) {
+      const subKey = newModel.needsInputImage ? "image_edit" : "image_gen";
+      sessionStorage.setItem(`ludusgen_last_model:${subKey}`, modelId);
+    }
 
     // If both are chat panel types, keep the same conversation session
-    const samePanelType = newModel?.panelType === oldModel?.panelType;
-
-    if (samePanelType && newModel?.panelType === 'chat') {
-      // Notify backend to generate summary for model switch
+    if (oldModel?.panelType === 'chat' && newModel?.panelType === 'chat') {
       const sessionId = sessionStorage.getItem("chat_session_current");
       if (sessionId) {
         getIdToken().then(async (token) => {
           try {
-            const response = await fetch(`${API_BASE}/api/chat/switch-model`, {
+            await fetch(`${API_BASE}/api/chat/switch-model`, {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
               body: JSON.stringify({ sessionId, newModelId: modelId })
             });
-            const data = await response.json();
-            if (data.summaryRefreshed) {
-              toast.success("Összefoglaló frissítve");
-            }
           } catch (e) {
             console.warn('[ModelSwitch] Failed:', e);
           }
         });
       }
-
-      // Just change the model, don't reset the conversation
-      // Don't update URL — prevents re-render/refresh
-      setSelectedAI(modelId);
-
-      const gId = findModelGroup(modelId);
-      const cId = findModelCat(modelId);
-      if (gId) setOpenGroups((p) => new Set([...p, gId]));
-      if (cId) setOpenCats((p) => new Set([...p, cId]));
-      setSidebarOpen(false);
-      setModelDropdownOpen(false);
-      return;
     }
 
-    // For different panel types, do the full reset
+    // Update state
     setSelectedAI(modelId);
 
-    // Sync URL tab parameter
-    if (newModel) {
-      let tab = "chat";
-      if (newModel.panelType === "image") tab = "image";
-      else if (newModel.panelType === "audio") tab = "audio";
-      else if (["threed", "trellis", "tripo"].includes(newModel.panelType)) tab = "3d";
-
-      setSearchParams(prev => {
-        const next = new URLSearchParams(prev);
-        next.set("tab", tab);
-        next.set("model", modelId);
-        return next;
-      });
-    }
+    // Update URL - Keep it clean (only tab)
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", tab);
+      next.delete("model");
+      return next;
+    }, { replace: true });
 
     const gId = findModelGroup(modelId);
     const cId = findModelCat(modelId);
@@ -173,6 +196,18 @@ export default function AIChat({ user, getIdToken }) {
           toggleCat={toggleCat}
           handleSelectModel={handleSelectModel}
           setSidebarOpen={setSidebarOpen}
+          onOpenJob={(job) => {
+            if (job?.targetTab) {
+              const next = new URLSearchParams(searchParams);
+              next.set('tab', job.targetTab);
+              next.delete('model'); // Clean URL
+              if (job.modelId) {
+                sessionStorage.setItem(`ludusgen_last_model:${job.targetTab}`, job.modelId);
+              }
+              setSearchParams(next);
+              sessionStorage.setItem(`ludusgen_open_job:${user?.uid || 'guest'}`, job.id);
+            }
+          }}
         />
       ),
       onModelChange: (newModel) => handleSelectModel(newModel.id),

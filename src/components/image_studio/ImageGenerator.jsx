@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
+import { MyUserContext } from '../../context/MyUserProvider';
+import { useJobs } from '../../context/JobsContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings2, PanelLeftClose, PanelLeftOpen, Sparkles, Layers, Box, Pencil } from 'lucide-react';
 import ImageControls from './ImageControls';
@@ -402,8 +404,20 @@ const getNvidiaType = (apiId = "") => {
 };
 
 export default function ImageGenerator({ selectedModel, onModelChange, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+  const { addJob, updateJob, markJobDone, markJobError, jobs, clearSeenCompletedJobs } = useJobs();
+  const startJob = (kind, title, targetTab) => {
+    const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    addJob({ id, kind, panelType: 'image', modelId: selectedModel.id, title, status: 'running', progress: 0, createdAt: Date.now(), updatedAt: Date.now(), errorMessage: null, completedAt: null, seenAt: null, targetTab });
+    return id;
+  };
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState([]);
+  const latestCompletedJob = useMemo(() => {
+    return [...jobs]
+      .filter((job) => job.panelType === 'image' && (job.status === 'done' || job.status === 'error') && job.resultImages?.length)
+      .sort((a, b) => (b.completedAt || b.updatedAt || 0) - (a.completedAt || a.updatedAt || 0))[0];
+  }, [jobs]);
   const [error, setError] = useState(null);
   const [genProgress, setGenProgress] = useState(0);
   const [genStatus, setGenStatus] = useState('');
@@ -421,17 +435,49 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
   const [promptExtend, setPromptExtend] = useState(true);
   const [fluxSizeIdx, setFluxSizeIdx] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState(null);
 
   const [leftOpen, setLeftOpen] = useState(true);
   const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(false);
   const [offsets, setOffsets] = useState({ left: 320, right: 0 });
 
-  
+
   // Master Sidebar Sync
   useEffect(() => {
     setLeftOpen(isGlobalOpen);
   }, [isGlobalOpen]);
+
+  useEffect(() => {
+    const jobId = sessionStorage.getItem(`ludusgen_open_job:${userId || 'guest'}`);
+    if (!jobId) return;
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job) return;
+
+    setSelectedJobId(jobId);
+    if (job.resultImages?.length) {
+      setGeneratedImages(job.resultImages);
+    }
+
+    if (job.status === 'running' || job.status === 'queued') {
+      setIsGenerating(true);
+      setGenProgress(job.progress ?? 0);
+      setGenStatus(job.status === 'queued' ? 'QUEUED' : 'PROCESSING');
+      setGenElapsed(Math.max(0, Math.floor((Date.now() - (job.createdAt || Date.now())) / 1000)));
+      return;
+    }
+
+    setIsGenerating(false);
+    if (job.resultImages?.length) {
+      setGenProgress(100);
+      setGenStatus('DONE');
+      setGenElapsed(0);
+    } else {
+      setGenProgress(job.progress ?? 0);
+      setGenStatus('');
+      setGenElapsed(0);
+    }
+  }, [jobs, userId]);
   const themeColor = selectedModel?.color || "#7c3aed";
 
   const provider = getProvider(selectedModel);
@@ -490,6 +536,9 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
     setGenProgress(0);
     setGenStatus('');
     setGenElapsed(0);
+    const jobId = startJob('image', prompt.trim().slice(0, 48) || 'Image generation', 'image');
+
+    updateJob(jobId, { progress: 0, updatedAt: Date.now() });
 
     try {
       const token = await getIdToken();
@@ -539,15 +588,19 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
           let event;
           try { event = JSON.parse(line.slice(6)); } catch { continue; }
           if (event.type === 'status') {
-            setGenProgress(event.progress ?? 0);
+            const progress = event.progress ?? 0;
+            setGenProgress(progress);
             setGenStatus(event.status ?? '');
             setGenElapsed(event.elapsed ?? 0);
+            updateJob(jobId, { progress, updatedAt: Date.now() });
           } else if (event.type === 'done') {
             const images = (event.images || []).map(img =>
               typeof img === 'string' ? img : (img.url || img.b64_json || img.image_url)
             ).filter(Boolean);
             setGeneratedImages(images);
             setGenProgress(100);
+            markJobDone(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now(), resultImages: images });
+            setSelectedJobId(jobId);
           } else if (event.type === 'error') {
             throw new Error(event.message || 'Hiba történt');
           }
@@ -555,6 +608,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
       }
     } catch (err) {
       setError(err.message);
+      markJobError(jobId, err.message || 'Hiba történt');
     } finally {
       setIsGenerating(false);
       setGenStatus('');
@@ -562,6 +616,19 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
       setGenElapsed(0);
     }
   };
+
+  useEffect(() => {
+    if (!generatedImages.length && latestCompletedJob?.resultImages?.length) {
+      setGeneratedImages(latestCompletedJob.resultImages);
+    }
+  }, [latestCompletedJob, generatedImages.length]);
+
+  useEffect(() => {
+    if (selectedJobId) {
+      const job = jobs.find((j) => j.id === selectedJobId);
+      if (job?.resultImages?.length) setGeneratedImages(job.resultImages);
+    }
+  }, [selectedJobId, jobs]);
 
   return (
     <StudioLayout
@@ -609,18 +676,16 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
                 className="group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer"
               >
                 <div
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${
-                    tool.isActive
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${tool.isActive
                       ? 'bg-white/5 border-white/10 shadow-xl'
                       : 'bg-transparent border-transparent hover:bg-white/[0.03] hover:border-white/5'
-                  }`}
+                    }`}
                   style={tool.isActive ? { borderColor: `${themeColor}40`, color: themeColor } : { color: '#52525b' }}
                 >
                   {tool.icon}
                 </div>
-                <span className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 ${
-                  tool.isActive ? 'text-white' : 'text-zinc-700 group-hover:text-zinc-500'
-                }`}>
+                <span className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 ${tool.isActive ? 'text-white' : 'text-zinc-700 group-hover:text-zinc-500'
+                  }`}>
                   {tool.label}
                 </span>
               </button>

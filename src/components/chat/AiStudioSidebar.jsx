@@ -1,13 +1,8 @@
-import React, { useContext } from 'react';
+import React, { useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wand2, X, ChevronDown, Zap, Sparkles, Home, ImageIcon, Pencil } from 'lucide-react';
 import { MODEL_GROUPS, ALL_MODELS, getModel, findModelGroup } from '../../ai_components/models';
-
-// Kép generáló modellek (nem szerkesztők)
-const IMAGE_GEN_MODELS = ALL_MODELS.filter(m => m.panelType === 'image' && !m.needsInputImage);
-// Kép szerkesztő modellek (needsInputImage: true)
-const IMAGE_EDIT_MODELS = ALL_MODELS.filter(m => m.panelType === 'image' && m.needsInputImage);
 import bgChat from '../../assets/bg-chat.png';
 import bgCode from '../../assets/bg-code.png';
 import bgAudio from '../../assets/bg-audio.png';
@@ -15,6 +10,13 @@ import bgImage from '../../assets/bg-image.png';
 import bg3d from '../../assets/bg-3d.png';
 import neuralCoin from '../../assets/neural-coin.png';
 import { MyUserContext } from '../../context/MyUserProvider';
+import { useJobs } from '../../context/JobsContext';
+import JobQueueWidget from './JobQueueWidget';
+
+// Kép generáló modellek (nem szerkesztők)
+const IMAGE_GEN_MODELS = ALL_MODELS.filter(m => m.panelType === 'image' && !m.needsInputImage);
+// Kép szerkesztő modellek (needsInputImage: true)
+const IMAGE_EDIT_MODELS = ALL_MODELS.filter(m => m.panelType === 'image' && m.needsInputImage);
 
 const CATEGORY_BGS = {
   chat: bgChat,
@@ -48,13 +50,19 @@ export default function AiStudioSidebar({
   toggleCat,
   handleSelectModel,
   setSidebarOpen,
-  isMobile
+  isMobile,
+  onOpenJob
 }) {
   const selectedModel = getModel(selectedAI);
   const { user } = useContext(MyUserContext);
+  const { clearSeenCompletedJobs } = useJobs();
   const activeColor = selectedModel?.color || '#8b5cf6';
   const currentGroupId = findModelGroup(selectedAI) || 'chat';
   const currentBg = CATEGORY_BGS[currentGroupId] || bgChat;
+  const handleJobOpen = (job) => {
+    clearSeenCompletedJobs(job.panelType);
+    if (onOpenJob) onOpenJob(job);
+  };
 
   return (
     <div
@@ -263,13 +271,25 @@ export default function AiStudioSidebar({
                           label: 'Képgenerálás',
                           icon: <ImageIcon className="w-4 h-4" />,
                           models: IMAGE_GEN_MODELS,
-                          defaultId: IMAGE_GEN_MODELS[0]?.id,
+                          getRestoredId: () => {
+                            const specific = sessionStorage.getItem('ludusgen_last_model:image_gen');
+                            if (specific && IMAGE_GEN_MODELS.some(m => m.id === specific)) return specific;
+                            const generic = sessionStorage.getItem('ludusgen_last_model:image');
+                            if (generic && IMAGE_GEN_MODELS.some(m => m.id === generic)) return generic;
+                            return IMAGE_GEN_MODELS[0]?.id;
+                          }
                         },
                         {
                           label: 'Képszerkesztés',
                           icon: <Pencil className="w-4 h-4" />,
                           models: IMAGE_EDIT_MODELS,
-                          defaultId: IMAGE_EDIT_MODELS[0]?.id,
+                          getRestoredId: () => {
+                            const specific = sessionStorage.getItem('ludusgen_last_model:image_edit');
+                            if (specific && IMAGE_EDIT_MODELS.some(m => m.id === specific)) return specific;
+                            const generic = sessionStorage.getItem('ludusgen_last_model:image');
+                            if (generic && IMAGE_EDIT_MODELS.some(m => m.id === generic)) return generic;
+                            return IMAGE_EDIT_MODELS[0]?.id;
+                          }
                         },
                       ].map((item) => {
                         const isActive = item.models.some(m => m.id === selectedAI);
@@ -278,7 +298,10 @@ export default function AiStudioSidebar({
                         return (
                           <button
                             key={item.label}
-                            onClick={() => item.defaultId && handleSelectModel(item.defaultId)}
+                            onClick={() => {
+                              const targetId = item.getRestoredId();
+                              if (targetId) handleSelectModel(targetId);
+                            }}
                             className={`w-full relative rounded-2xl border overflow-hidden transition-all duration-300 group/item ${isActive
                                 ? 'border-white/10'
                                 : 'border-transparent hover:border-white/5 hover:bg-white/[0.02]'
@@ -379,31 +402,7 @@ export default function AiStudioSidebar({
         })}
       </div>
 
-      {/* ── Footer ── */}
-      <div className="px-5 py-6 border-t border-white/5 relative z-20">
-        <motion.div
-          whileHover={{ scale: 1.01 }}
-          className="p-4 rounded-2xl bg-gradient-to-br from-white/[0.03] to-transparent border border-white/5 relative overflow-hidden group cursor-pointer"
-        >
-          <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/5 blur-[40px] rounded-full group-hover:bg-emerald-500/10 transition-all duration-700" />
-
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 animate-pulse" style={{ boxShadow: '0 0 6px rgba(16,185,129,0.4)' }} />
-              <span className="text-[9px] font-black text-zinc-500 italic uppercase tracking-[0.3em]">PRO MASTER</span>
-            </div>
-            <p className="text-[9px] text-zinc-600 font-bold uppercase leading-relaxed tracking-widest">
-              High-Fidelity Node
-            </p>
-            <p className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest">
-              Authorized Connect
-            </p>
-          </div>
-          <div className="absolute -bottom-1 -right-1 opacity-[0.03] group-hover:opacity-[0.08] transition-all duration-700">
-            <Zap className="w-10 h-10 text-white" />
-          </div>
-        </motion.div>
-      </div>
+      <JobQueueWidget onOpenJob={handleJobOpen} />
     </div>
   );
 }
