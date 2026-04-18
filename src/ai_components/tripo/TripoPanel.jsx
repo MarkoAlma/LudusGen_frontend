@@ -118,6 +118,7 @@ const CSS = `
   .tp-switch::after { content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.4); }
   .tp-switch.on::after { transform:translateX(16px); }
   .tp-input { width:100%;padding:9px 12px;border-radius:10px;font-size:12px;color:var(--text-primary);background:var(--bg-raised);border:1px solid var(--border);outline:none;font-family:inherit;transition:border-color 0.18s,background 0.18s,box-shadow 0.18s;box-sizing:border-box; }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none;margin:0; }
   .tp-input:focus { border-color:var(--border-accent);background:rgba(30,30,54,0.9);box-shadow:0 0 0 3px rgba(139,92,246,0.08); }
   .tp-input::placeholder { color:var(--text-muted); }
   .tp-ta { width:100%;padding:10px 13px;border-radius:11px;font-size:12px;color:var(--text-primary);background:var(--bg-raised);border:1px solid var(--border);outline:none;font-family:inherit;resize:none;line-height:1.6;box-sizing:border-box;transition:border-color 0.18s,box-shadow 0.18s; }
@@ -299,7 +300,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [editId, setEditId] = useState("");
   const [refineId, setRefineId] = useState("");
   const [stylizeId, setStylizeId] = useState("");
-  const [stylizeStyle, setStylizeStyle] = useState("cartoon");
+  const [stylizeStyle, setStylizeStyle] = useState("lego");
   const [animId, setAnimId] = useState("");
 
   // animate
@@ -387,6 +388,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [creativity, setCreativity] = useState(0.6);
   const [brushColor, setBrushColor] = useState("#ffffff");
   const [brushSize, setBrushSize] = useState(10);
+  const [brushOpacity, setBrushOpacity] = useState(1);
+  const [brushHardness, setBrushHardness] = useState(80);
   const canvasRef = useRef(null);
   const isDrawingRef = useRef(false);
 
@@ -675,7 +678,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             if (!persisted.savedToHistory && sd.modelUrl) {
               markHistorySaved();
               const _ni = await saveRigHist(persisted.taskId, sd.modelUrl, { prompt: "auto-rig", originalModelTaskId: persisted.mode === "animate" ? persisted.taskId : undefined, rigModelVer: persisted.rigModelVer, rigType: persisted.rigType, rigSpec: persisted.rigSpec });
-              if (_ni) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${persisted.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
+              if (_ni) { syncSelHist(_ni); getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${persisted.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { })); }
             }
             currentTaskId.current = null; clearPersistedGen();
           } else if (opType === "animate") {
@@ -691,7 +694,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             if (!persisted.savedToHistory) {
               markHistorySaved();
               const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "animation", animated: true });
-              if (_ni) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${persisted.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
+              if (_ni) { syncSelHist(_ni); getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${persisted.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { })); }
             }
             currentTaskId.current = null; clearPersistedGen();
           } else if (opType === "segment") {
@@ -710,7 +713,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             if (!persisted.savedToHistory && rawUrl) {
               markHistorySaved();
               const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "" });
-              if (_ni) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${persisted.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
+              if (_ni) { syncSelHist(_ni); getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${persisted.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { })); }
             }
           }
         };
@@ -827,6 +830,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const quadCost = quadMesh ? 5 : 0;
     return base + texAddon + ultraAddon + slpCost + partsCost + quadCost;
   }, [mode, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh, smartLowPoly, modelVer]);
+
+  const syncSelHist = useCallback((entry) => {
+    if (!entry) return;
+    setSelHistId(entry.id);
+    if (entry.taskId) setSearchParams(prev => { const n = new URLSearchParams(prev); n.set("tripoTaskId", entry.taskId); return n; }, { replace: true });
+    else setSearchParams(prev => { const n = new URLSearchParams(prev); n.delete("tripoTaskId"); return n; }, { replace: true });
+  }, [setSearchParams]);
 
   const handleGen = useCallback(async () => {
     if (!canGen) return;
@@ -1073,7 +1083,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         };
         setOptimisticItems(prev => [optimisticEntry, ...prev.filter(o => o.id !== mockStableId)]);
         setHistory(h => h.some(x => x.id === mockStableId) ? h : [optimisticEntry, ...h]);
-        setSelHistId(mockStableId);
+        syncSelHist(optimisticEntry);
 
         if (mode === "animate") {
           // Animated model is still rigged — keep rig state alive
@@ -1114,7 +1124,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             }
             setStatusMsg("");
             markHistorySaved();
-            if (firstEntry) setSelHistId(firstEntry.id);
+            if (firstEntry) syncSelHist(firstEntry);
           }
         } else {
           setRigStep("idle"); setRiggedId(null); setShowRig(false);
@@ -1139,7 +1149,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setErrorMsg(e.message ?? "Network error");
       refreshCredits?.();
     }
-  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, modelUrl, pollTask, fetchProxy, revokeBlobUrl, saveHist, activeTaskId, refreshCredits, userCredits, genCost, refineId, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history]);
+  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, modelUrl, pollTask, fetchProxy, revokeBlobUrl, saveHist, activeTaskId, refreshCredits, userCredits, genCost, refineId, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, syncSelHist]);
 
   const handlePrerigcheck = useCallback(async () => {
     if (!activeTaskId && !animId) return;
@@ -1190,14 +1200,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         };
         setOptimisticItems(prev => [rigOptEntry, ...prev.filter(o => o.id !== mockStableId)]);
         setHistory(h => h.some(x => x.id === mockStableId) ? h : [rigOptEntry, ...h]);
-        setSelHistId(mockStableId);
+        syncSelHist(rigOptEntry);
 
         currentTaskId.current = null;
         persistGen({ taskId: rd.taskId, requestId: rd.taskId, mode: "animate", prompt: "auto-rig", modelVer: "", lastProgress: 100, lastProgressAt: Date.now(), startedAt: Date.now(), riggedId: rd.taskId, opType: "rig", rigModelVer: animModelVer, rigType: actualRigType, rigSpec });
         const srcItemForRig = history.find(h => h.taskId === srcId); const rigBasePrompt = srcItemForRig?.prompt?.trim() || srcItemForRig?.name?.trim() || prompt.trim(); const aiRigName = await generateAIName(rigBasePrompt, "rig"); const _ni4 = await saveRigHist(rd.taskId, d.modelUrl, { prompt: "auto-rig", originalModelTaskId: srcId, aiName: aiRigName ?? undefined, rigModelVer: animModelVer, rigType: actualRigType, rigSpec }); markHistorySaved(); if (_ni4) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${rd.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
       }, { skipJumpCheck: true });
     } catch (e) { currentTaskId.current = null; if (pt.cancelled) return; setRigStep("idle"); setRiggedId(null); setShowRig(false); setErrorMsg(e.message); setStatusMsg(""); }
-  }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl, saveRigHist, rigSpec, animOutFormat, rigType, animModelVer, animBakeAnimation, animExportGeometry, animAnimateInPlace]);
+  }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl, saveRigHist, rigSpec, animOutFormat, rigType, animModelVer, animBakeAnimation, animExportGeometry, animAnimateInPlace, syncSelHist]);
 
   const handleStop = useCallback(async () => {
     userStoppedRef.current = true;
@@ -1280,6 +1290,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
     if (!t.cancelled) setLoadingId(null);
   }, [fetchProxy, revokeBlobUrl, setSearchParams]);
+
 
   // Called by Shared3DHistory once when the first Firestore snapshot arrives.
   // Restores the previously selected item from URL param or saved sessionStorage id.
@@ -1413,7 +1424,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               {(mode === "segment" || mode === "fill_parts") && <Segment segSub={mode === "fill_parts" ? "fill_parts" : segSub} activeTaskId={activeTaskId} isRiggedInput={isRiggedInput} color={color} />}
               {mode === "retopo" && <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={color} />}
               {mode === "texture" && <Texture mode={mode} activeTaskId={activeTaskId} texInputTab={texInputTab} setTexInputTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt} imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} multiImages={multiImages} setMultiImages={setMultiImages} tex4K={tex4K} setTex4K={setTex4K} pbrOn={texPbr} setPbrOn={setTexPbr} texAlignment={texAlignment} setTexAlignment={setTexAlignment} color={color} />}
-              {mode === "texture_edit" && <Texture mode={mode} activeTaskId={activeTaskId} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} brushSize={brushSize} setBrushSize={setBrushSize} canvasRef={canvasRef} color={color} onUndo={() => sceneRef.current?.undoPaint()} />}
+              {mode === "texture_edit" && <Texture mode={mode} activeTaskId={activeTaskId} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} brushSize={brushSize} setBrushSize={setBrushSize} brushOpacity={brushOpacity} setBrushOpacity={setBrushOpacity} brushHardness={brushHardness} setBrushHardness={setBrushHardness} canvasRef={canvasRef} color={color} onUndo={() => sceneRef.current?.undoPaint()} />}
               {mode === "animate" && <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} handleAutoRig={handleAutoRig} rigType={rigType} setRigType={setRigType} rigSpec={rigSpec} setRigSpec={setRigSpec} detectedRigType={detectedRigType} detectedRigModelVer={detectedRigModelVer} detectedRigSpec={detectedRigSpec} prerigcheckResult={prerigcheckResult} handlePrerigcheck={handlePrerigcheck} animOutFormat={animOutFormat} setAnimOutFormat={setAnimOutFormat} animBakeAnimation={animBakeAnimation} setAnimBakeAnimation={setAnimBakeAnimation} animExportGeometry={animExportGeometry} setAnimExportGeometry={setAnimExportGeometry} animAnimateInPlace={animAnimateInPlace} setAnimAnimateInPlace={setAnimAnimateInPlace} color={color} />}
               {mode === "refine" && (
                 <div>
@@ -1451,7 +1462,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   <div className="mb-4">
                     <span className="text-zinc-500 text-[11px] font-black uppercase tracking-widest block mb-2 italic">Style Filter</span>
                     <div className="grid grid-cols-2 gap-2">
-                      {["cartoon", "clay", "alien", "steampunk", "lego", "voxel", "voronoi", "minecraft", "gold", "ancient_bronze"].map(s => (
+                      {["lego", "voxel", "voronoi", "minecraft"].map(s => (
                         <button
                           key={s}
                           onClick={() => setStylizeStyle(s)}
@@ -1595,6 +1606,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         paintMode={mode === "texture_edit" && brushMode === "Paint Mode"}
         paintColor={brushColor}
         paintSize={brushSize}
+        paintOpacity={brushOpacity}
+        paintHardness={brushHardness}
         paintCanvasRef={canvasRef}
       />
     </StudioLayout>
@@ -1618,7 +1631,7 @@ function TripoWorkspaceWrapper({
   onAnimClipsDetected,
   animClips, activeClipIdx, onSwitchClip,
   // 3D Paint
-  paintMode, paintColor, paintSize, paintCanvasRef
+  paintMode, paintColor, paintSize, paintOpacity, paintHardness, paintCanvasRef
 }) {
   const { smoothL, smoothR } = useContext(StudioLayoutContext);
 
@@ -1689,6 +1702,8 @@ function TripoWorkspaceWrapper({
             paintMode={paintMode}
             paintColor={paintColor}
             paintSize={paintSize}
+            paintOpacity={paintOpacity}
+            paintHardness={paintHardness}
             paintCanvasRef={paintCanvasRef}
           />
           )}

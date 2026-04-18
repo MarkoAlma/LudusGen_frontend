@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   Image, Boxes, Grid3x3, Pencil, HelpCircle, Upload, Check, X,
-  Loader2, Globe, Lock, ChevronDown, PersonStanding, Zap, Images, Lightbulb,
+  Loader2, Globe, Lock, ChevronDown, ChevronUp, PersonStanding, Zap, Images, Lightbulb,
   Camera, Box, Gamepad2, FlaskConical, Triangle, Palette, Sparkles, ToyBrick, Mountain, Dice5,
 } from "lucide-react";
 import Enhancer from "../Enhancer";
@@ -116,19 +116,7 @@ function Na({ unsupported, tip, children }) {
 }
 
 /* ─── helpers ─────────────────────────────────────────────────────────── */
-function CoinIcon({ size = 15 }) {
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%",
-      background: "linear-gradient(135deg,#f5c518,#e09900)",
-      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-    }}>
-      <Zap style={{ width: size * 0.56, height: size * 0.56, color: "#0a0800" }} />
-    </div>
-  );
-}
-
-function Toggle({ label, value, onChange, hint = false, premium = false, disabled = false }) {
+function Toggle({ label, value, onChange, hint = false, disabled = false }) {
   return (
     <div
       style={{
@@ -138,12 +126,73 @@ function Toggle({ label, value, onChange, hint = false, premium = false, disable
       onClick={() => !disabled && onChange(!value)}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-        {premium && <CoinIcon />}
         <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>{label}</span>
         {hint && <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />}
       </div>
       <div className={"tp-switch" + (value ? " on" : "")}
         style={{ background: value ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
+    </div>
+  );
+}
+
+function SeedSpinner({ value, onChange, disabled = false }) {
+  const handleText = (e) => {
+    const v = e.target.value;
+    onChange(v === "" ? null : parseInt(v, 10));
+  };
+  const step = (dir) => {
+    if (disabled) return;
+    const cur = value ?? 0;
+    const next = Math.max(0, cur + dir);
+    onChange(next);
+  };
+  return (
+    <div style={{
+      display: "flex", alignItems: "stretch",
+      background: "var(--bg-raised)", border: "1px solid var(--border)",
+      borderRadius: 8, overflow: "hidden", height: 26,
+    }}>
+      <input
+        type="number" min="0" placeholder="Random"
+        value={value ?? ""}
+        onChange={handleText}
+        disabled={disabled}
+        style={{
+          width: 72, border: "none", outline: "none", background: "transparent",
+          color: "var(--text-primary)", fontSize: 11, fontFamily: "inherit",
+          textAlign: "right", padding: "0 6px",
+          MozAppearance: "textfield",
+        }}
+      />
+      <div style={{
+        display: "flex", flexDirection: "column",
+        borderLeft: "1px solid var(--border)",
+      }}>
+        <button
+          type="button" onClick={() => step(1)} disabled={disabled}
+          style={{
+            flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+            background: "transparent", border: "none", cursor: disabled ? "not-allowed" : "pointer",
+            padding: "0 4px", borderBottom: "1px solid var(--border)",
+            color: disabled ? "var(--text-muted)" : "var(--text-secondary)",
+            lineHeight: 1,
+          }}
+        >
+          <ChevronUp style={{ width: 9, height: 9 }} />
+        </button>
+        <button
+          type="button" onClick={() => step(-1)} disabled={disabled}
+          style={{
+            flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+            background: "transparent", border: "none", cursor: disabled ? "not-allowed" : "pointer",
+            padding: "0 4px",
+            color: disabled ? "var(--text-muted)" : "var(--text-secondary)",
+            lineHeight: 1,
+          }}
+        >
+          <ChevronDown style={{ width: 9, height: 9 }} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -217,7 +266,6 @@ function TopoControls({
           onClick={() => capsSmartLowPoly && handleSetSmartLowPoly(!smartLowPoly)}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <CoinIcon />
             <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Smart Low Poly</span>
             <span style={{ background: "linear-gradient(135deg,#c026d3,#a21caf)", color: "#fff", fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 4 }}>v2</span>
             <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
@@ -738,7 +786,6 @@ Respond ONLY with plain text, no JSON, no explanation.`;
                     };
                     inp.click();
                   }}>
-                  <div style={{ position: "absolute", top: 5, left: 5, zIndex: 2 }}><CoinIcon size={13} /></div>
                   {prev ? (
                     <img src={prev} alt={slot} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 6 }} />
                   ) : (
@@ -815,7 +862,6 @@ Respond ONLY with plain text, no JSON, no explanation.`;
             onDragOver={e => e.preventDefault()}
             onDrop={e => { e.preventDefault(); handleBatchFiles(e.dataTransfer.files); }}
           >
-            <div style={{ position: "absolute", top: 8, left: 8, zIndex: 2 }}><CoinIcon size={16} /></div>
             <div style={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}>
               <Lightbulb style={{ width: 16, height: 16, color: "#4a4a68" }} />
             </div>
@@ -891,7 +937,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
               outline: meshQ === "ultra" && caps.ultraMesh ? "1.5px solid rgba(108,99,255,0.4)" : "1.5px solid rgba(255,255,255,0.07)",
               cursor: caps.ultraMesh ? "pointer" : "not-allowed",
             }}>
-            <CoinIcon size={14} />Ultra
+            Ultra
           </button>
         </Na>
         {/* Standard — always available */}
@@ -945,7 +991,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
 
       {/* ── Texture ── */}
       <Na unsupported={!caps.texture} tip={`Texture not supported by ${modelVer}`}>
-        <Toggle label="Texture" value={texOn && caps.texture} onChange={v => caps.texture && setTexOn(v)} disabled={!caps.texture} />
+        <Toggle label="Texture" value={texOn && caps.texture} onChange={v => { if (caps.texture) { setTexOn(v); if (!v) { setPbrOn(false); setTex4K(false); } } }} disabled={!caps.texture} />
       </Na>
 
       <Collapsible label="Texture Settings">
@@ -963,7 +1009,6 @@ Respond ONLY with plain text, no JSON, no explanation.`;
               onClick={() => (texOn || pbrOn) && caps.tex4K && setTex4K(v => !v)}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                <CoinIcon size={14} />
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>4K Texture</span>
                 <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
               </div>
@@ -1026,14 +1071,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Model Seed</span>
                 <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
               </div>
-              <input
-                type="number" min="0" placeholder="Random"
-                value={modelSeed ?? ""}
-                onChange={e => caps.modelSeed && setModelSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
-                disabled={!caps.modelSeed}
-                className="tp-input"
-                style={{ width: 90, textAlign: "right", fontSize: 11, padding: "4px 8px" }}
-              />
+              <SeedSpinner value={modelSeed} onChange={v => caps.modelSeed && setModelSeed(v)} disabled={!caps.modelSeed} />
             </div>
           </Na>
 
@@ -1044,14 +1082,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Image Seed</span>
                 <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
               </div>
-              <input
-                type="number" min="0" placeholder="Random"
-                value={imageSeed ?? ""}
-                onChange={e => caps.imageSeed && setImageSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
-                disabled={!caps.imageSeed}
-                className="tp-input"
-                style={{ width: 90, textAlign: "right", fontSize: 11, padding: "4px 8px" }}
-              />
+              <SeedSpinner value={imageSeed} onChange={v => caps.imageSeed && setImageSeed(v)} disabled={!caps.imageSeed} />
             </div>
           </Na>
 
@@ -1063,14 +1094,7 @@ Respond ONLY with plain text, no JSON, no explanation.`;
                   <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Texture Seed</span>
                   <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
                 </div>
-                <input
-                  type="number" min="0" placeholder="Random"
-                  value={textureSeed ?? ""}
-                  onChange={e => caps.textureSeed && setTextureSeed(e.target.value === "" ? null : parseInt(e.target.value, 10))}
-                  disabled={!caps.textureSeed}
-                  className="tp-input"
-                  style={{ width: 90, textAlign: "right", fontSize: 11, padding: "4px 8px" }}
-                />
+                <SeedSpinner value={textureSeed} onChange={v => caps.textureSeed && setTextureSeed(v)} disabled={!caps.textureSeed} />
               </div>
             </Na>
           )}

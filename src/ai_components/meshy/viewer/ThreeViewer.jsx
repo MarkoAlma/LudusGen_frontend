@@ -40,6 +40,8 @@ const ThreeViewer = forwardRef(({
   paintMode = false,
   paintColor = '#ffffff',
   paintSize = 10,
+  paintOpacity = 0.35,
+  paintHardness = 60,
   paintCanvasRef = null,
 }, ref) => {
   const mountRef = useRef(null);
@@ -50,10 +52,10 @@ const ThreeViewer = forwardRef(({
     lightParamsRef.current = { lightMode, color, lightStrength, lightRotation, dramaticColor };
   }, [lightMode, color, lightStrength, lightRotation, dramaticColor]);
 
-  const paintRef = useRef({ paintMode, paintColor, paintSize, paintCanvasRef });
+  const paintRef = useRef({ paintMode, paintColor, paintSize, paintOpacity, paintHardness, paintCanvasRef });
   useEffect(() => {
-    paintRef.current = { paintMode, paintColor, paintSize, paintCanvasRef };
-  }, [paintMode, paintColor, paintSize, paintCanvasRef]);
+    paintRef.current = { paintMode, paintColor, paintSize, paintOpacity, paintHardness, paintCanvasRef };
+  }, [paintMode, paintColor, paintSize, paintOpacity, paintHardness, paintCanvasRef]);
 
   useEffect(() => {
     const el = mountRef.current;
@@ -184,13 +186,20 @@ const ThreeViewer = forwardRef(({
           camChanged = true;
           return cur + delta * f;
         };
+        const lerpTheta = (cur, tar, f) => {
+          let delta = tar - cur;
+          delta = ((delta + Math.PI) % (Math.PI * 2) + (Math.PI * 2)) % (Math.PI * 2) - Math.PI;
+          if (Math.abs(delta) < 0.0001) return tar;
+          camChanged = true;
+          return cur + delta * f;
+        };
 
         if (spinning) {
           camTarget.theta += 0.004;
           if (camTarget.theta > Math.PI * 2) camTarget.theta -= Math.PI * 2;
         }
 
-        cam.theta = lerp(cam.theta, camTarget.theta, lerpFactor);
+        cam.theta = lerpTheta(cam.theta, camTarget.theta, lerpFactor);
         cam.phi = lerp(cam.phi, camTarget.phi, lerpFactor);
         cam.radius = lerp(cam.radius, camTarget.radius, lerpFactor);
         cam.panX = lerp(cam.panX, camTarget.panX, lerpFactor);
@@ -439,11 +448,10 @@ const ThreeViewer = forwardRef(({
     if (!S.current) return;
     const { paintMode: pm } = paintRef.current;
     let dragMode = 'orbit';
-    // In paint mode, left-click = paint (block orbit), shift+click = orbit, right-click = pan
     if (pm && e.button === 0 && !e.shiftKey) {
       dragMode = 'paint';
     } else if (e.button === 0 && e.shiftKey) {
-      dragMode = 'model';
+      dragMode = 'orbit';
     } else if (e.button !== 0) {
       dragMode = 'pan';
     }
@@ -467,25 +475,28 @@ const ThreeViewer = forwardRef(({
   // Instead of calling createRadialGradient() per stamp (50+ times per
   // pointer event), we pre-render ONE soft circle to a tiny offscreen
   // canvas and blit it with drawImage() — orders of magnitude faster.
-  const _brushStampRef = useRef({ canvas: null, color: '', size: 0 });
+  const _brushStampRef = useRef({ canvas: null, color: '', size: 0, hardness: -1 });
 
-  const _getStamp = (color, size) => {
+  const _getStamp = (color, size, hardness = 60) => {
     const b = _brushStampRef.current;
-    if (b.canvas && b.color === color && b.size === size) return b.canvas;
+    if (b.canvas && b.color === color && b.size === size && b.hardness === hardness) return b.canvas;
     const diam = Math.max(2, size * 2);
     const c = document.createElement('canvas');
     c.width = diam; c.height = diam;
     const ctx = c.getContext('2d');
     const r = diam / 2;
+    // hardness 0=feathered edge, 100=hard edge
+    // soft stop position: hardness=0 → 0.0 (full feather), hardness=100 → 0.95 (nearly solid)
+    const softStop = hardness / 100 * 0.95;
     const grad = ctx.createRadialGradient(r, r, 0, r, r, r);
     grad.addColorStop(0, color);
-    grad.addColorStop(0.6, color);
+    grad.addColorStop(Math.max(0.01, softStop), color);
     grad.addColorStop(1, 'transparent');
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(r, r, r, 0, Math.PI * 2);
     ctx.fill();
-    b.canvas = c; b.color = color; b.size = size;
+    b.canvas = c; b.color = color; b.size = size; b.hardness = hardness;
     return c;
   };
 
@@ -509,22 +520,23 @@ const ThreeViewer = forwardRef(({
 
     const meshes = S.current._paintMeshes;
     if (!meshes || meshes.length === 0) return;
+    raycaster.firstHitOnly = true;
     const intersects = raycaster.intersectObjects(meshes, false);
     if (intersects.length === 0 || !intersects[0].uv) return;
 
-    const { paintColor: pc, paintSize: ps } = paintRef.current;
+    const { paintColor: pc, paintSize: ps, paintOpacity: po = 0.35, paintHardness: ph = 60 } = paintRef.current;
     const hit = intersects[0];
     const cvs = S.current._paintCanvas;
     if (!cvs) return;
     const ctx2d = cvs.getContext('2d');
     const curX = hit.uv.x * cvs.width;
     const curY = (1 - hit.uv.y) * cvs.height;
-    const radius = Math.max(1, ps);
-    const stamp = _getStamp(pc, radius);
+    const radius = Math.max(0.5, ps);
+    const stamp = _getStamp(pc, radius, ph);
     const stampR = stamp.width / 2;
 
     const prevAlpha = ctx2d.globalAlpha;
-    ctx2d.globalAlpha = 0.35;
+    ctx2d.globalAlpha = Math.max(0.01, Math.min(1, po));
 
     const last = S.current._lastPaintUV;
     const screenOk = last && Math.hypot(e.clientX - last.sx, e.clientY - last.sy) < 80;
