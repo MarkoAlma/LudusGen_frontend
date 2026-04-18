@@ -10,6 +10,7 @@ import ChatInput from '../components/chat/ChatInput';
 import ChatSidebar from '../components/chat/ChatSidebar';
 import ConfigPanel from '../components/chat/ConfigPanel';
 import ChatAtmosphere from '../components/chat/ChatAtmosphere';
+import SummaryIndicator from '../components/chat/SummaryIndicator';
 
 import StudioLayout from '../components/shared/StudioLayout';
 import { useStudioPanels } from '../context/StudioPanelContext';
@@ -66,6 +67,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
     onDechant,
     createNewSession,
     handleStop,
+    isSummarizing,
+    switchSession,
   } = useChatLogic(selectedModel, userId, getIdToken, onModelChange);
 
   const [historySidebarOpen, setHistorySidebarOpen] = useState(true);
@@ -101,8 +104,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
             conversations={conversations}
             loadingHistory={loadingHistory}
             onSelectSession={(id) => {
-              sessionStorage.setItem("chat_session_current", id);
-              window.location.reload();
+              switchSession(id);
             }}
             onClose={() => setHistorySidebarOpen(false)}
           />
@@ -158,7 +160,8 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
 
           {/* Input area */}
           {/* Chat Input Wrapper */}
-          <div className="px-3 sm:px-6 lg:px-12 pb-6 pt-1 relative z-20 flex justify-center">
+          <div className="px-3 sm:px-6 lg:px-12 pb-6 pt-1 relative z-20 flex flex-col items-center">
+            <SummaryIndicator isVisible={isSummarizing} />
             <div className="w-full max-w-3xl">
               <ChatInput
                 input={input}

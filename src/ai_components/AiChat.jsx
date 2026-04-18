@@ -13,6 +13,7 @@ import AiStudioSidebar from "../components/chat/AiStudioSidebar";
 import BackgroundFilters from "../components/chat/BackgroundFilters";
 
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import toast from "react-hot-toast";
 import { API_BASE } from "../api/client";
 
 export default function AIChat({ user, getIdToken }) {
@@ -83,13 +84,21 @@ export default function AIChat({ user, getIdToken }) {
       // Notify backend to generate summary for model switch
       const sessionId = sessionStorage.getItem("chat_session_current");
       if (sessionId) {
-        getIdToken().then(token =>
-          fetch(`${API_BASE}/api/chat/switch-model`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ sessionId, newModelId: modelId })
-          }).catch(e => console.warn('[ModelSwitch] Failed:', e))
-        );
+        getIdToken().then(async (token) => {
+          try {
+            const response = await fetch(`${API_BASE}/api/chat/switch-model`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ sessionId, newModelId: modelId })
+            });
+            const data = await response.json();
+            if (data.summaryRefreshed) {
+              toast.success("Összefoglaló frissítve");
+            }
+          } catch (e) {
+            console.warn('[ModelSwitch] Failed:', e);
+          }
+        });
       }
 
       // Just change the model, don't reset the conversation
@@ -129,7 +138,7 @@ export default function AIChat({ user, getIdToken }) {
     if (cId) setOpenCats((p) => new Set([...p, cId]));
     setSidebarOpen(false);
     setModelDropdownOpen(false);
-  }, [setSearchParams, selectedAI]);
+  }, [getIdToken, setSearchParams, selectedAI]);
 
   const toggleGroup = useCallback((id) => {
     setOpenGroups((p) => {

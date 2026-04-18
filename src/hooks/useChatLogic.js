@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import toast from "react-hot-toast";
 import { db } from "../firebase/firebaseApp";
 import {
   collection, addDoc, query, orderBy, limit, limitToLast, getDocs,
@@ -21,11 +22,21 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
   const [frequencyPenalty, setFrequencyPenalty] = useState(0);
   const [presencePenalty, setPresencePenalty] = useState(0);
   const [thinking, setThinking] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const [activePresetId, setActivePresetId] = useState("default_balanced");
   const [presets, setPresets] = useState(DEFAULT_PRESETS.chat);
   const [conversations, setConversations] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [attachedImage, setAttachedImage] = useState(null);
+  const [shouldRestoreModel, setShouldRestoreModel] = useState(true);
+  const [sessionId, setSessionId] = useState(() => {
+    let sid = sessionStorage.getItem("chat_session_current");
+    if (!sid) {
+      sid = `session_${Date.now()}`;
+      sessionStorage.setItem("chat_session_current", sid);
+    }
+    return sid;
+  });
 
   const chatScrollRef = useRef(null);
   const textareaRef = useRef(null);
@@ -78,23 +89,46 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
   }, [userId]);
 
 
-  const getCurrentSessionId = useCallback(() => {
-    let sid = sessionStorage.getItem("chat_session_current");
-    if (!sid) {
-      sid = `session_${Date.now()}`;
-      sessionStorage.setItem("chat_session_current", sid);
-    }
-    return sid;
+  const getCurrentSessionId = useCallback(() => sessionId, [sessionId]);
+
+  const switchSession = useCallback((newSid) => {
+    sessionStorage.setItem("chat_session_current", newSid);
+    setSessionId(newSid);
+    // Explicitly allow model restoration when switching from history
+    setShouldRestoreModel(true);
+    // Clearing messages before load creates a smoother visual transition
+    setMessages([]);
+    setAttachedImage(null);
   }, []);
 
   const loadCurrentConversation = useCallback(async () => {
     if (!userId) return;
     setLoadingHistory(true);
     try {
-      const sessionId = getCurrentSessionId();
+      const sid = sessionId;
 
-      // Try new path first
-      const newRef = getMessagesRef(sessionId);
+      // 1. Load Session Metadata to restore model if needed
+      if (shouldRestoreModel) {
+        const sessionSnap = await getDoc(getSessionRef(sid));
+        if (sessionSnap.exists()) {
+          const sessionData = sessionSnap.data();
+          const sessionModelId = sessionData.modelId;
+          
+          // If the session has a modelId that differs from current selection, switch it
+          if (sessionModelId && sessionModelId !== selectedModelRef.current?.id) {
+            const foundModel = ALL_MODELS.find(m => m.id === sessionModelId);
+            if (foundModel && onModelChange) {
+              console.log(`[Chat] Auto-restoring model for session ${sid}: ${sessionModelId}`);
+              onModelChange(foundModel);
+            }
+          }
+        }
+        // Once restored (or checked), don't force it again until next session switch
+        setShouldRestoreModel(false);
+      }
+
+      // 2. Load Messages
+      const newRef = getMessagesRef(sid);
       const q = query(newRef, orderBy("timestamp", "asc"), limitToLast(200));
       let snap = await getDocs(q);
 
@@ -102,7 +136,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
       if (snap.empty) {
         for (const modelId of CHAT_MODEL_IDS) {
           try {
-            const legacyRef = collection(db, "conversations", userId, modelId, sessionId, "messages");
+            const legacyRef = collection(db, "conversations", userId, modelId, sid, "messages");
             const lq = query(legacyRef, orderBy("timestamp", "asc"), limit(200));
             snap = await getDocs(lq);
             if (!snap.empty) {
@@ -113,11 +147,11 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
                 batch.set(newDocRef, d.data());
               });
               // Also migrate session doc
-              const legacySessionRef = doc(db, "conversations", userId, modelId, sessionId);
-              const sessionSnap = await getDoc(legacySessionRef);
-              if (sessionSnap.exists()) {
-                const newSessionRef = getSessionRef(sessionId);
-                batch.set(newSessionRef, sessionSnap.data());
+              const legacySessionRef = doc(db, "conversations", userId, modelId, sid);
+              const legacySessionSnap = await getDoc(legacySessionRef);
+              if (legacySessionSnap.exists()) {
+                const newSessionRef = getSessionRef(sid);
+                batch.set(newSessionRef, legacySessionSnap.data());
               }
               await batch.commit();
               break;
@@ -132,14 +166,17 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         content: `Szia! AI asszisztens itt. Miben segíthetek? 🚀`,
         model: "ai", id: "welcome",
       }]);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('[History] Failed to load session:', e); }
     setLoadingHistory(false);
-  }, [userId, getCurrentSessionId, getMessagesRef, getSessionRef]);
+  }, [userId, sessionId, getMessagesRef, getSessionRef, onModelChange]);
 
   useEffect(() => {
     loadConversationList();
+  }, [loadConversationList]);
+
+  useEffect(() => {
     loadCurrentConversation();
-  }, [loadConversationList, loadCurrentConversation]);
+  }, [sessionId, loadCurrentConversation]);
 
   // Track whether user intentionally scrolled up
   useEffect(() => {
@@ -279,9 +316,12 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
 
     const sessionId = getCurrentSessionId();
 
+    let token;
+
     try {
-      const token = await getIdToken();
+      token = await getIdToken();
       const controller = new AbortController();
+      let summaryRefreshed = false;
       abortControllerRef.current = { controller, accumulated: "" };
 
       const res = await fetch(`${API_BASE}/api/chat`, {
@@ -322,10 +362,21 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
               if (data === "[DONE]") continue;
               try {
                 const parsed = JSON.parse(data);
+                if (parsed.summaryStarted) {
+                  setIsSummarizing(true);
+                  continue;
+                }
+                if (parsed.summaryRefreshed) {
+                  summaryRefreshed = true;
+                  setIsSummarizing(false);
+                  continue;
+                }
                 accumulated += parsed.delta || "";
                 if (abortControllerRef.current) abortControllerRef.current.accumulated = accumulated;
                 setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: accumulated } : m));
-              } catch (e) { }
+              } catch {
+                continue;
+              }
             }
           }
         }
@@ -333,13 +384,22 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         const finalMsg = { role: "assistant", content: accumulated, model: model.id, id: aiMsgId };
         // await saveMessage(finalMsg);
         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...finalMsg, isStreaming: false } : m));
+        if (summaryRefreshed) {
+          setIsSummarizing(false);
+          toast.success("Összefoglaló frissítve");
+        }
       } else {
         // JSON response (Anthropic, OpenAI)
         const data = await res.json();
         if (data.success) {
+          summaryRefreshed = Boolean(data.summaryRefreshed);
           const finalMsg = { role: "assistant", content: data.content, model: model.id, id: aiMsgId };
           // await saveMessage(finalMsg);
           setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...finalMsg, isStreaming: false } : m));
+          if (summaryRefreshed) {
+            setIsSummarizing(false);
+            toast.success("Összefoglaló frissítve");
+          }
         } else {
           throw new Error(data.message || 'Ismeretlen hiba');
         }
@@ -373,6 +433,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
       }
     } finally {
       setIsTyping(false);
+      setIsSummarizing(false);
       abortControllerRef.current = null;
     }
   };
@@ -399,7 +460,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         abortControllerRef.current.controller.abort();
       }
     }
-  }, []);
+  }, [getCurrentSessionId, getIdToken]);
 
   // ── Model switching ───────────────────────────────────────────────
   const switchModel = useCallback((newModel) => {
@@ -416,6 +477,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     attachedImage, setAttachedImage,
     loadingHistory, conversations, chatScrollRef, textareaRef,
     presets, activePresetId, applyPreset, onEnhance, onDechant,
-    switchModel, createNewSession, handleStop,
+    switchModel, createNewSession, handleStop, isSummarizing,
+    switchSession,
   };
 }

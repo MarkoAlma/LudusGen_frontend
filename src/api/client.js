@@ -20,6 +20,7 @@ export async function authHeaders(getIdTokenOrToken) {
   };
 }
 
+
 /**
  * Generic POST helper with JSON body and auth.
  * @param {string} endpoint - relative path like '/api/enhance' or full URL
@@ -37,7 +38,7 @@ export async function post(endpoint, body, getIdTokenOrToken) {
   });
   if (!res.ok) {
     let errMsg = `HTTP ${res.status}`;
-    try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+    try { const j = await res.json(); errMsg = j.message || errMsg; } catch { }
     throw new Error(errMsg);
   }
   return res.json();
@@ -55,7 +56,7 @@ export async function get(endpoint, getIdTokenOrToken) {
   const res = await fetch(url, { headers });
   if (!res.ok) {
     let errMsg = `HTTP ${res.status}`;
-    try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+    try { const j = await res.json(); errMsg = j.message || errMsg; } catch { }
     throw new Error(errMsg);
   }
   return res.json();
@@ -73,7 +74,7 @@ export async function del(endpoint, getIdTokenOrToken) {
   const res = await fetch(url, { method: 'DELETE', headers });
   if (!res.ok) {
     let errMsg = `HTTP ${res.status}`;
-    try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+    try { const j = await res.json(); errMsg = j.message || errMsg; } catch { }
     throw new Error(errMsg);
   }
   return res.json();
@@ -204,7 +205,7 @@ export async function enhancePrompt({
   });
   if (!res.ok) {
     let errMsg = `HTTP ${res.status}`;
-    try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+    try { const j = await res.json(); errMsg = j.message || errMsg; } catch { }
     throw new Error(errMsg);
   }
   const json = await res.json();
