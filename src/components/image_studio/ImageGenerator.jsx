@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { useJobs } from '../../context/JobsContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings2, PanelLeftClose, PanelLeftOpen, Sparkles, Layers, Box, Pencil } from 'lucide-react';
+import { Settings2, PanelLeftClose, PanelLeftOpen, Sparkles, Layers, Box, Pencil, History } from 'lucide-react';
 import ImageControls from './ImageControls';
 import ImageWorkspace from './ImageWorkspace';
+import ImageGallery from './ImageGallery';
 import ImageStudioBG from '../../assets/image_studio_v2.png';
 import BackgroundFilters from '../chat/BackgroundFilters';
 import StudioLayout from '../shared/StudioLayout';
@@ -403,8 +404,8 @@ const getNvidiaType = (apiId = "") => {
   return "other";
 };
 
-export default function ImageGenerator({ selectedModel, onModelChange, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
-  const { addJob, updateJob, markJobDone, markJobError, jobs, clearSeenCompletedJobs } = useJobs();
+export default function ImageGenerator({ selectedModel, onModelChange, onGalleryChange, forceViewGenSignal, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+  const { addJob, updateJob, markJobDone, markJobError, removeJob, jobs, clearSeenCompletedJobs } = useJobs();
   const startJob = (kind, title, targetTab) => {
     const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     addJob({ id, kind, panelType: 'image', modelId: selectedModel.id, title, status: 'running', progress: 0, createdAt: Date.now(), updatedAt: Date.now(), errorMessage: null, completedAt: null, seenAt: null, targetTab });
@@ -441,12 +442,33 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
   const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(false);
   const [offsets, setOffsets] = useState({ left: 320, right: 0 });
+  const [view, setView] = useState('gen'); // gen | gallery
+
+
+  // Master Sidebar Sync: If the user selects a new model from the master sidebar, 
+  // we should switch back to the generation workspace from the gallery.
+  useEffect(() => {
+    setView('gen');
+  }, [selectedModel.id, forceViewGenSignal]);
+
+  useEffect(() => {
+    if (onGalleryChange) {
+      onGalleryChange(view === 'gallery');
+    }
+  }, [view]);
 
 
   // Master Sidebar Sync
   useEffect(() => {
     setLeftOpen(isGlobalOpen);
   }, [isGlobalOpen]);
+
+  useEffect(() => {
+    if (selectedModel?.panelType === 'image') {
+      const key = selectedModel.needsInputImage ? 'ludusgen_last_image_edit_model' : 'ludusgen_last_image_gen_model';
+      localStorage.setItem(key, selectedModel.id);
+    }
+  }, [selectedModel]);
 
   useEffect(() => {
     const jobId = sessionStorage.getItem(`ludusgen_open_job:${userId || 'guest'}`);
@@ -532,6 +554,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
     }
 
     setIsGenerating(true);
+    setGeneratedImages([]); // Automatikusan eltünteti az előzőt
     setError(null);
     setGenProgress(0);
     setGenStatus('');
@@ -601,6 +624,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
             setGenProgress(100);
             markJobDone(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now(), resultImages: images });
             setSelectedJobId(jobId);
+            sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
           } else if (event.type === 'error') {
             throw new Error(event.message || 'Hiba történt');
           }
@@ -617,18 +641,8 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
     }
   };
 
-  useEffect(() => {
-    if (!generatedImages.length && latestCompletedJob?.resultImages?.length) {
-      setGeneratedImages(latestCompletedJob.resultImages);
-    }
-  }, [latestCompletedJob, generatedImages.length]);
-
-  useEffect(() => {
-    if (selectedJobId) {
-      const job = jobs.find((j) => j.id === selectedJobId);
-      if (job?.resultImages?.length) setGeneratedImages(job.resultImages);
-    }
-  }, [selectedJobId, jobs]);
+  // Restoration effects removed to prevent "fighting" with Close Asset functionality.
+  // The initial useEffect at the top handles session restoration.
 
   return (
     <StudioLayout
@@ -639,7 +653,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
       rightOpen={rightOpen}
       setRightOpen={setRightOpen}
       leftWidth={320}
-      leftSecondaryWidth={392}
+      leftSecondaryWidth={view === 'gallery' ? 72 : 392}
       onOffsetChange={setOffsets}
       leftSidebar={globalSidebar}
       leftSecondarySidebar={
@@ -652,21 +666,38 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
                 id: 'generate',
                 label: 'GENERATE',
                 icon: <Sparkles className="w-5 h-5" />,
-                isActive: !selectedModel.needsInputImage,
+                isActive: !selectedModel.needsInputImage && view === 'gen',
                 onClick: () => {
-                  const first = ALL_MODELS.find(m => m.panelType === 'image' && !m.needsInputImage);
-                  if (first) onModelChange?.(first);
+                  setView('gen');
+                  if (!!selectedModel.needsInputImage) {
+                    const lastId = localStorage.getItem('ludusgen_last_image_gen_model');
+                    const lastModel = lastId ? ALL_MODELS.find(m => m.id === lastId && m.panelType === 'image' && !m.needsInputImage) : null;
+                    const fallback = ALL_MODELS.find(m => m.panelType === 'image' && !m.needsInputImage);
+                    if (lastModel || fallback) onModelChange?.(lastModel || fallback);
+                  }
                 },
               },
               {
                 id: 'edit',
                 label: 'EDIT',
                 icon: <Pencil className="w-5 h-5" />,
-                isActive: !!selectedModel.needsInputImage,
+                isActive: !!selectedModel.needsInputImage && view === 'gen',
                 onClick: () => {
-                  const first = ALL_MODELS.find(m => m.panelType === 'image' && m.needsInputImage);
-                  if (first) onModelChange?.(first);
+                  setView('gen');
+                  if (!selectedModel.needsInputImage) {
+                    const lastId = localStorage.getItem('ludusgen_last_image_edit_model');
+                    const lastModel = lastId ? ALL_MODELS.find(m => m.id === lastId && m.panelType === 'image' && m.needsInputImage) : null;
+                    const fallback = ALL_MODELS.find(m => m.panelType === 'image' && m.needsInputImage);
+                    if (lastModel || fallback) onModelChange?.(lastModel || fallback);
+                  }
                 },
+              },
+              {
+                id: 'gallery',
+                label: 'GALLERY',
+                icon: <History className="w-5 h-5" />,
+                isActive: view === 'gallery',
+                onClick: () => setView('gallery'),
               },
             ].map((tool) => (
               <button
@@ -694,35 +725,37 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
           </div>
 
           <div className="flex-1 h-full overflow-hidden">
-            <ImageControls
-              selectedModel={selectedModel}
-              onModelChange={onModelChange}
-              prompt={prompt} setPrompt={setPrompt}
-              negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
-              aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
-              quality={quality} setQuality={setQuality}
-              numImages={numImages} setNumImages={setNumImages}
-              seed={seed} setSeed={setSeed}
-              steps={steps} setSteps={setSteps}
-              guidance={guidance} setGuidance={setGuidance}
-              promptExtend={promptExtend} setPromptExtend={setPromptExtend}
-              inputImages={inputImages} setInputImages={setInputImages}
-              isGenerating={isGenerating}
-              onGenerate={handleGenerate}
-              fluxSizeIdx={fluxSizeIdx}
-              setFluxSizeIdx={setFluxSizeIdx}
-              showAdvanced={showAdvanced}
-              setShowAdvanced={setShowAdvanced}
-              isEnhancerBusy={isEnhancerBusy}
-              setIsEnhancerBusy={setIsEnhancerBusy}
-              enhancingPrompt={selectedModel.needsInputImage ? ENHANCING_PROMPT_EDIT : ENHANCING_PROMPT_IMAGE}
-              dehancingPrompt={selectedModel.needsInputImage ? DEHANCING_PROMPT_EDIT : DEHANCING_PROMPT_IMAGE}
-              gemmaVisionPrompt={GEMMA_VISION_PROMPT}
-              ASPECT_RATIO_LIST={ASPECT_RATIO_LIST}
-              QUALITY_PRESETS={QUALITY_PRESETS}
-              FLUX_SIZES={FLUX_SIZES}
-              getIdToken={getIdToken}
-            />
+            {view !== 'gallery' && (
+              <ImageControls
+                selectedModel={selectedModel}
+                onModelChange={onModelChange}
+                prompt={prompt} setPrompt={setPrompt}
+                negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
+                aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
+                quality={quality} setQuality={setQuality}
+                numImages={numImages} setNumImages={setNumImages}
+                seed={seed} setSeed={setSeed}
+                steps={steps} setSteps={setSteps}
+                guidance={guidance} setGuidance={setGuidance}
+                promptExtend={promptExtend} setPromptExtend={setPromptExtend}
+                inputImages={inputImages} setInputImages={setInputImages}
+                isGenerating={isGenerating}
+                onGenerate={handleGenerate}
+                fluxSizeIdx={fluxSizeIdx}
+                setFluxSizeIdx={setFluxSizeIdx}
+                showAdvanced={showAdvanced}
+                setShowAdvanced={setShowAdvanced}
+                isEnhancerBusy={isEnhancerBusy}
+                setIsEnhancerBusy={setIsEnhancerBusy}
+                enhancingPrompt={selectedModel.needsInputImage ? ENHANCING_PROMPT_EDIT : ENHANCING_PROMPT_IMAGE}
+                dehancingPrompt={selectedModel.needsInputImage ? DEHANCING_PROMPT_EDIT : DEHANCING_PROMPT_IMAGE}
+                gemmaVisionPrompt={GEMMA_VISION_PROMPT}
+                ASPECT_RATIO_LIST={ASPECT_RATIO_LIST}
+                QUALITY_PRESETS={QUALITY_PRESETS}
+                FLUX_SIZES={FLUX_SIZES}
+                getIdToken={getIdToken}
+              />
+            )}
           </div>
         </div>
       }
@@ -763,15 +796,32 @@ export default function ImageGenerator({ selectedModel, onModelChange, userId, g
         </div>
 
         <div className="flex-1 relative z-10 overflow-hidden">
-          <ImageWorkspace
-            isGenerating={isGenerating}
-            images={generatedImages}
-            error={error}
-            selectedModel={selectedModel}
-            genProgress={genProgress}
-            genStatus={genStatus}
-            genElapsed={genElapsed}
-          />
+          {view === 'gallery' ? (
+            <ImageGallery 
+              getIdToken={getIdToken} 
+              onUsePrompt={(p) => {
+                setPrompt(p);
+                setView('gen');
+              }}
+            />
+          ) : (
+            <ImageWorkspace
+              isGenerating={isGenerating}
+              images={generatedImages}
+              onClear={() => {
+                const currentId = sessionStorage.getItem(`ludusgen_open_job:${userId || 'guest'}`);
+                if (currentId) removeJob(currentId);
+                setGeneratedImages([]);
+                sessionStorage.removeItem(`ludusgen_open_job:${userId || 'guest'}`);
+                setSelectedJobId(null);
+              }}
+              error={error}
+              selectedModel={selectedModel}
+              genProgress={genProgress}
+              genStatus={genStatus}
+              genElapsed={genElapsed}
+            />
+          )}
         </div>
       </div>
     </StudioLayout>

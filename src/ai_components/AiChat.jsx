@@ -60,12 +60,15 @@ export default function AIChat({ user, getIdToken }) {
 
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [forceViewGenSignal, setForceViewGenSignal] = useState(0);
 
   // Desktop Sidebar Persistence & Motion
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('desktop_sidebar_open');
     return saved !== null ? JSON.parse(saved) : true;
   });
+
+  const [imageGalleryActive, setImageGalleryActive] = useState(false);
 
   const smoothWidth = useSpring(desktopSidebarOpen ? 320 : 0, { damping: 38, stiffness: 180 });
 
@@ -147,13 +150,14 @@ export default function AIChat({ user, getIdToken }) {
     // Update state
     setSelectedAI(modelId);
 
-    // Update URL - Keep it clean (only tab)
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
       next.set("tab", tab);
       next.delete("model");
       return next;
     }, { replace: true });
+
+    setForceViewGenSignal(s => s + 1);
 
     const gId = findModelGroup(modelId);
     const cId = findModelCat(modelId);
@@ -208,9 +212,12 @@ export default function AIChat({ user, getIdToken }) {
               sessionStorage.setItem(`ludusgen_open_job:${user?.uid || 'guest'}`, job.id);
             }
           }}
+          isImageGallery={imageGalleryActive}
         />
       ),
       onModelChange: (newModel) => handleSelectModel(newModel.id),
+      onGalleryChange: (active) => setImageGalleryActive(active),
+      forceViewGenSignal,
       initialDropdownOpen: modelDropdownOpen,
       onNewChatWithPicker: () => {
         setModelDropdownOpen(true);

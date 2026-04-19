@@ -112,8 +112,7 @@ export default function StudioLayout({
   const effectiveL1Width = getL1Width();
 
   // ── Transform hooks (Must be top-level for React) ────────────────────────
-  const combinedLeftWidth = leftWidth + (leftSecondarySidebar ? leftSecondaryWidth : 0);
-  const desktopLX = useTransform(smoothL, v => v - combinedLeftWidth);
+  const desktopLX = useTransform(smoothL, v => (v <= 0.1 ? -1000 : 0));
   const desktopRX = useTransform(smoothR, v => (rightWidth - v));
   const contentWidthExpr = useTransform([smoothL, smoothR], ([l, r]) => `calc(100% - ${l + r}px)`);
 
@@ -143,23 +142,23 @@ export default function StudioLayout({
         {/* ── Desktop Sidebars (Transform-based for performance) ────────── */}
         {!activeOverlay && leftSidebar && (
           <motion.div
-            className="absolute left-0 top-0 bottom-0 z-40 flex border-r border-white/5 will-change-transform"
+            className="absolute left-0 top-0 bottom-0 z-40 flex border-r border-white/5 will-change-transform origin-left"
             style={{ 
               x: desktopLX,
-              width: combinedLeftWidth,
+              width: smoothL,
               background: '#0a0a14' 
             }}
           >
             {/* L1: Master Sidebar */}
-            <div className="h-full flex-shrink-0" style={{ width: leftWidth }}>
+            <motion.div className="h-full flex-shrink-0" style={{ width: smoothL1 }}>
               <div className="h-full overflow-hidden">{leftSidebar}</div>
-            </div>
+            </motion.div>
 
             {/* L2: Secondary Panel */}
             {leftSecondarySidebar && (
-              <div className="h-full flex-shrink-0" style={{ width: leftSecondaryWidth }}>
+              <motion.div className="h-full flex-shrink-0" style={{ width: smoothL2 }}>
                 <div className="h-full overflow-hidden">{leftSecondarySidebar}</div>
-              </div>
+              </motion.div>
             )}
           </motion.div>
         )}
@@ -169,7 +168,7 @@ export default function StudioLayout({
             className="absolute right-0 top-0 bottom-0 z-40 border-l border-white/5 will-change-transform"
             style={{ 
               x: desktopRX,
-              width: rightWidth, 
+              width: smoothR, 
               background: '#0a0a14' 
             }}
           >

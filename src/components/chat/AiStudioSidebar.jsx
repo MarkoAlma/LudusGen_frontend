@@ -51,7 +51,8 @@ export default function AiStudioSidebar({
   handleSelectModel,
   setSidebarOpen,
   isMobile,
-  onOpenJob
+  onOpenJob,
+  isImageGallery
 }) {
   const selectedModel = getModel(selectedAI);
   const { user } = useContext(MyUserContext);
@@ -292,7 +293,7 @@ export default function AiStudioSidebar({
                           }
                         },
                       ].map((item) => {
-                        const isActive = item.models.some(m => m.id === selectedAI);
+                        const isActive = !isImageGallery && item.models.some(m => m.id === selectedAI);
                         const activeModel = isActive ? getModel(selectedAI) : null;
                         const color = activeModel?.color || '#f59e0b';
                         return (

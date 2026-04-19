@@ -155,7 +155,8 @@ function ImageCard({ img, idx, onZoom, onDownload }) {
 }
 
 // ── Fő komponens ────────────────────────────────────────────────────────────────
-export default function ImageWorkspace({ isGenerating, images, error, selectedModel, genProgress = 0, genStatus = '', genElapsed = 0 }) {
+// ── Fő komponens ────────────────────────────────────────────────────────────────
+export default function ImageWorkspace({ isGenerating, images, onClear, error, selectedModel, genProgress = 0, genStatus = '', genElapsed = 0 }) {
   const [lightboxIdx, setLightboxIdx] = useState(null);
 
   const downloadImage = (url) => {
@@ -307,8 +308,11 @@ export default function ImageWorkspace({ isGenerating, images, error, selectedMo
             Bulk Export <Download className="w-4 h-4" />
           </button>
           <div className="w-px h-5 bg-white/5 mx-2" />
-          <button className="px-6 py-3 rounded-xl bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:scale-105 transition-all flex items-center gap-3">
-            Redefine <RefreshCw className="w-4 h-4" />
+          <button 
+            onClick={onClear}
+            className="px-6 py-3 rounded-xl bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:scale-105 transition-all flex items-center gap-3"
+          >
+            Close Asset <X className="w-4 h-4" />
           </button>
         </motion.div>
       )}
