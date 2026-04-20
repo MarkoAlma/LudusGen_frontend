@@ -16,6 +16,16 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import toast from "react-hot-toast";
 import { API_BASE } from "../api/client";
 
+const PANEL_TYPE_TO_TAB = {
+  tripo: 'tripo',
+  threed: 'threed',
+  trellis: 'trellis',
+  meshy: 'meshy',
+  image: 'image',
+  audio: 'audio',
+  music: 'music',
+};
+
 export default function AIChat({ user, getIdToken }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const getTabForModel = useCallback((model) => {
@@ -201,15 +211,6 @@ export default function AIChat({ user, getIdToken }) {
           handleSelectModel={handleSelectModel}
           setSidebarOpen={setSidebarOpen}
           onOpenJob={(job) => {
-            const PANEL_TYPE_TO_TAB = {
-              tripo: 'tripo',
-              threed: 'threed',
-              trellis: 'trellis',
-              meshy: 'meshy',
-              image: 'image',
-              audio: 'audio',
-              music: 'music',
-            };
             const targetTab = job?.targetTab || PANEL_TYPE_TO_TAB[job?.panelType];
             if (targetTab) {
               const next = new URLSearchParams(searchParams);

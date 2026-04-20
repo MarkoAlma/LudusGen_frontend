@@ -385,7 +385,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const raw = sessionStorage.getItem('tripo_pending_model');
     if (!raw) return;
     try {
-      const { url, taskId, isBlobUrl } = JSON.parse(raw);
+      const { url, taskId } = JSON.parse(raw);
       sessionStorage.removeItem('tripo_pending_model');
       if (!url) return;
       // Only load if viewer is currently empty (don't override user's selection)
@@ -1425,13 +1425,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
     markJobDone(inst.instanceId, { title: inst.label, progress: 100 });
 
-    // Persist completed model URL so TripoPanel can load it on next mount (cross-panel case)
-    const pendingModelUrl = blobUrl || d.modelUrl;
-    if (pendingModelUrl) {
+    // Persist the durable Firestore URL so TripoPanel can load it on next mount (cross-panel case).
+    // Blob URLs are revoked on unmount and must not be stored here.
+    if (d.modelUrl) {
       sessionStorage.setItem('tripo_pending_model', JSON.stringify({
-        url: pendingModelUrl,
+        url: d.modelUrl,
         taskId: inst.taskId,
-        isBlobUrl: !!blobUrl,
       }));
     }
 
