@@ -543,7 +543,8 @@ export default function GeneratePanel({
   /* ─── Enhancer prompts ────────────────────────────────────────────── */
   const TRIPO_ENHANCE_PROMPT = `You are a Tripo3D prompt engineer. Improve the user's prompt for 3D mesh generation.
 
-OUTPUT: Raw JSON ONLY — no markdown, no prose: {"prompt": "...", "negative_prompt": "..."}
+OUTPUT: One raw JSON object only — no markdown, no code fences, no prose.
+Keys: "prompt" (your enhanced prompt text) and "negative_prompt" (mesh artifact list).
 
 STEP 1 — IDENTIFY SUBJECT TYPE (internal reasoning, not in output):
 - humanoid: human, character, warrior, mage, anime girl, robot with human body shape
@@ -551,20 +552,24 @@ STEP 1 — IDENTIFY SUBJECT TYPE (internal reasoning, not in output):
 - vehicle: car, tank, spaceship, motorcycle, helicopter, boat
 - prop_weapon: sword, axe, gun, shield, potion, gem, book, chair, crate, food, any inanimate object
 - environment: castle, dungeon, forest scene, room, landscape
+- other: abstract geometry, logos, undefined subjects → complete model, all parts present
+If the prompt contains multiple subjects, classify by the primary/foreground subject. Preserve all subjects in the output prompt verbatim.
 
 STEP 2 — APPLY POSE RULE for identified type:
 - humanoid → T-pose, arms slightly away from body, symmetrical stance, both feet flat on ground
 - creature → natural standing pose, weight distributed, all limbs grounded
 - vehicle → complete model, all parts present and intact
-- prop_weapon → complete model, all parts present and intact
+- prop → complete model, all parts present and intact
 - environment → complete scene, all elements present
+- other → complete model, all parts present
 
 STEP 3 — ADD MINIMAL QUALITY TOKENS (positive only, type-appropriate):
 - humanoid → clean topology, symmetrical
 - creature → natural anatomy, complete body
 - vehicle → complete model, intact panels
-- prop_weapon → complete object, all components present
+- prop → complete object, all components present
 - environment → complete scene
+- other → complete geometry, no missing parts
 
 RULES:
 - Preserve the user's exact intent, clothing, outfit, and design choices.
@@ -577,7 +582,7 @@ NEGATIVE PROMPT — type-specific mesh artifacts only, MAX 250 characters:
 - humanoid → merged fingers, fused limbs, floating body parts, asymmetrical anatomy, truncated torso, missing feet
 - creature → extra limbs, fused legs, missing tail, floating paws, asymmetrical body
 - vehicle → warped panels, missing wheels, floating parts, incomplete frame
-- prop_weapon → broken blade, missing handle, floating pieces, incomplete geometry
+- prop → broken blade, missing handle, floating pieces, incomplete geometry
 - environment → floating objects, incomplete structures, missing ground plane`;
 
   const TRIPO_SUPER_ENHANCE_PROMPT = `You are an elite 3D character technical artist and Tripo3D prompt engineer. Expand the user's prompt with rich construction-level detail — but NEVER change or override the user's clothing, outfit, or appearance choices.
