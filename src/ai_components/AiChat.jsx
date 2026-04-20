@@ -201,12 +201,22 @@ export default function AIChat({ user, getIdToken }) {
           handleSelectModel={handleSelectModel}
           setSidebarOpen={setSidebarOpen}
           onOpenJob={(job) => {
-            if (job?.targetTab) {
+            const PANEL_TYPE_TO_TAB = {
+              tripo: 'tripo',
+              threed: 'threed',
+              trellis: 'trellis',
+              meshy: 'meshy',
+              image: 'image',
+              audio: 'audio',
+              music: 'music',
+            };
+            const targetTab = job?.targetTab || PANEL_TYPE_TO_TAB[job?.panelType];
+            if (targetTab) {
               const next = new URLSearchParams(searchParams);
-              next.set('tab', job.targetTab);
-              next.delete('model'); // Clean URL
+              next.set('tab', targetTab);
+              next.delete('model');
               if (job.modelId) {
-                sessionStorage.setItem(`ludusgen_last_model:${job.targetTab}`, job.modelId);
+                sessionStorage.setItem(`ludusgen_last_model:${targetTab}`, job.modelId);
               }
               setSearchParams(next);
               sessionStorage.setItem(`ludusgen_open_job:${user?.uid || 'guest'}`, job.id);

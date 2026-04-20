@@ -380,6 +380,26 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (selHistId) sessionStorage.setItem("tripo_sel_hist", selHistId);
     else sessionStorage.removeItem("tripo_sel_hist");
   }, [selHistId]);
+  // Load pending model URL written by onParallelTaskSuccess when panel was unmounted
+  useEffect(() => {
+    const raw = sessionStorage.getItem('tripo_pending_model');
+    if (!raw) return;
+    try {
+      const { url, taskId, isBlobUrl } = JSON.parse(raw);
+      sessionStorage.removeItem('tripo_pending_model');
+      if (!url) return;
+      // Only load if viewer is currently empty (don't override user's selection)
+      if (!modelUrl) {
+        setModelUrl(url);
+        setGenStatus("succeeded");
+      }
+      if (taskId) {
+        const docId = `tripo_${taskId}`;
+        setSelHistId(docId);
+      }
+    } catch { /* malformed storage entry — ignore */ }
+  }, []);
+
   const activeH = useMemo(() => history.find(h => h.id === selHistId), [history, selHistId]);
   const activeTaskId = activeH?.taskId || activeH?.task_id || activeH?.id || "";
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -423,7 +443,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const activeTasksRef = useRef(new Map());
   const [_taskTick, forceUpdate] = useReducer(x => x + 1, 0);
   const [focusedInstanceId, setFocusedInstanceId] = useState(null);
-  const { addJob, updateJob, markJobDoneAndSeen, markJobError, registerCancelHandler, unregisterCancelHandler } = useJobs();
+  const { addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, registerCancelHandler, unregisterCancelHandler } = useJobs();
   const fileRef = useRef(null);
   const currentTaskId = useRef(null);
   const currentRequestId = useRef(null);
@@ -533,14 +553,17 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       case "texture_edit":
         return !!(editId.trim() || activeTaskId) &&
                (brushMode === "Paint Mode" || !!brushPrompt.trim());
-      case "refine":  return !!(refineId.trim() || activeTaskId);
+      case "refine": {
+        if (!refineId.trim() && activeH?.params?.texture === true) return false;
+        return !!(refineId.trim() || activeTaskId);
+      }
       case "stylize": return !!(stylizeId.trim() || activeTaskId);
       case "animate": return !!riggedId && selAnim.size > 0;
       default: return false;
     }
   }, [mode, genTab, prompt, imgToken, batchImages, segId, fillId, retopoId,
       texId, texInputTab, texPrompt, multiImages, editId, brushMode, brushPrompt,
-      refineId, stylizeId, riggedId, selAnim, activeTaskId, focusedInstanceId, _taskTick]);
+      refineId, stylizeId, riggedId, selAnim, activeTaskId, activeH, focusedInstanceId, _taskTick]);
 
 
 
@@ -1400,7 +1423,18 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       // Free the blob if not showing it in the viewer
       if (!isThisTaskSelected) revokeBlobUrl(blobUrl);
     }
-    markJobDoneAndSeen(inst.instanceId, { title: inst.label, progress: 100 });
+    markJobDone(inst.instanceId, { title: inst.label, progress: 100 });
+
+    // Persist completed model URL so TripoPanel can load it on next mount (cross-panel case)
+    const pendingModelUrl = blobUrl || d.modelUrl;
+    if (pendingModelUrl) {
+      sessionStorage.setItem('tripo_pending_model', JSON.stringify({
+        url: pendingModelUrl,
+        taskId: inst.taskId,
+        isBlobUrl: !!blobUrl,
+      }));
+    }
+
     refreshCredits?.();
 
     // Optimistic entry so Shared3DHistory shows card immediately (before Firestore round-trip)
@@ -1463,6 +1497,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           label: inst.label,
           mode: inst.mode,
           modelVer: inst.snapshot?.model_version ?? undefined,
+          ...(inst.snapshot?.texture === true && { texture: true }),
         });
         if (ni) {
           syncSelHist(ni);
@@ -1478,7 +1513,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     } catch (e) {
       console.error("[onParallelTaskSuccess] saveHist failed:", e?.message ?? e);
     }
-  }, [saveHist, syncSelHist, getIdToken, refreshCredits, revokeBlobUrl, markJobDoneAndSeen, setOptimisticItems, history]);
+  }, [saveHist, syncSelHist, getIdToken, refreshCredits, revokeBlobUrl, markJobDone, setOptimisticItems, history]);
 
   const onParallelTaskFail = useCallback((inst, reason) => {
     markJobError(inst.instanceId, reason);
@@ -1727,10 +1762,17 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   <p className="text-zinc-500 text-[11px] leading-relaxed mb-4 italic">
                     Enhance mesh quality, fix topology issues, and improve geometry detail. Uses Tripo refine_model (30 credits).
                   </p>
-                  <div className="p-2 px-3 rounded-lg bg-yellow-500/10 border border-yellow-500/25 mb-4">
-                    <p className="text-yellow-400 font-bold text-[10px] m-0 uppercase tracking-widest">Requirement</p>
-                    <p className="text-yellow-300/70 text-[10px] mt-1 leading-relaxed">Only works on models generated <span className="font-bold">without texture</span>. Turn off Texture in Generate before using Refine.</p>
-                  </div>
+                  {activeH?.params?.texture === true ? (
+                    <div className="p-2 px-3 rounded-lg bg-red-500/10 border border-red-500/30 mb-4">
+                      <p className="text-red-400 font-bold text-[10px] m-0 uppercase tracking-widest">Not Refinable</p>
+                      <p className="text-red-300/70 text-[10px] mt-1 leading-relaxed">This model was generated <span className="font-bold">with texture</span>. Refine only works on draft meshes (no texture). Generate a new model without texture, then apply Refine.</p>
+                    </div>
+                  ) : (
+                    <div className="p-2 px-3 rounded-lg bg-yellow-500/10 border border-yellow-500/25 mb-4">
+                      <p className="text-yellow-400 font-bold text-[10px] m-0 uppercase tracking-widest">Requirement</p>
+                      <p className="text-yellow-300/70 text-[10px] mt-1 leading-relaxed">Only works on models generated <span className="font-bold">without texture</span>. Turn off Texture in Generate before using Refine.</p>
+                    </div>
+                  )}
                   <input
                     className="tp-input"
                     placeholder="Or enter task ID manually..."
