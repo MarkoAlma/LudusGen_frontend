@@ -12,7 +12,7 @@ function groupConversationsByDate(conversations) {
   const groups = { today: [], yesterday: [], thisWeek: [], older: [] };
 
   conversations.forEach(conv => {
-    const ts = conv.updatedAt?.seconds || 0;
+    const ts = conv.updatedAt?.seconds || conv.timestamp?.seconds || (conv.createdAt ? new Date(conv.createdAt).getTime() / 1000 : 0);
     if (ts >= todayStart) groups.today.push(conv);
     else if (ts >= yesterdayStart) groups.yesterday.push(conv);
     else if (ts >= weekStart) groups.thisWeek.push(conv);
@@ -49,7 +49,12 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
   return (
     <div
       className="flex flex-col h-full bg-[#03000a] w-full relative overflow-hidden"
-      style={{ WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}
+      style={{ 
+        WebkitFontSmoothing: 'antialiased', 
+        MozOsxFontSmoothing: 'grayscale',
+        transform: 'translateZ(0)',
+        backfaceVisibility: 'hidden'
+      }}
     >
       {/* Forum-Matched Atmospheric Glow */}
       <div className="absolute inset-0 z-0 pointer-events-none opacity-20">
@@ -87,8 +92,8 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
       {/* Search Bar */}
       <div className="px-6 py-5 relative z-10">
         <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-500 group/search ${searchFocused
-            ? 'bg-white/[0.04] border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.03)]'
-            : 'bg-white/[0.02] border-white/5'
+          ? 'bg-white/[0.04] border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.03)]'
+          : 'bg-white/[0.02] border-white/5'
           }`}>
           <Search className={`w-4 h-4 transition-colors duration-500 ${searchFocused ? 'text-white' : 'text-gray-700'}`} />
           <input
