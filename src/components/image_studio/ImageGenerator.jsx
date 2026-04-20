@@ -405,7 +405,7 @@ const getNvidiaType = (apiId = "") => {
 };
 
 export default function ImageGenerator({ selectedModel, onModelChange, onGalleryChange, forceViewGenSignal, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
-  const { addJob, updateJob, markJobDone, markJobError, removeJob, jobs, clearSeenCompletedJobs } = useJobs();
+  const { addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, removeJob, jobs, clearSeenCompletedJobs } = useJobs();
   const startJob = (kind, title, targetTab) => {
     const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     addJob({ id, kind, panelType: 'image', modelId: selectedModel.id, title, status: 'running', progress: 0, createdAt: Date.now(), updatedAt: Date.now(), errorMessage: null, completedAt: null, seenAt: null, targetTab });
@@ -477,11 +477,10 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
     if (!job) return;
 
     setSelectedJobId(jobId);
-    if (job.resultImages?.length) {
-      setGeneratedImages(job.resultImages);
-    }
 
     if (job.status === 'running' || job.status === 'queued') {
+      // Futó job: NE mutass régi képet — csak a progress-t állítsd vissza
+      setGeneratedImages([]);
       setIsGenerating(true);
       setGenProgress(job.progress ?? 0);
       setGenStatus(job.status === 'queued' ? 'QUEUED' : 'PROCESSING');
@@ -489,8 +488,10 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
       return;
     }
 
+    // Kész/hibás job: mutasd meg a képet
     setIsGenerating(false);
     if (job.resultImages?.length) {
+      setGeneratedImages(job.resultImages);
       setGenProgress(100);
       setGenStatus('DONE');
       setGenElapsed(0);
@@ -560,6 +561,9 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
     setGenStatus('');
     setGenElapsed(0);
     const jobId = startJob('image', prompt.trim().slice(0, 48) || 'Image generation', 'image');
+    // Azonnal mentjük az új job ID-t, hogy navigáció után is az aktuális generálást találja meg
+    sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
+    setSelectedJobId(jobId);
 
     updateJob(jobId, { progress: 0, updatedAt: Date.now() });
 
@@ -622,7 +626,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
             ).filter(Boolean);
             setGeneratedImages(images);
             setGenProgress(100);
-            markJobDone(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now(), resultImages: images });
+            markJobDoneAndSeen(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now(), resultImages: images });
             setSelectedJobId(jobId);
             sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
           } else if (event.type === 'error') {

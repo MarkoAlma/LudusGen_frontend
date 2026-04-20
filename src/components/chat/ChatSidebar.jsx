@@ -70,9 +70,9 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
         <div className="px-6 h-20 lg:h-24 flex items-center justify-between">
           <div className="relative">
             <h3 className="text-white text-[12px] font-black uppercase tracking-[0.4em] flex items-center gap-3 italic">
-              <History className="w-4 h-4 text-primary" /> Archive_Base
+              <History className="w-4 h-4 text-primary" /> Előzmények
             </h3>
-            <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-2 ml-7">System_Vault</p>
+            <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-2 ml-7">Beszélgetések</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -136,39 +136,31 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
                         {/* Hover Border Beam (Mini) */}
                         <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity" />
 
-                        <div className="w-10 h-10 rounded-xl bg-white/[0.03] flex items-center justify-center border border-white/8 shrink-0 group-hover/item:rotate-6 group-hover/item:bg-primary/20 group-hover/item:border-primary/40 transition-all duration-700">
-                          <MessageSquare className="w-4 h-4 text-gray-700 group-hover/item:text-primary transition-colors" />
-                        </div>
-
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 flex flex-col justify-center">
                           <p className="text-[13px] font-black text-white/50 truncate group-hover/item:text-white transition-colors duration-500 italic tracking-tight">
                             {conv.title || 'Untitled_Session'}
                           </p>
-                          <div className="flex items-center gap-3 mt-1.5">
-                            <span className="text-[8px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded border border-primary/20 shadow-[0_0_10px_rgba(138,43,226,0.1)]">
-                              {conv.tokenCount || 0} TKNS
-                            </span>
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap overflow-hidden">
                             {conv.modelName && (
-                              <>
-                                <div className="w-[1px] h-2.5 bg-white/10" />
-                                <span
-                                  className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border"
-                                  style={{
-                                    color: (getModel(conv.modelId)?.color || '#8b5cf6') + '99',
-                                    borderColor: (getModel(conv.modelId)?.color || '#8b5cf6') + '33',
-                                    backgroundColor: (getModel(conv.modelId)?.color || '#8b5cf6') + '11',
-                                  }}
-                                >
-                                  {conv.modelName}
-                                </span>
-                              </>
+                              <span
+                                className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border truncate max-w-[80px] shrink-0"
+                                style={{
+                                  color: (getModel(conv.modelId)?.color || '#8b5cf6') + '99',
+                                  borderColor: (getModel(conv.modelId)?.color || '#8b5cf6') + '33',
+                                  backgroundColor: (getModel(conv.modelId)?.color || '#8b5cf6') + '11',
+                                }}
+                                title={conv.modelName}
+                              >
+                                {conv.modelName}
+                              </span>
                             )}
-                            <div className="w-[1px] h-2.5 bg-white/10" />
-                            <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">{conv.updatedAt ? new Date(conv.updatedAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '00:00'}</span>
+                            <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest shrink-0 mt-0.5">
+                              {conv.updatedAt ? new Date(conv.updatedAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '00:00'}
+                            </span>
                           </div>
                         </div>
 
-                        <div className="opacity-0 group-hover/item:opacity-100 transition-opacity translate-x-1 group-hover/item:translate-x-0 transition-all duration-500">
+                        <div className="opacity-0 group-hover/item:opacity-100 transition-opacity translate-x-1 group-hover/item:translate-x-0 transition-all duration-500 shrink-0">
                           <ChevronRight className="w-4 h-4 text-primary" />
                         </div>
                       </button>

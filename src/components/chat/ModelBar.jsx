@@ -41,27 +41,8 @@ export default function ModelBar({
   initialDropdownOpen = false
 }) {
   const themeColor = selectedModel?.color || "#8b5cf6";
-  const [latency, setLatency] = useState(12);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(initialDropdownOpen);
   const dropdownRef = useRef(null);
-
-  // Latency measurement
-  useEffect(() => {
-    let isMounted = true;
-    const measurePing = async () => {
-      try {
-        const start = performance.now();
-        await fetch(window.location.origin, { method: 'HEAD', cache: 'no-store' });
-        const end = performance.now();
-        if (isMounted) setLatency(Math.round(end - start) + Math.floor(Math.random() * 10 + 5));
-      } catch (err) {
-        if (isMounted) setLatency(prev => Math.max(5, Math.min(120, prev + (Math.random() - 0.5) * 20)));
-      }
-    };
-    measurePing();
-    const interval = setInterval(measurePing, 5000);
-    return () => { isMounted = false; clearInterval(interval); };
-  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -86,60 +67,57 @@ export default function ModelBar({
   }, [onModelSwitch]);
 
   return (
-    <motion.header
-      className="absolute z-40 top-4"
-      initial={false}
-      animate={{
-        left: 0,
-        right: (isDesktop && historySidebarOpen) ? HISTORY_SIDEBAR_W : 0,
-      }}
-      transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+    <motion.div
+      className="w-full flex items-center justify-between px-2"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
     >
-      <div className="flex items-center gap-3 p-2 pr-4 rounded-l-2xl rounded-r-none bg-black/40 backdrop-blur-xl border border-white/10 border-r-0 shadow-2xl shadow-black/50">
+      <div className="flex items-center gap-2">
         {/* Mobile sidebar toggle */}
         <button
           onClick={() => setSidebarOpen(true)}
-          className="xl:hidden p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-300"
+          className="xl:hidden p-2 rounded-xl text-gray-500 hover:text-white hover:bg-white/10 transition-all duration-300"
           aria-label="Oldalsáv megnyitása"
         >
-          <Sparkles className="w-5 h-5" />
+          <Sparkles className="w-4 h-4" />
         </button>
 
         {/* Model selector */}
         <div className="relative flex items-center gap-2" ref={dropdownRef}>
           <button
             onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
-            className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/8 hover:bg-white/[0.06] hover:border-white/15 transition-all duration-300"
+            className="flex items-center gap-2 pl-1 pr-3 py-1.5 rounded-xl hover:bg-white/[0.04] transition-all duration-300 text-gray-400 hover:text-white"
             aria-label="Modell váltás"
             aria-expanded={modelDropdownOpen}
             aria-haspopup="listbox"
           >
             {/* Avatar dot */}
             <div
-              className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-              style={{ backgroundColor: `${themeColor}20`, color: themeColor }}
+              className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 border"
+              style={{ backgroundColor: `${themeColor}20`, borderColor: `${themeColor}40`, color: themeColor }}
             >
-              <Sparkles className="w-3.5 h-3.5" />
+              <Sparkles className="w-3 h-3" />
             </div>
 
             {/* Model name */}
-            <span className="text-xs font-bold text-white truncate max-w-[120px]">
+            <span className="text-[11px] font-bold truncate max-w-[150px]">
               {selectedModel?.name || 'AI'}
             </span>
 
             {/* Chevron */}
-            <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform duration-200 ${modelDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3 h-3 text-zinc-600 transition-transform duration-200 ${modelDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Dropdown */}
           <AnimatePresence>
             {modelDropdownOpen && (
               <motion.div
-                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                exit={{ opacity: 0, y: 10, scale: 0.98 }}
                 transition={{ duration: 0.15 }}
-                className="absolute top-full left-0 mt-2 w-80 rounded-xl border border-white/10 bg-[#0d0d14]/98 backdrop-blur-xl shadow-2xl z-50 overflow-hidden"
+                className="absolute bottom-full left-0 mb-2 w-80 rounded-xl border border-white/10 bg-[#0d0d14]/98 backdrop-blur-xl shadow-[0_16px_40px_rgba(0,0,0,0.8)] z-50 overflow-hidden"
               >
                 {/* Header */}
                 <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
@@ -206,46 +184,40 @@ export default function ModelBar({
             )}
           </AnimatePresence>
         </div>
-
-        {/* Separator */}
-        <div className="w-px h-7 bg-white/8 hidden sm:block" />
-
-        {/* Actions */}
-        <div className="flex items-center gap-1.5">
-          {/* Latency */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1.5 rounded-lg">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">{Math.round(latency)}MS</span>
-          </div>
-
-          {/* New Chat Button */}
-          <button
-            onClick={onNewChat}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 hover:border-primary/30 active:scale-95 transition-all duration-300"
-            title="Új beszélgetés másik AI-val"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-black uppercase tracking-[0.15em] hidden sm:inline">Új AI-val</span>
-          </button>
-
-          {/* History toggle (mobile) */}
-          <button
-            onClick={() => setHistorySidebarOpen(true)}
-            className="xl:hidden p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-          >
-            <History className="w-4 h-4" />
-          </button>
-
-          {/* Config */}
-          <button
-            onClick={onConfigOpen}
-            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-500 group/btn"
-            title="Config"
-          >
-            <Settings2 className="w-4 h-4 group-hover/btn:rotate-90 transition-transform duration-500" />
-          </button>
-        </div>
       </div>
-    </motion.header>
+
+      {/* Actions */}
+      <div className="flex items-center gap-0.5 sm:gap-2">
+        {/* New Chat Button */}
+        <button
+          onClick={onNewChat}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.04] active:scale-95 transition-all duration-300"
+          title="Új munkaablak nyitása"
+        >
+          <Plus className="w-3 h-3" />
+          <span className="text-[10px] font-medium tracking-wide hidden sm:inline">Új chat</span>
+        </button>
+
+        <div className="w-px h-4 bg-white/10 hidden sm:block mx-1" />
+
+        {/* History toggle (mobile) */}
+        <button
+          onClick={() => setHistorySidebarOpen(true)}
+          className="xl:hidden p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all"
+          title="Előzmények megnyitása"
+        >
+          <History className="w-4 h-4" />
+        </button>
+
+        {/* Config */}
+        <button
+          onClick={onConfigOpen}
+          className="p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all duration-500 group/btn"
+          title="Beállítások"
+        >
+          <Settings2 className="w-4 h-4 group-hover/btn:rotate-90 transition-transform duration-500" />
+        </button>
+      </div>
+    </motion.div>
   );
 }

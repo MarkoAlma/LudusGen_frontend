@@ -153,7 +153,7 @@ const MiniWaveform = ({ color, isPlaying }) => (
 );
 
 export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
-  const { addJob, updateJob, markJobDone, markJobError } = useJobs();
+  const { addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError } = useJobs();
   const startJob = (kind, title, targetTab) => {
     const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     addJob({ id, kind, panelType: 'audio', modelId: selectedModel.id, title, status: 'running', progress: 0, createdAt: Date.now(), updatedAt: Date.now(), errorMessage: null, completedAt: null, seenAt: null, targetTab });
@@ -316,7 +316,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
       if (!data.success) throw new Error(data.message);
 
       setAudioUrl(data.audioUrl);
-      markJobDone(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now() });
+      markJobDoneAndSeen(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now() });
 
       if (userId) {
         try {

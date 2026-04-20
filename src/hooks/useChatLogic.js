@@ -281,10 +281,10 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     setInput("");
     setAttachedImage(null);
     setIsTyping(false);
-    // Reload conversation list and load the new empty session
+    setShouldRestoreModel(false); // Új sessionban ne állítsa vissza a régi modellt
+    setSessionId(newSid); // ← Ez váltja ki a loadCurrentConversation useEffect-et az új ID-val
     loadConversationList();
-    loadCurrentConversation();
-  }, [loadConversationList, loadCurrentConversation]);
+  }, [loadConversationList]);
 
   // ── Trigger summary generation (fire-and-forget) ──────────────────
   // REMOVED — backend now handles context/summary

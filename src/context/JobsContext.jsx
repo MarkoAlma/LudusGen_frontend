@@ -78,6 +78,22 @@ export function JobsProvider({ children }) {
     } : job))));
   }, []);
 
+  // Ha a user már a panelen volt és "élőben" látta a generálást, azonnal látottnak jelöljük.
+  // Ez megakadályozza, hogy a widget feleslegesen megjelenítse az értesítést.
+  const markJobDoneAndSeen = useCallback((id, patch = {}) => {
+    const now = Date.now();
+    setJobs((prev) => normalizeJobs(prev.map((job) => (job.id === id ? {
+      ...job,
+      ...patch,
+      status: 'done',
+      progress: patch.progress ?? 100,
+      completedAt: patch.completedAt ?? now,
+      updatedAt: patch.updatedAt ?? now,
+      seenAt: now,
+      errorMessage: null,
+    } : job))));
+  }, []);
+
   const markJobError = useCallback((id, message) => {
     setJobs((prev) => normalizeJobs(prev.map((job) => (job.id === id ? {
       ...job,
@@ -109,10 +125,11 @@ export function JobsProvider({ children }) {
     addJob,
     updateJob,
     markJobDone,
+    markJobDoneAndSeen,
     markJobError,
     removeJob,
     clearSeenCompletedJobs,
-  }), [jobs, addJob, updateJob, markJobDone, markJobError, removeJob, clearSeenCompletedJobs]);
+  }), [jobs, addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, removeJob, clearSeenCompletedJobs]);
 
   return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>;
 }

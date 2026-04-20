@@ -11,7 +11,7 @@ export default function ChatInput({
   const [justSent, setJustSent] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
-  
+
   // Reset height when input is cleared externally
   React.useEffect(() => {
     if (input === '' && textareaRef?.current) {
@@ -95,7 +95,7 @@ export default function ChatInput({
 
   return (
     <div
-      className="relative bg-transparent group/input"
+      className="relative rounded-[1.5rem] bg-[#0d0d12]/60 backdrop-blur-2xl border border-white/[0.08] shadow-[0_16px_40px_rgba(0,0,0,0.4)] transition-all duration-500 group/input focus-within:border-primary/30 focus-within:bg-[#0d0d12]/80 focus-within:shadow-[0_16px_50px_rgba(138,43,226,0.12)]"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -163,17 +163,11 @@ export default function ChatInput({
         {/* Forum-Matched Command Module */}
         <div
           onClick={(e) => {
-            // Focus textarea when clicking anywhere in the input area,
-            // except on buttons and file input
             if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'svg' && !e.target.closest('button')) {
               textareaRef?.current?.focus();
             }
           }}
-          className={`flex items-center gap-3 px-5 py-3 rounded-[1.5rem] border transition-all duration-700 relative backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] cursor-text ${
-            focused
-              ? 'bg-white/[0.08] border-primary/40'
-              : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/10'
-          }`}
+          className="flex items-center gap-3 px-4 py-3 relative cursor-text"
         >
           {/* Subtle Ambient Glow */}
           {focused && (
@@ -223,13 +217,12 @@ export default function ChatInput({
               onClick={isTyping ? handleStop : (hasContent ? handleSendWithAnimation : undefined)}
               disabled={!hasContent && !isTyping}
               whileTap={(hasContent || isTyping) ? { scale: 0.92 } : {}}
-              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-all duration-700 relative overflow-hidden group/send ${
-                isTyping
+              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-all duration-700 relative overflow-hidden group/send ${isTyping
                   ? 'bg-red-500/10 border border-red-500/20 text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.1)] hover:bg-red-500/20 hover:border-red-500/40'
                   : hasContent
                     ? 'bg-primary text-white shadow-[0_10px_30px_rgba(138,43,226,0.3)] hover:shadow-[0_15px_40px_rgba(138,43,226,0.4)] hover:scale-105'
                     : 'bg-white/[0.04] text-gray-700 pointer-events-none'
-              }`}
+                }`}
             >
               <AnimatePresence mode="wait">
                 {justSent ? (
@@ -266,19 +259,6 @@ export default function ChatInput({
             </motion.button>
           </div>
         </div>
-
-        {/* Footer hints — Station Log Labels */}
-        <div className="hidden sm:flex items-center justify-center gap-8 mt-6">
-          <div className="flex items-center gap-3 group/hint cursor-default">
-             <kbd className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-500 font-mono text-[9px] group-hover/hint:text-zinc-400 group-hover/hint:border-white/20 transition-all duration-700 italic font-black tracking-widest">ENTER</kbd>
-             <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em] group-hover/hint:text-zinc-400 transition-colors">Command_Submit</span>
-          </div>
-          <div className="flex items-center gap-3 group/hint cursor-default">
-             <kbd className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-zinc-500 font-mono text-[9px] group-hover/hint:text-zinc-400 group-hover/hint:border-white/20 transition-all duration-700 italic font-black tracking-widest">SHIFT+ENTER</kbd>
-             <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em] group-hover/hint:text-zinc-400 transition-colors">Vector_Return</span>
-          </div>
-        </div>
-
       </div>
     </div>
   );

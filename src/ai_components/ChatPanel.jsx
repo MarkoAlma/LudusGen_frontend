@@ -122,26 +122,14 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
         {/* Main Interface Area */}
         <div className="flex-1 flex flex-col min-w-0 relative h-full z-10 px-0 max-w-full">
 
-          {/* Header */}
-          <ModelBar
-            selectedModel={selectedModel}
-            setSidebarOpen={setSidebarOpen}
-            setHistorySidebarOpen={() => setHistorySidebarOpen(true)}
-            onConfigOpen={() => setConfigOpen(true)}
-            navHeight={navHeight}
-            historySidebarOpen={historySidebarOpen}
-            isDesktop={isDesktop}
-            sidebarCollapsed={!isGlobalOpen}
-            onModelSwitch={(newModel) => onModelChange?.(newModel)}
-            onNewChat={() => { createNewSession(); onNewChatWithPicker?.(); }}
-            initialDropdownOpen={initialDropdownOpen}
-          />
+          {/* Top Fade Mask replacing the old Header */}
+          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#03000a] via-[#03000a]/90 to-transparent z-30 pointer-events-none" />
 
           {/* Scrollable message area */}
           <div className="flex-1 relative overflow-hidden">
             <div ref={chatScrollRef} className="h-full overflow-y-auto scrollbar-thin px-3 sm:px-6 lg:px-12">
               <div
-                className="w-full pb-8 flex flex-col space-y-4 pt-24"
+                className="w-full pb-8 flex flex-col space-y-4 pt-16"
               >
                 <MessageList
                   messages={messages}
@@ -159,20 +147,41 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
           </div>
 
           {/* Input area */}
-          {/* Chat Input Wrapper */}
-          <div className="px-3 sm:px-6 lg:px-12 pb-6 pt-1 relative z-20 flex flex-col items-center">
+          <div className="px-3 sm:px-6 lg:px-12 pb-6 pt-2 relative z-20 flex flex-col items-center">
             <SummaryIndicator isVisible={isSummarizing} />
-            <div className="w-full max-w-3xl">
-              <ChatInput
-                input={input}
-                setInput={setInput}
-                isTyping={isTyping}
-                handleSend={handleSend}
-                handleStop={handleStop}
-                attachedImage={attachedImage}
-                setAttachedImage={setAttachedImage}
-                textareaRef={textareaRef}
-              />
+            <div className="w-full max-w-3xl flex flex-col items-center">
+              
+              {/* Floating Toolbar (Model Bar & Config) - On Top */}
+              <div className="w-full mb-2 lg:mb-3 px-1">
+                <ModelBar
+                  selectedModel={selectedModel}
+                  setSidebarOpen={setSidebarOpen}
+                  setHistorySidebarOpen={() => setHistorySidebarOpen(true)}
+                  onConfigOpen={() => setConfigOpen(true)}
+                  navHeight={navHeight}
+                  historySidebarOpen={historySidebarOpen}
+                  isDesktop={isDesktop}
+                  sidebarCollapsed={!isGlobalOpen}
+                  onModelSwitch={(newModel) => onModelChange?.(newModel)}
+                  onNewChat={() => { createNewSession(); onNewChatWithPicker?.(); }}
+                  initialDropdownOpen={initialDropdownOpen}
+                />
+              </div>
+
+              {/* Standalone Premium Chat Input */}
+              <div className="w-full">
+                <ChatInput
+                  input={input}
+                  setInput={setInput}
+                  isTyping={isTyping}
+                  handleSend={handleSend}
+                  handleStop={handleStop}
+                  attachedImage={attachedImage}
+                  setAttachedImage={setAttachedImage}
+                  textareaRef={textareaRef}
+                />
+              </div>
+
             </div>
           </div>
 

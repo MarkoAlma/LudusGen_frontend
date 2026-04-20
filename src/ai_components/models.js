@@ -3,80 +3,7 @@
 // ═══════════════════════════════════════════════════════
 
 export const MODEL_GROUPS = [
-    // ─── CHAT ────────────────────────────────────────────
-    {
-        id: "chat",
-        label: "Chat",
-        emoji: "💬",
-        color: "#8b5cf6",
-        defaultOpen: true,
-        categories: [
-            {
-                id: "chat_anthropic",
-                label: "Anthropic",
-                models: [
-                    {
-                        id: "claude_sonnet",
-                        name: "Claude Sonnet 4",
-                        tier: "lite", tierLabel: "Gyors",
-                        description: "Intelligens, gyors, olcsó",
-                        badge: "$3 / 1M tok",
-                        apiModel: "claude-sonnet-4-20250514",
-                        provider: "anthropic",
-                        color: "#f59e0b",
-                        gradient: "from-amber-400 to-orange-400",
-                        panelType: "chat",
-                        defaultSystemPrompt: "You are a helpful, harmless, and honest assistant. Respond in the same language the user writes in.",
-                    },
-                    {
-                        id: "claude_opus",
-                        name: "Claude Opus 4",
-                        tier: "pro", tierLabel: "Prémium",
-                        description: "A legerősebb Anthropic modell",
-                        badge: "$15 / 1M tok",
-                        apiModel: "claude-opus-4-20250514",
-                        provider: "anthropic",
-                        color: "#f97316",
-                        gradient: "from-orange-400 to-red-400",
-                        panelType: "chat",
-                        defaultSystemPrompt: "You are a helpful, harmless, and honest assistant. Respond in the same language the user writes in.",
-                    },
-                ],
-            },
-            {
-                id: "chat_openai",
-                label: "OpenAI",
-                models: [
-                    {
-                        id: "gpt4o_mini",
-                        name: "GPT-4o mini",
-                        tier: "lite", tierLabel: "Gyors",
-                        description: "Gyors, olcsó, megbízható",
-                        badge: "$0.15 / 1M tok",
-                        apiModel: "gpt-4o-mini",
-                        provider: "openai",
-                        color: "#10b981",
-                        gradient: "from-emerald-400 to-teal-400",
-                        panelType: "chat",
-                        defaultSystemPrompt: "You are a helpful assistant. Respond in the same language the user writes in.",
-                    },
-                    {
-                        id: "gpt4o",
-                        name: "GPT-4o",
-                        tier: "pro", tierLabel: "Prémium",
-                        description: "Multimodális flagship modell",
-                        badge: "$5 / 1M tok",
-                        apiModel: "gpt-4o",
-                        provider: "openai",
-                        color: "#059669",
-                        gradient: "from-teal-500 to-emerald-500",
-                        panelType: "chat",
-                        defaultSystemPrompt: "You are a helpful assistant. Respond in the same language the user writes in.",
-                    },
-                ],
-            },
-        ],
-    },
+
 
     // ─── KÓD ─────────────────────────────────────────────
     {
@@ -143,6 +70,7 @@ export const MODEL_GROUPS = [
                     { id: "nvidia-glm4.7", name: "Z.ai GLM 4.7 (NVIDIA)", apiModel: "z-ai/glm4.7", provider: "nvidia", color: "#16f921", gradient: "from-lime-400 to-green-500", defaultTemperature: 0.7, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat" },
                     { id: "deepseek-v3.2", name: "DeepSeek v3.2 (NVIDIA)", apiModel: "deepseek-ai/deepseek-v3.2", provider: "nvidia", color: "#3b82f6", gradient: "from-blue-500 to-indigo-600", defaultTemperature: 0.3, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
                     { id: "google-gemma-3-27b-it", name: "(img) Gemma 3 27B IT (NVIDIA)", apiModel: "google/gemma-3-27b-it", provider: "nvidia", color: "#4285f4", gradient: "from-blue-400 to-red-400", supportsVision: true, defaultTemperature: 0.8, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
+                    { id: "google/gemma-4-31b-it", name: "(img) Gemma 4 31B IT (NVIDIA)", apiModel: "google/gemma-4-31b-it", provider: "nvidia", color: "#4285f4", gradient: "from-blue-400 to-red-400", supportsVision: true, defaultTemperature: 0.8, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
 
 
                     //                     {

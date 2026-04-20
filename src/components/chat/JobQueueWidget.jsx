@@ -1,67 +1,176 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, CheckCircle2, XCircle, Clock3, ChevronRight } from 'lucide-react';
+import {
+  MessageSquare, Image, Music2, Box, Loader2,
+  CheckCircle2, XCircle, Clock4, ChevronRight,
+  Cpu, Mic2, Layers, Wand2, Volume2, LayoutGrid
+} from 'lucide-react';
 import { useJobs } from '../../context/JobsContext';
 
-const STATUS_META = {
-  running: { label: 'Fut', icon: Activity, tone: 'text-emerald-400' },
-  queued: { label: 'Sor', icon: Clock3, tone: 'text-zinc-400' },
-  done: { label: 'Kész', icon: CheckCircle2, tone: 'text-sky-400' },
-  error: { label: 'Hiba', icon: XCircle, tone: 'text-rose-400' },
+// ── Panel-type → icon & palette ──────────────────────────────────
+const PANEL_META = {
+  chat:   { icon: MessageSquare, label: 'Chat',    color: '#8b5cf6', glow: 'rgba(139,92,246,0.35)' },
+  image:  { icon: Image,        label: 'Kép',     color: '#f59e0b', glow: 'rgba(245,158,11,0.35)' },
+  audio:  { icon: Volume2,      label: 'Hang',    color: '#10b981', glow: 'rgba(16,185,129,0.35)' },
+  music:  { icon: Music2,       label: 'Zene',    color: '#06b6d4', glow: 'rgba(6,182,212,0.35)'  },
+  threed: { icon: Box,          label: '3D',      color: '#a78bfa', glow: 'rgba(167,139,250,0.35)' },
+  trellis:{ icon: Layers,       label: 'Trellis', color: '#38bdf8', glow: 'rgba(56,189,248,0.35)' },
+  tripo:  { icon: Cpu,          label: 'Tripo',   color: '#d946ef', glow: 'rgba(217,70,239,0.35)' },
+  meshy:  { icon: LayoutGrid,   label: 'Meshy',   color: '#f97316', glow: 'rgba(249,115,22,0.35)' },
 };
 
-function JobRow({ job, onOpen }) {
-  const meta = STATUS_META[job.status] || STATUS_META.queued;
-  const Icon = meta.icon;
+const STATUS_META = {
+  running: { label: 'Folyamat',  ring: true  },
+  queued:  { label: 'Várólista', ring: false },
+  done:    { label: 'Kész',      ring: false },
+  error:   { label: 'Hiba',      ring: false },
+};
 
+// Animated spinning ring for running jobs
+function SpinningRing({ color }) {
   return (
-    <button
-      onClick={() => onOpen(job)}
-      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl border border-white/5 bg-white/[0.03] hover:bg-white/[0.06] transition-all text-left"
-    >
-      <div className={`w-8 h-8 rounded-xl flex items-center justify-center border border-white/5 ${meta.tone}`}>
-        <Icon className="w-4 h-4" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-black uppercase tracking-wide text-white truncate">{job.title}</p>
-          <span className={`text-[8px] font-black uppercase tracking-[0.25em] ${meta.tone}`}>{meta.label}</span>
-        </div>
-        <div className="mt-1 h-1.5 rounded-full bg-white/[0.05] overflow-hidden">
-          <div className="h-full rounded-full bg-white/30" style={{ width: `${Math.max(0, Math.min(job.progress ?? 0, 100))}%` }} />
-        </div>
-      </div>
-      <ChevronRight className="w-4 h-4 text-zinc-600" />
-    </button>
+    <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 36 36">
+      <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" />
+      <motion.circle
+        cx="18" cy="18" r="15"
+        fill="none"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray="20 75"
+        animate={{ rotate: [0, 360] }}
+        style={{ transformOrigin: 'center', transformBox: 'fill-box' }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: 'linear' }}
+      />
+    </svg>
   );
 }
 
-function JobList({ jobs, onOpen }) {
-  if (!jobs.length) {
-    return (
-      <motion.div
-        key="empty"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="rounded-2xl border border-dashed border-white/5 bg-white/[0.02] px-3 py-4 text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-700 text-center"
-      >
-        Nincs aktív feladat
-      </motion.div>
-    );
-  }
+function JobRow({ job, onOpen }) {
+  const panelMeta = PANEL_META[job.panelType] || PANEL_META.chat;
+  const statusMeta = STATUS_META[job.status] || STATUS_META.queued;
+  const PanelIcon = panelMeta.icon;
+  const progress = Math.max(0, Math.min(job.progress ?? 0, 100));
 
-  return jobs.map((job) => (
-    <motion.div
-      key={job.id}
-      layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      transition={{ duration: 0.18 }}
+  const isRunning = job.status === 'running';
+  const isDone    = job.status === 'done';
+  const isError   = job.status === 'error';
+  const isQueued  = job.status === 'queued';
+
+  const statusColor = isDone
+    ? '#34d399'
+    : isError
+    ? '#f87171'
+    : isQueued
+    ? '#71717a'
+    : panelMeta.color;
+
+  return (
+    <motion.button
+      onClick={() => onOpen(job)}
+      whileHover={{ scale: 1.012 }}
+      whileTap={{ scale: 0.985 }}
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left group/row relative overflow-hidden"
+      style={{
+        background: 'rgba(255,255,255,0.035)',
+        border: `1px solid rgba(255,255,255,0.07)`,
+        boxShadow: isRunning ? `0 0 18px -6px ${panelMeta.glow}` : 'none',
+        transition: 'box-shadow 0.4s ease',
+      }}
     >
-      <JobRow job={job} onOpen={onOpen} />
-    </motion.div>
-  ));
+      {/* Hover shimmer */}
+      <div className="absolute inset-0 opacity-0 group-hover/row:opacity-100 transition-opacity duration-300"
+        style={{ background: `radial-gradient(ellipse at 30% 50%, ${panelMeta.color}08, transparent 70%)` }} />
+
+      {/* Left accent line */}
+      <div
+        className="absolute left-0 top-2 bottom-2 w-[2.5px] rounded-full transition-all duration-500"
+        style={{
+          backgroundColor: statusColor,
+          boxShadow: isRunning ? `0 0 8px ${statusColor}` : 'none',
+          opacity: isRunning || isDone || isError ? 1 : 0.35,
+        }}
+      />
+
+      {/* Panel-type icon pill */}
+      <div className="relative flex-shrink-0 w-9 h-9">
+        {/* Soft glow behind icon */}
+        <div className="absolute inset-0 rounded-[11px] opacity-20 blur-[8px] transition-opacity duration-500"
+          style={{ background: panelMeta.color }}
+        />
+        <div
+          className="relative z-10 w-9 h-9 rounded-[11px] flex items-center justify-center"
+          style={{
+            background: `linear-gradient(135deg, ${panelMeta.color}22, ${panelMeta.color}10)`,
+            border: `1px solid ${panelMeta.color}30`,
+            color: panelMeta.color,
+          }}
+        >
+          {isRunning && <SpinningRing color={panelMeta.color} />}
+          <PanelIcon className="w-[15px] h-[15px] relative z-10" />
+        </div>
+      </div>
+
+      {/* Text + progress */}
+      <div className="min-w-0 flex-1 relative z-10">
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <p className="text-[11px] font-black uppercase tracking-wide text-white/90 truncate leading-none">
+            {job.title}
+          </p>
+
+          {/* Status badge */}
+          <span
+            className="flex-shrink-0 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em]"
+            style={{
+              background: `${statusColor}18`,
+              color: statusColor,
+              border: `1px solid ${statusColor}28`,
+            }}
+          >
+            {statusMeta.label}
+          </span>
+        </div>
+
+        {/* Progress bar */}
+        <div className="h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          <motion.div
+            className="h-full rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            style={{
+              background: isError
+                ? '#f87171'
+                : isDone
+                ? `linear-gradient(90deg, #34d399, #10b981)`
+                : `linear-gradient(90deg, ${panelMeta.color}, ${panelMeta.color}cc)`,
+              boxShadow: isRunning ? `0 0 8px ${panelMeta.color}90` : 'none',
+            }}
+          />
+        </div>
+
+        {/* Bottom row: type label + percent */}
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="text-[8px] font-bold uppercase tracking-[0.25em] text-zinc-600">
+            {panelMeta.label}
+          </span>
+          {isRunning && (
+            <span className="text-[8px] font-bold tabular-nums" style={{ color: panelMeta.color }}>
+              {progress}%
+            </span>
+          )}
+          {isDone && (
+            <span className="text-[8px] font-bold text-emerald-400">✓ Kész</span>
+          )}
+          {isError && (
+            <span className="text-[8px] font-bold text-rose-400">✕ Hiba</span>
+          )}
+        </div>
+      </div>
+
+      <ChevronRight className="w-3.5 h-3.5 text-zinc-700 group-hover/row:text-zinc-400 transition-colors flex-shrink-0 relative z-10" />
+    </motion.button>
+  );
 }
 
 export default function JobQueueWidget({ onOpenJob }) {
@@ -70,20 +179,91 @@ export default function JobQueueWidget({ onOpenJob }) {
     .filter((job) => job.status === 'running' || job.status === 'queued' || !job.seenAt)
     .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
 
+  const activeCount = visibleJobs.filter(j => j.status === 'running' || j.status === 'queued').length;
+
   return (
-    <div className="px-5 py-4 border-t border-white/5 relative z-20">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.35em] text-zinc-500">Folyamatban</p>
-          <p className="text-[8px] font-bold uppercase tracking-[0.25em] text-zinc-700 mt-1">Legfrissebb elöl</p>
-        </div>
-        <Activity className="w-4 h-4 text-zinc-600" />
+    <div className="relative z-20 mt-auto">
+      {/* Top separator with gradient glow effect */}
+      <div className="relative h-px mx-5 mb-4">
+        <div className="absolute inset-0 bg-white/5" />
+        {activeCount > 0 && (
+          <motion.div
+            className="absolute inset-0"
+            animate={{ opacity: [0.4, 1, 0.4] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.5), transparent)' }}
+          />
+        )}
       </div>
 
-      <div className="space-y-2 max-h-56 overflow-y-auto scrollbar-hide">
-        <AnimatePresence initial={false}>
-          <JobList jobs={visibleJobs} onOpen={onOpenJob} />
-        </AnimatePresence>
+      <div className="px-4 pb-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3 px-1">
+          <div className="flex items-center gap-2">
+            {/* Pulse dot */}
+            {activeCount > 0 ? (
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-60" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
+              </span>
+            ) : (
+              <span className="h-2 w-2 rounded-full bg-zinc-700" />
+            )}
+            <p className="text-[9px] font-black uppercase tracking-[0.32em] text-zinc-400">
+              Folyamatban
+            </p>
+          </div>
+
+          {activeCount > 0 && (
+            <motion.span
+              key={activeCount}
+              initial={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest"
+              style={{
+                background: 'rgba(139,92,246,0.15)',
+                color: '#a78bfa',
+                border: '1px solid rgba(139,92,246,0.25)',
+              }}
+            >
+              {activeCount} aktív
+            </motion.span>
+          )}
+        </div>
+
+        {/* Job list */}
+        <div className="space-y-2 max-h-[220px] overflow-y-auto scrollbar-hide">
+          <AnimatePresence initial={false}>
+            {visibleJobs.length === 0 ? (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center py-5 rounded-2xl gap-2"
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.05)' }}
+              >
+                <Wand2 className="w-4 h-4 text-zinc-700" />
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-zinc-700">
+                  Nincs aktív feladat
+                </p>
+              </motion.div>
+            ) : (
+              visibleJobs.map((job) => (
+                <motion.div
+                  key={job.id}
+                  layout
+                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.95 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <JobRow job={job} onOpen={onOpenJob} />
+                </motion.div>
+              ))
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );
