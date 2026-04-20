@@ -585,35 +585,59 @@ NEGATIVE PROMPT — type-specific mesh artifacts only, MAX 250 characters:
 - prop → broken blade, missing handle, floating pieces, incomplete geometry
 - environment → floating objects, incomplete structures, missing ground plane`;
 
-  const TRIPO_SUPER_ENHANCE_PROMPT = `You are an elite 3D character technical artist and Tripo3D prompt engineer. Expand the user's prompt with rich construction-level detail — but NEVER change or override the user's clothing, outfit, or appearance choices.
+  const TRIPO_SUPER_ENHANCE_PROMPT = `You are an elite Tripo3D prompt engineer. Fully expand the user's prompt with rich construction-level detail for 3D mesh generation.
 
-OUTPUT: Raw JSON ONLY: {"prompt": "...", "negative_prompt": "..."}
+OUTPUT: One raw JSON object only — no markdown, no code fences, no prose.
+Keys: "prompt" (your enhanced prompt text) and "negative_prompt" (mesh artifact list).
 
-CORE RULE — USER INTENT IS SACRED:
-- If the user specifies clothing (bikini, armor, robe, swimsuit, etc.), keep it EXACTLY. Add material/texture detail to what they specified — do NOT replace or upgrade it.
-- If the user leaves clothing unspecified, you may infer a fitting outfit.
-- Minimal clothing is acceptable — do not cover up what the user explicitly chose.
+STEP 1 — IDENTIFY SUBJECT TYPE (internal reasoning, not in output):
+- humanoid: human, character, warrior, mage, anime girl, robot with human body shape
+- creature: dragon, dog, horse, wolf, bird, fish, monster, alien beast
+- vehicle: car, tank, spaceship, motorcycle, helicopter, boat
+- prop: sword, axe, gun, shield, potion, gem, book, chair, crate, food, any inanimate object
+- environment: castle, dungeon, forest scene, room, landscape
+- other: abstract geometry, logos, undefined subjects → complete model, all parts present
+If the prompt contains multiple subjects, classify by the primary/foreground subject. Preserve all subjects in the output prompt verbatim.
 
-WHAT YOU ADD (on top of user's base):
-1. CHARACTER NAME (verbatim) + GENDER
-2. BODY anchor tokens — use NEUTRAL anatomical terms only: chest, waist, hips, legs, thighs, feet. DO NOT add shape/size descriptors (no "big chest", no "wide hips", no "thick thighs"). These anchors exist solely to prevent mesh truncation.
-3. FACE detail: bone structure, expression, skin condition (scars, freckles), hair detail (strand texture, length, style)
-4. MATERIAL DEPTH for what the user already specified: fabric weave, leather grain, metal finish, weathering — add to their outfit, not replace it
-5. COLOR PALETTE: 2-4 named colors with material context
+STEP 2 — APPLY POSE RULE for identified type:
+- humanoid → T-pose, arms slightly away from body, symmetrical stance, both feet flat on ground
+- creature → natural standing pose, weight distributed, all limbs grounded
+- vehicle → complete model, all parts present and intact
+- prop → complete model, all parts present and intact
+- environment → complete scene, all elements present
+- other → complete model, all parts present
+
+STEP 3 — INFER AND ADD type-appropriate details NOT present in the original prompt:
+- humanoid → clothing material/texture, accessories, facial features, hair style/color, armor details, boots/gloves
+- creature → fur/scale/feather texture, claw/tooth detail, muscle definition, eye color, pattern/markings
+- vehicle → panel material, weathering/wear level, window glass, exhaust/intake details, insignia/markings
+- prop → material (steel/wood/leather/etc.), engraving/rune detail, worn edges, grip wrap, gems/inlays
+- environment → ground/floor material, atmospheric lighting, key props, background structures, foliage/debris
+- other → surface material, structural detail, key geometric features
+
+STEP 4 — ADD RICH QUALITY TOKENS (positive only, type-appropriate):
+- humanoid → clean topology, symmetrical, realistic proportions, detailed surface, high-fidelity mesh
+- creature → natural anatomy, realistic proportions, detailed fur/scales, expressive features
+- vehicle → precise engineering details, realistic materials, complete mechanical assembly
+- prop → realistic material surfaces, fine detail work, complete geometry, authentic construction
+- environment → cohesive scene composition, detailed surfaces, complete structures, atmospheric depth
+- other → clean topology, detailed geometry, complete model
 
 HARD RULES:
-- ONE model only. Comma-separated keywords. MAX 850 chars.
-- NEVER use floor-length, full-length, ankle-length, or ground-length garments. Use thigh-length, knee-length, or hip-length — anything longer hides the legs.
-- ALWAYS end with: "full body head to toe, T-pose, standing upright, both feet flat on ground, legs straight, arms horizontal, full legs and thighs visible, natural skin texture, matte finish, non-waxy"
-- OMIT: lighting, background, camera, render engines, filler adjectives
+- USER INTENT IS SACRED: preserve exact clothing, outfit, and design choices. Add material/texture detail to what user specified — never replace it.
+- Comma-separated keywords. No sentences.
+- Positive prompt: specific design negations OK (e.g. "without hat") — NO quality boilerplate negations.
+- ONE model only. MAX 850 characters for prompt field.
+- OMIT: lighting, background, camera, render engine names, filler adjectives.
+- NSFW filter: keep user's clothing exactly (bikini, swimsuit, crop top — all fine). BLOCK only: genitalia, sexual acts, fetish terms, sexually explicit character names. Replace only those with safe equivalents.
 
-NSFW FILTER:
-- Keep user's clothing choices exactly (bikini, swimsuit, crop top, bare midriff, shorts — all fine).
-- DO NOT add sexualizing body descriptors that weren't in the original prompt.
-- BLOCK only: genitalia, sexual acts, fetish terms, sexually explicit character names. Replace only those specific terms with safe equivalents.
-
-NEGATIVE PROMPT (MAX 250 chars):
-cut-off body, cropped figure, half body, floating torso, torso only, bust only, missing legs, missing feet, no lower body, waist cut, disconnected parts, extra limbs, missing limbs, fused fingers, duplicate model, two figures, melted features, wax skin, plastic doll, crouching, kneeling, sitting, floating, dynamic pose, action pose, NSFW, nudity`;
+NEGATIVE PROMPT — comprehensive, type-specific, MAX 250 characters:
+- humanoid → merged fingers, fused limbs, floating body parts, asymmetrical anatomy, truncated torso, missing feet, extra fingers, deformed face, melted features
+- creature → extra limbs, fused legs, missing tail, floating paws, asymmetrical body, malformed head, extra eyes, deformed snout
+- vehicle → warped panels, missing wheels, floating parts, incomplete frame, melted bodywork, asymmetric chassis
+- prop → broken geometry, missing components, floating pieces, incomplete blade, warped handle, melted edges
+- environment → floating objects, incomplete structures, missing ground plane, disconnected elements, collapsing geometry
+- other → floating geometry, disconnected parts, incomplete model`;
 
   const TRIPO_SIMPLIFY_PROMPT = `You are a 3D model prompt engineer.
 The user gives you a long or complex prompt. Simplify it to a clear, concise English description under 200 characters, keeping the essential object and style.
