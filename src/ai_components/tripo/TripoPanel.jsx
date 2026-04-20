@@ -1,5 +1,5 @@
 import React, {
-  useState, useRef, useCallback, useEffect, useMemo, useContext,
+  useState, useRef, useCallback, useEffect, useMemo, useContext, useReducer,
 } from "react";
 import {
   Download, Loader2, AlertCircle, Trash2, RotateCcw,
@@ -22,8 +22,10 @@ import DownloadModal from "../trellis/DownloadModal";
 import { saveHistoryToFirestore, loadHistoryPageFromFirestore } from "../trellis/utils";
 import Shared3DHistory from "../../components/shared/Shared3DHistory";
 import { getAnimById, ANIMATION_LIBRARY, ANIM_CATEGORIES } from "./animationlibrary";
-import { persistGen, loadPersistedGen, updatePersistedProgress, clearPersistedGen, markHistorySaved } from "./useGenerationPersist";
+import { persistGen, loadPersistedGen, updatePersistedProgress, clearPersistedGen, markHistorySaved, persistActiveTask, removeActiveTask, loadPersistedActiveTasks } from "./useGenerationPersist";
 
+import { useActiveTasksPoller } from "./useActiveTasksPoller";
+import { getCachedThumbnail } from "../trellis/Glbthumbnail";
 import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX } from "./GeneratePanel";
 import Segment from "./Segment";
 import Retopo from "./Retopo";
@@ -34,6 +36,7 @@ import { useSearchParams } from "react-router-dom";
 import { MyUserContext } from "../../context/MyUserProvider";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useStudioPanels } from "../../context/StudioPanelContext";
+import { useJobs } from "../../context/JobsContext";
 import toast from "react-hot-toast";
 
 /* ─── constants ─────────────────────────────────────────────────────── */
@@ -93,6 +96,11 @@ const CSS = `
   }
   @keyframes spin   { to { transform: rotate(360deg); } }
   @keyframes fadeUp { from { opacity:0;transform:translateY(6px) } to { opacity:1;transform:none } }
+  @keyframes pulseGlow {
+    0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+  }
   .anim-spin { animation: spin 1s linear infinite; }
   .fade-up   { animation: fadeUp 0.18s ease forwards; }
   .tp-viewport canvas { position: relative !important; z-index: 0 !important; }
@@ -254,7 +262,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [genTab, setGenTab] = useState("image");
   const [modelVer, setModelVer] = useState(MODEL_VERSIONS[0].id);
   const [prompt, setPrompt] = useState("");
-  const [negPrompt, setNegPrompt] = useState("floating objects, extra limbs, missing limbs, cut off body, cropped figure, background scenery, fused fingers, warped topology, duplicate figure, two models, inverted normals, texture stretching, melted features, wax skin, plastic doll, artifacts");
+  const [negPrompt, setNegPrompt] = useState("");
+  const [aiSuggestedNeg, setAiSuggestedNeg] = useState("");
   const [makeBetter, setMakeBetter] = useState(true);
   const [imgFile, setImgFile] = useState(null);
   const [imgPrev, setImgPrev] = useState(null);
@@ -268,6 +277,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [pbrOn, setPbrOn] = useState(false);
   const [genStatus, setGenStatus] = useState("idle");
   const [isRunning, setIsRunning] = useState(false);
+  const [pendingCountdown, setPendingCountdown] = useState(null);
+  const pendingTaskRef = useRef(null);
   const [multiImages, setMultiImages] = useState([]);
   const [batchImages, setBatchImages] = useState([]);
 
@@ -304,10 +315,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [animId, setAnimId] = useState("");
 
   // animate
-  const [animModelVer, setAnimModelVer] = useState("v2.5-animals");
+  const [animModelVer, setAnimModelVer] = useState("v1");
   const [animSearch, setAnimSearch] = useState("");
   const [animCat, setAnimCat] = useState("all");
   const [selAnim, setSelAnim] = useState(new Set());
+  const [rigBtnLocked, setRigBtnLocked] = useState(false);
   const [rigStep, setRigStep] = useState("idle");
   const [riggedId, setRiggedId] = useState(null);
   const riggedIdRef = useRef(null);
@@ -317,7 +329,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [detectedRigType, setDetectedRigType] = useState(null);
   const [detectedRigModelVer, setDetectedRigModelVer] = useState(null);
   const [detectedRigSpec, setDetectedRigSpec] = useState(null);
-  const [prerigcheckResult, setPrerigcheckResult] = useState(null);
+  const rigCompatRef = useRef({});
+  const [rigCompat, setRigCompat] = useState(null);
   const [animOutFormat, setAnimOutFormat] = useState("glb");
   const [animBakeAnimation, setAnimBakeAnimation] = useState(true);
   const [animExportGeometry, setAnimExportGeometry] = useState(true);
@@ -361,7 +374,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [history, setHistory] = useState([]);
   const [optimisticItems, setOptimisticItems] = useState([]);
   const [selHistId, setSelHistId] = useState(() => sessionStorage.getItem("tripo_sel_hist") || null);
+  const selHistIdRef = useRef(selHistId);
   useEffect(() => {
+    selHistIdRef.current = selHistId;
     if (selHistId) sessionStorage.setItem("tripo_sel_hist", selHistId);
     else sessionStorage.removeItem("tripo_sel_hist");
   }, [selHistId]);
@@ -399,9 +414,16 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
 
   const histAbort = useRef(null);
+  const histInit = useRef(false);
   const sceneRef = useRef(null);
   const pollAb = useRef(null);
   const prevUrl = useRef(null);
+
+  // ── Parallel task tracking ───────────────────────────────────────────
+  const activeTasksRef = useRef(new Map());
+  const [_taskTick, forceUpdate] = useReducer(x => x + 1, 0);
+  const [focusedInstanceId, setFocusedInstanceId] = useState(null);
+  const { addJob, updateJob, markJobDoneAndSeen, markJobError, registerCancelHandler, unregisterCancelHandler } = useJobs();
   const fileRef = useRef(null);
   const currentTaskId = useRef(null);
   const currentRequestId = useRef(null);
@@ -488,21 +510,37 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     });
   }, [sceneRef]);
 
+  const PARALLEL_LIMIT = 10;
+
   const canGen = useMemo(() => {
-    if (isRunning) return false;
+    const running = [...activeTasksRef.current.values()]
+      .filter(t => t.status === "running" || t.status === "pending").length;
+    if (running >= PARALLEL_LIMIT) return false;
+
     switch (mode) {
-      case "generate": return genTab === "text" ? !!prompt.trim() : genTab === "batch" ? (batchImages?.length > 0) : !!imgToken;
-      case "segment": return !!(segId.trim() || activeTaskId);
+      case "generate":
+        return genTab === "text" ? !!prompt.trim()
+             : genTab === "batch" ? (batchImages?.length > 0)
+             : !!imgToken;
+      case "segment":    return !!(segId.trim() || activeTaskId);
       case "fill_parts": return !!(fillId.trim() || activeTaskId);
-      case "retopo": return !!(retopoId.trim() || activeTaskId);
-      case "texture": return !!(texId.trim() || activeTaskId) && (texInputTab === "text" ? !!texPrompt.trim() : texInputTab === "image" ? !!imgToken : multiImages.length > 0);
-      case "texture_edit": return !!(editId.trim() || activeTaskId) && (brushMode === "Paint Mode" || !!brushPrompt.trim());
-      case "refine": return !!(refineId.trim() || activeTaskId);
+      case "retopo":     return !!(retopoId.trim() || activeTaskId);
+      case "texture":
+        return !!(texId.trim() || activeTaskId) &&
+               (texInputTab === "text" ? !!texPrompt.trim()
+              : texInputTab === "image" ? !!imgToken
+              : multiImages.length > 0);
+      case "texture_edit":
+        return !!(editId.trim() || activeTaskId) &&
+               (brushMode === "Paint Mode" || !!brushPrompt.trim());
+      case "refine":  return !!(refineId.trim() || activeTaskId);
       case "stylize": return !!(stylizeId.trim() || activeTaskId);
       case "animate": return !!riggedId && selAnim.size > 0;
       default: return false;
     }
-  }, [isRunning, mode, genTab, prompt, imgToken, batchImages, segId, fillId, retopoId, activeTaskId, texInputTab, texPrompt, multiImages, editId, texId, refineId, stylizeId, riggedId, selAnim, brushMode, brushPrompt]);
+  }, [mode, genTab, prompt, imgToken, batchImages, segId, fillId, retopoId,
+      texId, texInputTab, texPrompt, multiImages, editId, brushMode, brushPrompt,
+      refineId, stylizeId, riggedId, selAnim, activeTaskId, focusedInstanceId, _taskTick]);
 
 
 
@@ -555,11 +593,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       const d = await res.json();
       if (!d.success) throw new Error(d.message);
       toast.success(`Asset uploaded: ${d.filename}`);
-      // Reset history state — the existing useEffect will reload
-      histInit.current = false;
-      lastDocR.current = null;
       setHistory([]);
-      setHasMore(false);
     } catch (e) {
       toast.error(`Upload failed: ${e.message}`);
       setErrorMsg("Asset upload failed: " + e.message);
@@ -568,7 +602,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, [getIdToken]);
 
-  const pollTask = useCallback(async (taskId, pt, headers, onSuccess, { skipJumpCheck = false } = {}) => {
+  const pollTask = useCallback(async (taskId, pt, headers, onSuccess, { skipJumpCheck = false, onProgress = null } = {}) => {
     let n = 0, prevProgress = 0, stuckSince = null;
     while (n < POLL_MAX) {
       if (pt.cancelled) return;
@@ -594,6 +628,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       if (d.status !== "success" && d.status !== "failed" && d.status !== "cancelled") {
         const dp = Math.min(prog, 99); setProgress(dp); updatePersistedProgress(dp); prevProgress = prog;
         if (dp >= 95) setStatusMsg("Finalizing…");
+        if (onProgress) onProgress(dp);
       }
       if (d.status === "success") {
         // prerigcheck tasks don't return a model — they only set rigCheckResult
@@ -675,6 +710,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             if (blob) { revokeBlobUrl(prevUrl.current); setModelUrl(blob); prevUrl.current = blob; }
             setRiggedId(persisted.taskId); setRigStep("rigged"); setShowRig(true);
             setStatusMsg(""); setGenStatus("succeeded");
+
+            if (sd.modelUrl && blob) {
+              try {
+                const buf = await fetch(blob).then(r => r.arrayBuffer());
+                await getCachedThumbnail(buf, { width: 280, height: 280 }, sd.modelUrl);
+              } catch { }
+            }
+
             if (!persisted.savedToHistory && sd.modelUrl) {
               markHistorySaved();
               const _ni = await saveRigHist(persisted.taskId, sd.modelUrl, { prompt: "auto-rig", originalModelTaskId: persisted.mode === "animate" ? persisted.taskId : undefined, rigModelVer: persisted.rigModelVer, rigType: persisted.rigType, rigSpec: persisted.rigSpec });
@@ -691,6 +734,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             setModelUrl(blob); prevUrl.current = blob;
             setGenStatus("succeeded"); setProgress(100); setStatusMsg(""); setIsRunning(false);
             setRiggedId(persisted.taskId); setShowRig(true);
+
+            if (rawUrl && blob) {
+              try {
+                const buf = await fetch(blob).then(r => r.arrayBuffer());
+                await getCachedThumbnail(buf, { width: 280, height: 280 }, rawUrl);
+              } catch { }
+            }
+
             if (!persisted.savedToHistory) {
               markHistorySaved();
               const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "animation", animated: true });
@@ -710,6 +761,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             setModelUrl(blob); prevUrl.current = blob;
             setGenStatus("succeeded"); setProgress(100); setStatusMsg(""); setIsRunning(false);
             currentTaskId.current = null; clearPersistedGen();
+
+            if (rawUrl && blob) {
+              try {
+                const buf = await fetch(blob).then(r => r.arrayBuffer());
+                await getCachedThumbnail(buf, { width: 280, height: 280 }, rawUrl);
+              } catch { }
+            }
+
             if (!persisted.savedToHistory && rawUrl) {
               markHistorySaved();
               const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "" });
@@ -747,27 +806,49 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Page-reload resume for parallel tasks — restore persisted active tasks into Map
+  useEffect(() => {
+    const persisted = loadPersistedActiveTasks();
+    if (!persisted || persisted.length === 0) return;
+    const resumable = persisted.filter(t => t.status === "running" && t.taskId);
+    if (resumable.length === 0) return;
+    for (const t of resumable) {
+      activeTasksRef.current.set(t.instanceId, t);
+    }
+    if (resumable.length > 0) {
+      setFocusedInstanceId(resumable[resumable.length - 1].instanceId);
+      forceUpdate();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const saveHist = useCallback(async (taskId, rawUrl, extra = {}) => {
     const dedupKey = rawUrl + "|" + taskId;
     if (_savedUrls.has(dedupKey)) return null;
     _savedUrls.add(dedupKey);
-    const autoName = (extra.prompt || prompt).trim().split(/\s+/).slice(0, 2).join(" ");
-    const resolvedName = modelName.trim() || extra.name || autoName || null;
-    const item = { prompt: prompt.trim() || extra.label || mode, name: resolvedName, status: "succeeded", model_url: rawUrl, source: "tripo", mode, taskId, params: { model_version: modelVer, mode, ...extra }, ts: Date.now() };
+    const cap2 = s => s ? s.trim().split(/\s+/).slice(0, 2).join(" ") : s;
+    // Use task-specific values from extra when available — never use closed-over UI state for parallel tasks
+    const effectivePrompt = extra.prompt ?? prompt;
+    const effectiveMode = extra.mode ?? mode;
+    const effectiveModelVer = extra.modelVer ?? modelVer;
+    const autoName = cap2(effectivePrompt.trim());
+    const resolvedName = cap2(extra.name) || autoName || null;
+    const item = { prompt: effectivePrompt.trim() || extra.label || effectiveMode, name: resolvedName, status: "succeeded", model_url: rawUrl, source: "tripo", mode: effectiveMode, taskId, styleId: activeStyle || null, params: { model_version: effectiveModelVer, mode: effectiveMode, ...extra }, ts: Date.now() };
     const stableDocId = extra.animationIndex != null ? `tripo_${taskId}_${extra.animationIndex}` : `tripo_${taskId}`;
     const { docId } = await saveHistoryToFirestore(userId, item, stableDocId);
     const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
     setOptimisticItems(prev => prev.filter(o => o.id !== stableDocId));
     setHistory(h => [ni, ...h]); setSelHistId(ni.id); histInit.current = true; return ni;
-  }, [userId, prompt, mode, modelVer, modelName]);
+  }, [userId, prompt, mode, modelVer]);
 
   // Save a rigged model to history with mode="rig"
   const saveRigHist = useCallback(async (taskId, rawUrl, extra = {}) => {
     const dedupKey = rawUrl + "|" + taskId;
     if (_savedUrls.has(dedupKey)) return null;
     _savedUrls.add(dedupKey);
-    const srcPrompt = history.find(h => h.taskId === extra.originalModelTaskId)?.name || history.find(h => h.taskId === extra.originalModelTaskId)?.prompt || extra.prompt || "model";
-    const rigName = extra.aiName || (srcPrompt.split(/\s+/).slice(0, 2).join(" ") + "_rigged");
+    const srcItem = history.find(h => h.taskId === extra.originalModelTaskId);
+    const srcPrompt = srcItem?.name || srcItem?.prompt || extra.prompt || "model";
+    const srcShort = srcPrompt.trim().split(/\s+/).slice(0, 2).join(" ");
+    const rigName = extra.aiName || `Rig:${srcShort}`;
     // Explicitly build params — never let extra override mode/rigged/animated
     const params = { rigModelVer: extra.rigModelVer, rigType: extra.rigType, rigSpec: extra.rigSpec, originalModelTaskId: extra.originalModelTaskId, mode: "rig", rigged: true };
     const item = { prompt: extra.prompt || "auto-rig", name: rigName, status: "succeeded", model_url: rawUrl, source: "tripo", mode: "rig", taskId, params, ts: Date.now() };
@@ -849,17 +930,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       return;
     }
 
-    setGenStatus("pending"); setIsRunning(true); setErrorMsg(""); setProgress(0); setStatusMsg("");
-    prevUrl.current = modelUrl; setModelUrl(null); setGenStatus("pending");
-    if (pollAb.current) pollAb.current.cancelled = true;
-    const pt = { cancelled: false }; pollAb.current = pt;
-    const requestId = crypto.randomUUID(); currentRequestId.current = requestId;
-    userStoppedRef.current = false;
+    setGenStatus("pending"); setErrorMsg("");
     const srcId = activeTaskId;
     const animSlugs = [...selAnim].map(id => getAnimById(id)?.slug).filter(Boolean);
     const animSlug = animSlugs.length === 1 ? animSlugs[0] : null;
     try {
-      const headers = await authH();
       let body;
 
       /* ── texture_edit: upload mask from canvas before building body ── */
@@ -1021,7 +1096,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             ...(maskToken && { file: { type: "png", file_token: maskToken } }),
           };
           break;
-        case "refine": body = { type: "refine_model", original_model_task_id: (refineId.trim() || srcId) }; break;
+        case "refine": body = { type: "refine_model", draft_model_task_id: (refineId.trim() || srcId) }; break;
         case "stylize": body = { type: "stylize_model", original_model_task_id: (stylizeId.trim() || srcId), style: stylizeStyle }; break;
         case "animate": {
           const baseModelId = riggedId || activeH?.params?.originalModelTaskId || activeTaskId;
@@ -1043,143 +1118,200 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         default: return;
       }
 
-      setStatusMsg("Starting…");
-      const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify(body) });
-      const td = await tr.json();
-      if (!td.success) {
-        const msg = td.message ?? "Task failed";
-        const lower = msg.toLowerCase();
-        if (lower.includes("insufficient") || lower.includes("credit") || lower.includes("balance")) throw Object.assign(new Error("Insufficient credits. Please top up your balance."), { type: "credits" });
-        if (lower.includes("nsfw") || lower.includes("content policy") || lower.includes("moderat")) throw Object.assign(new Error("Content blocked: NSFW or policy violation detected."), { type: "nsfw" });
-        throw new Error(msg);
-      }
+      // Generate instanceId and label
+      const instanceId = crypto.randomUUID();
+      const genCount = [...activeTasksRef.current.values()].filter(t => t.mode === mode).length;
+      const label = `${mode.charAt(0).toUpperCase() + mode.slice(1)} #${genCount + 1}`;
 
-      currentTaskId.current = td.taskId;
-      const opTypeForMode = { generate: "generate", text: "generate", image: "generate", batch: "generate", multi: "generate", retopo: "retopo", texture: "texture", texture_edit: "texture", stylize: "stylize", refine: "refine", animate: "animate", segment: "segment", fill_parts: "fill" };
-      persistGen({ taskId: td.taskId, requestId, mode, prompt: prompt.trim(), modelVer, lastProgress: 0, lastProgressAt: Date.now(), startedAt: Date.now(), opType: opTypeForMode[mode] ?? "generate" });
-      setStatusMsg(mode === "animate" && selAnim.size > 1 ? `Generating ${selAnim.size} animations…` : "Generating…");
-      await pollTask(td.taskId, pt, headers, async d => {
-        if (pt.cancelled) return;
-        if (currentRequestId.current !== requestId) return;
-        const animatedModels = Array.isArray(d.rawOutput?.animated_models) ? d.rawOutput.animated_models : null;
-        if (mode === "animate") console.log("[TripoPanel] animate_retarget result:", { taskId: td.taskId, modelUrl: d.modelUrl, animated_models: animatedModels, animated_models_count: animatedModels?.length ?? 0, rawOutputKeys: Object.keys(d.rawOutput ?? {}) });
-        const rawUrl = d.modelUrl ?? (animatedModels ? animatedModels[0] : null);
-        if (!rawUrl) throw Object.assign(new Error("Generation blocked: content policy or empty output. Credits were not charged."), { type: "nsfw" }); const blob = await fetchProxy(rawUrl, td.taskId);
-        if (pt.cancelled) { revokeBlobUrl(blob); return; }
-        revokeBlobUrl(prevUrl.current);
-        setModelUrl(blob); prevUrl.current = blob;
-        setGenStatus("succeeded"); setProgress(100); setStatusMsg(""); setIsRunning(false);
-        
-        // Instant optimistic entry so the HistoryCard shows immediately with full data
-        const mockStableId = `tripo_${td.taskId}`;
-        const autoName = prompt.trim().split(/\s+/).slice(0, 3).join(" ") || mode;
-        const optimisticEntry = {
-          id: mockStableId, taskId: td.taskId, status: "succeeded",
-          model_url: rawUrl, source: "tripo", mode, ts: Date.now(),
-          prompt: prompt.trim() || mode,
-          name: modelName.trim() || autoName,
-          params: { model_version: modelVer, mode },
-          createdAt: { toDate: () => new Date() },
-        };
-        setOptimisticItems(prev => [optimisticEntry, ...prev.filter(o => o.id !== mockStableId)]);
-        setHistory(h => h.some(x => x.id === mockStableId) ? h : [optimisticEntry, ...h]);
-        syncSelHist(optimisticEntry);
+      // Optimistic map entry
+      activeTasksRef.current.set(instanceId, {
+        instanceId,
+        taskId: null,
+        mode,
+        opType: mode,
+        label,
+        status: "pending",
+        progress: 0,
+        errorMsg: null,
+        result: null,
+        startedAt: Date.now(),
+        snapshot: body,
+        originalTaskId: activeTaskId || null,
+        // animate_retarget metadata for onParallelTaskSuccess
+        animSlugs: mode === "animate" ? animSlugs : undefined,
+        riggedId: mode === "animate" ? (riggedId || activeTaskId || null) : undefined,
+      });
+      setFocusedInstanceId(instanceId);
+      addJob({ id: instanceId, panelType: "tripo", title: label, status: "queued", progress: 0, countdown: 5, createdAt: Date.now(), updatedAt: Date.now() });
+      forceUpdate();
 
-        if (mode === "animate") {
-          // Animated model is still rigged — keep rig state alive
-          setRiggedId(td.taskId); setShowRig(true);
-          if (!userStoppedRef.current) {
-            const urlsToSave = animatedModels ?? [rawUrl];
-            const total = urlsToSave.length;
-            const srcItem = history.find(h => h.taskId === (riggedId || srcId));
-            const baseNameForAnim = srcItem?.name || srcItem?.prompt?.trim().split(/\s+/).slice(0, 2).join(" ") || "model";
-            const basePromptForAnim = srcItem?.prompt?.trim() || prompt.trim() || baseNameForAnim;
-            const animLabelsForName = urlsToSave.map((_, i) => {
-              const sl = animSlugs[i] ?? animSlugs[0] ?? null;
-              return getAnimById([...selAnim][i])?.label ?? sl ?? "animation";
-            });
-            const aiAnimNames = await Promise.all(
-              animLabelsForName.map(lbl => generateAIName(basePromptForAnim, "animation", lbl))
-            );
-            let firstEntry = null;
-            for (let i = 0; i < total; i++) {
-              const url = urlsToSave[i];
-              if (!url) continue;
-              if (total > 1) setStatusMsg(`Animation ${i + 1}/${total} saving…`);
-              const singleSlug = animSlugs[i] ?? animSlugs[0] ?? null;
-              const singleLabel = animLabelsForName[i];
-              const animSuffix = (singleSlug || singleLabel || "anim").split(":").pop().toLowerCase();
-              const entry = await saveHist(td.taskId, url, {
-                prompt: singleLabel,
-                name: aiAnimNames[i] ?? `${baseNameForAnim}_${animSuffix}`,
-                animation: singleSlug,
-                animated: true,
-                animationName: singleLabel,
-                animations: total > 1 ? animSlugs : undefined,
-                animationIndex: i,
-                originalModelTaskId: riggedId || srcId || null,
-              });
-              if (entry) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${td.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
-              if (i === 0) firstEntry = entry;
-            }
-            setStatusMsg("");
-            markHistorySaved();
-            if (firstEntry) syncSelHist(firstEntry);
+      // 5s cancellable window before sending to Tripo
+      const CANCEL_WINDOW = 5;
+      let cancelled = false;
+      setPendingCountdown(CANCEL_WINDOW);
+      pendingTaskRef.current = { instanceId, cancelled: false };
+      registerCancelHandler(instanceId, () => { if (pendingTaskRef.current) pendingTaskRef.current.cancelled = true; });
+
+      await new Promise((resolve) => {
+        let remaining = CANCEL_WINDOW;
+        const tick = setInterval(() => {
+          remaining -= 1;
+          if (pendingTaskRef.current?.cancelled) {
+            clearInterval(tick);
+            cancelled = true;
+            setPendingCountdown(null);
+            pendingTaskRef.current = null;
+            resolve();
+            return;
           }
-        } else {
-          setRigStep("idle"); setRiggedId(null); setShowRig(false);
-          if (!userStoppedRef.current) { const aiName = await generateAIName(prompt.trim(), "model"); const _ni3 = await saveHist(td.taskId, rawUrl, { prompt: prompt.trim(), name: aiName ?? undefined }); markHistorySaved(); if (_ni3) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${td.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { })); }
-        }
-        currentTaskId.current = null; clearPersistedGen();
-        setModelName("");
-        refreshCredits?.();
-      }, { skipJumpCheck: mode === "animate" });
-    } catch (e) {
-      setIsRunning(false); setProgress(0); setStatusMsg(""); setRigStep("idle"); setRiggedId(null); setShowRig(false); currentTaskId.current = null; clearPersistedGen();
-      if (pt.cancelled) { setModelUrl(prevUrl.current); setGenStatus(prevUrl.current ? "succeeded" : "idle"); return; }
-      if (e.autoStop) { setModelUrl(prevUrl.current); setGenStatus(prevUrl.current ? "succeeded" : "idle"); setErrorMsg(e.message); return; }
-      if (!e.type && e.rawOutput) {
-        const reason = (e.rawOutput?.rawOutput?.error_msg ?? e.rawOutput?.rawOutput?.message ?? e.rawOutput?.rawOutput?.reason ?? "").toLowerCase();
-        if (reason.includes("nsfw") || reason.includes("content policy") || reason.includes("safety")) { e.type = "nsfw"; e.message = "Content blocked: NSFW or policy violation detected."; }
-        else if (reason.includes("insufficient") || reason.includes("credit")) { e.type = "credits"; e.message = "Insufficient credits. Please top up your balance."; }
-      }
-      const isHardError = e.type === "credits" || e.type === "nsfw";
-      setModelUrl(prevUrl.current);
-      setGenStatus(prevUrl.current ? "succeeded" : (isHardError ? "idle" : "failed"));
-      setErrorMsg(e.message ?? "Network error");
-      refreshCredits?.();
-    }
-  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, modelUrl, pollTask, fetchProxy, revokeBlobUrl, saveHist, activeTaskId, refreshCredits, userCredits, genCost, refineId, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, syncSelHist]);
+          if (remaining <= 0) {
+            clearInterval(tick);
+            setPendingCountdown(null);
+            updateJob(instanceId, { countdown: null });
+            pendingTaskRef.current = null;
+            resolve();
+          } else {
+            setPendingCountdown(remaining);
+            updateJob(instanceId, { countdown: remaining });
+          }
+        }, 1000);
+      });
+      unregisterCancelHandler(instanceId);
 
-  const handlePrerigcheck = useCallback(async () => {
-    if (!activeTaskId && !animId) return;
-    setErrorMsg("");
-    const srcId = animId.trim() || activeTaskId;
+      if (cancelled) {
+        // Remove the optimistic entry without submitting
+        activeTasksRef.current.delete(instanceId);
+        markJobError(instanceId, "Cancelled");
+        forceUpdate();
+        return;
+      }
+
+      try {
+        const headers = await authH();
+        const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify(body) });
+        const td = await tr.json();
+        if (!td.success) {
+          const msg = td.message ?? "Task failed";
+          const lower = msg.toLowerCase();
+          if (lower.includes("insufficient") || lower.includes("credit") || lower.includes("balance")) throw Object.assign(new Error("Nincs elég Tripo kredit. Tölts fel a fiókodba!"), { type: "credits" });
+          if (lower.includes("nsfw") || lower.includes("content policy") || lower.includes("moderat")) throw Object.assign(new Error("Tartalom blokkolva: NSFW vagy irányelvek megsértése."), { type: "nsfw" });
+          throw new Error(msg);
+        }
+
+        const current = activeTasksRef.current.get(instanceId);
+        if (current) {
+          activeTasksRef.current.set(instanceId, { ...current, taskId: td.taskId, status: "running" });
+          persistActiveTask({ ...activeTasksRef.current.get(instanceId) });
+          updateJob(instanceId, { status: "running", progress: 0 });
+        }
+        forceUpdate();
+      } catch (e) {
+        const current = activeTasksRef.current.get(instanceId);
+        if (current) {
+          activeTasksRef.current.set(instanceId, { ...current, status: "failed", errorMsg: e.message ?? "Network error" });
+        }
+        markJobError(instanceId, e.message ?? "Network error");
+        forceUpdate();
+        refreshCredits?.();
+        if (!e.type) toast.error(e.message ?? "Task létrehozása sikertelen.");
+        else if (e.type === "credits") toast.error("Nincs elég Tripo kredit. Tölts fel a fiókodba!");
+        else if (e.type === "nsfw") toast.error("Tartalom blokkolva: NSFW vagy irányelvek megsértése.");
+      }
+    } catch (e) {
+      // Body-building errors (mask upload, switch default already returns early)
+      console.warn("[handleGen] Unexpected error during body construction:", e.message);
+      setErrorMsg(e.message ?? "Generation setup failed");
+    }
+  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, syncSelHist, forceUpdate, persistActiveTask, addJob, updateJob, markJobError]);
+
+  const getCompatibility = useCallback(async (srcId) => {
+    // 1. In-memory cache
+    if (rigCompatRef.current[srcId] !== undefined) return rigCompatRef.current[srcId];
+
+    // 2. Firestore read
+    try {
+      const { getDoc, doc } = await import("firebase/firestore");
+      const { db } = await import("../../firebase/firebaseApp");
+      const snap = await getDoc(doc(db, "trellis_history", `tripo_${srcId}`));
+      if (snap.exists()) {
+        const val = snap.data()?.params?.isAnimatable;
+        if (val !== undefined && val !== null) {
+          rigCompatRef.current[srcId] = val;
+          return val;
+        }
+      }
+    } catch (_) {}
+
+    // 3. API call — costs 0 credits
     try {
       const headers = await authH();
-      const rr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify({ type: "animate_prerigcheck", original_model_task_id: srcId }) });
-      const rd = await rr.json(); if (!rd.success) throw new Error(rd.message);
+      const rr = await fetch(BASE_URL + "/api/tripo/task", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ type: "animate_prerigcheck", original_model_task_id: srcId }),
+      });
+      const rd = await rr.json();
+      if (!rd.success) throw new Error(rd.message);
+      let result = null;
       await pollTask(rd.taskId, { cancelled: false }, headers, d => {
-        setPrerigcheckResult({ riggable: true, rigType: d.detectedRigType || "biped" });
+        result = d.rigCheckResult ?? d.is_animatable ?? null;
         if (d.detectedRigType) setDetectedRigType(d.detectedRigType);
       }, { skipJumpCheck: true });
-    } catch (e) { setErrorMsg(e.message); }
-  }, [activeTaskId, animId, authH, pollTask]);
+
+      const boolResult = result === null ? null : Boolean(result);
+      rigCompatRef.current[srcId] = boolResult;
+
+      // Persist to Firestore
+      try {
+        const { doc, updateDoc, setDoc } = await import("firebase/firestore");
+        const { db } = await import("../../firebase/firebaseApp");
+        const ref = doc(db, "trellis_history", `tripo_${srcId}`);
+        try {
+          await updateDoc(ref, { "params.isAnimatable": boolResult });
+        } catch {
+          await setDoc(ref, { params: { isAnimatable: boolResult } }, { merge: true });
+        }
+      } catch (fsErr) {
+        console.warn("[getCompatibility] Firestore write failed:", fsErr.message);
+      }
+
+      return boolResult;
+    } catch {
+      return null;
+    }
+  }, [authH, pollTask]);
 
   const handleAutoRig = useCallback(async () => {
     if (!activeTaskId && !animId) return;
-    setErrorMsg(""); setRigStep("rigging");
+    setRigBtnLocked(true);
+    setTimeout(() => setRigBtnLocked(false), 2000);
+    setErrorMsg("");
+
+    // Phase 1: rig compatibility check (0 credits)
+    const srcId = animId.trim() || activeTaskId;
+    setRigCompat("checking");
+    const isAnimatable = await getCompatibility(srcId);
+    if (isAnimatable === false) {
+      setRigCompat(false);
+      return;
+    }
+    setRigCompat(isAnimatable === true ? true : null);
+
+    // Phase 2: actual rig (25 credits)
+    setRigStep("rigging");
     setDetectedRigModelVer(null); setDetectedRigType(null); setDetectedRigSpec(null);
     if (pollAb.current) pollAb.current.cancelled = true;
     const pt = { cancelled: false }; pollAb.current = pt;
     userStoppedRef.current = false;
-    const srcId = animId.trim() || activeTaskId;
+    const jobId = crypto.randomUUID();
+    addJob({ id: jobId, panelType: "tripo", title: "Auto Rig", status: "queued", progress: 0, createdAt: Date.now(), updatedAt: Date.now() });
     try {
       const headers = await authH();
       setStatusMsg("Rigging…");
       const rr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify({ type: "animate_rig", original_model_task_id: srcId, spec: rigSpec, out_format: animOutFormat, rig_type: rigType, bake_animation: animBakeAnimation, export_with_geometry: animExportGeometry, animate_in_place: animAnimateInPlace }) });
       const rd = await rr.json(); if (!rd.success) throw new Error(rd.message);
       currentTaskId.current = rd.taskId;
+      updateJob(jobId, { status: "running", progress: 0 });
       await pollTask(rd.taskId, pt, headers, async d => {
         if (pt.cancelled) return;
         const blob = d.modelUrl ? await fetchProxy(d.modelUrl, rd.taskId) : null;
@@ -1188,6 +1320,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         const actualRigType = d.rigType || rigType;
         setRiggedId(rd.taskId); setRigStep("rigged"); setShowRig(true); setStatusMsg(""); setGenStatus("succeeded");
         setDetectedRigModelVer(animModelVer); setDetectedRigType(actualRigType); setDetectedRigSpec(rigSpec);
+
+        if (d.modelUrl && blob) {
+          try {
+            const buf = await fetch(blob).then(r => r.arrayBuffer());
+            await getCachedThumbnail(buf, { width: 280, height: 280 }, d.modelUrl);
+          } catch { }
+        }
 
         const mockStableId = `tripo_${rd.taskId}`;
         const rigOptEntry = {
@@ -1203,29 +1342,164 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         syncSelHist(rigOptEntry);
 
         currentTaskId.current = null;
+        markJobDoneAndSeen(jobId, { title: "Auto Rig", progress: 100 });
         persistGen({ taskId: rd.taskId, requestId: rd.taskId, mode: "animate", prompt: "auto-rig", modelVer: "", lastProgress: 100, lastProgressAt: Date.now(), startedAt: Date.now(), riggedId: rd.taskId, opType: "rig", rigModelVer: animModelVer, rigType: actualRigType, rigSpec });
         const srcItemForRig = history.find(h => h.taskId === srcId); const rigBasePrompt = srcItemForRig?.prompt?.trim() || srcItemForRig?.name?.trim() || prompt.trim(); const aiRigName = await generateAIName(rigBasePrompt, "rig"); const _ni4 = await saveRigHist(rd.taskId, d.modelUrl, { prompt: "auto-rig", originalModelTaskId: srcId, aiName: aiRigName ?? undefined, rigModelVer: animModelVer, rigType: actualRigType, rigSpec }); markHistorySaved(); if (_ni4) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${rd.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
-      }, { skipJumpCheck: true });
-    } catch (e) { currentTaskId.current = null; if (pt.cancelled) return; setRigStep("idle"); setRiggedId(null); setShowRig(false); setErrorMsg(e.message); setStatusMsg(""); }
-  }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl, saveRigHist, rigSpec, animOutFormat, rigType, animModelVer, animBakeAnimation, animExportGeometry, animAnimateInPlace, syncSelHist]);
+      }, { skipJumpCheck: true, onProgress: dp => updateJob(jobId, { status: "running", progress: dp }) });
+    } catch (e) { currentTaskId.current = null; if (pt.cancelled) { markJobError(jobId, "Cancelled"); return; } setRigStep("idle"); setRiggedId(null); setShowRig(false); setErrorMsg(e.message); setStatusMsg(""); markJobError(jobId, e.message); }
+  }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl, saveRigHist, rigSpec, animOutFormat, rigType, animModelVer, animBakeAnimation, animExportGeometry, animAnimateInPlace, syncSelHist, addJob, updateJob, markJobDoneAndSeen, markJobError, getCompatibility]);
 
-  const handleStop = useCallback(async () => {
-    userStoppedRef.current = true;
-    if (pollAb.current) pollAb.current.cancelled = true;
-    setIsRunning(false); setProgress(0); setStatusMsg(""); clearPersistedGen();
-    setRigStep("idle");
-    const taskId = currentTaskId.current;
-    if (taskId) {
-      currentTaskId.current = null;
+  const handleStop = useCallback(async (instanceId) => {
+    const id = instanceId ?? focusedInstanceId;
+    const inst = id ? activeTasksRef.current.get(id) : null;
+    if (!inst) return;
+
+    activeTasksRef.current.set(id, {
+      ...inst,
+      _cancelled: true,
+      status: "failed",
+      errorMsg: "User stopped",
+    });
+    removeActiveTask(id);
+    markJobError(id, "User stopped");
+    forceUpdate();
+
+    if (inst.taskId) {
       try {
         const t = getIdToken ? await getIdToken() : "";
-        await fetch(BASE_URL + "/api/tripo/task/" + taskId + "/cancel", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + t } });
-      } catch (err) { console.warn("[handleStop] cancel request failed:", err.message); }
+        await fetch(`${BASE_URL}/api/tripo/task/${inst.taskId}/cancel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+        });
+      } catch (err) { console.warn("[handleStop] cancel failed:", err.message); }
     }
-    setModelUrl(prevUrl.current); setGenStatus(prevUrl.current ? "succeeded" : "idle"); setErrorMsg("");
-  }, [getIdToken]);
+  }, [focusedInstanceId, getIdToken, forceUpdate, markJobError]);
 
+  // ── Parallel task poller callbacks ──────────────────────────────────────
+  const onParallelTaskSuccess = useCallback(async (inst, d, blobUrl) => {
+    if (blobUrl) {
+      // Only update viewer if user hasn't manually selected a different history item
+      const thisOptimisticId = `tripo_${inst.taskId}`;
+      const currentSel = selHistIdRef.current;
+      const isThisTaskSelected = !currentSel || currentSel === thisOptimisticId;
+      if (isThisTaskSelected) {
+        revokeBlobUrl(prevUrl.current);
+        setModelUrl(blobUrl);
+        prevUrl.current = blobUrl;
+        setGenStatus("succeeded");
+      }
 
+      // Prime thumbnail cache so HistoryCard renders instantly (no blank placeholder)
+      if (d.modelUrl) {
+        try {
+          const buf = await fetch(blobUrl).then(r => r.arrayBuffer());
+          await getCachedThumbnail(buf, { width: 280, height: 280 }, d.modelUrl);
+        } catch { /* non-critical — HistoryCard will regenerate on miss */ }
+      }
+
+      // Free the blob if not showing it in the viewer
+      if (!isThisTaskSelected) revokeBlobUrl(blobUrl);
+    }
+    markJobDoneAndSeen(inst.instanceId, { title: inst.label, progress: 100 });
+    refreshCredits?.();
+
+    // Optimistic entry so Shared3DHistory shows card immediately (before Firestore round-trip)
+    if (d.modelUrl && inst.taskId) {
+      const stableDocId = `tripo_${inst.taskId}`;
+      setOptimisticItems(prev => [
+        {
+          id: stableDocId,
+          taskId: inst.taskId,
+          status: "succeeded",
+          model_url: d.modelUrl,
+          source: "tripo",
+          mode: inst.mode,
+          ts: Date.now(),
+          prompt: inst.snapshot?.prompt ?? "",
+          params: inst.mode === "animate" ? { animated: true, originalModelTaskId: inst.riggedId || inst.originalTaskId || null } : undefined,
+          createdAt: { toDate: () => new Date() },
+        },
+        ...prev.filter(o => o.id !== stableDocId),
+      ]);
+    }
+
+    try {
+      const isAnimate = inst.mode === "animate";
+      if (isAnimate) {
+        // animate_retarget — save each animated_model URL as a separate history entry
+        const animatedModels = Array.isArray(d.rawOutput?.animated_models) ? d.rawOutput.animated_models : null;
+        const urlsToSave = animatedModels ?? (d.modelUrl ? [d.modelUrl] : []);
+        const animSlugs = inst.animSlugs ?? [];
+        const srcItem = history.find(h => h.taskId === inst.riggedId) || history.find(h => h.taskId === inst.originalTaskId);
+        const baseName = (srcItem?.name || srcItem?.prompt || "model").trim().split(/\s+/).slice(0, 2).join(" ");
+        for (let i = 0; i < urlsToSave.length; i++) {
+          const url = urlsToSave[i];
+          if (!url) continue;
+          const slug = animSlugs[i] ?? animSlugs[0] ?? null;
+          const label = slug ?? "animation";
+          const animSuffix = (slug || label).split(":").pop().toLowerCase();
+          const animTypePart = animSuffix.charAt(0).toUpperCase() + animSuffix.slice(1);
+          const ni = await saveHist(inst.taskId, url, {
+            prompt: label,
+            name: `${animTypePart}/${baseName}`,
+            animation: slug,
+            animated: true,
+            animationName: label,
+            animations: animSlugs.length > 1 ? animSlugs : undefined,
+            animationIndex: animSlugs.length > 1 ? i : undefined,
+            originalModelTaskId: inst.riggedId || inst.originalTaskId || null,
+          });
+          if (ni) {
+            syncSelHist(ni);
+            try {
+              const tok = await getIdToken();
+              await fetch(`${BASE_URL}/api/tripo/task/${inst.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } });
+            } catch { /* non-critical */ }
+          }
+        }
+      } else {
+        const ni = await saveHist(inst.taskId, d.modelUrl, {
+          prompt: inst.snapshot?.prompt ?? "",
+          label: inst.label,
+          mode: inst.mode,
+          modelVer: inst.snapshot?.model_version ?? undefined,
+        });
+        if (ni) {
+          syncSelHist(ni);
+          try {
+            const tok = await getIdToken();
+            await fetch(`${BASE_URL}/api/tripo/task/${inst.taskId}/ack`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${tok}` },
+            });
+          } catch { /* non-critical */ }
+        }
+      }
+    } catch (e) {
+      console.error("[onParallelTaskSuccess] saveHist failed:", e?.message ?? e);
+    }
+  }, [saveHist, syncSelHist, getIdToken, refreshCredits, revokeBlobUrl, markJobDoneAndSeen, setOptimisticItems, history]);
+
+  const onParallelTaskFail = useCallback((inst, reason) => {
+    markJobError(inst.instanceId, reason);
+    toast.error(`${inst.label ?? inst.mode}: ${reason}`);
+    refreshCredits?.();
+  }, [refreshCredits, markJobError]);
+
+  // ── Parallel task poller ─────────────────────────────────────────────────
+  useActiveTasksPoller({
+    activeTasksRef,
+    forceUpdate,
+    getIdToken,
+    fetchProxy,
+    revokeBlobUrl,
+    refreshCredits,
+    onTaskSuccess: onParallelTaskSuccess,
+    onTaskFail: onParallelTaskFail,
+    onTaskProgress: useCallback((instanceId, prog) => {
+      updateJob(instanceId, { status: "running", progress: prog });
+    }, [updateJob]),
+  });
 
   const selHist = useCallback(async (item) => {
     if (histAbort.current) histAbort.current.cancelled = true;
@@ -1315,8 +1589,17 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setTexId(item.taskId); setAnimId(item.taskId); setEditId(item.taskId);
       setRefineId(item.taskId); setStylizeId(item.taskId);
     }
+    setActiveStyle(item?.styleId || "");
     setErrorMsg("");
   }, []);
+
+  // Reset rigCompat when srcId changes — restore from cache if present
+  useEffect(() => {
+    const srcId = animId.trim() || activeTaskId;
+    if (!srcId) { setRigCompat(null); return; }
+    const cached = rigCompatRef.current[srcId];
+    setRigCompat(cached !== undefined ? cached : null);
+  }, [animId, activeTaskId]);
 
   // Rig auto-detection callback — passed to TripoWorkspaceWrapper so it can access riggedIdRef
   const onRigDetected = useCallback((count) => {
@@ -1369,6 +1652,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     setRightOpen(v => !v);
   }, [rightOpen, isMobile, setLeftSecondaryOpen]);
 
+  const activeTasksRunningCount = useMemo(() =>
+    [...activeTasksRef.current.values()].filter(t => t.status === "running" || t.status === "pending").length,
+  [_taskTick]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <StudioLayout
       leftOpen={leftOpen}
@@ -1420,12 +1707,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               </h3>
             </div>
             <div className="flex-1 overflow-y-auto p-4 tp-scroll">
-              {mode === "generate" && <GeneratePanel genTab={genTab} setGenTab={setGenTab} modelVer={modelVer} setModelVer={setModelVer} prompt={prompt} setPrompt={setPrompt} negPrompt={negPrompt} setNegPrompt={setNegPrompt} makeBetter={makeBetter} setMakeBetter={setMakeBetter} imgPrev={imgPrev} setImgPrev={setImgPrev} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} imgToken={imgToken} setImgToken={setImgToken} setImgFile={setImgFile} meshQ={meshQ} setMeshQ={setMeshQ} inParts={inParts} setInParts={setInParts} privacy={privacy} setPrivacy={setPrivacy} texOn={texOn} setTexOn={setTexOn} tex4K={tex4K} setTex4K={setTex4K} pbrOn={pbrOn} setPbrOn={setPbrOn} polycount={polycount} setPolycount={setPolycount} quadMesh={quadMesh} setQuadMesh={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} tPose={tPose} setTPose={setTPose} modelSeed={modelSeed} setModelSeed={setModelSeed} textureSeed={textureSeed} setTextureSeed={setTextureSeed} imageSeed={imageSeed} setImageSeed={setImageSeed} autoSize={autoSize} setAutoSize={setAutoSize} exportUv={exportUv} setExportUv={setExportUv} multiImages={multiImages} setMultiImages={setMultiImages} batchImages={batchImages} setBatchImages={setBatchImages} handleMultiImg={handleMultiImg} handleBatchImg={handleBatchImg} getIdToken={getIdToken} backendCaps={backendCaps} color={color} isRunning={isRunning} handleGen={handleGen} setErrorMsg={setErrorMsg} activeStyles={activeStyle} onStyleToggle={handleStyleToggle} />}
+              {mode === "generate" && <GeneratePanel genTab={genTab} setGenTab={setGenTab} modelVer={modelVer} setModelVer={setModelVer} prompt={prompt} setPrompt={setPrompt} negPrompt={negPrompt} setNegPrompt={setNegPrompt} makeBetter={makeBetter} setMakeBetter={setMakeBetter} imgPrev={imgPrev} setImgPrev={setImgPrev} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} imgToken={imgToken} setImgToken={setImgToken} setImgFile={setImgFile} meshQ={meshQ} setMeshQ={setMeshQ} inParts={inParts} setInParts={setInParts} privacy={privacy} setPrivacy={setPrivacy} texOn={texOn} setTexOn={setTexOn} tex4K={tex4K} setTex4K={setTex4K} pbrOn={pbrOn} setPbrOn={setPbrOn} polycount={polycount} setPolycount={setPolycount} quadMesh={quadMesh} setQuadMesh={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} tPose={tPose} setTPose={setTPose} modelSeed={modelSeed} setModelSeed={setModelSeed} textureSeed={textureSeed} setTextureSeed={setTextureSeed} imageSeed={imageSeed} setImageSeed={setImageSeed} autoSize={autoSize} setAutoSize={setAutoSize} exportUv={exportUv} setExportUv={setExportUv} multiImages={multiImages} setMultiImages={setMultiImages} batchImages={batchImages} setBatchImages={setBatchImages} handleMultiImg={handleMultiImg} handleBatchImg={handleBatchImg} getIdToken={getIdToken} backendCaps={backendCaps} color={color} isRunning={isRunning} handleGen={handleGen} setErrorMsg={setErrorMsg} activeStyles={activeStyle} onStyleToggle={handleStyleToggle} aiSuggestedNeg={aiSuggestedNeg} setAiSuggestedNeg={setAiSuggestedNeg} />}
               {(mode === "segment" || mode === "fill_parts") && <Segment segSub={mode === "fill_parts" ? "fill_parts" : segSub} activeTaskId={activeTaskId} isRiggedInput={isRiggedInput} color={color} />}
               {mode === "retopo" && <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={color} />}
               {mode === "texture" && <Texture mode={mode} activeTaskId={activeTaskId} texInputTab={texInputTab} setTexInputTab={setTexInputTab} texPrompt={texPrompt} setTexPrompt={setTexPrompt} imgPrev={imgPrev} imgToken={imgToken} imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef} multiImages={multiImages} setMultiImages={setMultiImages} tex4K={tex4K} setTex4K={setTex4K} pbrOn={texPbr} setPbrOn={setTexPbr} texAlignment={texAlignment} setTexAlignment={setTexAlignment} color={color} />}
               {mode === "texture_edit" && <Texture mode={mode} activeTaskId={activeTaskId} brushMode={brushMode} setBrushMode={setBrushMode} brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt} creativity={creativity} setCreativity={setCreativity} brushColor={brushColor} setBrushColor={setBrushColor} brushSize={brushSize} setBrushSize={setBrushSize} brushOpacity={brushOpacity} setBrushOpacity={setBrushOpacity} brushHardness={brushHardness} setBrushHardness={setBrushHardness} canvasRef={canvasRef} color={color} onUndo={() => sceneRef.current?.undoPaint()} />}
-              {mode === "animate" && <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} handleAutoRig={handleAutoRig} rigType={rigType} setRigType={setRigType} rigSpec={rigSpec} setRigSpec={setRigSpec} detectedRigType={detectedRigType} detectedRigModelVer={detectedRigModelVer} detectedRigSpec={detectedRigSpec} prerigcheckResult={prerigcheckResult} handlePrerigcheck={handlePrerigcheck} animOutFormat={animOutFormat} setAnimOutFormat={setAnimOutFormat} animBakeAnimation={animBakeAnimation} setAnimBakeAnimation={setAnimBakeAnimation} animExportGeometry={animExportGeometry} setAnimExportGeometry={setAnimExportGeometry} animAnimateInPlace={animAnimateInPlace} setAnimAnimateInPlace={setAnimAnimateInPlace} color={color} />}
+              {mode === "animate" && <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} rigBtnLocked={rigBtnLocked} handleAutoRig={handleAutoRig} rigType={rigType} setRigType={setRigType} rigSpec={rigSpec} setRigSpec={setRigSpec} detectedRigType={detectedRigType} detectedRigModelVer={detectedRigModelVer} detectedRigSpec={detectedRigSpec} rigCompat={rigCompat} animOutFormat={animOutFormat} setAnimOutFormat={setAnimOutFormat} animBakeAnimation={animBakeAnimation} setAnimBakeAnimation={setAnimBakeAnimation} animExportGeometry={animExportGeometry} setAnimExportGeometry={setAnimExportGeometry} animAnimateInPlace={animAnimateInPlace} setAnimAnimateInPlace={setAnimAnimateInPlace} color={color} />}
               {mode === "refine" && (
                 <div>
                   {activeTaskId && (
@@ -1440,6 +1727,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   <p className="text-zinc-500 text-[11px] leading-relaxed mb-4 italic">
                     Enhance mesh quality, fix topology issues, and improve geometry detail. Uses Tripo refine_model (30 credits).
                   </p>
+                  <div className="p-2 px-3 rounded-lg bg-yellow-500/10 border border-yellow-500/25 mb-4">
+                    <p className="text-yellow-400 font-bold text-[10px] m-0 uppercase tracking-widest">Requirement</p>
+                    <p className="text-yellow-300/70 text-[10px] mt-1 leading-relaxed">Only works on models generated <span className="font-bold">without texture</span>. Turn off Texture in Generate before using Refine.</p>
+                  </div>
                   <input
                     className="tp-input"
                     placeholder="Or enter task ID manually..."
@@ -1482,47 +1773,152 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 </div>
               )}
             </div>
-            <div className="px-4 pt-4 pb-0 border-t border-white/5 bg-black/20">
-              <input
-                className="tp-input"
-                placeholder={prompt ? prompt.trim().split(/\s+/).slice(0, 2).join(" ") || "Model neve…" : "Model neve…"}
-                value={modelName}
-                onChange={e => setModelName(e.target.value)}
-                style={{ width: "100%", marginBottom: 10, fontSize: 11, height: 36, borderRadius: 10 }}
-              />
-            </div>
-            <div className="p-4 pt-2 border-white/0 bg-black/20">
-              {isRunning ? (
-                <div className="fade-up">
-                  <div className="flex flex-col items-center mb-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Loader2 className="w-4 h-4 text-primary anim-spin" />
-                      <span className="text-[11px] font-black text-primary uppercase tracking-[0.2em] italic">{progress}% Complete</span>
-                    </div>
-                    <PBar value={progress} />
+            {/* Action bar */}
+            <div style={{ padding: "6px 10px 10px", flexShrink: 0 }}>
+              <div style={{
+                position: "relative",
+                borderRadius: 12,
+                background: "#0d0b1a",
+                border: "1px solid rgba(139,92,246,0.18)",
+                overflow: "hidden",
+                borderLeft: "3px solid #8b5cf6",
+                boxShadow: "0 0 24px rgba(139,92,246,0.08), inset 0 1px 0 rgba(255,255,255,0.04)",
+              }}>
+                {/* purple corner glow */}
+                <div style={{ position: "absolute", top: 0, left: 0, width: 120, height: 60, background: "radial-gradient(ellipse at 0% 0%, rgba(139,92,246,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+                {/* Model name row */}
+                <div style={{ padding: "10px 12px 0", position: "relative", zIndex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 8, fontWeight: 700, color: "rgba(139,92,246,0.6)", textTransform: "uppercase", letterSpacing: "0.18em", fontFamily: "'JetBrains Mono', monospace" }}>ASSET NAME</span>
+                    <div style={{ flex: 1, height: 1, background: "rgba(139,92,246,0.12)" }} />
                   </div>
-                  <button className="w-full py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[11px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all" onClick={handleStop}>
-                    Terminálás
-                  </button>
+                  <input
+                    className="tp-input"
+                    placeholder={prompt ? prompt.trim().split(/\s+/).slice(0, 2).join(" ") || "Model neve…" : "Model neve…"}
+                    value={modelName}
+                    onChange={e => setModelName(e.target.value)}
+                    style={{ width: "100%", fontSize: 11, height: 32, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "#e8e0ff", letterSpacing: "0.04em" }}
+                  />
                 </div>
-              ) : (
-                <>
-                  <button className={"tp-gen-btn" + (canGen ? " go" : " no")} onClick={handleGen} disabled={!canGen} style={{ height: 58, borderRadius: 20 }}>
-                    {genLabel}
-                    {canGen && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 12, paddingLeft: 12, borderLeft: "1px solid rgba(255,255,255,0.2)" }}>
-                        <CoinIcon size={16} /><span style={{ fontSize: 16, fontWeight: 900 }}>{genCost}</span>
+
+                {/* Generate / Running area */}
+                <div style={{ padding: "8px 12px 10px", position: "relative", zIndex: 1 }}>
+                  {pendingCountdown !== null ? (
+                    <div className="fade-up">
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+                          <Loader2 style={{ width: 11, height: 11, color: "#8b5cf6", flexShrink: 0 }} className="anim-spin" />
+                          <span style={{ fontSize: 11, fontWeight: 900, color: "#e8e0ff", textTransform: "uppercase", letterSpacing: "0.14em", fontFamily: "'JetBrains Mono', monospace" }}>Feldolgozás</span>
+                        </div>
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, color: "#c084fc", textTransform: "uppercase", letterSpacing: "0.1em",
+                          background: "rgba(139,92,246,0.18)", border: "1px solid rgba(139,92,246,0.35)",
+                          borderRadius: 20, padding: "2px 8px", fontFamily: "'JetBrains Mono', monospace",
+                        }}>FELDOLGOZÁS</span>
                       </div>
-                    )}
-                  </button>
-                  {modelUrl && !isRunning && (
-                    <button onClick={() => { setDlItem(null); setDlOpen(true); }}
-                      className="w-full mt-3 py-3 rounded-xl bg-white/5 border border-white/5 text-zinc-500 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:text-white hover:border-white/10 transition-all">
-                      <Download className="w-4 h-4" /> Export Engine
-                    </button>
+                      <button
+                        style={{
+                          width: "100%", padding: "7px 0", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                          background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
+                          color: "#f87171", fontSize: 9, fontWeight: 700, letterSpacing: "0.16em",
+                          textTransform: "uppercase", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace",
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.15)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.4)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; }}
+                        onClick={() => { if (pendingTaskRef.current) pendingTaskRef.current.cancelled = true; }}
+                      >
+                        <span style={{ fontSize: 12, lineHeight: 1 }}>✕</span>
+                        <span>MÉGSE ({pendingCountdown}s)</span>
+                      </button>
+                    </div>
+                  ) : isRunning ? (
+                    <div className="fade-up">
+                      {/* Running header row */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+                          <Loader2 style={{ width: 11, height: 11, color: "#8b5cf6", flexShrink: 0 }} className="anim-spin" />
+                          <span style={{ fontSize: 11, fontWeight: 900, color: "#e8e0ff", textTransform: "uppercase", letterSpacing: "0.14em", fontFamily: "'JetBrains Mono', monospace" }}>{genLabel}</span>
+                        </div>
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, color: "#c084fc", textTransform: "uppercase", letterSpacing: "0.1em",
+                          background: "rgba(139,92,246,0.18)", border: "1px solid rgba(139,92,246,0.35)",
+                          borderRadius: 20, padding: "2px 8px", fontFamily: "'JetBrains Mono', monospace",
+                        }}>FELDOLGOZÁS</span>
+                      </div>
+                      {/* Progress bar */}
+                      <div style={{ position: "relative", height: 3, borderRadius: 3, background: "rgba(255,255,255,0.07)", overflow: "hidden", marginBottom: 6 }}>
+                        <div style={{
+                          position: "absolute", left: 0, top: 0, height: "100%",
+                          width: `${progress}%`,
+                          background: "linear-gradient(90deg, #a855f7, #ec4899)",
+                          borderRadius: 3,
+                          boxShadow: "0 0 8px rgba(236,72,153,0.6)",
+                          transition: "width 0.4s ease",
+                        }} />
+                      </div>
+                      {/* Sub row */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                        <span style={{ fontSize: 8, fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.14em", fontFamily: "'JetBrains Mono', monospace" }}>TRIPO</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: "#a855f7", fontFamily: "'JetBrains Mono', monospace" }}>{progress}%</span>
+                      </div>
+                      <button
+                        style={{
+                          width: "100%", padding: "7px 0", borderRadius: 8,
+                          background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
+                          color: "#f87171", fontSize: 9, fontWeight: 700, letterSpacing: "0.16em",
+                          textTransform: "uppercase", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace",
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.15)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.4)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; }}
+                        onClick={() => handleStop()}
+                      >
+                        TERMINÁLÁS
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        className={"tp-gen-btn" + (canGen ? " go" : " no")}
+                        onClick={handleGen}
+                        disabled={!canGen}
+                        style={{ height: 48, borderRadius: 10, width: "100%", fontSize: 12, letterSpacing: "0.12em" }}
+                        title={
+                          activeTasksRunningCount >= PARALLEL_LIMIT
+                            ? `Maximum párhuzamos taskok elérve (${PARALLEL_LIMIT}/${PARALLEL_LIMIT})`
+                            : undefined
+                        }
+                      >
+                        {genLabel}
+                        {canGen && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 10, paddingLeft: 10, borderLeft: "1px solid rgba(255,255,255,0.18)" }}>
+                            <CoinIcon size={13} /><span style={{ fontSize: 13, fontWeight: 900 }}>{genCost}</span>
+                          </div>
+                        )}
+                      </button>
+                      {modelUrl && !isRunning && (
+                        <button
+                          onClick={() => { setDlItem(null); setDlOpen(true); }}
+                          style={{
+                            width: "100%", marginTop: 6, padding: "7px 0", borderRadius: 8,
+                            background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                            color: "rgba(255,255,255,0.35)", fontSize: 9, fontWeight: 700,
+                            letterSpacing: "0.16em", textTransform: "uppercase", cursor: "pointer",
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                            fontFamily: "'JetBrains Mono', monospace", transition: "all 0.15s",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = "#e8e0ff"; e.currentTarget.style.borderColor = "rgba(139,92,246,0.3)"; e.currentTarget.style.background = "rgba(139,92,246,0.08)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = "rgba(255,255,255,0.35)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+                        >
+                          <Download style={{ width: 10, height: 10 }} /> EXPORT ENGINE
+                        </button>
+                      )}
+                    </>
                   )}
-                </>
-              )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1582,13 +1978,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         showRig={showRig}
         setShowRig={setShowRig}
         riggedId={riggedId}
-        rigStep={rigStep}
         autoSpin={autoSpin}
         setAutoSpin={setAutoSpin}
         loadingId={loadingId}
         isRunning={isRunning}
-        statusMsg={statusMsg}
-        progress={progress}
         camP={camP}
         sceneRef={sceneRef}
         dlItem={dlItem}
@@ -1623,9 +2016,9 @@ function TripoWorkspaceWrapper({
   showGrid, setShowGrid, modelUrl, bgColor, setBgColor,
   lStr, setLStr, lRot, setLRot, lAutoR, setLAutoR, lAutoS, setLAutoS,
   dramC, setDramC, gc1, setGc1, gc2, setGc2, wireOv, setWireOv,
-  wireOp, setWireOp, wireC, setWireC, showRig, setShowRig, riggedId, rigStep,
+  wireOp, setWireOp, wireC, setWireC, showRig, setShowRig, riggedId,
   autoSpin, setAutoSpin,
-  loadingId, isRunning, statusMsg, progress, camP, sceneRef,
+  loadingId, isRunning, camP, sceneRef,
   dlItem, setDlItem, setDlOpen, dlOpen, handleDlClose, activeH,
   onRigDetected,
   onAnimClipsDetected,
@@ -1721,55 +2114,6 @@ function TripoWorkspaceWrapper({
           )}
         </AnimatePresence>
 
-        <AnimatePresence>
-          {rigStep === "rigging" && (
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/70 backdrop-blur-3xl"
-            >
-              <div className="w-20 h-20 rounded-[1.5rem] bg-emerald/10 border-2 border-emerald/20 flex items-center justify-center mb-6 shadow-emerald-heavy animate-pulse">
-                <PersonStanding className="w-9 h-9 text-emerald shadow-emerald-glow" />
-              </div>
-              <h2 className="text-2xl font-black text-white uppercase tracking-[0.2em] italic mb-2">Auto Rigging</h2>
-              {statusMsg && <p className="text-emerald text-[10px] font-black uppercase tracking-[0.4em] mb-6 opacity-60 leading-relaxed text-center max-w-xs">{statusMsg}</p>}
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 text-emerald anim-spin" />
-                <p className="text-zinc-400 text-[11px] font-bold tracking-wider">Applying skeleton bones…</p>
-              </div>
-              {progress > 0 && (
-                <div style={{ width: 200, marginTop: 16 }}>
-                  <PBar value={progress} />
-                  <p className="text-[11px] font-mono text-white mt-2 text-center tracking-widest">{progress}%</p>
-                </div>
-              )}
-              <button
-                className="mt-6 px-8 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[11px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all"
-                onClick={handleStop}
-              >
-                Terminálás
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {isRunning && (
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/70 backdrop-blur-3xl pointer-events-none"
-            >
-              <div className="w-24 h-24 rounded-[2rem] bg-primary/10 border-2 border-primary/20 flex items-center justify-center mb-8 shadow-primary-heavy animate-pulse">
-                <Sparkles className="w-10 h-10 text-primary shadow-primary-glow" />
-              </div>
-              <h2 className="text-3xl font-black text-white uppercase tracking-[0.2em] italic mb-2">Nexus Forge Alpha</h2>
-              {statusMsg && <p className="text-primary text-[10px] font-black uppercase tracking-[0.4em] mb-6 opacity-60 leading-relaxed text-center max-w-xs">{statusMsg}</p>}
-              <div className="w-64">
-                <PBar value={progress} />
-                <p className="text-[14px] font-mono text-white mt-4 text-center tracking-widest">{progress}%</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {!isRunning && !modelUrl && !loadingId && (
           <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none opacity-20">
