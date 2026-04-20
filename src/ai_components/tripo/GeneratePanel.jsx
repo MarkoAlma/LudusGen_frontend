@@ -541,78 +541,74 @@ export default function GeneratePanel({
   const isModernModel = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
 
   /* ─── Enhancer prompts ────────────────────────────────────────────── */
-  const TRIPO_ENHANCE_PROMPT = `You are a world-class 3D concept artist and Tripo3D prompt engineer. Transform the user's raw idea into a vivid, production-ready 3D asset description that a mesh generator will interpret as a stunning model.
+  const TRIPO_ENHANCE_PROMPT = `You are a Tripo3D prompt engineer. Improve the user's prompt for 3D mesh generation.
+
+OUTPUT: Raw JSON ONLY — no markdown, no prose: {"prompt": "...", "negative_prompt": "..."}
+
+STEP 1 — IDENTIFY SUBJECT TYPE (internal reasoning, not in output):
+- humanoid: human, character, warrior, mage, anime girl, robot with human body shape
+- creature: dragon, dog, horse, wolf, bird, fish, monster, alien beast
+- vehicle: car, tank, spaceship, motorcycle, helicopter, boat
+- prop_weapon: sword, axe, gun, shield, potion, gem, book, chair, crate, food, any inanimate object
+- environment: castle, dungeon, forest scene, room, landscape
+
+STEP 2 — APPLY POSE RULE for identified type:
+- humanoid → T-pose, arms slightly away from body, symmetrical stance, both feet flat on ground
+- creature → natural standing pose, weight distributed, all limbs grounded
+- vehicle → complete model, all parts present and intact
+- prop_weapon → complete model, all parts present and intact
+- environment → complete scene, all elements present
+
+STEP 3 — ADD MINIMAL QUALITY TOKENS (positive only, type-appropriate):
+- humanoid → clean topology, symmetrical
+- creature → natural anatomy, complete body
+- vehicle → complete model, intact panels
+- prop_weapon → complete object, all components present
+- environment → complete scene
+
+RULES:
+- Preserve the user's exact intent, clothing, outfit, and design choices.
+- Comma-separated keywords. No sentences.
+- Positive prompt: specific design negations are OK (e.g. "without hat") — NO quality boilerplate like "no artifacts", "non-waxy", "no missing parts".
+- MAX 850 characters for prompt field.
+- OMIT: lighting, background, camera, render engine names, "photorealistic", "4K", "CGI"
+
+NEGATIVE PROMPT — type-specific mesh artifacts only, MAX 250 characters:
+- humanoid → merged fingers, fused limbs, floating body parts, asymmetrical anatomy, truncated torso, missing feet
+- creature → extra limbs, fused legs, missing tail, floating paws, asymmetrical body
+- vehicle → warped panels, missing wheels, floating parts, incomplete frame
+- prop_weapon → broken blade, missing handle, floating pieces, incomplete geometry
+- environment → floating objects, incomplete structures, missing ground plane`;
+
+  const TRIPO_SUPER_ENHANCE_PROMPT = `You are an elite 3D character technical artist and Tripo3D prompt engineer. Expand the user's prompt with rich construction-level detail — but NEVER change or override the user's clothing, outfit, or appearance choices.
 
 OUTPUT: Raw JSON ONLY: {"prompt": "...", "negative_prompt": "..."}
 
-CREATIVE PHILOSOPHY:
-- Think like a concept artist at a AAA studio. The user gives you a seed — you grow it into a fully realized design.
-- INFER what the user is imagining but didn't say: if they say "warrior", you decide the era, armor style, weapon wear, battle damage, cultural influence.
-- Every keyword should paint a picture of FORM and SURFACE — what would a sculptor see?
+CORE RULE — USER INTENT IS SACRED:
+- If the user specifies clothing (bikini, armor, robe, swimsuit, etc.), keep it EXACTLY. Add material/texture detail to what they specified — do NOT replace or upgrade it.
+- If the user leaves clothing unspecified, you may infer a fitting outfit.
+- Minimal clothing is acceptable — do not cover up what the user explicitly chose.
 
-PROMPT STRUCTURE (in this order):
-1. CHARACTER NAME (verbatim if given) + GENDER ("male"/"female"/"neutral") as separate early tokens
-2. ARCHETYPE/ROLE: what this character IS (e.g., "battle-hardened samurai", "cyberpunk street medic")
-3. BODY: Use direct tags — chest, stomach, waist, hips, butt, shoulders, arms, legs, thighs. Shape words like "big chest", "wide hips", "round butt", "muscular arms", "thick thighs" are ENCOURAGED when fitting.
-4. FACE/HEAD: facial structure, expression, hair (style + texture + length), ears, jaw shape
-5. OUTFIT: each garment piece separately with material + condition (pristine/weathered/battle-worn/patched)
-6. DESIGN LANGUAGE: hard-surface vs organic, panel lines vs flowing curves, geometric vs asymmetric, chunky vs sleek
-7. MATERIAL STORY: surfaces tell history — scratched metal means combat, worn leather means journey, clean fabric means status
-8. COLOR PALETTE: 2-3 dominant colors by name (obsidian black, burnt sienna, arctic white) — no hex/RGB
-
-HARD RULES:
-- ONE model only. Never pairs/duos.
-- Comma-separated keywords — no sentences, no conjunctions. MAX 850 chars.
-- ALWAYS end with: "full body head to toe, complete figure, full legs and feet visible, neutral A-pose, standing on ground plane, natural skin texture, matte finish, non-waxy"
-- OMIT: lighting, background, camera, render engine names, "photorealistic", "highly detailed", "4K", "CGI"
-
-NSFW FILTER (Tripo rejects explicit content):
-- SAFE: big chest, round butt, wide hips, curvy, muscular, slim, thick thighs, toned stomach — these are geometry.
-- BLOCK: nudity, genitalia, sexual poses, "naked/nude/topless/exposed/see-through", fetish terms. Replace with minimal clothing (tank top, bodysuit, shorts).
-- Pure NSFW requests → output a neutral character in default outfit.
-
-NEGATIVE PROMPT (MAX 250 chars):
-floating objects, disconnected parts, extra limbs, missing limbs, cut-off torso, background scenery, fused fingers, duplicate model, two figures, melted features, wax skin, plastic doll, NSFW, nudity`;
-
-  const TRIPO_SUPER_ENHANCE_PROMPT = `You are an elite 3D character technical artist and Tripo3D prompt engineer. Transform the user's idea into the most detailed, production-quality 3D asset description possible — adding construction-level detail a concept artist would specify in a final character sheet.
-
-OUTPUT: Raw JSON ONLY: {"prompt": "...", "negative_prompt": "..."}
-
-CREATIVE PHILOSOPHY:
-- You are the final step before a model goes into production. Every surface, seam, and silhouette choice must be intentional.
-- INFER the full design from minimal input — if user says "knight", you decide: plate armor era (Gothic/Maximilian/fantasy), damage history, heraldry hints, under-armor layering, gauntlet articulation style.
-- Think in LAYERS: skin → undergarments → base clothing → armor/accessories → weathering/storytelling
-
-PROMPT STRUCTURE (in this order):
-1. CHARACTER NAME (verbatim) + GENDER ("male"/"female"/"neutral")
-2. ARCHETYPE with a twist — don't be generic ("frost-scarred Viking shieldmaiden" not just "Viking woman")
-3. BODY: chest, stomach, waist, hips, butt, shoulders, arms, legs, thighs — with shape (big chest, wide hips, round butt, muscular arms are ENCOURAGED)
-4. FACE: bone structure, expression micro-detail, skin condition (scars, freckles, laugh lines), hair physics
-5. OUTFIT (layer by layer, inside out): fabric weight, drape behavior, tension points, seam routing, closure type (buckles/laces/clasps)
-6. HARD-SURFACE: panel flow direction, edge bevels, rivet patterns, hinge mechanisms, surface finish (anodized/brushed/hammered)
-7. ORGANIC SURFACES: pore density variation (coarse on arms, fine on cheeks), vein topology on hands, knuckle wrinkle depth, nail shape
-8. MATERIAL NARRATIVE: each surface tells a micro-story — polished brass = ceremonial, scratched steel = combat veteran, frayed cloth = long journey
-9. COLOR PALETTE: 2-4 named colors with material context (ash-grey weathered steel, deep burgundy dyed leather)
-
-CONSTRUCTION DETAILS TO ADD:
-- Fabric: weave pattern, thread direction, seam reinforcement, button/rivet material, wear-fade zones, hem finishing
-- Leather: tanning type (vegetable/chrome), grain direction, tooling patterns, dye penetration depth, flex cracking at joints
-- Metal: forging marks, heat treatment color bands, weld bead visibility, patina distribution, reflection sharpness
-- Hair: strand diameter variation, root lift, flyaway density, part line definition, texture gradient wet-to-dry
-- Skin: sub-surface scatter zones (ears, fingertips, nose), callus mapping (palms, heels), micro-expression wrinkle map
+WHAT YOU ADD (on top of user's base):
+1. CHARACTER NAME (verbatim) + GENDER
+2. BODY anchor tokens — use NEUTRAL anatomical terms only: chest, waist, hips, legs, thighs, feet. DO NOT add shape/size descriptors (no "big chest", no "wide hips", no "thick thighs"). These anchors exist solely to prevent mesh truncation.
+3. FACE detail: bone structure, expression, skin condition (scars, freckles), hair detail (strand texture, length, style)
+4. MATERIAL DEPTH for what the user already specified: fabric weave, leather grain, metal finish, weathering — add to their outfit, not replace it
+5. COLOR PALETTE: 2-4 named colors with material context
 
 HARD RULES:
 - ONE model only. Comma-separated keywords. MAX 850 chars.
-- ALWAYS end with: "full body head to toe, complete figure, full legs and feet visible, neutral A-pose, standing on ground plane, natural skin texture, matte finish, non-waxy"
+- NEVER use floor-length, full-length, ankle-length, or ground-length garments. Use thigh-length, knee-length, or hip-length — anything longer hides the legs.
+- ALWAYS end with: "full body head to toe, T-pose, standing upright, both feet flat on ground, legs straight, arms horizontal, full legs and thighs visible, natural skin texture, matte finish, non-waxy"
 - OMIT: lighting, background, camera, render engines, filler adjectives
 
-NSFW FILTER (Tripo rejects explicit content):
-- SAFE: big chest, round butt, wide hips, curvy, muscular, slim, thick thighs — geometry descriptors.
-- BLOCK: nudity, genitalia, sexual poses, "naked/nude/topless/exposed/see-through", fetish terms. Replace with minimal clothing.
-- Pure NSFW → neutral character in default clothing.
+NSFW FILTER:
+- Keep user's clothing choices exactly (bikini, swimsuit, crop top, bare midriff, shorts — all fine).
+- DO NOT add sexualizing body descriptors that weren't in the original prompt.
+- BLOCK only: genitalia, sexual acts, fetish terms, sexually explicit character names. Replace only those specific terms with safe equivalents.
 
 NEGATIVE PROMPT (MAX 250 chars):
-floating objects, disconnected parts, extra limbs, missing limbs, cut-off torso, background scenery, fused fingers, duplicate model, two figures, melted features, wax skin, plastic doll, NSFW, nudity`;
+cut-off body, cropped figure, half body, floating torso, torso only, bust only, missing legs, missing feet, no lower body, waist cut, disconnected parts, extra limbs, missing limbs, fused fingers, duplicate model, two figures, melted features, wax skin, plastic doll, crouching, kneeling, sitting, floating, dynamic pose, action pose, NSFW, nudity`;
 
   const TRIPO_SIMPLIFY_PROMPT = `You are a 3D model prompt engineer.
 The user gives you a long or complex prompt. Simplify it to a clear, concise English description under 200 characters, keeping the essential object and style.
