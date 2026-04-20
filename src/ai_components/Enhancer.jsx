@@ -240,7 +240,10 @@ function Enhancer({
       }
 
       const systemPrompt = superMode && super_enhancing_prompt ? super_enhancing_prompt : enhancing_prompt;
+      console.log('[Enchanter] system prompt:', systemPrompt);
+      console.log('[Enchanter] user content:', userContent);
       const raw = await callChat(systemPrompt, userContent, 0.4, 0.9, 2048);
+      console.log('[Enchanter] raw response:', raw);
       const ok = applyResult(raw);
       if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
       else if (streamError?.startsWith('⚠️')) setStreamError(null);
