@@ -63,3 +63,47 @@ export function markHistorySaved() {
     localStorage.setItem(LS_KEY, JSON.stringify({ ...JSON.parse(raw), savedToHistory: true }));
   } catch {}
 }
+
+/* ─── parallel task persistence (tripo_active_tasks array) ────────── */
+const LS_TASKS_KEY = "tripo_active_tasks";
+const TASK_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+export function persistActiveTask(instance) {
+  try {
+    const raw = localStorage.getItem(LS_TASKS_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    const idx = list.findIndex(e => e.instanceId === instance.instanceId);
+    const entry = {
+      instanceId: instance.instanceId,
+      taskId: instance.taskId,
+      mode: instance.mode,
+      originalTaskId: instance.originalTaskId,
+      label: instance.label,
+      progress: instance.progress,
+      startedAt: instance.startedAt,
+      opType: instance.mode,
+      savedAt: Date.now(),
+    };
+    if (idx >= 0) list[idx] = entry;
+    else list.push(entry);
+    localStorage.setItem(LS_TASKS_KEY, JSON.stringify(list));
+  } catch { /* quota / private browsing */ }
+}
+
+export function removeActiveTask(instanceId) {
+  try {
+    const raw = localStorage.getItem(LS_TASKS_KEY);
+    if (!raw) return;
+    const list = JSON.parse(raw).filter(e => e.instanceId !== instanceId);
+    localStorage.setItem(LS_TASKS_KEY, JSON.stringify(list));
+  } catch {}
+}
+
+export function loadPersistedActiveTasks() {
+  try {
+    const raw = localStorage.getItem(LS_TASKS_KEY);
+    if (!raw) return [];
+    const now = Date.now();
+    return JSON.parse(raw).filter(e => now - (e.savedAt ?? 0) < TASK_TTL_MS);
+  } catch { return []; }
+}
