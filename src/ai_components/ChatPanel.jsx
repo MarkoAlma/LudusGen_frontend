@@ -150,7 +150,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
           <div className="px-3 sm:px-6 lg:px-12 pb-6 pt-2 relative z-20 flex flex-col items-center">
             <SummaryIndicator isVisible={isSummarizing} />
             <div className="w-full max-w-3xl flex flex-col items-center">
-              
+
               {/* Floating Toolbar (Model Bar & Config) - On Top */}
               <div className="w-full mb-2 lg:mb-3 px-1">
                 <ModelBar
@@ -167,6 +167,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
                   initialDropdownOpen={initialDropdownOpen}
                 />
               </div>
+
 
               {/* Standalone Premium Chat Input */}
               <div className="w-full">
