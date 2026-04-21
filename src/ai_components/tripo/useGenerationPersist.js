@@ -49,11 +49,11 @@ export function updatePersistedProgress(progress) {
       lastProgress: progress,
       lastProgressAt: Date.now(),
     }));
-  } catch {}
+  } catch { }
 }
 
 export function clearPersistedGen() {
-  try { localStorage.removeItem(LS_KEY); } catch {}
+  try { localStorage.removeItem(LS_KEY); } catch { }
 }
 
 export function markHistorySaved() {
@@ -61,7 +61,7 @@ export function markHistorySaved() {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return;
     localStorage.setItem(LS_KEY, JSON.stringify({ ...JSON.parse(raw), savedToHistory: true }));
-  } catch {}
+  } catch { }
 }
 
 /* ─── parallel task persistence (tripo_active_tasks array) ────────── */
@@ -76,12 +76,14 @@ export function persistActiveTask(instance) {
     const entry = {
       instanceId: instance.instanceId,
       taskId: instance.taskId,
+      status: instance.status ?? "running",
       mode: instance.mode,
       originalTaskId: instance.originalTaskId,
       label: instance.label,
       progress: instance.progress,
       startedAt: instance.startedAt,
       opType: instance.mode,
+      snapshot: instance.snapshot ?? null,
       savedAt: Date.now(),
     };
     if (idx >= 0) list[idx] = entry;
@@ -96,7 +98,11 @@ export function removeActiveTask(instanceId) {
     if (!raw) return;
     const list = JSON.parse(raw).filter(e => e.instanceId !== instanceId);
     localStorage.setItem(LS_TASKS_KEY, JSON.stringify(list));
-  } catch {}
+  } catch { }
+}
+
+export function clearAllPersistedActiveTasks() {
+  try { localStorage.removeItem(LS_TASKS_KEY); } catch (_) {}
 }
 
 export function loadPersistedActiveTasks() {

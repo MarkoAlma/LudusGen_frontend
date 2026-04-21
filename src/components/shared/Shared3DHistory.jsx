@@ -6,71 +6,23 @@ import {
 } from 'lucide-react';
 import { collection, query, where, orderBy, getDocs, limit, startAfter, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseApp';
-import HistoryCard from '../../ai_components/trellis/HistoryCard';
+import HistoryCard from '../../ai_components/shared/HistoryCard';
 import { getItemTs } from '../../ai_components/trellis/utils';
 import { Tooltip } from '../../ai_components/meshy/ui/Primitives';
 import toast from 'react-hot-toast';
+import './Shared3DHistory.css';
 
 const PAGE_SIZE = 15;
 const HISTORY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-/* ─── CSS injected once ─────────────────────────────────────────────────── */
-const INJECTED_ID = "__archive-panel-styles__";
-if (!document.getElementById(INJECTED_ID)) {
-  const s = document.createElement("style");
-  s.id = INJECTED_ID;
-  s.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
-
-    .arch-scroll::-webkit-scrollbar { width: 3px; }
-    .arch-scroll::-webkit-scrollbar-track { background: transparent; }
-    .arch-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-
-    @keyframes arch-shimmer {
-      0% { background-position: -200% 0; }
-      100% { background-position: 200% 0; }
-    }
-    @keyframes arch-pulse-dot {
-      0%, 100% { opacity: 0.15; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(1.8); }
-    }
-    @keyframes arch-scan {
-      0% { transform: translateY(-100%); opacity: 0; }
-      10% { opacity: 1; }
-      90% { opacity: 1; }
-      100% { transform: translateY(800%); opacity: 0; }
-    }
-    @keyframes arch-border-spin {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-    .arch-tab-active::after {
-      content: '';
-      position: absolute;
-      bottom: -1px;
-      left: 20%;
-      right: 20%;
-      height: 1.5px;
-      border-radius: 2px;
-      background: var(--arch-tab-color, #a78bfa);
-      box-shadow: 0 0 6px var(--arch-tab-color, #a78bfa);
-    }
-    .arch-chip-active {
-      background: linear-gradient(90deg, var(--chip-from), var(--chip-to)) !important;
-    }
-  `;
-  document.head.appendChild(s);
-}
-
 /* ─── Type color map ────────────────────────────────────────────────────── */
 const TYPE_COLORS = {
-  model:     { rail: "#64748b", glow: "#475569" },
-  rigged:    { rail: "#f472b6", glow: "#db2777" },
+  model: { rail: "#64748b", glow: "#475569" },
+  rigged: { rail: "#f472b6", glow: "#db2777" },
   animation: { rail: "#22d3ee", glow: "#0891b2" },
-  trellis:   { rail: "#34d399", glow: "#059669" },
-  upload:    { rail: "#94a3b8", glow: "#475569" },
+  trellis: { rail: "#34d399", glow: "#059669" },
+  upload: { rail: "#94a3b8", glow: "#475569" },
 };
 
 /* ─── Section header — editorial divider style ──────────────────────────── */
@@ -157,38 +109,31 @@ function EmptyState({ accent, message }) {
 }
 
 const TABS = [
-  { id: 'tripo',   label: 'Tripo3D',    color: "#64748b" },
-  { id: 'trellis', label: 'Trellis',    color: "#34d399" },
-  { id: 'upload',  label: 'Uploads',    color: "#94a3b8" },
+  { id: 'tripo', label: 'Tripo3D', color: "#64748b" },
+  { id: 'trellis', label: 'Trellis', color: "#34d399" },
+  { id: 'upload', label: 'Uploads', color: "#94a3b8" },
 ];
 
 const SUBTABS = [
-  { id: 'all',        label: 'All',     icon: LayoutGrid, from: "#64748b", to: "#475569" },
-  { id: 'models',     label: 'Models',  icon: Box,        from: "#64748b", to: "#334155" },
-  { id: 'rigged',     label: 'Rig',     icon: PersonStanding, from: "#f472b6", to: "#db2777" },
-  { id: 'animations', label: 'Anim',    icon: Wand2,      from: "#22d3ee", to: "#0891b2" },
+  { id: 'all', label: 'All', icon: LayoutGrid, from: "#64748b", to: "#475569" },
+  { id: 'models', label: 'Models', icon: Box, from: "#64748b", to: "#334155" },
+  { id: 'rigged', label: 'Rig', icon: PersonStanding, from: "#f472b6", to: "#db2777" },
+  { id: 'animations', label: 'Anim', icon: Wand2, from: "#22d3ee", to: "#0891b2" },
 ];
 
-const listVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.04 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, x: -6 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] } },
-};
 
 export default function Shared3DHistory({
   userId, getIdToken, color = "#a78bfa",
   onSelect, onReuse, onDownload, onHistoryLoad, activeItemId, loadingId,
   refreshTrigger = 0, defaultTab = 'tripo', optimisticItems = [],
+  firestoreCollection = 'trellis_history',
 }) {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [subTab, setSubTab] = useState('all');
   const [histQ, setHistQ] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [history, setHistory] = useState([]);
-  const [histLoad, setHistLoad] = useState(false);
+  const [histLoad, setHistLoad] = useState(true);
   const [moreLoad, setMoreLoad] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [assetUploading, setAssetUploading] = useState(false);
@@ -199,13 +144,19 @@ export default function Shared3DHistory({
   const historyLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (!userId) return;
-    const q = query(collection(db, 'trellis_history'),
+    if (!userId) { setHistLoad(false); return; }
+    const q = query(collection(db, firestoreCollection),
       where('userId', '==', userId), orderBy('createdAt', 'desc'), limit(PAGE_SIZE));
     const unsub = onSnapshot(q, (snap) => {
       const now = Date.now();
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(item => { const ts = getItemTs(item); return ts === 0 || (now - ts) < HISTORY_TTL_MS; });
+      const rawItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const items = rawItems.filter(item => {
+        if (!item.model_url) {
+          console.log("[Shared3DHistory] filtered out (no model_url):", item.id, item);
+          return false;
+        }
+        const ts = getItemTs(item); return ts === 0 || (now - ts) < HISTORY_TTL_MS;
+      });
       setHistory(items);
       lastDocR.current = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
       setHasMore(snap.docs.length === PAGE_SIZE);
@@ -213,19 +164,22 @@ export default function Shared3DHistory({
       if (!historyLoadedRef.current) { historyLoadedRef.current = true; onHistoryLoad?.(items); }
     }, err => { console.error("[Shared3DHistory]", err); setHistLoad(false); });
     return () => unsub();
-  }, [userId]);
+  }, [userId, firestoreCollection, refreshTrigger]);
 
   const loadMore = useCallback(async () => {
     if (!hasMore || moreLoad || !lastDocR.current) return;
     setMoreLoad(true);
     try {
-      const q = query(collection(db, 'trellis_history'),
+      const q = query(collection(db, firestoreCollection),
         where('userId', '==', userId), orderBy('createdAt', 'desc'),
         startAfter(lastDocR.current), limit(PAGE_SIZE));
       const snap = await getDocs(q);
       const now = Date.now();
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(item => { const ts = getItemTs(item); return ts === 0 || (now - ts) < HISTORY_TTL_MS; });
+        .filter(item => {
+          if (!item.model_url) return false;
+          const ts = getItemTs(item); return ts === 0 || (now - ts) < HISTORY_TTL_MS;
+        });
       setHistory(prev => { const s = new Set(prev.map(i => i.id)); return [...prev, ...items.filter(i => !s.has(i.id))]; });
       lastDocR.current = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
       setHasMore(snap.docs.length === PAGE_SIZE);
@@ -282,6 +236,7 @@ export default function Shared3DHistory({
   }, [history, optimisticItems]);
 
   const filtHist = useMemo(() => mergedHistory.filter(item => {
+    if (!item.model_url) return false;
     if (histQ && !(item.prompt || "").toLowerCase().includes(histQ.toLowerCase())) return false;
     const src = item.source || "trellis";
     if (activeTab === 'tripo') {
@@ -589,42 +544,51 @@ export default function Shared3DHistory({
 
         {/* Tripo sections */}
         {!histLoad && activeTab === 'tripo' && tripoSections && (
-          <AnimatePresence mode="wait">
-            <motion.div key={`${activeTab}-${subTab}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.14 }}>
-              {tripoSections.generated.length > 0 && (
+          <AnimatePresence mode="sync">
+            <motion.div key={`${activeTab}-${subTab}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
+              {subTab === 'all' ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  {[...filtHist].sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0)).map(item => {
+                    const isRig = item.mode === 'rig' || item.params?.rigged === true || item.params?.type === 'animate_rig';
+                    const isAnim = (item.mode === 'animate' && !isRig) || item.params?.animated === true || item.params?.type === 'animate_retarget';
+                    const cardColor = isAnim ? TYPE_COLORS.animation.rail : isRig ? TYPE_COLORS.rigged.rail : accent;
+                    return (
+                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={cardColor} getIdToken={getIdToken} />
+                    );
+                  })}
+                </div>
+              ) : (
                 <>
-                  <SectionHeader label="Generated Models" icon={Sparkles} typeColor={TYPE_COLORS.model} count={tripoSections.generated.length} />
-                  <motion.div variants={listVariants} initial="hidden" animate="visible" style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
-                    {tripoSections.generated.map(item => (
-                      <motion.div key={item.id} variants={itemVariants}>
-                        <HistoryCard item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={accent} getIdToken={getIdToken} />
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                </>
-              )}
-              {tripoSections.rigged.length > 0 && (
-                <>
-                  <SectionHeader label="Rigged Characters" icon={PersonStanding} typeColor={TYPE_COLORS.rigged} count={tripoSections.rigged.length} />
-                  <motion.div variants={listVariants} initial="hidden" animate="visible" style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
-                    {tripoSections.rigged.map(item => (
-                      <motion.div key={item.id} variants={itemVariants}>
-                        <HistoryCard item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={TYPE_COLORS.rigged.rail} getIdToken={getIdToken} />
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                </>
-              )}
-              {tripoSections.animations.length > 0 && (
-                <>
-                  <SectionHeader label="Animations" icon={Wand2} typeColor={TYPE_COLORS.animation} count={tripoSections.animations.length} />
-                  <motion.div variants={listVariants} initial="hidden" animate="visible" style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
-                    {tripoSections.animations.map(item => (
-                      <motion.div key={item.id} variants={itemVariants}>
-                        <HistoryCard item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={TYPE_COLORS.animation.rail} getIdToken={getIdToken} />
-                      </motion.div>
-                    ))}
-                  </motion.div>
+                  {tripoSections.generated.length > 0 && (
+                    <>
+                      <SectionHeader label="Generated Models" icon={Sparkles} typeColor={TYPE_COLORS.model} count={tripoSections.generated.length} />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
+                        {tripoSections.generated.map(item => (
+                          <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={accent} getIdToken={getIdToken} />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {tripoSections.rigged.length > 0 && (
+                    <>
+                      <SectionHeader label="Rigged Characters" icon={PersonStanding} typeColor={TYPE_COLORS.rigged} count={tripoSections.rigged.length} />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
+                        {tripoSections.rigged.map(item => (
+                          <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={TYPE_COLORS.rigged.rail} getIdToken={getIdToken} />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {tripoSections.animations.length > 0 && (
+                    <>
+                      <SectionHeader label="Animations" icon={Wand2} typeColor={TYPE_COLORS.animation} count={tripoSections.animations.length} />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
+                        {tripoSections.animations.map(item => (
+                          <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={TYPE_COLORS.animation.rail} getIdToken={getIdToken} />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </motion.div>
@@ -633,15 +597,13 @@ export default function Shared3DHistory({
 
         {/* Other tabs */}
         {!histLoad && activeTab !== 'tripo' && filtHist.length > 0 && (
-          <AnimatePresence mode="wait">
-            <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.14 }}>
-              <motion.div variants={listVariants} initial="hidden" animate="visible" style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <AnimatePresence mode="sync">
+            <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {filtHist.map(item => (
-                  <motion.div key={item.id} variants={itemVariants}>
-                    <HistoryCard item={item} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={accent} getIdToken={getIdToken} />
-                  </motion.div>
+                  <HistoryCard key={item.id} item={item} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={accent} getIdToken={getIdToken} />
                 ))}
-              </motion.div>
+              </div>
             </motion.div>
           </AnimatePresence>
         )}

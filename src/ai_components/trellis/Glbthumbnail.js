@@ -277,6 +277,11 @@ export function generateGlbThumbnail(source, options = {}) {
 // ── Cache ────────────────────────────────────────────────────────────────
 const _cache = new Map();
 
+export function checkThumbnailCache(key) {
+  if (!key) return null;
+  return _cache.has(key) ? _cache.get(key) : null;
+}
+
 /**
  * Get a cached thumbnail. Accepts ArrayBuffer or URL.
  * @param {ArrayBuffer|string} source

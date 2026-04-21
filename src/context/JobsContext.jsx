@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase/firebaseApp';
 
@@ -45,6 +45,7 @@ function normalizeJobs(jobs) {
 export function JobsProvider({ children }) {
   const [userUid, setUserUid] = useState(null);
   const [jobs, setJobs] = useState(() => normalizeJobs(readStoredJobs(null)));
+  const cancelHandlersRef = useRef(new Map());
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
@@ -108,6 +109,19 @@ export function JobsProvider({ children }) {
     setJobs((prev) => prev.filter((job) => job.id !== id));
   }, []);
 
+  const registerCancelHandler = useCallback((id, fn) => {
+    cancelHandlersRef.current.set(id, fn);
+  }, []);
+
+  const unregisterCancelHandler = useCallback((id) => {
+    cancelHandlersRef.current.delete(id);
+  }, []);
+
+  const cancelJob = useCallback((id) => {
+    const fn = cancelHandlersRef.current.get(id);
+    if (fn) { fn(); cancelHandlersRef.current.delete(id); }
+  }, []);
+
   const clearSeenCompletedJobs = useCallback((panelType) => {
     setJobs((prev) => normalizeJobs(prev.map((job) => (
       (job.status === 'done' || job.status === 'error') && job.panelType === panelType
@@ -129,7 +143,10 @@ export function JobsProvider({ children }) {
     markJobError,
     removeJob,
     clearSeenCompletedJobs,
-  }), [jobs, addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, removeJob, clearSeenCompletedJobs]);
+    registerCancelHandler,
+    unregisterCancelHandler,
+    cancelJob,
+  }), [jobs, addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, removeJob, clearSeenCompletedJobs, registerCancelHandler, unregisterCancelHandler, cancelJob]);
 
   return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>;
 }

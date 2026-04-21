@@ -1,7 +1,7 @@
 // trellis/Animate.jsx
 import React, { useState } from "react";
 import {
-  PersonStanding, ChevronDown, ChevronRight, Check, Loader2, Search, Zap, AlertCircle,
+  PersonStanding, ChevronDown, ChevronRight, Check, Loader2, Zap, AlertCircle, Search,
 } from "lucide-react";
 import { ANIMATION_LIBRARY, ANIM_CATEGORIES } from "./animationlibrary";
 
@@ -67,8 +67,8 @@ function AnimCard({ anim, isSelected, selCount, onSelect }) {
 /**
  * Props:
  *  activeTaskId, animId
- *  rigStep, handleAutoRig, handlePrerigcheck
- *  prerigcheckResult  { riggable: bool, rigType: string } | null
+ *  rigStep, handleAutoRig
+ *  rigCompat  null | "checking" | true | false
  *  selAnim, setSelAnim
  *  animModelVer, setAnimModelVer  (for auto-rig: "v1", "v2", or "v2.5")
  *  rigType, setRigType            (for auto-rig: biped, quadruped, etc.)
@@ -86,9 +86,9 @@ export default function Animate({
   activeTaskId,
   animId,
   rigStep,
+  rigBtnLocked,
   handleAutoRig,
-  handlePrerigcheck,
-  prerigcheckResult,
+  rigCompat,
   selAnim, setSelAnim,
   animModelVer, setAnimModelVer,
   rigType, setRigType,
@@ -241,45 +241,20 @@ export default function Animate({
         </div>
       )}
 
-      {/* Prerigcheck button */}
-      {hasModel && rigStep === "idle" && (
-        <button
-          className="auto-rig-btn ready"
-          onClick={handlePrerigcheck}
-          style={{ marginBottom: 8, background: "rgba(108,99,255,0.12)", border: "1px solid rgba(108,99,255,0.3)" }}
-        >
-          <Search style={{ width: 14, height: 14 }} />Check Rig Compatibility
-        </button>
-      )}
-
-      {/* Prerigcheck result */}
-      {prerigcheckResult && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 11, marginBottom: 12,
-          background: prerigcheckResult.riggable ? "rgba(34,197,94,0.07)" : "rgba(239,68,68,0.07)",
-          border: "1px solid " + (prerigcheckResult.riggable ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"),
-        }}>
-          {prerigcheckResult.riggable
-            ? <Check style={{ width: 11, height: 11, color: "#22c55e", flexShrink: 0 }} />
-            : <AlertCircle style={{ width: 11, height: 11, color: "#ef4444", flexShrink: 0 }} />}
-          <span style={{ fontSize: 11, color: prerigcheckResult.riggable ? "#86efac" : "#fca5a5" }}>
-            {prerigcheckResult.riggable
-              ? `Riggable — detected type: ${prerigcheckResult.rigType}`
-              : "Model may not be riggable"}
-          </span>
-        </div>
-      )}
-
-      {/* Auto Rig button */}
+      {/* Auto Rig button — only locked for 2s after click to prevent double-submit */}
       <button
-        className={"auto-rig-btn" + (hasModel && rigStep !== "rigging" ? " ready" : " disabled")}
+        className={"auto-rig-btn" + (hasModel && !rigBtnLocked && rigCompat !== "checking" && rigCompat !== false ? " ready" : " disabled")}
         onClick={handleAutoRig}
-        disabled={!hasModel || rigStep === "rigging"}
-        style={{ marginBottom: 16 }}
+        disabled={!hasModel || rigBtnLocked || rigCompat === "checking" || rigCompat === false}
+        style={{ marginBottom: 16, ...(rigCompat === false ? { background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)" } : {}) }}
       >
-        {rigStep === "rigging"
+        {rigBtnLocked
           ? <><Loader2 style={{ width: 14, height: 14 }} className="anim-spin" />Rigging…</>
-          : <><CoinIcon size={16} />Auto Rig<span style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 400, marginLeft: 2 }}>25</span></>}
+          : rigCompat === "checking"
+            ? <><Loader2 style={{ width: 14, height: 14 }} className="anim-spin" />Ellenőrzés…</>
+            : rigCompat === false
+              ? <><AlertCircle style={{ width: 14, height: 14, color: "#ef4444" }} />Nem kompatibilis</>
+              : <><CoinIcon size={16} />Auto Rig<span style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 400, marginLeft: 2 }}>25</span></>}
       </button>
 
       {/* Rigged confirmation */}

@@ -81,13 +81,13 @@ export function setGridColor(s, c1, c2) {
   s.markDirty?.();
 }
 
-export function applyLights(s, mode, color, strength = 1, rotation = 0, dramaticColor = null, viewMode = "normal") {
+export function applyLights(s, mode, color, strength = 1, rotation = 0, dramaticColor = null, viewMode = "normal", elevation = 45) {
   const { THREE, lightGroup } = s;
   if (!THREE) return;
   const toRemove = lightGroup.children.filter((c) => !c.userData.isBackLight);
   toRemove.forEach((c) => lightGroup.remove(c));
 
-  if (viewMode === 'uv') { lightGroup.rotation.y = 0; s.markDirty?.(); return; }
+  if (viewMode === 'uv') { lightGroup.rotation.y = 0; lightGroup.rotation.x = 0; s.markDirty?.(); return; }
 
   if (viewMode === 'clay') {
     lightGroup.add(new THREE.HemisphereLight(0xc8c0b8, 0x302820, 0.18));
@@ -97,7 +97,9 @@ export function applyLights(s, mode, color, strength = 1, rotation = 0, dramatic
     fill.position.set(-6, 3, 2); lightGroup.add(fill);
     const back = new THREE.DirectionalLight(0x909090, 0.1);
     back.position.set(0, 2, -7); lightGroup.add(back);
-    lightGroup.rotation.y = 0; s.markDirty?.(); return;
+    lightGroup.rotation.y = (rotation * Math.PI) / 180;
+    lightGroup.rotation.x = ((elevation - 45) * Math.PI) / 180;
+    s.markDirty?.(); return;
   }
 
   const k = strength;
@@ -122,6 +124,7 @@ export function applyLights(s, mode, color, strength = 1, rotation = 0, dramatic
     back.position.set(-5, -2, -5); lightGroup.add(back);
   }
   lightGroup.rotation.y = (rotation * Math.PI) / 180;
+  lightGroup.rotation.x = ((elevation - 45) * Math.PI) / 180;
   s.markDirty?.();
 }
 
@@ -380,6 +383,11 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
   if (!THREE) return;
   if (placeholder) placeholder.visible = false;
 
+  // Cancel any in-flight load — stale handleSuccess will no-op
+  if (s._loadToken) s._loadToken.cancelled = true;
+  const token = { cancelled: false };
+  s._loadToken = token;
+
   if (s.model) {
     disposeModel(scene, s.model, s.origMaterials, s._wireCache, s._clayMats, s._uvMats);
     s.model = null;
@@ -393,6 +401,7 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
   }
 
   const handleSuccess = (object) => {
+    if (token.cancelled) return;
     const model = object.scene || object;
 
     // Filter out non-mesh objects (bones, empty nodes) before computing bounds

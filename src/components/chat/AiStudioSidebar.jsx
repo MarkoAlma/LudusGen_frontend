@@ -61,7 +61,6 @@ export default function AiStudioSidebar({
   const currentGroupId = findModelGroup(selectedAI) || 'chat';
   const currentBg = CATEGORY_BGS[currentGroupId] || bgChat;
   const handleJobOpen = (job) => {
-    clearSeenCompletedJobs(job.panelType);
     if (onOpenJob) onOpenJob(job);
   };
 

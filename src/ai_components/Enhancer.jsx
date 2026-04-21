@@ -109,6 +109,9 @@ function Enhancer({
   const [describingImages, setDescribingImages] = useState(false);
   const [streamError, setStreamError] = useState(null);
 
+  // Undo stack — stores previous prompt values before AI replaces them
+  const undoStack = useRef([]);
+
   const isBusy = enhancing || superEnhancing || dechanting || describingImages;
 
   useEffect(() => {
@@ -172,6 +175,11 @@ function Enhancer({
     return (json.description || '').trim();
   }, [authHeaders, gemmaVisionPrompt]);
 
+  // ── Undo: snapshot before AI overwrites prompt ───────────────────────────
+  const pushUndo = useCallback(() => {
+    if (value.trim()) undoStack.current.push(value);
+  }, [value]);
+
   // ── AI válasz feldolgozása: JSON vagy plain string ────────────────────────
   const applyResult = useCallback((raw) => {
     const cleaned = raw
@@ -184,7 +192,7 @@ function Enhancer({
       const parsed = JSON.parse(cleaned);
       if (parsed && typeof parsed === 'object') {
         if (typeof parsed.prompt === 'string' && parsed.prompt.trim()) {
-          onChange(trimToLimit(parsed.prompt.trim()));
+          onChange(trimToLimit(parsed.prompt.trim())); // trimToLimit already enforces 850-char limit
           if (typeof parsed.negative_prompt === 'string' && onNegativeChange) {
             onNegativeChange(parsed.negative_prompt.trim().slice(0, 250));
           }
@@ -240,10 +248,8 @@ function Enhancer({
       }
 
       const systemPrompt = superMode && super_enhancing_prompt ? super_enhancing_prompt : enhancing_prompt;
-      console.log('[Enchanter] system prompt:', systemPrompt);
-      console.log('[Enchanter] user content:', userContent);
       const raw = await callChat(systemPrompt, userContent, 0.4, 0.9, 2048);
-      console.log('[Enchanter] raw response:', raw);
+      pushUndo();
       const ok = applyResult(raw);
       if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
       else if (streamError?.startsWith('⚠️')) setStreamError(null);
@@ -255,7 +261,7 @@ function Enhancer({
       setSuperEnhancing(false);
       setDescribingImages(false);
     }
-  }, [value, enhancing, superEnhancing, describingImages, enhancing_prompt, super_enhancing_prompt, inputImages, callChat, callVisionDescribe, applyResult, streamError, stylePrefix]);
+  }, [value, enhancing, superEnhancing, describingImages, enhancing_prompt, super_enhancing_prompt, inputImages, callChat, callVisionDescribe, applyResult, pushUndo, streamError, stylePrefix]);
 
   // ── Dechance ──────────────────────────────────────────────────────────────
   const handleDechance = useCallback(async () => {
@@ -264,6 +270,7 @@ function Enhancer({
     setStreamError(null);
     try {
       const raw = await callChat(dechanting_prompt, value.trim(), 0.4, 0.9, 800);
+      pushUndo();
       const ok = applyResult(raw);
       if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
     } catch (err) {
@@ -272,7 +279,7 @@ function Enhancer({
     } finally {
       setDechanting(false);
     }
-  }, [value, dechanting, dechanting_prompt, callChat, applyResult]);
+  }, [value, dechanting, dechanting_prompt, callChat, applyResult, pushUndo]);
 
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef(null);
@@ -292,8 +299,14 @@ function Enhancer({
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !disabled && value.trim() && !isOverLimit) {
       onSubmit();
+      return;
     }
-  }, [disabled, value, isOverLimit, onSubmit]);
+    if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey && undoStack.current.length > 0) {
+      e.preventDefault();
+      const prev = undoStack.current.pop();
+      onChange(prev);
+    }
+  }, [disabled, value, isOverLimit, onSubmit, onChange]);
 
   const simplifyDisabled = !hasContent || dechanting || disabled;
   const enhanceDisabled = !hasContent || enhancing || describingImages || disabled;

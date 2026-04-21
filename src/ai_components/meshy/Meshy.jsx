@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import {
   Upload,
@@ -584,6 +585,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
   // ── Lighting advanced state ───────────────────────────────────────────────
   const [lightStrength, setLightStrength] = useState(1.0);
   const [lightRotation, setLightRotation] = useState(0);
+  const [lightElevation, setLightElevation] = useState(45);
   const [lightAutoRotate, setLightAutoRotate] = useState(false);
   const [lightAutoRotateSpeed, setLightAutoRotateSpeed] = useState(0.5);
   const [dramaticColor, setDramaticColor] = useState("#4400ff");
@@ -1190,6 +1192,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
             modelUrl={modelUrl}
             lightStrength={lightStrength}
             lightRotation={lightRotation}
+            lightElevation={lightElevation}
             lightAutoRotate={lightAutoRotate}
             lightAutoRotateSpeed={lightAutoRotateSpeed}
             dramaticColor={dramaticColor}
@@ -1371,6 +1374,8 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
                     setLightStrength={setLightStrength}
                     lightRotation={lightRotation}
                     setLightRotation={setLightRotation}
+                    lightElevation={lightElevation}
+                    setLightElevation={setLightElevation}
                     lightAutoRotate={lightAutoRotate}
                     setLightAutoRotate={setLightAutoRotate}
                     lightAutoRotateSpeed={lightAutoRotateSpeed}

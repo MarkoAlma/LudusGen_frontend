@@ -5,16 +5,6 @@ import { persistActiveTask, removeActiveTask } from "./useGenerationPersist";
 const POLL_MS = 2500;
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-/**
- * Polls all running activeTasks instances every POLL_MS.
- *
- * @param {React.MutableRefObject<Map>} activeTasksRef  - ref to the activeTasks Map
- * @param {() => void} forceUpdate  - call to trigger re-render
- * @param {() => Promise<string>} getIdToken  - returns Firebase Bearer token string
- * @param {(url: string, taskId: string) => Promise<string>} fetchProxy  - proxies model URL → blob URL
- * @param {(url: string) => void} revokeBlobUrl  - revokes previous blob URL
- * @param {() => void} refreshCredits  - refreshes user credit display
- */
 export function useActiveTasksPoller({
   activeTasksRef,
   forceUpdate,
@@ -22,11 +12,19 @@ export function useActiveTasksPoller({
   fetchProxy,
   revokeBlobUrl,
   refreshCredits,
+  onTaskSuccess,
+  onTaskFail,
+  onTaskProgress,
 }) {
   const intervalRef = useRef(null);
 
+  // Refs so interval always calls latest versions — prevents stale closure bugs
+  const cbRef = useRef({});
+  cbRef.current = { getIdToken, fetchProxy, revokeBlobUrl, refreshCredits, forceUpdate, onTaskSuccess, onTaskFail, onTaskProgress };
+
   useEffect(() => {
     intervalRef.current = setInterval(async () => {
+      const { getIdToken, fetchProxy, forceUpdate, onTaskSuccess, onTaskFail, onTaskProgress } = cbRef.current;
       const map = activeTasksRef.current;
       const running = [...map.values()].filter(t => t.status === "running" && t.taskId);
       if (running.length === 0) return;
@@ -65,12 +63,10 @@ export function useActiveTasksPoller({
             result: blobUrl ? { modelUrl: blobUrl, taskId: inst.taskId } : null,
           });
           removeActiveTask(inst.instanceId);
-          refreshCredits?.();
           changed = true;
-          try {
-            const { default: toast } = await import("react-hot-toast");
-            toast.success(`${current.label} kész! Kattints a betöltéshez.`, { duration: 6000 });
-          } catch {}
+          if (onTaskSuccess) {
+            try { await onTaskSuccess(inst, d, blobUrl); } catch (e) { console.error("[useActiveTasksPoller] onTaskSuccess threw:", e?.message ?? e); }
+          }
         } else if (d.status === "failed" || d.status === "cancelled") {
           map.set(inst.instanceId, {
             ...current,
@@ -78,13 +74,14 @@ export function useActiveTasksPoller({
             errorMsg: `Task ${d.status}`,
           });
           removeActiveTask(inst.instanceId);
-          refreshCredits?.();
           changed = true;
+          if (onTaskFail) onTaskFail(inst, `Task ${d.status}`);
         } else {
           const prog = Math.min(d.progress ?? current.progress, 99);
           if (prog !== current.progress) {
             map.set(inst.instanceId, { ...current, progress: prog });
             persistActiveTask({ ...current, progress: prog });
+            if (onTaskProgress) onTaskProgress(inst.instanceId, prog);
             changed = true;
           }
         }

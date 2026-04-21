@@ -21,6 +21,7 @@ const ThreeViewer = forwardRef(({
   rightOffset = 0,
   lightStrength = 1,
   lightRotation = 0,
+  lightElevation = 45,
   lightAutoRotate = false,
   lightAutoRotateSpeed = 0.5,
   dramaticColor = null,
@@ -47,10 +48,10 @@ const ThreeViewer = forwardRef(({
   const mountRef = useRef(null);
   const S = useRef(null);
 
-  const lightParamsRef = useRef({ lightMode, color, lightStrength, lightRotation, dramaticColor });
+  const lightParamsRef = useRef({ lightMode, color, lightStrength, lightRotation, lightElevation, dramaticColor });
   useEffect(() => {
-    lightParamsRef.current = { lightMode, color, lightStrength, lightRotation, dramaticColor };
-  }, [lightMode, color, lightStrength, lightRotation, dramaticColor]);
+    lightParamsRef.current = { lightMode, color, lightStrength, lightRotation, lightElevation, dramaticColor };
+  }, [lightMode, color, lightStrength, lightRotation, lightElevation, dramaticColor]);
 
   const paintRef = useRef({ paintMode, paintColor, paintSize, paintOpacity, paintHardness, paintCanvasRef });
   useEffect(() => {
@@ -163,7 +164,7 @@ const ThreeViewer = forwardRef(({
         pmremGenerator, envTexture,
       };
 
-      applyLights(S.current, lightMode, color, lightStrength, lightRotation, dramaticColor, viewMode);
+      applyLights(S.current, lightMode, color, lightStrength, lightRotation, dramaticColor, viewMode, lightElevation);
       applyViewMode(S.current, viewMode);
       setSceneBg(S.current, bgColor);
 
@@ -339,7 +340,7 @@ const ThreeViewer = forwardRef(({
     applyViewMode(S.current, viewMode);
     applyWireframeOverlay(S.current, wireframeOverlay, wireOpacity, wireHexColor);
     const p = lightParamsRef.current;
-    applyLights(S.current, p.lightMode, p.color, p.lightStrength, p.lightRotation, p.dramaticColor, viewMode);
+    applyLights(S.current, p.lightMode, p.color, p.lightStrength, p.lightRotation, p.dramaticColor, viewMode, p.lightElevation);
   }, [viewMode]); // eslint-disable-line
 
   useEffect(() => {
@@ -354,16 +355,17 @@ const ThreeViewer = forwardRef(({
 
   useEffect(() => {
     if (!S.current?.scene) return;
-    applyLights(S.current, lightMode, color, lightStrength, lightRotation, dramaticColor, viewMode);
-  }, [lightMode, color, lightStrength, lightRotation, dramaticColor]); // eslint-disable-line
+    applyLights(S.current, lightMode, color, lightStrength, lightRotation, dramaticColor, viewMode, lightElevation);
+  }, [lightMode, color, lightStrength, lightRotation, lightElevation, dramaticColor]); // eslint-disable-line
 
   useEffect(() => {
     if (!S.current) return;
     S.current.lightAutoRotate = lightAutoRotate;
     S.current.lightAutoRotateSpeed = lightAutoRotateSpeed;
     if (!lightAutoRotate) S.current.lightGroup.rotation.y = (lightRotation * Math.PI) / 180;
+    S.current.lightGroup.rotation.x = ((lightElevation - 45) * Math.PI) / 180;
     S.current.markDirty?.();
-  }, [lightAutoRotate, lightAutoRotateSpeed, lightRotation]);
+  }, [lightAutoRotate, lightAutoRotateSpeed, lightRotation, lightElevation]);
 
   useEffect(() => {
     if (S.current?.grid) { S.current.grid.visible = showGrid; S.current.markDirty?.(); }
@@ -600,10 +602,18 @@ const ThreeViewer = forwardRef(({
       if (targetMesh) targetMesh.rotation.y += dx * 0.012;
     } else if (mode === 'pan') {
       const spd = S.current.cam.radius * 0.0018;
-      const { theta } = S.current.cam;
-      camTarget.panX -= dx * spd * Math.cos(theta);
-      camTarget.panZ = (camTarget.panZ ?? 0) - dx * spd * Math.sin(theta);
-      camTarget.panY -= dy * spd;
+      const { theta, phi } = S.current.cam;
+      // Screen-space pan: mouse X → horizontal screen axis, mouse Y → vertical screen axis
+      // Right vector (screen X) = perpendicular to view direction in XZ plane
+      const rightX = Math.cos(theta);
+      const rightZ = -Math.sin(theta);
+      // Up vector (screen Y) = perpendicular to view direction in vertical plane
+      const upX = -Math.cos(phi) * Math.sin(theta);
+      const upY = Math.sin(phi);
+      const upZ = -Math.cos(phi) * Math.cos(theta);
+      camTarget.panX -= dx * spd * rightX + dy * spd * upX;
+      camTarget.panY -= dy * spd * upY;
+      camTarget.panZ = (camTarget.panZ ?? 0) - dx * spd * rightZ - dy * spd * upZ;
     } else {
       camTarget.theta -= dx * 0.007;
       camTarget.phi = Math.max(0.05, Math.min(Math.PI - 0.05, camTarget.phi - dy * 0.007));

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare, Image, Music2, Box, Loader2,
   CheckCircle2, XCircle, Clock4, ChevronRight,
-  Cpu, Mic2, Layers, Wand2, Volume2, LayoutGrid
+  Cpu, Mic2, Layers, Wand2, Volume2, LayoutGrid, X
 } from 'lucide-react';
 import { useJobs } from '../../context/JobsContext';
 
@@ -46,7 +46,7 @@ function SpinningRing({ color }) {
   );
 }
 
-function JobRow({ job, onOpen }) {
+function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
   const panelMeta = PANEL_META[job.panelType] || PANEL_META.chat;
   const statusMeta = STATUS_META[job.status] || STATUS_META.queued;
   const PanelIcon = panelMeta.icon;
@@ -56,6 +56,7 @@ function JobRow({ job, onOpen }) {
   const isDone    = job.status === 'done';
   const isError   = job.status === 'error';
   const isQueued  = job.status === 'queued';
+  const hasCountdown = isQueued && job.countdown != null;
 
   const statusColor = isDone
     ? '#34d399'
@@ -67,7 +68,7 @@ function JobRow({ job, onOpen }) {
 
   return (
     <motion.button
-      onClick={() => onOpen(job)}
+      onClick={() => { if (isDone || isError) onMarkSeen?.(job.id); onOpen(job); }}
       whileHover={{ scale: 1.012 }}
       whileTap={{ scale: 0.985 }}
       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left group/row relative overflow-hidden"
@@ -118,17 +119,35 @@ function JobRow({ job, onOpen }) {
             {job.title}
           </p>
 
-          {/* Status badge */}
-          <span
-            className="flex-shrink-0 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em]"
-            style={{
-              background: `${statusColor}18`,
-              color: statusColor,
-              border: `1px solid ${statusColor}28`,
-            }}
-          >
-            {statusMeta.label}
-          </span>
+          {/* Status badge / countdown cancel */}
+          {hasCountdown ? (
+            <button
+              onClick={e => { e.stopPropagation(); onCancel?.(job.id); }}
+              className="flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em] transition-all duration-150"
+              style={{
+                background: 'rgba(239,68,68,0.12)',
+                color: '#f87171',
+                border: '1px solid rgba(239,68,68,0.28)',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.22)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)'; }}
+            >
+              <X style={{ width: 8, height: 8 }} />
+              {job.countdown}s
+            </button>
+          ) : (
+            <span
+              className="flex-shrink-0 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em]"
+              style={{
+                background: `${statusColor}18`,
+                color: statusColor,
+                border: `1px solid ${statusColor}28`,
+              }}
+            >
+              {statusMeta.label}
+            </span>
+          )}
         </div>
 
         {/* Progress bar */}
@@ -174,10 +193,10 @@ function JobRow({ job, onOpen }) {
 }
 
 export default function JobQueueWidget({ onOpenJob }) {
-  const { jobs } = useJobs();
+  const { jobs, cancelJob, updateJob } = useJobs();
   const visibleJobs = [...jobs]
     .filter((job) => job.status === 'running' || job.status === 'queued' || !job.seenAt)
-    .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   const activeCount = visibleJobs.filter(j => j.status === 'running' || j.status === 'queued').length;
 
@@ -232,7 +251,7 @@ export default function JobQueueWidget({ onOpenJob }) {
         </div>
 
         {/* Job list */}
-        <div className="space-y-2 max-h-[220px] overflow-y-auto scrollbar-hide">
+        <div className="space-y-2 max-h-[340px] overflow-y-auto scrollbar-hide">
           <AnimatePresence initial={false}>
             {visibleJobs.length === 0 ? (
               <motion.div
@@ -258,7 +277,7 @@ export default function JobQueueWidget({ onOpenJob }) {
                   exit={{ opacity: 0, y: -6, scale: 0.95 }}
                   transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 >
-                  <JobRow job={job} onOpen={onOpenJob} />
+                  <JobRow job={job} onOpen={onOpenJob} onCancel={cancelJob} onMarkSeen={(id) => updateJob(id, { seenAt: Date.now() })} />
                 </motion.div>
               ))
             )}

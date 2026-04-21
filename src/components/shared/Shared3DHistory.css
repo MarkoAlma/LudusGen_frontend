@@ -1,0 +1,37 @@
+.arch-scroll::-webkit-scrollbar { width: 3px; }
+.arch-scroll::-webkit-scrollbar-track { background: transparent; }
+.arch-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+@keyframes arch-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes arch-pulse-dot {
+  0%, 100% { opacity: 0.15; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.8); }
+}
+@keyframes arch-scan {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(800%); opacity: 0; }
+}
+@keyframes arch-border-spin {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.arch-tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 20%;
+  right: 20%;
+  height: 1.5px;
+  border-radius: 2px;
+  background: var(--arch-tab-color, #a78bfa);
+  box-shadow: 0 0 6px var(--arch-tab-color, #a78bfa);
+}
+.arch-chip-active {
+  background: linear-gradient(90deg, var(--chip-from), var(--chip-to)) !important;
+}

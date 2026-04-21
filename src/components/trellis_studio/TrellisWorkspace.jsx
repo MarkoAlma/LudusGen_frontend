@@ -37,6 +37,7 @@ export default function TrellisWorkspace({
   const [lightMode, setLightMode] = useState("studio");
   const [lStr, setLStr] = useState(1.4);
   const [lRot, setLRot] = useState(0);
+  const [lElev, setLElev] = useState(45);
   const [lAutoR, setLAutoR] = useState(false);
   const [lAutoS, setLAutoS] = useState(0.5);
   const [dramC, setDramC] = useState("#ffffff");
@@ -109,6 +110,7 @@ export default function TrellisWorkspace({
             lightMode={lightMode} setLightMode={setLightMode}
             lightStrength={lStr} setLightStrength={setLStr}
             lightRotation={lRot} setLightRotation={setLRot}
+            lightElevation={lElev} setLightElevation={setLElev}
             lightAutoRotate={lAutoR} setLightAutoRotate={setLAutoR}
             lightAutoRotateSpeed={lAutoS} setLightAutoRotateSpeed={setLAutoS}
             dramaticColor={dramC} setDramaticColor={setDramC}
@@ -180,6 +182,7 @@ export default function TrellisWorkspace({
             bgColor={bgColor}
             lightStrength={lStr}
             lightRotation={lRot}
+            lightElevation={lElev}
             lightAutoRotate={lAutoR}
             lightAutoRotateSpeed={lAutoS}
             dramaticColor={dramC}

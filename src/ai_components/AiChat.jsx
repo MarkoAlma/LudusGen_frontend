@@ -17,10 +17,10 @@ import toast from "react-hot-toast";
 import { API_BASE } from "../api/client";
 
 const PANEL_TYPE_TO_TAB = {
-  tripo: 'tripo',
-  threed: 'threed',
-  trellis: 'trellis',
-  meshy: 'meshy',
+  tripo: '3d',
+  threed: '3d',
+  trellis: '3d',
+  meshy: '3d',
   image: 'image',
   audio: 'audio',
   music: 'music',
@@ -216,6 +216,9 @@ export default function AIChat({ user, getIdToken }) {
               const next = new URLSearchParams(searchParams);
               next.set('tab', targetTab);
               next.delete('model');
+              if (job?.panelType === 'tripo' && job.taskId) {
+                next.set('tripoTaskId', job.taskId);
+              }
               if (job.modelId) {
                 sessionStorage.setItem(`ludusgen_last_model:${targetTab}`, job.modelId);
               }

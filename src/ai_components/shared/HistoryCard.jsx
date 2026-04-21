@@ -1,8 +1,8 @@
-// trellis/HistoryCard.jsx  — DAW / Game Asset Browser aesthetic
+// shared/HistoryCard.jsx  — DAW / Game Asset Browser aesthetic
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Download, RotateCcw, Trash2, Loader2, Box, Sparkles, AlertCircle, PersonStanding, Wand2 } from "lucide-react";
-import { getCachedThumbnail } from "./Glbthumbnail";
-import { fetchModelData } from "./utils";
+import { Download, RotateCcw, Trash2, Box, Sparkles, AlertCircle, PersonStanding, Wand2 } from "lucide-react";
+import { getCachedThumbnail, checkThumbnailCache } from "../trellis/Glbthumbnail";
+import { fetchModelData } from "../trellis/utils";
 
 /* ─── CSS injection ──────────────────────────────────────────────────────── */
 const CARD_STYLE_ID = "__hcard-styles__";
@@ -10,8 +10,6 @@ if (!document.getElementById(CARD_STYLE_ID)) {
   const s = document.createElement("style");
   s.id = CARD_STYLE_ID;
   s.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
-
     @keyframes hcard-shimmer {
       0%   { background-position: -400% 0; }
       100% { background-position: 400% 0; }
@@ -100,7 +98,7 @@ function ShimmerThumb({ height }) {
   return (
     <div style={{
       width: "100%", height, borderRadius: "7px 7px 0 0",
-      background: "linear-gradient(90deg, #0d0920 25%, #1a1040 50%, #0d0920 75%)",
+      background: "linear-gradient(90deg, #12082a 25%, #261560 50%, #12082a 75%)",
       backgroundSize: "400% 100%",
       animation: "hcard-shimmer 1.6s ease-in-out infinite",
       position: "relative", overflow: "hidden",
@@ -151,17 +149,29 @@ const HistoryCard = React.memo(function HistoryCard({
       if (EXPIRED_URLS.has(item.model_url)) setErrorCode(410);
       return;
     }
+    const cached = checkThumbnailCache(item.model_url);
+    if (cached) {
+      setThumbnail(cached);
+      setThumbError(false);
+      setThumbLoading(false);
+      return;
+    }
     let cancelled = false;
     setThumbError(false);
+    let loadingTimer = null;
     (async () => {
-      setThumbLoading(true); setErrorCode(null);
+      setErrorCode(null);
       try {
         const data = await fetchModelData(item.model_url, getIdToken, item.taskId);
         if (cancelled || !data) return;
+        // Show shimmer only if not already resolved (prevents flicker for cache hits)
+        if (!cancelled) { loadingTimer = setTimeout(() => { if (!cancelled) setThumbLoading(true); }, 150); }
         const thumb = await getCachedThumbnail(data.buffer, { width: 280, height: 280 }, item.model_url);
         if (data.blobUrl) URL.revokeObjectURL(data.blobUrl);
+        clearTimeout(loadingTimer);
         if (!cancelled) { if (thumb) setThumbnail(thumb); else setThumbError(true); }
       } catch (err) {
+        clearTimeout(loadingTimer);
         if (!cancelled) {
           const st = err.status || null; setErrorCode(st); setThumbError(true);
           if (st === 410) EXPIRED_URLS.add(item.model_url);
@@ -169,7 +179,7 @@ const HistoryCard = React.memo(function HistoryCard({
         }
       } finally { if (!cancelled) setThumbLoading(false); }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(loadingTimer); };
   }, [item?.model_url, getIdToken]);
 
   const handleSelect = useCallback(() => onSelect?.(item), [onSelect, item]);

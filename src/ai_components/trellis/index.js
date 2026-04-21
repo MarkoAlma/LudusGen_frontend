@@ -51,7 +51,7 @@ export {
 export { WireframeControl } from './WireframeControl';
 export { RigControl } from './RigControl';
 export { BgColorPicker } from './BgColorPicker';
-export { default as HistoryCard } from './HistoryCard';
+export { default as HistoryCard } from '../shared/HistoryCard';
 export { default as StylePicker } from './StylePicker';
 export { default as PromptInput } from './PromptInput';
 export { default as ConfirmModal } from './ConfirmModal';

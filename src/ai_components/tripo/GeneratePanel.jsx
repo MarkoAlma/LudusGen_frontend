@@ -86,7 +86,11 @@ export const MODEL_CAPS = {
   },
 };
 
+// Every entry in MODEL_VERSIONS must have a corresponding MODEL_CAPS entry
 export function getModelCaps(modelVer) {
+  if (!(modelVer in MODEL_CAPS)) {
+    console.warn(`[getModelCaps] Unknown model version "${modelVer}" — falling back to v2.5 caps. Add an entry to MODEL_CAPS.`);
+  }
   return MODEL_CAPS[modelVer] ?? MODEL_CAPS["v2.5-20250123"];
 }
 
@@ -446,6 +450,99 @@ export const STYLE_PREFIX = [
 ];
 
 
+/* ─── Enhancer prompts (module-scope — no component deps) ────────────── */
+const TRIPO_ENHANCE_PROMPT = `You are a Tripo3D prompt engineer. Improve the user's prompt for 3D mesh generation.
+
+OUTPUT: Raw JSON ONLY — no markdown, no prose: {"prompt": "...", "negative_prompt": "..."}
+
+STEP 1 — IDENTIFY SUBJECT TYPE (internal reasoning, not in output):
+- humanoid: human, character, warrior, mage, anime girl, robot with human body shape
+- creature: dragon, dog, horse, wolf, bird, fish, monster, alien beast
+- vehicle: car, tank, spaceship, motorcycle, helicopter, boat
+- prop_weapon: sword, axe, gun, shield, potion, gem, book, chair, crate, food, any inanimate object
+- environment: castle, dungeon, forest scene, room, landscape
+
+STEP 2 — APPLY POSE RULE for identified type:
+- humanoid → T-pose, arms slightly away from body, symmetrical stance, both feet flat on ground
+- creature → natural standing pose, weight distributed, all limbs grounded
+- vehicle → complete model, all parts present and intact
+- prop_weapon → complete model, all sides fully closed, no open faces, no hollow shells
+- environment → complete scene, all elements present
+
+STEP 3 — ADD MINIMAL QUALITY TOKENS (positive only, type-appropriate):
+- humanoid → clean topology, symmetrical
+- creature → natural anatomy, complete body
+- vehicle → complete model, intact panels, fully enclosed geometry
+- prop_weapon → complete object, all sides present, fully closed mesh, back and bottom faces included
+- environment → complete scene
+
+RULES:
+- Preserve the user's exact intent, clothing, outfit, and design choices.
+- Comma-separated keywords. No sentences.
+- For prop_weapon: always append "fully closed mesh, all sides modeled, no missing faces, complete back geometry"
+- Positive prompt: specific design negations are OK (e.g. "without hat") — NO quality boilerplate like "no artifacts", "non-waxy", "no missing parts".
+- MAX 850 characters for prompt field.
+- OMIT: lighting, background, camera, render engine names, "photorealistic", "4K", "CGI"
+
+NEGATIVE PROMPT — type-specific mesh artifacts only, MAX 250 characters:
+- humanoid → merged fingers, fused limbs, floating body parts, asymmetrical anatomy, truncated torso, missing feet
+- creature → extra limbs, fused legs, missing tail, floating paws, asymmetrical body
+- vehicle → warped panels, missing wheels, floating parts, incomplete frame, open geometry
+- prop_weapon → open faces, missing backface, hollow shell, incomplete geometry, broken blade, missing handle, floating pieces
+- environment → floating objects, incomplete structures, missing ground plane`;
+
+const TRIPO_SUPER_ENHANCE_PROMPT = `You are an elite Tripo3D prompt engineer. Fully expand the user's prompt with rich construction-level detail for 3D mesh generation.
+
+OUTPUT: Raw JSON ONLY — no markdown, no prose: {"prompt": "...", "negative_prompt": "..."}
+
+STEP 1 — IDENTIFY SUBJECT TYPE (internal reasoning, not in output):
+- humanoid: human, character, warrior, mage, anime girl, robot with human body shape
+- creature: dragon, dog, horse, wolf, bird, fish, monster, alien beast
+- vehicle: car, tank, spaceship, motorcycle, helicopter, boat
+- prop_weapon: sword, axe, gun, shield, potion, gem, book, chair, crate, food, any inanimate object
+- environment: castle, dungeon, forest scene, room, landscape
+
+STEP 2 — APPLY POSE RULE for identified type:
+- humanoid → T-pose, arms slightly away from body, symmetrical stance, both feet flat on ground
+- creature → natural standing pose, weight distributed, all limbs grounded
+- vehicle → complete model, all parts present and intact
+- prop_weapon → complete model, all sides fully closed, no open faces, no hollow shells
+- environment → complete scene, all elements present
+
+STEP 3 — INFER AND ADD type-appropriate details NOT present in the original prompt:
+- humanoid → clothing material/texture, accessories, facial features, hair style/color, armor details, boots/gloves
+- creature → fur/scale/feather texture, claw/tooth detail, muscle definition, eye color, pattern/markings
+- vehicle → panel material, weathering/wear level, window glass, exhaust/intake details, insignia/markings, fully enclosed body
+- prop_weapon → material (steel/wood/leather/etc.), engraving/rune detail, worn edges, grip wrap, gems/inlays, back face, bottom face, all sides modeled
+- environment → ground/floor material, atmospheric lighting, key props, background structures, foliage/debris
+
+STEP 4 — ADD RICH QUALITY TOKENS (positive only, type-appropriate):
+- humanoid → clean topology, symmetrical, realistic proportions, detailed surface, high-fidelity mesh
+- creature → natural anatomy, realistic proportions, detailed fur/scales, expressive features
+- vehicle → precise engineering details, realistic materials, complete mechanical assembly, fully closed geometry
+- prop_weapon → realistic material surfaces, fine detail work, fully closed mesh, all sides modeled, complete back geometry, no missing faces, authentic construction
+- environment → cohesive scene composition, detailed surfaces, complete structures, atmospheric depth
+
+HARD RULES:
+- USER INTENT IS SACRED: preserve exact clothing, outfit, and design choices. Add material/texture detail to what user specified — never replace it.
+- Comma-separated keywords. No sentences.
+- For prop_weapon: always append "fully closed mesh, all sides modeled, complete back and bottom geometry" to positive prompt.
+- Positive prompt: specific design negations OK (e.g. "without hat") — NO quality boilerplate negations.
+- ONE model only. MAX 850 characters for prompt field.
+- OMIT: lighting, background, camera, render engine names, "photorealistic", "4K", "CGI"
+- NSFW filter: keep user's clothing exactly (bikini, swimsuit, crop top — all fine). BLOCK only: genitalia, sexual acts, fetish terms, sexually explicit character names. Replace only those with safe equivalents.
+
+NEGATIVE PROMPT — comprehensive, type-specific, MAX 250 characters:
+- humanoid → merged fingers, fused limbs, floating body parts, asymmetrical anatomy, truncated torso, missing feet, extra fingers, deformed face, melted features
+- creature → extra limbs, fused legs, missing tail, floating paws, asymmetrical body, malformed head, extra eyes, deformed snout
+- vehicle → warped panels, missing wheels, floating parts, incomplete frame, melted bodywork, asymmetric chassis, open geometry
+- prop_weapon → open faces, missing backface, hollow shell, broken geometry, missing components, floating pieces, incomplete blade, warped handle, melted edges
+- environment → floating objects, incomplete structures, missing ground plane, disconnected elements, collapsing geometry`;
+
+const TRIPO_SIMPLIFY_PROMPT = `You are a 3D model prompt engineer.
+The user gives you a long or complex prompt. Simplify it to a clear, concise English description under 200 characters, keeping the essential object and style.
+Respond ONLY with plain text, no JSON, no explanation.`;
+
 /* ─── GeneratePanel ───────────────────────────────────────────────────── */
 export default function GeneratePanel({
   genTab, setGenTab,
@@ -539,109 +636,6 @@ export default function GeneratePanel({
   /* ─── Derived ─────────────────────────────────────────────────────── */
   const partsDisabled = texOn || pbrOn || quadMesh;
   const isModernModel = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
-
-  /* ─── Enhancer prompts ────────────────────────────────────────────── */
-  const TRIPO_ENHANCE_PROMPT = `You are a Tripo3D prompt engineer. Improve the user's prompt for 3D mesh generation.
-
-OUTPUT: One raw JSON object only — no markdown, no code fences, no prose.
-Keys: "prompt" (your enhanced prompt text) and "negative_prompt" (mesh artifact list).
-
-STEP 1 — IDENTIFY SUBJECT TYPE (internal reasoning, not in output):
-- humanoid: human, character, warrior, mage, anime girl, robot with human body shape
-- creature: dragon, dog, horse, wolf, bird, fish, monster, alien beast
-- vehicle: car, tank, spaceship, motorcycle, helicopter, boat
-- prop_weapon: sword, axe, gun, shield, potion, gem, book, chair, crate, food, any inanimate object
-- environment: castle, dungeon, forest scene, room, landscape
-- other: abstract geometry, logos, undefined subjects → complete model, all parts present
-If the prompt contains multiple subjects, classify by the primary/foreground subject. Preserve all subjects in the output prompt verbatim.
-
-STEP 2 — APPLY POSE RULE for identified type:
-- humanoid → T-pose, arms slightly away from body, symmetrical stance, both feet flat on ground
-- creature → natural standing pose, weight distributed, all limbs grounded
-- vehicle → complete model, all parts present and intact
-- prop → complete model, all parts present and intact
-- environment → complete scene, all elements present
-- other → complete model, all parts present
-
-STEP 3 — ADD MINIMAL QUALITY TOKENS (positive only, type-appropriate):
-- humanoid → clean topology, symmetrical
-- creature → natural anatomy, complete body
-- vehicle → complete model, intact panels
-- prop → complete object, all components present
-- environment → complete scene
-- other → complete geometry, no missing parts
-
-RULES:
-- Preserve the user's exact intent, clothing, outfit, and design choices.
-- Comma-separated keywords. No sentences.
-- Positive prompt: specific design negations are OK (e.g. "without hat") — NO quality boilerplate like "no artifacts", "non-waxy", "no missing parts".
-- MAX 850 characters for prompt field.
-- OMIT: lighting, background, camera, render engine names, "photorealistic", "4K", "CGI"
-
-NEGATIVE PROMPT — type-specific mesh artifacts only, MAX 250 characters:
-- humanoid → merged fingers, fused limbs, floating body parts, asymmetrical anatomy, truncated torso, missing feet
-- creature → extra limbs, fused legs, missing tail, floating paws, asymmetrical body
-- vehicle → warped panels, missing wheels, floating parts, incomplete frame
-- prop → broken blade, missing handle, floating pieces, incomplete geometry
-- environment → floating objects, incomplete structures, missing ground plane`;
-
-  const TRIPO_SUPER_ENHANCE_PROMPT = `You are an elite Tripo3D prompt engineer. Fully expand the user's prompt with rich construction-level detail for 3D mesh generation.
-
-OUTPUT: One raw JSON object only — no markdown, no code fences, no prose.
-Keys: "prompt" (your enhanced prompt text) and "negative_prompt" (mesh artifact list).
-
-STEP 1 — IDENTIFY SUBJECT TYPE (internal reasoning, not in output):
-- humanoid: human, character, warrior, mage, anime girl, robot with human body shape
-- creature: dragon, dog, horse, wolf, bird, fish, monster, alien beast
-- vehicle: car, tank, spaceship, motorcycle, helicopter, boat
-- prop: sword, axe, gun, shield, potion, gem, book, chair, crate, food, any inanimate object
-- environment: castle, dungeon, forest scene, room, landscape
-- other: abstract geometry, logos, undefined subjects → complete model, all parts present
-If the prompt contains multiple subjects, classify by the primary/foreground subject. Preserve all subjects in the output prompt verbatim.
-
-STEP 2 — APPLY POSE RULE for identified type:
-- humanoid → T-pose, arms slightly away from body, symmetrical stance, both feet flat on ground
-- creature → natural standing pose, weight distributed, all limbs grounded
-- vehicle → complete model, all parts present and intact
-- prop → complete model, all parts present and intact
-- environment → complete scene, all elements present
-- other → complete model, all parts present
-
-STEP 3 — INFER AND ADD type-appropriate details NOT present in the original prompt:
-- humanoid → clothing material/texture, accessories, facial features, hair style/color, armor details, boots/gloves
-- creature → fur/scale/feather texture, claw/tooth detail, muscle definition, eye color, pattern/markings
-- vehicle → panel material, weathering/wear level, window glass, exhaust/intake details, insignia/markings
-- prop → material (steel/wood/leather/etc.), engraving/rune detail, worn edges, grip wrap, gems/inlays
-- environment → ground/floor material, atmospheric lighting, key props, background structures, foliage/debris
-- other → surface material, structural detail, key geometric features
-
-STEP 4 — ADD RICH QUALITY TOKENS (positive only, type-appropriate):
-- humanoid → clean topology, symmetrical, realistic proportions, detailed surface, high-fidelity mesh
-- creature → natural anatomy, realistic proportions, detailed fur/scales, expressive features
-- vehicle → precise engineering details, realistic materials, complete mechanical assembly
-- prop → realistic material surfaces, fine detail work, complete geometry, authentic construction
-- environment → cohesive scene composition, detailed surfaces, complete structures, atmospheric depth
-- other → clean topology, detailed geometry, complete model
-
-HARD RULES:
-- USER INTENT IS SACRED: preserve exact clothing, outfit, and design choices. Add material/texture detail to what user specified — never replace it.
-- Comma-separated keywords. No sentences.
-- Positive prompt: specific design negations OK (e.g. "without hat") — NO quality boilerplate negations.
-- ONE model only. MAX 850 characters for prompt field.
-- OMIT: lighting, background, camera, render engine names, filler adjectives.
-- NSFW filter: keep user's clothing exactly (bikini, swimsuit, crop top — all fine). BLOCK only: genitalia, sexual acts, fetish terms, sexually explicit character names. Replace only those with safe equivalents.
-
-NEGATIVE PROMPT — comprehensive, type-specific, MAX 250 characters:
-- humanoid → merged fingers, fused limbs, floating body parts, asymmetrical anatomy, truncated torso, missing feet, extra fingers, deformed face, melted features
-- creature → extra limbs, fused legs, missing tail, floating paws, asymmetrical body, malformed head, extra eyes, deformed snout
-- vehicle → warped panels, missing wheels, floating parts, incomplete frame, melted bodywork, asymmetric chassis
-- prop → broken geometry, missing components, floating pieces, incomplete blade, warped handle, melted edges
-- environment → floating objects, incomplete structures, missing ground plane, disconnected elements, collapsing geometry
-- other → floating geometry, disconnected parts, incomplete model`;
-
-  const TRIPO_SIMPLIFY_PROMPT = `You are a 3D model prompt engineer.
-The user gives you a long or complex prompt. Simplify it to a clear, concise English description under 200 characters, keeping the essential object and style.
-Respond ONLY with plain text, no JSON, no explanation.`;
 
   /* ─── Render ──────────────────────────────────────────────────────── */
   return (

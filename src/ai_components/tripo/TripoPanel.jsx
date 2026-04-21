@@ -19,13 +19,14 @@ import {
 } from "../trellis/.";
 import ConfirmModal from "../trellis/ConfirmModal";
 import DownloadModal from "../trellis/DownloadModal";
-import { saveHistoryToFirestore, loadHistoryPageFromFirestore } from "../trellis/utils";
 import Shared3DHistory from "../../components/shared/Shared3DHistory";
 import { getAnimById, ANIMATION_LIBRARY, ANIM_CATEGORIES } from "./animationlibrary";
 import { persistGen, loadPersistedGen, updatePersistedProgress, clearPersistedGen, markHistorySaved, persistActiveTask, removeActiveTask, loadPersistedActiveTasks } from "./useGenerationPersist";
 
 import { useActiveTasksPoller } from "./useActiveTasksPoller";
 import { getCachedThumbnail } from "../trellis/Glbthumbnail";
+import { useTripoHistory } from "./useTripoHistory";
+import { useTripoRig } from "./useTripoRig";
 import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX } from "./GeneratePanel";
 import Segment from "./Segment";
 import Retopo from "./Retopo";
@@ -48,8 +49,10 @@ const POLL_MAX = 500;
 const PROGRESS_JUMP_LIMIT = 30;
 const STUCK_THRESHOLD_MS = 300_000;
 
-// Session-level dedup guard — prevents double Firestore writes if saveHist is called twice for the same URL
-const _savedUrls = new Set();
+// Module-level store: survives TripoPanel unmount/remount within the same session tab.
+// Replaces sessionStorage — avoids stale URLs on tab duplication and is invisible to React lifecycle.
+let _pendingModel = null;   // { url: string, taskId: string } | null
+let _selHistId = null;      // string | null
 
 const NAV = [
   { id: "generate", label: "Model", icon: Sparkles, sub: false },
@@ -230,6 +233,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const isMobile = ctxMobile || isMobile640;
   const isTablet = ctxTablet || isTablet1024;
 
+  const { jobs, addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, registerCancelHandler, unregisterCancelHandler } = useJobs();
+
   // Register panels with centralized manager
   useEffect(() => {
     registerPanel('L1');
@@ -329,7 +334,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [detectedRigType, setDetectedRigType] = useState(null);
   const [detectedRigModelVer, setDetectedRigModelVer] = useState(null);
   const [detectedRigSpec, setDetectedRigSpec] = useState(null);
-  const rigCompatRef = useRef({});
   const [rigCompat, setRigCompat] = useState(null);
   const [animOutFormat, setAnimOutFormat] = useState("glb");
   const [animBakeAnimation, setAnimBakeAnimation] = useState(true);
@@ -356,6 +360,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [activeClipIdx, setActiveClipIdx] = useState(0);
   const [lStr, setLStr] = useState(1.0);
   const [lRot, setLRot] = useState(0);
+  const [lElev, setLElev] = useState(45);
   const [lAutoR, setLAutoR] = useState(false);
   const [lAutoS, setLAutoS] = useState(0.5);
   const [dramC, setDramC] = useState("#4400ff");
@@ -373,40 +378,39 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   // history — persist selected model across refresh
   const [history, setHistory] = useState([]);
   const [optimisticItems, setOptimisticItems] = useState([]);
-  const [selHistId, setSelHistId] = useState(() => sessionStorage.getItem("tripo_sel_hist") || null);
+  const [selHistId, setSelHistId] = useState(() => _selHistId || null);
   const selHistIdRef = useRef(selHistId);
   useEffect(() => {
     selHistIdRef.current = selHistId;
-    if (selHistId) sessionStorage.setItem("tripo_sel_hist", selHistId);
-    else sessionStorage.removeItem("tripo_sel_hist");
+    _selHistId = selHistId || null;
   }, [selHistId]);
   // Load pending model URL written by onParallelTaskSuccess when panel was unmounted
   useEffect(() => {
-    const raw = sessionStorage.getItem('tripo_pending_model');
-    if (!raw) return;
-    try {
-      const { url, taskId } = JSON.parse(raw);
-      sessionStorage.removeItem('tripo_pending_model');
-      if (!url) return;
-      // Only load if viewer is currently empty (don't override user's selection)
-      if (!modelUrl) {
-        setModelUrl(url);
-        setGenStatus("succeeded");
-      }
-      if (taskId) {
-        const docId = `tripo_${taskId}`;
-        setSelHistId(docId);
-      }
-    } catch { /* malformed storage entry — ignore */ }
+    const pending = _pendingModel;
+    if (!pending) return;
+    _pendingModel = null;
+    if (!pending.url) return;
+    // Only load if viewer is currently empty (don't override user's selection)
+    if (!modelUrl) {
+      setModelUrl(pending.url);
+      setGenStatus("succeeded");
+    }
+    if (pending.taskId) {
+      setSelHistId(`tripo_${pending.taskId}`);
+    }
   }, []);
 
   const activeH = useMemo(() => history.find(h => h.id === selHistId), [history, selHistId]);
   const activeTaskId = activeH?.taskId || activeH?.task_id || activeH?.id || "";
+  const activeTaskIdRef = useRef(activeTaskId);
+  activeTaskIdRef.current = activeTaskId;
+  const historyRef = useRef(history);
+  historyRef.current = history;
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   // Pre-set loadingId when a model is expected on mount (URL param or saved session)
   // so ThreeViewer never mounts and shows the placeholder before the real model loads.
   const [loadingId, setLoadingId] = useState(() =>
-    (searchParams.get("tripoTaskId") || sessionStorage.getItem("tripo_sel_hist"))
+    (searchParams.get("tripoTaskId") || _selHistId)
       ? "__url_pending__" : null
   );
 
@@ -443,13 +447,16 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const activeTasksRef = useRef(new Map());
   const [_taskTick, forceUpdate] = useReducer(x => x + 1, 0);
   const [focusedInstanceId, setFocusedInstanceId] = useState(null);
-  const { addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, registerCancelHandler, unregisterCancelHandler } = useJobs();
   const fileRef = useRef(null);
   const currentTaskId = useRef(null);
   const currentRequestId = useRef(null);
   const userStoppedRef = useRef(false);
   // Holds a taskId from ?tripoTaskId= URL param until history loads and we can auto-select it
   const pendingUrlTaskId = useRef(searchParams.get("tripoTaskId") || null);
+  // Tracks the last taskId we wrote to the URL ourselves — prevents the URL-watcher
+  // effect from re-selecting the old item during the render cycle between saveHist
+  // updating activeTaskId and syncSelHist updating the URL param.
+  const programmaticUrlRef = useRef(null);
 
   // ── Backend-driven model capabilities ───────────────────────────────────
   // Fetched once on mount; falls back to null so GeneratePanel uses its own
@@ -540,19 +547,19 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     switch (mode) {
       case "generate":
         return genTab === "text" ? !!prompt.trim()
-             : genTab === "batch" ? (batchImages?.length > 0)
-             : !!imgToken;
-      case "segment":    return !!(segId.trim() || activeTaskId);
+          : genTab === "batch" ? (batchImages?.length > 0)
+            : !!imgToken;
+      case "segment": return !!(segId.trim() || activeTaskId);
       case "fill_parts": return !!(fillId.trim() || activeTaskId);
-      case "retopo":     return !!(retopoId.trim() || activeTaskId);
+      case "retopo": return !!(retopoId.trim() || activeTaskId);
       case "texture":
         return !!(texId.trim() || activeTaskId) &&
-               (texInputTab === "text" ? !!texPrompt.trim()
-              : texInputTab === "image" ? !!imgToken
+          (texInputTab === "text" ? !!texPrompt.trim()
+            : texInputTab === "image" ? !!imgToken
               : multiImages.length > 0);
       case "texture_edit":
         return !!(editId.trim() || activeTaskId) &&
-               (brushMode === "Paint Mode" || !!brushPrompt.trim());
+          (brushMode === "Paint Mode" || !!brushPrompt.trim());
       case "refine": {
         if (!refineId.trim() && activeH?.params?.texture === true) return false;
         return !!(refineId.trim() || activeTaskId);
@@ -562,8 +569,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       default: return false;
     }
   }, [mode, genTab, prompt, imgToken, batchImages, segId, fillId, retopoId,
-      texId, texInputTab, texPrompt, multiImages, editId, brushMode, brushPrompt,
-      refineId, stylizeId, riggedId, selAnim, activeTaskId, activeH, focusedInstanceId, _taskTick]);
+    texId, texInputTab, texPrompt, multiImages, editId, brushMode, brushPrompt,
+    refineId, stylizeId, riggedId, selAnim, activeTaskId, activeH, focusedInstanceId, _taskTick]);
 
 
 
@@ -844,43 +851,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const saveHist = useCallback(async (taskId, rawUrl, extra = {}) => {
-    const dedupKey = rawUrl + "|" + taskId;
-    if (_savedUrls.has(dedupKey)) return null;
-    _savedUrls.add(dedupKey);
-    const cap2 = s => s ? s.trim().split(/\s+/).slice(0, 2).join(" ") : s;
-    // Use task-specific values from extra when available — never use closed-over UI state for parallel tasks
-    const effectivePrompt = extra.prompt ?? prompt;
-    const effectiveMode = extra.mode ?? mode;
-    const effectiveModelVer = extra.modelVer ?? modelVer;
-    const autoName = cap2(effectivePrompt.trim());
-    const resolvedName = cap2(extra.name) || autoName || null;
-    const item = { prompt: effectivePrompt.trim() || extra.label || effectiveMode, name: resolvedName, status: "succeeded", model_url: rawUrl, source: "tripo", mode: effectiveMode, taskId, styleId: activeStyle || null, params: { model_version: effectiveModelVer, mode: effectiveMode, ...extra }, ts: Date.now() };
-    const stableDocId = extra.animationIndex != null ? `tripo_${taskId}_${extra.animationIndex}` : `tripo_${taskId}`;
-    const { docId } = await saveHistoryToFirestore(userId, item, stableDocId);
-    const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
-    setOptimisticItems(prev => prev.filter(o => o.id !== stableDocId));
-    setHistory(h => [ni, ...h]); setSelHistId(ni.id); histInit.current = true; return ni;
-  }, [userId, prompt, mode, modelVer]);
-
-  // Save a rigged model to history with mode="rig"
-  const saveRigHist = useCallback(async (taskId, rawUrl, extra = {}) => {
-    const dedupKey = rawUrl + "|" + taskId;
-    if (_savedUrls.has(dedupKey)) return null;
-    _savedUrls.add(dedupKey);
-    const srcItem = history.find(h => h.taskId === extra.originalModelTaskId);
-    const srcPrompt = srcItem?.name || srcItem?.prompt || extra.prompt || "model";
-    const srcShort = srcPrompt.trim().split(/\s+/).slice(0, 2).join(" ");
-    const rigName = extra.aiName || `Rig:${srcShort}`;
-    // Explicitly build params — never let extra override mode/rigged/animated
-    const params = { rigModelVer: extra.rigModelVer, rigType: extra.rigType, rigSpec: extra.rigSpec, originalModelTaskId: extra.originalModelTaskId, mode: "rig", rigged: true };
-    const item = { prompt: extra.prompt || "auto-rig", name: rigName, status: "succeeded", model_url: rawUrl, source: "tripo", mode: "rig", taskId, params, ts: Date.now() };
-    const stableDocId = `tripo_${taskId}`;
-    const { docId } = await saveHistoryToFirestore(userId, item, stableDocId);
-    const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
-    setOptimisticItems(prev => prev.filter(o => o.id !== stableDocId));
-    setHistory(h => [ni, ...h]); setSelHistId(ni.id); histInit.current = true; return ni;
-  }, [userId, history]);
+  const { saveHist, saveRigHist } = useTripoHistory({
+    userId, prompt, negPrompt, mode, modelVer, activeStyle, history, histInit,
+    setOptimisticItems, setHistory, setSelHistId,
+  });
 
   const generateAIName = useCallback(async (basePrompt, type, animLabel = "") => {
     if (!basePrompt?.trim()) return null;
@@ -938,6 +912,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const syncSelHist = useCallback((entry) => {
     if (!entry) return;
     setSelHistId(entry.id);
+    programmaticUrlRef.current = entry.taskId || null;
     if (entry.taskId) setSearchParams(prev => { const n = new URLSearchParams(prev); n.set("tripoTaskId", entry.taskId); return n; }, { replace: true });
     else setSearchParams(prev => { const n = new URLSearchParams(prev); n.delete("tripoTaskId"); return n; }, { replace: true });
   }, [setSearchParams]);
@@ -1040,27 +1015,89 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             };
           } else if (genTab === "batch") {
             const isP1 = effectiveModel === "P1-20260311";
-            body = {
-              type: "image_to_model",
-              file: { type: "jpg", file_token: batchImages[0]?.token },
-              model_version: effectiveModel,
-              ...(negPrompt.trim() && !isP1 && { negative_prompt: negPrompt.trim() }),
-              ...(tPose && { t_pose: true }),
-              texture: texOn,
-              ...(pbrOn && { pbr: true }),
-              ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
-              ...(makeBetter && { enable_image_autofix: true }),
-              ...(polycount > 0 && { face_limit: polycount }),
-              // P1-20260311 does NOT support quad, smart_low_poly, generate_parts, geometry_quality
-              ...(!isP1 && quadMesh && { quad: true }),
-              ...(!isP1 && smartLowPoly && { smart_low_poly: true }),
-              ...(!isP1 && inParts && { generate_parts: true }),
-              ...(modelSeed != null && { model_seed: modelSeed }),
-              ...(imageSeed != null && { image_seed: imageSeed }),
-              ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
-              ...(autoSize && { auto_size: true }),
-              ...(!exportUv && { export_uv: false }),
-            };
+            const alreadyRunning = [...activeTasksRef.current.values()]
+              .filter(t => t.status === "running" || t.status === "pending").length;
+            const slotsAvailable = Math.max(0, PARALLEL_LIMIT - alreadyRunning);
+            const imagesToSubmit = batchImages.slice(0, slotsAvailable);
+            if (imagesToSubmit.length === 0) return;
+
+            for (const batchImg of imagesToSubmit) {
+              const batchBody = {
+                type: "image_to_model",
+                file: { type: "jpg", file_token: batchImg.token },
+                model_version: effectiveModel,
+                ...(negPrompt.trim() && !isP1 && { negative_prompt: negPrompt.trim() }),
+                ...(tPose && { t_pose: true }),
+                texture: texOn,
+                ...(pbrOn && { pbr: true }),
+                ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
+                ...(makeBetter && { enable_image_autofix: true }),
+                ...(polycount > 0 && { face_limit: polycount }),
+                // P1-20260311 does NOT support quad, smart_low_poly, generate_parts, geometry_quality
+                ...(!isP1 && quadMesh && { quad: true }),
+                ...(!isP1 && smartLowPoly && { smart_low_poly: true }),
+                ...(!isP1 && inParts && { generate_parts: true }),
+                ...(modelSeed != null && { model_seed: modelSeed }),
+                ...(imageSeed != null && { image_seed: imageSeed }),
+                ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
+                ...(autoSize && { auto_size: true }),
+                ...(!exportUv && { export_uv: false }),
+              };
+
+              const batchInstanceId = crypto.randomUUID();
+              const batchCount = [...activeTasksRef.current.values()].filter(t => t.mode === mode).length;
+              const batchLabel = `Generate #${batchCount + 1}`;
+
+              activeTasksRef.current.set(batchInstanceId, {
+                instanceId: batchInstanceId,
+                taskId: null,
+                mode,
+                opType: mode,
+                label: batchLabel,
+                status: "pending",
+                progress: 0,
+                errorMsg: null,
+                result: null,
+                startedAt: Date.now(),
+                snapshot: batchBody,
+                originalTaskId: activeTaskId || null,
+              });
+              setFocusedInstanceId(batchInstanceId);
+              addJob({ id: batchInstanceId, panelType: "tripo", title: batchLabel, status: "queued", progress: 0, countdown: null, createdAt: Date.now(), updatedAt: Date.now() });
+              forceUpdate();
+
+              try {
+                const headers = await authH();
+                const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify(batchBody) });
+                const td = await tr.json();
+                if (!td.success) {
+                  const msg = td.message ?? "Task failed";
+                  const lower = msg.toLowerCase();
+                  if (lower.includes("insufficient") || lower.includes("credit") || lower.includes("balance")) throw Object.assign(new Error("Nincs elég Tripo kredit. Tölts fel a fiókodba!"), { type: "credits" });
+                  if (lower.includes("nsfw") || lower.includes("content policy") || lower.includes("moderat")) throw Object.assign(new Error("Tartalom blokkolva: NSFW vagy irányelvek megsértése."), { type: "nsfw" });
+                  throw new Error(msg);
+                }
+                const current = activeTasksRef.current.get(batchInstanceId);
+                if (current) {
+                  activeTasksRef.current.set(batchInstanceId, { ...current, taskId: td.taskId, status: "running" });
+                  persistActiveTask({ ...activeTasksRef.current.get(batchInstanceId) });
+                  updateJob(batchInstanceId, { status: "running", progress: 0 });
+                }
+                forceUpdate();
+              } catch (e) {
+                const current = activeTasksRef.current.get(batchInstanceId);
+                if (current) {
+                  activeTasksRef.current.set(batchInstanceId, { ...current, status: "failed", errorMsg: e.message ?? "Network error" });
+                }
+                markJobError(batchInstanceId, e.message ?? "Network error");
+                forceUpdate();
+                refreshCredits?.();
+                if (!e.type) toast.error(e.message ?? "Task létrehozása sikertelen.");
+                else if (e.type === "credits") { toast.error("Nincs elég Tripo kredit. Tölts fel a fiókodba!"); break; }
+                else if (e.type === "nsfw") toast.error("Tartalom blokkolva: NSFW vagy irányelvek megsértése.");
+              }
+            }
+            return; // batch handled — skip single-task dispatch below
           } else {
             const isUltra = meshQ === "ultra" && _isModern;
             const isP1 = effectiveModel === "P1-20260311";
@@ -1165,11 +1202,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         riggedId: mode === "animate" ? (riggedId || activeTaskId || null) : undefined,
       });
       setFocusedInstanceId(instanceId);
-      addJob({ id: instanceId, panelType: "tripo", title: label, status: "queued", progress: 0, countdown: 5, createdAt: Date.now(), updatedAt: Date.now() });
+      addJob({ id: instanceId, panelType: "tripo", title: label, status: "queued", progress: 0, countdown: 3, createdAt: Date.now(), updatedAt: Date.now() });
       forceUpdate();
 
-      // 5s cancellable window before sending to Tripo
-      const CANCEL_WINDOW = 5;
+      // 3s cancellable window before sending to Tripo
+      const CANCEL_WINDOW = 3;
       let cancelled = false;
       setPendingCountdown(CANCEL_WINDOW);
       pendingTaskRef.current = { instanceId, cancelled: false };
@@ -1225,7 +1262,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         if (current) {
           activeTasksRef.current.set(instanceId, { ...current, taskId: td.taskId, status: "running" });
           persistActiveTask({ ...activeTasksRef.current.get(instanceId) });
-          updateJob(instanceId, { status: "running", progress: 0 });
+          updateJob(instanceId, { status: "running", progress: 0, taskId: td.taskId });
         }
         forceUpdate();
       } catch (e) {
@@ -1247,144 +1284,50 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, syncSelHist, forceUpdate, persistActiveTask, addJob, updateJob, markJobError]);
 
-  const getCompatibility = useCallback(async (srcId) => {
-    // 1. In-memory cache
-    if (rigCompatRef.current[srcId] !== undefined) return rigCompatRef.current[srcId];
-
-    // 2. Firestore read
-    try {
-      const { getDoc, doc } = await import("firebase/firestore");
-      const { db } = await import("../../firebase/firebaseApp");
-      const snap = await getDoc(doc(db, "trellis_history", `tripo_${srcId}`));
-      if (snap.exists()) {
-        const val = snap.data()?.params?.isAnimatable;
-        if (val !== undefined && val !== null) {
-          rigCompatRef.current[srcId] = val;
-          return val;
-        }
-      }
-    } catch (_) {}
-
-    // 3. API call — costs 0 credits
-    try {
-      const headers = await authH();
-      const rr = await fetch(BASE_URL + "/api/tripo/task", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ type: "animate_prerigcheck", original_model_task_id: srcId }),
-      });
-      const rd = await rr.json();
-      if (!rd.success) throw new Error(rd.message);
-      let result = null;
-      await pollTask(rd.taskId, { cancelled: false }, headers, d => {
-        result = d.rigCheckResult ?? d.is_animatable ?? null;
-        if (d.detectedRigType) setDetectedRigType(d.detectedRigType);
-      }, { skipJumpCheck: true });
-
-      const boolResult = result === null ? null : Boolean(result);
-      rigCompatRef.current[srcId] = boolResult;
-
-      // Persist to Firestore
-      try {
-        const { doc, updateDoc, setDoc } = await import("firebase/firestore");
-        const { db } = await import("../../firebase/firebaseApp");
-        const ref = doc(db, "trellis_history", `tripo_${srcId}`);
-        try {
-          await updateDoc(ref, { "params.isAnimatable": boolResult });
-        } catch {
-          await setDoc(ref, { params: { isAnimatable: boolResult } }, { merge: true });
-        }
-      } catch (fsErr) {
-        console.warn("[getCompatibility] Firestore write failed:", fsErr.message);
-      }
-
-      return boolResult;
-    } catch {
-      return null;
-    }
-  }, [authH, pollTask]);
-
-  const handleAutoRig = useCallback(async () => {
-    if (!activeTaskId && !animId) return;
-    setRigBtnLocked(true);
-    setTimeout(() => setRigBtnLocked(false), 2000);
-    setErrorMsg("");
-
-    // Phase 1: rig compatibility check (0 credits)
-    const srcId = animId.trim() || activeTaskId;
-    setRigCompat("checking");
-    const isAnimatable = await getCompatibility(srcId);
-    if (isAnimatable === false) {
-      setRigCompat(false);
-      return;
-    }
-    setRigCompat(isAnimatable === true ? true : null);
-
-    // Phase 2: actual rig (25 credits)
-    setRigStep("rigging");
-    setDetectedRigModelVer(null); setDetectedRigType(null); setDetectedRigSpec(null);
-    if (pollAb.current) pollAb.current.cancelled = true;
-    const pt = { cancelled: false }; pollAb.current = pt;
-    userStoppedRef.current = false;
-    const jobId = crypto.randomUUID();
-    addJob({ id: jobId, panelType: "tripo", title: "Auto Rig", status: "queued", progress: 0, createdAt: Date.now(), updatedAt: Date.now() });
-    try {
-      const headers = await authH();
-      setStatusMsg("Rigging…");
-      const rr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify({ type: "animate_rig", original_model_task_id: srcId, spec: rigSpec, out_format: animOutFormat, rig_type: rigType, bake_animation: animBakeAnimation, export_with_geometry: animExportGeometry, animate_in_place: animAnimateInPlace }) });
-      const rd = await rr.json(); if (!rd.success) throw new Error(rd.message);
-      currentTaskId.current = rd.taskId;
-      updateJob(jobId, { status: "running", progress: 0 });
-      await pollTask(rd.taskId, pt, headers, async d => {
-        if (pt.cancelled) return;
-        const blob = d.modelUrl ? await fetchProxy(d.modelUrl, rd.taskId) : null;
-        if (pt.cancelled) { revokeBlobUrl(blob); return; }
-        if (blob) { revokeBlobUrl(prevUrl.current); setModelUrl(blob); prevUrl.current = blob; }
-        const actualRigType = d.rigType || rigType;
-        setRiggedId(rd.taskId); setRigStep("rigged"); setShowRig(true); setStatusMsg(""); setGenStatus("succeeded");
-        setDetectedRigModelVer(animModelVer); setDetectedRigType(actualRigType); setDetectedRigSpec(rigSpec);
-
-        if (d.modelUrl && blob) {
-          try {
-            const buf = await fetch(blob).then(r => r.arrayBuffer());
-            await getCachedThumbnail(buf, { width: 280, height: 280 }, d.modelUrl);
-          } catch { }
-        }
-
-        const mockStableId = `tripo_${rd.taskId}`;
-        const rigOptEntry = {
-          id: mockStableId, taskId: rd.taskId, status: "succeeded",
-          model_url: d.modelUrl, source: "tripo", mode: "rig", ts: Date.now(),
-          prompt: "auto-rig",
-          name: (history.find(h => h.taskId === srcId)?.name || "model") + "_rigged",
-          params: { rigModelVer: animModelVer, rigType: actualRigType, rigSpec, rigged: true, mode: "rig" },
-          createdAt: { toDate: () => new Date() },
-        };
-        setOptimisticItems(prev => [rigOptEntry, ...prev.filter(o => o.id !== mockStableId)]);
-        setHistory(h => h.some(x => x.id === mockStableId) ? h : [rigOptEntry, ...h]);
-        syncSelHist(rigOptEntry);
-
-        currentTaskId.current = null;
-        markJobDoneAndSeen(jobId, { title: "Auto Rig", progress: 100 });
-        persistGen({ taskId: rd.taskId, requestId: rd.taskId, mode: "animate", prompt: "auto-rig", modelVer: "", lastProgress: 100, lastProgressAt: Date.now(), startedAt: Date.now(), riggedId: rd.taskId, opType: "rig", rigModelVer: animModelVer, rigType: actualRigType, rigSpec });
-        const srcItemForRig = history.find(h => h.taskId === srcId); const rigBasePrompt = srcItemForRig?.prompt?.trim() || srcItemForRig?.name?.trim() || prompt.trim(); const aiRigName = await generateAIName(rigBasePrompt, "rig"); const _ni4 = await saveRigHist(rd.taskId, d.modelUrl, { prompt: "auto-rig", originalModelTaskId: srcId, aiName: aiRigName ?? undefined, rigModelVer: animModelVer, rigType: actualRigType, rigSpec }); markHistorySaved(); if (_ni4) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${rd.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
-      }, { skipJumpCheck: true, onProgress: dp => updateJob(jobId, { status: "running", progress: dp }) });
-    } catch (e) { currentTaskId.current = null; if (pt.cancelled) { markJobError(jobId, "Cancelled"); return; } setRigStep("idle"); setRiggedId(null); setShowRig(false); setErrorMsg(e.message); setStatusMsg(""); markJobError(jobId, e.message); }
-  }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl, saveRigHist, rigSpec, animOutFormat, rigType, animModelVer, animBakeAnimation, animExportGeometry, animAnimateInPlace, syncSelHist, addJob, updateJob, markJobDoneAndSeen, markJobError, getCompatibility]);
+  const { rigCompatRef, getCompatibility, handleAutoRig } = useTripoRig({
+    activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl,
+    saveRigHist, generateAIName, getIdToken,
+    rigSpec, animOutFormat, rigType, animModelVer, animBakeAnimation, animExportGeometry, animAnimateInPlace,
+    history, prompt, syncSelHist,
+    addJob, updateJob, markJobDoneAndSeen, markJobError,
+    pollAb, prevUrl, currentTaskId, userStoppedRef,
+    setRigBtnLocked, setErrorMsg, setRigCompat, setRigStep,
+    setDetectedRigModelVer, setDetectedRigType, setDetectedRigSpec,
+    setStatusMsg, setModelUrl, setRiggedId, setShowRig, setGenStatus,
+    setOptimisticItems, setHistory,
+  });
 
   const handleStop = useCallback(async (instanceId) => {
     const id = instanceId ?? focusedInstanceId;
     const inst = id ? activeTasksRef.current.get(id) : null;
-    if (!inst) return;
+    const stopMsg = "Task will finish on Tripo servers — credits will be used";
+
+    if (!inst) {
+      // Fallback: single-task (rig) path — no instanceId in activeTasksRef
+      const singleTaskId = currentTaskId.current;
+      if (pollAb.current) pollAb.current.cancelled = true;
+      userStoppedRef.current = true;
+      setStatusMsg(stopMsg);
+      if (singleTaskId) {
+        try {
+          const t = getIdToken ? await getIdToken() : "";
+          await fetch(`${BASE_URL}/api/tripo/task/${singleTaskId}/cancel`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+          });
+        } catch (err) { console.warn("[handleStop] cancel request failed:", err.message); }
+      }
+      return;
+    }
 
     activeTasksRef.current.set(id, {
       ...inst,
       _cancelled: true,
       status: "failed",
-      errorMsg: "User stopped",
+      errorMsg: stopMsg,
     });
     removeActiveTask(id);
-    markJobError(id, "User stopped");
+    markJobError(id, stopMsg);
     forceUpdate();
 
     if (inst.taskId) {
@@ -1394,9 +1337,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
         });
-      } catch (err) { console.warn("[handleStop] cancel failed:", err.message); }
+      } catch (err) { console.warn("[handleStop] cancel request failed:", err.message); }
     }
-  }, [focusedInstanceId, getIdToken, forceUpdate, markJobError]);
+  }, [focusedInstanceId, getIdToken, forceUpdate, markJobError, currentTaskId, pollAb, userStoppedRef, setStatusMsg]);
 
   // ── Parallel task poller callbacks ──────────────────────────────────────
   const onParallelTaskSuccess = useCallback(async (inst, d, blobUrl) => {
@@ -1423,15 +1366,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       // Free the blob if not showing it in the viewer
       if (!isThisTaskSelected) revokeBlobUrl(blobUrl);
     }
-    markJobDone(inst.instanceId, { title: inst.label, progress: 100 });
+    markJobDone(inst.instanceId, { title: inst.label, progress: 100, taskId: inst.taskId, modelUrl: d.modelUrl ?? null });
 
-    // Persist the durable Firestore URL so TripoPanel can load it on next mount (cross-panel case).
+    // Persist the durable Firestore URL so TripoPanel can load it on next mount.
     // Blob URLs are revoked on unmount and must not be stored here.
     if (d.modelUrl) {
-      sessionStorage.setItem('tripo_pending_model', JSON.stringify({
-        url: d.modelUrl,
-        taskId: inst.taskId,
-      }));
+      _pendingModel = { url: d.modelUrl, taskId: inst.taskId };
     }
 
     refreshCredits?.();
@@ -1539,6 +1479,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (histAbort.current) histAbort.current.cancelled = true;
     const t = { cancelled: false }; histAbort.current = t;
     setLoadingId(item.id); setSelHistId(item.id); setGenStatus(item.status);
+    programmaticUrlRef.current = item?.taskId || null;
     if (item?.taskId) setSearchParams(prev => { const n = new URLSearchParams(prev); n.set("tripoTaskId", item.taskId); return n; }, { replace: true });
     else setSearchParams(prev => { const n = new URLSearchParams(prev); n.delete("tripoTaskId"); return n; }, { replace: true });
     // Show textures by default when loading from archive (base color mode)
@@ -1605,11 +1546,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const onHistoryLoad = useCallback((items) => {
     // URL param takes priority over sessionStorage
     const urlTaskId = pendingUrlTaskId.current;
-    const savedHistId = sessionStorage.getItem("tripo_sel_hist");
     const item = urlTaskId
       ? items.find(i => i.taskId === urlTaskId || i.id === urlTaskId)
-      : savedHistId
-        ? items.find(i => i.id === savedHistId)
+      : _selHistId
+        ? items.find(i => i.id === _selHistId)
         : null;
     if (!item) { setLoadingId(null); return; }
     pendingUrlTaskId.current = null;
@@ -1617,7 +1557,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   }, [selHist]);
 
   const reuse = useCallback((item) => {
-    if (item?.prompt) setPrompt(item.prompt);
+    const styleObj = STYLE_PREFIX.find(s => s.id === item?.styleId);
+    const rawPrompt = styleObj?.prefix && item?.prompt?.startsWith(styleObj.prefix)
+      ? item.prompt.slice(styleObj.prefix.length)
+      : (item?.prompt || "");
+    setPrompt(rawPrompt);
+    setNegPrompt(item?.negPrompt || "");
     if (item?.taskId) {
       setSegId(item.taskId); setFillId(item.taskId); setRetopoId(item.taskId);
       setTexId(item.taskId); setAnimId(item.taskId); setEditId(item.taskId);
@@ -1640,7 +1585,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (riggedIdRef && !riggedIdRef.current && activeTaskId) {
       setRiggedId(activeTaskId);
     }
-  }, [activeTaskId, detectedRigModelVer, detectedRigType, detectedRigSpec, animModelVer, rigType, rigSpec]);
+  }, [activeTaskId]);
 
 
 
@@ -1688,7 +1633,56 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   const activeTasksRunningCount = useMemo(() =>
     [...activeTasksRef.current.values()].filter(t => t.status === "running" || t.status === "pending").length,
-  [_taskTick]); // eslint-disable-line react-hooks/exhaustive-deps
+    [_taskTick]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Consume ludusgen_open_job written by AiChat when user clicks a completed job in JobQueueWidget
+  // We run this on mount and also whenever jobs or history change in case the item wasn't ready yet.
+  useEffect(() => {
+    if (!user?.uid) return;
+    const key = `ludusgen_open_job:${user.uid}`;
+    const jobId = sessionStorage.getItem(key);
+    if (!jobId) return;
+
+    const job = jobs.find(j => j.id === jobId);
+    if (job?.taskId) {
+      const histItem = history.find(h => h.taskId === job.taskId);
+      if (histItem) {
+        sessionStorage.removeItem(key);
+        selHist(histItem);
+      } else if (job.status === 'done') {
+        // Still waiting for history to sync the finished job
+        pendingUrlTaskId.current = job.taskId;
+        setLoadingId("__url_pending__");
+      }
+    } else {
+      // Job doesn't have taskId yet or was removed?
+      sessionStorage.removeItem(key);
+    }
+  }, [user?.uid, jobs, history, selHist]);
+
+  // Synchronize active model with tripoTaskId URL parameter
+  const urlTaskIdParam = searchParams.get("tripoTaskId");
+  const urlTaskIdParamRef = useRef(urlTaskIdParam);
+  urlTaskIdParamRef.current = urlTaskIdParam;
+  useEffect(() => {
+    if (!urlTaskIdParam) return;
+    // Skip URL changes we initiated ourselves (saveHist, syncSelHist, selHist)
+    if (programmaticUrlRef.current === urlTaskIdParam) {
+      programmaticUrlRef.current = null;
+      return;
+    }
+    // Read latest values via refs — avoids history/activeTaskId as deps
+    // which would re-trigger on every Firestore snapshot or state update
+    if (urlTaskIdParam === activeTaskIdRef.current) return;
+    const histItem = historyRef.current.find(h => h.taskId === urlTaskIdParam);
+    if (histItem) {
+      selHist(histItem);
+    } else {
+      pendingUrlTaskId.current = urlTaskIdParam;
+      setLoadingId("__url_pending__");
+    }
+  // Only re-run when the URL param itself changes (external navigation)
+  }, [urlTaskIdParam, selHist]);
 
   return (
     <StudioLayout
@@ -1974,6 +1968,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             loadingId={loadingId}
             refreshTrigger={refreshTrigger}
             optimisticItems={optimisticItems}
+            firestoreCollection="tripo_history"
             onSelect={selHist}
             onReuse={reuse}
             onHistoryLoad={onHistoryLoad}
@@ -2000,6 +1995,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         setLStr={setLStr}
         lRot={lRot}
         setLRot={setLRot}
+        lElev={lElev}
+        setLElev={setLElev}
         lAutoR={lAutoR}
         setLAutoR={setLAutoR}
         lAutoS={lAutoS}
@@ -2055,7 +2052,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 function TripoWorkspaceWrapper({
   color, viewMode, setViewMode, lightMode, setLightMode,
   showGrid, setShowGrid, modelUrl, bgColor, setBgColor,
-  lStr, setLStr, lRot, setLRot, lAutoR, setLAutoR, lAutoS, setLAutoS,
+  lStr, setLStr, lRot, setLRot, lElev, setLElev, lAutoR, setLAutoR, lAutoS, setLAutoS,
   dramC, setDramC, gc1, setGc1, gc2, setGc2, wireOv, setWireOv,
   wireOp, setWireOp, wireC, setWireC, showRig, setShowRig, riggedId,
   autoSpin, setAutoSpin,
@@ -2097,7 +2094,7 @@ function TripoWorkspaceWrapper({
         <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0 min-w-0" style={{ flexWrap: 'wrap' }}>
           <BgColorPicker value={bgColor} onChange={setBgColor} />
           <div className="w-px h-5 bg-white/5 hidden sm:block mx-0" />
-          <LightingControls viewMode={viewMode} lightMode={lightMode} setLightMode={setLightMode} lightStrength={lStr} setLightStrength={setLStr} lightRotation={lRot} setLightRotation={setLRot} lightAutoRotate={lAutoR} setLightAutoRotate={setLAutoR} lightAutoRotateSpeed={lAutoS} setLightAutoRotateSpeed={setLAutoS} dramaticColor={dramC} setDramaticColor={setDramC} gridColor1={gc1} setGridColor1={setGc1} gridColor2={gc2} setGridColor2={setGc2} color={color} />
+          <LightingControls viewMode={viewMode} lightMode={lightMode} setLightMode={setLightMode} lightStrength={lStr} setLightStrength={setLStr} lightRotation={lRot} setLightRotation={setLRot} lightElevation={lElev} setLightElevation={setLElev} lightAutoRotate={lAutoR} setLightAutoRotate={setLAutoR} lightAutoRotateSpeed={lAutoS} setLightAutoRotateSpeed={setLAutoS} dramaticColor={dramC} setDramaticColor={setDramC} gridColor1={gc1} setGridColor1={setGc1} gridColor2={gc2} setGridColor2={setGc2} color={color} />
           <div className="w-px h-5 bg-white/5 hidden sm:block" />
           <IconBtn icon={<Grid3x3 className="w-4 h-4" />} tip="Grid" active={showGrid} color={color} onClick={() => setShowGrid(v => !v)} />
         </div>
@@ -2109,37 +2106,38 @@ function TripoWorkspaceWrapper({
           {(loadingId === "__url_pending__" && !modelUrl) ? (
             <div className="absolute inset-0 bg-black" />
           ) : (
-          <ThreeViewer
-            color={color}
-            viewMode={viewMode}
-            lightMode={lightMode}
-            showGrid={showGrid}
-            modelUrl={modelUrl}
-            lightStrength={lStr}
-            lightRotation={lRot}
-            lightAutoRotate={lAutoR}
-            lightAutoRotateSpeed={lAutoS}
-            dramaticColor={dramC}
-            wireframeOverlay={wireOv}
-            wireOpacity={wireOp}
-            wireHexColor={wireC.replace("#", "0x")}
-            showRig={showRig && !!riggedId}
-            onRigDetected={onRigDetected}
-            onAnimClipsDetected={onAnimClipsDetected}
-            autoSpin={autoSpin}
-            bgColor={bgColor}
-            gridColor1={gc1}
-            gridColor2={gc2}
-            onSpinStop={() => setAutoSpin(false)}
-            onReady={s => { sceneRef.current = s; }}
-            // 3D Paint
-            paintMode={paintMode}
-            paintColor={paintColor}
-            paintSize={paintSize}
-            paintOpacity={paintOpacity}
-            paintHardness={paintHardness}
-            paintCanvasRef={paintCanvasRef}
-          />
+            <ThreeViewer
+              color={color}
+              viewMode={viewMode}
+              lightMode={lightMode}
+              showGrid={showGrid}
+              modelUrl={modelUrl}
+              lightStrength={lStr}
+              lightRotation={lRot}
+              lightElevation={lElev}
+              lightAutoRotate={lAutoR}
+              lightAutoRotateSpeed={lAutoS}
+              dramaticColor={dramC}
+              wireframeOverlay={wireOv}
+              wireOpacity={wireOp}
+              wireHexColor={wireC.replace("#", "0x")}
+              showRig={showRig && !!riggedId}
+              onRigDetected={onRigDetected}
+              onAnimClipsDetected={onAnimClipsDetected}
+              autoSpin={autoSpin}
+              bgColor={bgColor}
+              gridColor1={gc1}
+              gridColor2={gc2}
+              onSpinStop={() => setAutoSpin(false)}
+              onReady={s => { sceneRef.current = s; }}
+              // 3D Paint
+              paintMode={paintMode}
+              paintColor={paintColor}
+              paintSize={paintSize}
+              paintOpacity={paintOpacity}
+              paintHardness={paintHardness}
+              paintCanvasRef={paintCanvasRef}
+            />
           )}
         </div>
 
@@ -2176,11 +2174,10 @@ function TripoWorkspaceWrapper({
               <button
                 key={i}
                 onClick={() => onSwitchClip(i)}
-                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
-                  activeClipIdx === i
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,229,255,0.15)]'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${activeClipIdx === i
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,229,255,0.15)]'
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
+                  }`}
               >
                 {clip.name || `Clip ${i + 1}`}
               </button>

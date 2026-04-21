@@ -269,7 +269,8 @@ export async function loadHistoryPageFromFirestore(userId, { limit = 10, startAf
 // ezzel a mezővel automatikus törléshez (ha engedélyezve van).
 // ────────────────────────────────────────────────────────────────────────────
 
-export async function saveHistoryToFirestore(userId, itemData, docId = null) {
+export async function saveHistoryToFirestore(userId, itemData, docId = null, firestoreCollection = 'trellis_history') {
+  if (!userId) { console.warn('[saveHistoryToFirestore] called without userId — skipped'); return { docId: null }; }
   const now = Date.now();
   const data = {
     userId,
@@ -279,10 +280,10 @@ export async function saveHistoryToFirestore(userId, itemData, docId = null) {
     expiresAt: now + HISTORY_TTL_MS,
   };
   if (docId) {
-    const docRef = doc(db, 'trellis_history', docId);
+    const docRef = doc(db, firestoreCollection, docId);
     await setDoc(docRef, data, { merge: true });
     return { docId };
   }
-  const docRef = await addDoc(collection(db, 'trellis_history'), data);
+  const docRef = await addDoc(collection(db, firestoreCollection), data);
   return { docId: docRef.id };
 }
