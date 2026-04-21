@@ -2241,6 +2241,7 @@ function TripoWorkspaceWrapper({
               <span className="hidden sm:inline">Latency:</span><span className="sm:hidden">L:</span> <span className="text-zinc-500">14ms</span>
             </span>
           </div>
+
         </div>
       )}
     </div>
