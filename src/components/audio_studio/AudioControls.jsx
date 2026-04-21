@@ -19,18 +19,32 @@ const MUSIC_GENRES = ["cinematic orchestral", "lo-fi hip hop", "electronic", "ja
 const MUSIC_MOODS = ["epic", "chill", "energetic", "melancholic", "happy", "dark", "romantic", "tense", "peaceful", "mysterious"];
 
 const RIVA_LANGUAGES = [
-  { code: "EN-US", label: "English (US)" },
-  { code: "ES-US", label: "Spanish (US)" },
-  { code: "FR-FR", label: "Français" },
-  { code: "DE-DE", label: "Deutsch" },
-  { code: "ZH-CN", label: "中文 (简体)" },
-  { code: "IT-IT", label: "Italiano" },
-  { code: "VI-VN", label: "Tiếng Việt" },
+  { code: "EN-US", label: "English" },
+  { code: "ES-US", label: "Spanish" },
+  { code: "FR-FR", label: "French" },
+  { code: "DE-DE", label: "German" },
+  { code: "ZH-CN", label: "Mandarin" },
+  { code: "IT-IT", label: "Italian" },
+  { code: "VI-VN", label: "Vietnamese" },
+  { code: "HI-IN", label: "Hindi" },
+  { code: "JA-JP", label: "Japanese" },
 ];
 
 const EMOTION_EMOJI = {
   Neutral: "😐", Angry: "😠", Calm: "😌", Happy: "😊",
-  Sad: "😢", Fearful: "😨", Disgust: "🤢", PleasantSurprise: "😲",
+  Sad: "😢", Fearful: "😨", Disgust: "🤢", Disgusted: "🤢", PleasantSurprised: "😲",
+};
+
+const EMOTION_LABELS = {
+  Neutral: "Semleges",
+  Angry: "Mérges",
+  Calm: "Nyugodt",
+  Happy: "Vidám",
+  Sad: "Szomorú",
+  Fearful: "Félő",
+  Disgust: "Undorodó",
+  Disgusted: "Undorodó",
+  PleasantSurprised: "Meglepett",
 };
 
 export default function AudioControls({
@@ -124,7 +138,7 @@ export default function AudioControls({
 
             <div className="flex-1 min-w-0 text-left">
               <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.25em] leading-none mb-0.5">
-                {isTTS ? 'Neural Synthesis' : 'Sonic Architecture'}
+                {isTTS ? 'Neurális szintézis' : 'Zenei architektúra'}
               </p>
               <p className="text-[12px] font-black text-white truncate leading-none">
                 {selectedModel.name}
@@ -146,8 +160,8 @@ export default function AudioControls({
                 className="absolute top-full left-4 right-4 mt-1 rounded-xl border border-white/10 bg-[#0d0d14]/98 backdrop-blur-xl shadow-2xl z-50 overflow-hidden"
               >
                 <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
-                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">Audio Models</span>
-                  <span className="text-[8px] text-zinc-600 font-bold">{availableModels.length} units</span>
+                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">Hang modellek</span>
+                  <span className="text-[8px] text-zinc-600 font-bold">{availableModels.length} modell</span>
                 </div>
                 <div className="max-h-72 overflow-y-auto py-1">
                   {availableModels.map(model => (
@@ -168,7 +182,7 @@ export default function AudioControls({
                         <span className="text-[9px] text-zinc-600 font-medium">{model.provider}</span>
                       </div>
                       {selectedModel.id === model.id && (
-                        <span className="text-[8px] font-black text-emerald-500 uppercase flex-shrink-0">Active</span>
+                        <span className="text-[8px] font-black text-emerald-500 uppercase flex-shrink-0">Aktív</span>
                       )}
                     </button>
                   ))}
@@ -186,14 +200,14 @@ export default function AudioControls({
           <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
               <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic">
-                {isTTS ? 'Input Manuscript' : 'Musical Blueprint'}
+                {isTTS ? 'Bemeneti szöveg' : 'Zenei leírás'}
               </label>
               <Sparkles className="w-3.5 h-3.5 text-primary opacity-30" />
             </div>
             <textarea
               value={isTTS ? text : musicPrompt}
               onChange={(e) => isTTS ? setText(e.target.value) : setMusicPrompt(e.target.value)}
-              placeholder={isTTS ? "Type or paste transcript..." : "Describe a melody, style, or atmosphere..."}
+              placeholder={isTTS ? "Gépelj vagy másolj be szöveget..." : "Írj le egy dallamot, stílust vagy hangulatot..."}
               rows={4}
               className="w-full bg-white/[0.02] border border-white/5 rounded-2xl p-4 text-[13px] text-zinc-200 placeholder-zinc-800 focus:outline-none focus:border-white/10 transition-all resize-none leading-relaxed"
             />
@@ -205,7 +219,7 @@ export default function AudioControls({
           <div className="space-y-8">
             <div className="flex items-center gap-2 px-1">
               <Settings2 className="w-3.5 h-3.5 text-zinc-600" />
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Core Parameters</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Alapbeállítások</span>
             </div>
 
             {isTTS ? (
@@ -213,7 +227,7 @@ export default function AudioControls({
                 {isNvidiaRiva ? (
                   <>
                     <Select
-                      label="Synthesis Language"
+                      label="Szintézis nyelve"
                       options={RIVA_LANGUAGES}
                       value={rivaLang}
                       onChange={setRivaLang}
@@ -223,7 +237,7 @@ export default function AudioControls({
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 px-1">
                         <Activity className="w-3 h-3 text-zinc-600" />
-                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Vocal Profile</span>
+                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Hang profil</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         {rivaVoices.map(v => (
@@ -249,7 +263,7 @@ export default function AudioControls({
                       <div className="space-y-4">
                         <div className="flex items-center gap-2 px-1">
                           <Smile className="w-3 h-3 text-zinc-600" />
-                          <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Emotional Bias</span>
+                          <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Érzelmi tónus</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {(rivaVoices.find(v => v.name === rivaVoiceName)?.emotions || []).map(emo => (
@@ -264,7 +278,7 @@ export default function AudioControls({
                                 boxShadow: `0 0 15px ${color}08`
                               } : {}}
                             >
-                              <span className={rivaEmotion === emo ? 'text-white' : ''}>{EMOTION_EMOJI[emo] || ""}</span> {emo}
+                              <span className={rivaEmotion === emo ? 'text-white' : ''}>{EMOTION_EMOJI[emo] || ""}</span> {EMOTION_LABELS[emo] || emo}
                             </button>
                           ))}
                         </div>
@@ -276,7 +290,7 @@ export default function AudioControls({
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 px-1">
                         <Activity className="w-3 h-3 text-zinc-600" />
-                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Vocal Identity</span>
+                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Hang karakter</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         {TTS_VOICES.map(v => (
@@ -302,7 +316,7 @@ export default function AudioControls({
                       <div className="flex justify-between items-center px-1">
                         <div className="flex items-center gap-2">
                           <Volume2 className="w-3 h-3 text-zinc-600" />
-                          <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Spectral Velocity</span>
+                          <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Beszédsebesség</span>
                         </div>
                         <span className="text-[10px] font-black italic" style={{ color }}>{speed}x</span>
                       </div>
@@ -317,15 +331,15 @@ export default function AudioControls({
             ) : (
               <div className="space-y-8">
                 <div className="grid grid-cols-2 gap-4">
-                  <Select label="Sonic Genre" options={MUSIC_GENRES} value={genre} onChange={setGenre} icon={Music} />
-                  <Select label="Atmosphere" options={MUSIC_MOODS} value={mood} onChange={setMood} icon={Smile} />
+                  <Select label="Zenei műfaj" options={MUSIC_GENRES} value={genre} onChange={setGenre} icon={Music} />
+                  <Select label="Hangulat" options={MUSIC_MOODS} value={mood} onChange={setMood} icon={Smile} />
                 </div>
 
                 <div className="space-y-4 pt-2">
                   <div className="flex justify-between items-center px-1">
                     <div className="flex items-center gap-2">
                       <Clock className="w-3 h-3 text-zinc-600" />
-                      <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Sequence Duration</span>
+                      <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Zene hossza</span>
                     </div>
                     <span className="text-[10px] font-black italic" style={{ color }}>{duration}s</span>
                   </div>
@@ -344,7 +358,7 @@ export default function AudioControls({
                     <div className={`p-2 rounded-lg transition-colors ${instrumental ? 'bg-primary/20 text-white' : 'bg-white/10 text-zinc-800'}`}>
                       <Mic className="w-3.5 h-3.5" />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] italic">Instrumental Only</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] italic">Csak hangszeres</span>
                   </div>
                   <div className="w-8 h-4 rounded-full relative transition-colors" style={{ backgroundColor: instrumental ? color : 'rgba(255,255,255,0.05)' }}>
                     <motion.div
@@ -377,11 +391,11 @@ export default function AudioControls({
               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.5 }}>
                 <Activity className="w-4 h-4" />
               </motion.div>
-              <span>Forging...</span>
+              <span>Alkotás...</span>
             </>
           ) : (
             <>
-              <span>Initiate Forge</span> <Zap className="w-4 h-4 fill-current" />
+              <span>Létrehozás indítása</span> <Zap className="w-4 h-4 fill-current" />
             </>
           )}
         </button>

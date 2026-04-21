@@ -39,6 +39,7 @@ import {
 import StudioLayout from "../../components/shared/StudioLayout";
 import { useStudioPanels } from "../../context/StudioPanelContext";
 import { API_BASE as API_BASE_RAW } from "../../api/client";
+import { useJobs } from "../../context/JobsContext";
 
 // ── Sub-modules ────────────────────────────────────────────────────────────
 import ThreeViewer from "./viewer/ThreeViewer";
@@ -534,8 +535,9 @@ function WireframeControl({
   );
 }
 
-export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+export default function MeshyPanel({ selectedModel, getIdToken, userId, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
   const { registerPanel, unregisterPanel } = useStudioPanels();
+  const { jobs, addJob, updateJob, markJobDoneAndSeen, markJobError } = useJobs();
   const color = selectedModel?.color || "#06b6d4";
 
   // Register panels with centralized manager
@@ -595,11 +597,26 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
   const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [offsets, setOffsets] = useState({ left: 320, right: 320 });
+  const [currentJobId, setCurrentJobId] = useState(null);
 
   // Master Sidebar Sync
   useEffect(() => {
     setLeftOpen(isGlobalOpen);
   }, [isGlobalOpen]);
+
+  // Sync with global jobs for cancellation
+  useEffect(() => {
+    if (!currentJobId || genStatus !== "pending") return;
+    const stillExists = jobs.some(j => j.id === currentJobId);
+    if (!stillExists) {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      setGenStatus("idle");
+      setProgress(0);
+      setTaskId(null);
+      setRefining(false);
+      setCurrentJobId(null);
+    }
+  }, [jobs, currentJobId, genStatus]);
 
   // ── UI state ─────────────────────────────────────────────────────────────
   const [showDownload, setShowDownload] = useState(false);
@@ -703,7 +720,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
   }, [getIdToken]);
 
   const startPolling = useCallback(
-    (id, type) => {
+    (id, type, jobId) => {
       clearInterval(pollTimerRef.current);
       pollTimerRef.current = setInterval(async () => {
         try {
@@ -718,13 +735,28 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
             return;
           }
           const data = await res.json();
+          
+          // Cancellation check
+          if (!jobs.some(j => j.id === jobId)) {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+            return;
+          }
+
           if (!data.success) {
             console.error("[Meshy] poll returned non-success:", data.message);
             toast.error("Generálási hiba: " + (data.message || "ismeretlen hiba"));
+            if (jobId) markJobError(jobId, data.message || "Ismeretlen hiba");
             return;
           }
-          setProgress(data.progress ?? 0);
+          
+          const currentProgress = data.progress ?? 0;
+          setProgress(currentProgress);
           setGenStatus(data.status?.toLowerCase() ?? "pending");
+          
+          if (jobId) {
+            updateJob(jobId, { progress: currentProgress, status: 'running' });
+          }
+
           if (data.status === "SUCCEEDED") {
             clearInterval(pollTimerRef.current);
             setProgress(100);
@@ -747,16 +779,19 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
             };
             setHistory((h) => [item, ...h]);
             setActiveItem(item);
+            if (jobId) markJobDoneAndSeen(jobId, { progress: 100 });
           } else if (data.status === "FAILED" || data.status === "EXPIRED") {
             clearInterval(pollTimerRef.current);
-            setErrorMsg(data.task_error?.message ?? "Generálás sikertelen");
+            const msg = data.task_error?.message ?? "Generálás sikertelen";
+            setErrorMsg(msg);
+            if (jobId) markJobError(jobId, msg);
           }
         } catch (err) {
           console.error("Poll error:", err);
         }
       }, POLL_MS);
     },
-    [authHeaders, inputMode, prompt, imageFile],
+    [authHeaders, inputMode, prompt, imageFile, updateJob, markJobDoneAndSeen, markJobError],
   );
 
   const handleGenerate = useCallback(async () => {
@@ -768,6 +803,19 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
     setPreviewTaskId(null);
     setProgress(0);
     setGenStatus("pending");
+    const jobId = crypto.randomUUID();
+    const title = inputMode === "text" ? prompt.trim().slice(0, 30) : `Kép: ${imageFile?.name?.slice(0, 20) || 'feltöltés'}`;
+    
+    addJob({
+      id: jobId,
+      title,
+      status: 'queued',
+      panelType: 'meshy',
+      progress: 0,
+      createdAt: Date.now(),
+    });
+    setCurrentJobId(jobId);
+
     try {
       const headers = await authHeaders();
       let res, data;
@@ -775,7 +823,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
         res = await fetch(`${API_BASE}/text-to-3d`, {
           method: "POST",
           headers,
-          body: JSON.stringify({ prompt: prompt.trim(), ...params }),
+          body: JSON.stringify({ prompt: prompt.trim(), jobId, ...params }),
         });
         data = await res.json();
         setTaskType("text-to-3d");
@@ -786,6 +834,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
           headers,
           body: JSON.stringify({
             image_url: imageDataURI,
+            jobId,
             model_type: params.model_type,
             ai_model: params.ai_model,
             topology: params.topology,
@@ -804,15 +853,17 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
       if (!data.success) {
         setGenStatus("failed");
         setErrorMsg(data.message ?? "Hiba");
+        markJobError(jobId, data.message ?? "Hiba");
         return;
       }
       setTaskId(data.task_id);
-      startPolling(data.task_id, inputMode === "text" ? "text-to-3d" : "image-to-3d");
+      startPolling(data.task_id, inputMode === "text" ? "text-to-3d" : "image-to-3d", jobId);
     } catch (err) {
       setGenStatus("failed");
       setErrorMsg(err.message ?? "Hálózati hiba");
+      markJobError(jobId, err.message ?? "Hálózati hiba");
     }
-  }, [genStatus, inputMode, prompt, imageFile, params, authHeaders, startPolling]);
+  }, [genStatus, inputMode, prompt, imageFile, params, authHeaders, startPolling, addJob, markJobError]);
 
   const handleRefine = useCallback(async () => {
     if (!previewTaskId || refining) return;
@@ -820,6 +871,17 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
     setGenStatus("pending");
     setProgress(0);
     setErrorMsg("");
+    const jobId = crypto.randomUUID();
+    addJob({
+      id: jobId,
+      title: `Finomítás: ${activeItem?.prompt?.slice(0, 20) || '3D Modell'}`,
+      status: 'queued',
+      panelType: 'meshy',
+      progress: 0,
+      createdAt: Date.now(),
+    });
+    setCurrentJobId(jobId);
+
     try {
       const headers = await authHeaders();
       const res = await fetch(`${API_BASE}/refine`, {
@@ -829,6 +891,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
           preview_task_id: previewTaskId,
           enable_pbr: params.enable_pbr,
           texture_prompt: params.texture_prompt,
+          jobId,
         }),
       });
       const data = await res.json();
@@ -836,16 +899,18 @@ export default function Trellis2Panel({ selectedModel, getIdToken, userId, isGlo
         setGenStatus("failed");
         setErrorMsg(data.message);
         setRefining(false);
+        markJobError(jobId, data.message);
         return;
       }
       setTaskId(data.task_id);
-      startPolling(data.task_id, "text-to-3d");
+      startPolling(data.task_id, "text-to-3d", jobId);
     } catch (err) {
       setGenStatus("failed");
       setErrorMsg(err.message);
       setRefining(false);
+      markJobError(jobId, err.message);
     }
-  }, [previewTaskId, refining, params, authHeaders, startPolling]);
+  }, [previewTaskId, refining, params, authHeaders, startPolling, addJob, markJobError, activeItem]);
 
   useEffect(() => () => clearInterval(pollTimerRef.current), []);
 

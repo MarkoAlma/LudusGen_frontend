@@ -148,7 +148,7 @@ function ImageCard({ img, idx, onZoom, onDownload }) {
       {/* Badge jobb felül */}
       <div className="absolute top-4 left-4 px-2.5 py-1 bg-black/50 backdrop-blur-md border border-white/8 rounded-lg text-[8px] font-black text-white/40 uppercase tracking-[0.25em] flex items-center gap-1.5">
         <div className="w-1 h-1 rounded-full bg-violet-400 animate-pulse" />
-        Output #{idx + 1}
+        Kimenet #{idx + 1}
       </div>
     </motion.div>
   );
@@ -199,7 +199,7 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
               <AlertCircle className="w-8 h-8" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black text-white italic tracking-tighter uppercase">Protocol Violation</h3>
+              <h3 className="text-xl font-black text-white italic tracking-tighter uppercase">Protokoll hiba</h3>
               <p className="text-zinc-600 max-w-sm font-bold text-[11px] uppercase tracking-widest leading-relaxed">{error}</p>
             </div>
           </motion.div>
@@ -228,7 +228,7 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
                 </div>
                 <div className="space-y-5">
                   <h3 className="text-2xl font-black text-white italic tracking-[0.4em] uppercase">
-                    Forging Asset<span className="animate-pulse">...</span>
+                    Kép alkotása<span className="animate-pulse">...</span>
                   </h3>
                   {genStatus && (
                     <div className={`text-[8px] font-black uppercase tracking-widest px-3 py-1.5 rounded-md border ${
@@ -264,8 +264,8 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <h3 className="text-sm font-black text-zinc-800 italic uppercase tracking-[0.5em]">System Standby</h3>
-                  <p className="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">Execute prompt to initialize engine</p>
+                  <h3 className="text-sm font-black text-zinc-800 italic uppercase tracking-[0.5em]">Rendszer készenlét</h3>
+                  <p className="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">Adj meg egy leírást a motor indításához</p>
                 </div>
               </div>
             )}
@@ -305,14 +305,14 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
             onClick={() => images.forEach(downloadImage)}
             className="px-6 py-3 rounded-xl bg-white/5 border border-white/5 text-zinc-500 font-black text-[10px] uppercase tracking-[0.2em] hover:text-white hover:bg-white/10 transition-all flex items-center gap-3"
           >
-            Bulk Export <Download className="w-4 h-4" />
+            Összes letöltése <Download className="w-4 h-4" />
           </button>
           <div className="w-px h-5 bg-white/5 mx-2" />
           <button 
             onClick={onClear}
             className="px-6 py-3 rounded-xl bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:scale-105 transition-all flex items-center gap-3"
           >
-            Close Asset <X className="w-4 h-4" />
+            Képernyő ürítése <X className="w-4 h-4" />
           </button>
         </motion.div>
       )}

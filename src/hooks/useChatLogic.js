@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import { db } from "../firebase/firebaseApp";
 import {
   collection, addDoc, query, orderBy, limit, limitToLast, getDocs,
-  serverTimestamp, doc, setDoc, getDoc, writeBatch,
+  serverTimestamp, doc, setDoc, getDoc, writeBatch, startAfter,
 } from "firebase/firestore";
 import { DEFAULT_PRESETS, ALL_MODELS } from "../ai_components/models";
 import { API_BASE } from "../api/client";
@@ -30,6 +30,9 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
   const [loadingConversationList, setLoadingConversationList] = useState(false);
   const [attachedImage, setAttachedImage] = useState(null);
   const [shouldRestoreModel, setShouldRestoreModel] = useState(true);
+  const [lastVisibleDoc, setLastVisibleDoc] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [sessionId, setSessionId] = useState(() => {
     let sid = sessionStorage.getItem("chat_session_current");
     if (!sid) {
@@ -49,6 +52,10 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
   sessionIdRef.current = sessionId;
   const onModelChangeRef = useRef(onModelChange);
   onModelChangeRef.current = onModelChange;
+  const isFetchingRef = useRef(false);
+  const lastVisibleDocRef = useRef(null);
+  const hasMoreRef = useRef(true);
+  const legacyLoadedRef = useRef(false);
 
   // ── Firestore refs — model-independent ────────────────────────────
   const getSessionRef = useCallback((sessionId) =>
@@ -60,42 +67,93 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     [userId]);
 
   // ── Load History — model-independent with legacy fallback ─────────
-  const loadConversationList = useCallback(async () => {
-    if (!userId) return;
-    setLoadingConversationList(true);
+  const loadConversationList = useCallback(async (isLoadMore = false) => {
+    if (!userId || isFetchingRef.current) return;
+    
+    if (isLoadMore) {
+      if (!hasMoreRef.current || !lastVisibleDocRef.current) return;
+      setIsLoadingMore(true);
+    } else {
+      setLoadingConversationList(true);
+      setHasMore(true);
+      hasMoreRef.current = true;
+      lastVisibleDocRef.current = null;
+      setLastVisibleDoc(null);
+    }
+
+    isFetchingRef.current = true;
+
     try {
-      // Try new path first
-      const newRef = collection(db, "conversations", userId, "sessions");
-      const q = query(newRef, orderBy("updatedAt", "desc"), limit(50));
+      const pageSize = isLoadMore ? 40 : 30;
+      const sessionsRef = collection(db, "conversations", userId, "sessions");
+      
+      let q;
+      if (isLoadMore && lastVisibleDocRef.current) {
+        q = query(sessionsRef, orderBy("updatedAt", "desc"), startAfter(lastVisibleDocRef.current), limit(pageSize));
+      } else {
+        q = query(sessionsRef, orderBy("updatedAt", "desc"), limit(pageSize));
+      }
+
       const snap = await getDocs(q);
+      const newLastVisible = snap.docs[snap.docs.length - 1];
       let convs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      // Also query legacy paths and merge
-      const legacyPromises = CHAT_MODEL_IDS.map(async (modelId) => {
-        try {
-          const ref = collection(db, "conversations", userId, modelId);
-          const lq = query(ref, orderBy("updatedAt", "desc"), limit(20));
-          const lsnap = await getDocs(lq);
-          return lsnap.docs.map(d => ({ id: d.id, ...d.data(), _legacyModelId: modelId }));
-        } catch { return []; }
-      });
+      if (snap.docs.length < pageSize) {
+        setHasMore(false);
+        hasMoreRef.current = false;
 
-      const legacyConvs = (await Promise.all(legacyPromises)).flat();
-      const existingIds = new Set(convs.map(c => c.id));
-      for (const legacy of legacyConvs) {
-        if (!existingIds.has(legacy.id)) {
-          convs.push(legacy);
+        // END OF MODERN SESSIONS: Now load legacy "archived" sessions if not already done
+        if (!legacyLoadedRef.current) {
+          const legacyPromises = CHAT_MODEL_IDS.map(async (modelId) => {
+            try {
+              const ref = collection(db, "conversations", userId, modelId);
+              const lq = query(ref, orderBy("updatedAt", "desc"), limit(40));
+              const lsnap = await getDocs(lq);
+              return lsnap.docs.map(d => ({ id: d.id, ...d.data(), _legacyModelId: modelId }));
+            } catch { return []; }
+          });
+
+          const legacyConvs = (await Promise.all(legacyPromises)).flat();
+          const existingIds = new Set(convs.map(c => c.id));
+          const filteredLegacy = legacyConvs.filter(l => !existingIds.has(l.id));
+          
+          filteredLegacy.sort((a, b) => {
+            const timeA = a.updatedAt?.seconds || a.timestamp?.seconds || (a.createdAt ? new Date(a.createdAt).getTime() / 1000 : 0);
+            const timeB = b.updatedAt?.seconds || b.timestamp?.seconds || (b.createdAt ? new Date(b.createdAt).getTime() / 1000 : 0);
+            return timeB - timeA;
+          });
+
+          convs = [...convs, ...filteredLegacy];
+          legacyLoadedRef.current = true;
         }
       }
 
-      convs.sort((a, b) => {
-        const timeA = a.updatedAt?.seconds || a.timestamp?.seconds || (a.createdAt ? new Date(a.createdAt).getTime() / 1000 : 0);
-        const timeB = b.updatedAt?.seconds || b.timestamp?.seconds || (b.createdAt ? new Date(b.createdAt).getTime() / 1000 : 0);
-        return timeB - timeA;
-      });
-      setConversations(convs.slice(0, 50));
-    } catch (e) { console.error(e); }
-    setLoadingConversationList(false);
+      if (!isLoadMore) {
+        setConversations(convs);
+      } else {
+        setConversations(prev => {
+          const merged = [...prev, ...convs];
+          const seen = new Set();
+          return merged.filter(c => {
+            if (seen.has(c.id)) return false;
+            seen.add(c.id);
+            return true;
+          });
+        });
+      }
+
+      lastVisibleDocRef.current = newLastVisible;
+      setLastVisibleDoc(newLastVisible);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingConversationList(false);
+      setIsLoadingMore(false);
+      // Give some breathing room before next fetch allowed
+      setTimeout(() => {
+        isFetchingRef.current = false;
+      }, 800);
+    }
   }, [userId]);
 
 
@@ -210,8 +268,11 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
   }, [userId, sessionId, getMessagesRef, getSessionRef]);
 
   useEffect(() => {
-    loadConversationList();
-  }, [loadConversationList]);
+    if (userId) {
+      loadConversationList();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   useEffect(() => {
     loadCurrentConversation();
@@ -277,13 +338,10 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         sessionId,
         modelId: model.id,
         modelName: model.name,
-        ...(msg.role === "user" ? { title: contentToSave.slice(0, 60) } : {}),
         lastMessage: contentToSave.slice(0, 100),
         lastRole: msg.role,
         updatedAt: serverTimestamp(),
       }, { merge: true });
-
-      loadConversationList();
     } catch (e) { console.error('[History] Failed to save message:', e); }
   };
 
@@ -328,10 +386,71 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     setSessionId(newSid);
   }, []);
 
+  const deleteSession = useCallback(async (sid) => {
+    if (!userId || !sid) return;
+
+    // Preserve previous state for potential rollback
+    const previousConversations = conversations;
+
+    // 1. Optimistic UI update: remove item immediately
+    setConversations(prev => prev.filter(c => c.id !== sid));
+
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`${API_BASE}/api/chat/session/${sid}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Törlés sikertelen');
+      
+      toast.success('Beszélgetés törölve');
+      
+      // 2. If we deleted the current session, start a new one
+      if (sid === sessionId) {
+        createNewSession();
+      }
+      
+      // No loadConversationList() call here - we already handled it optimistically!
+    } catch (e) {
+      console.error('[Delete] Failed:', e);
+      toast.error('Hiba a törlés során');
+      // Rollback on failure
+      setConversations(previousConversations);
+    }
+  }, [userId, getIdToken, sessionId, createNewSession, conversations]);
+
+  const renameSession = useCallback(async (sid, newTitle) => {
+    if (!userId || !sid || !newTitle.trim()) return;
+    const trimmedTitle = newTitle.trim();
+
+    // Optimistic UI update
+    setConversations(prev => prev.map(c => c.id === sid ? { ...c, title: trimmedTitle } : c));
+
+    try {
+      const token = await getIdToken();
+      const res = await fetch(`${API_BASE}/api/chat/session/${sid}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ title: trimmedTitle })
+      });
+      if (!res.ok) throw new Error('Átnevezés sikertelen');
+      
+      toast.success('Átnevezve');
+    } catch (e) {
+      console.error('[Rename] Failed:', e);
+      toast.error('Hiba az átnevezés során');
+      // Rollback on failure
+      loadConversationList();
+    }
+  }, [userId, getIdToken, loadConversationList]);
+
   // ── Trigger summary generation (fire-and-forget) ──────────────────
   // REMOVED — backend now handles context/summary
 
-  const syncFinalMessage = useCallback(async (sid, msgId, content) => {
+  const syncFinalMessage = useCallback(async (sid, msgId, content, isFirstMessage = false) => {
     if (!msgId || !sid || !userId) return;
     try {
       // 1. Direct Frontend Persistence (Bulletproof fallback)
@@ -369,7 +488,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
       });
       
       console.log(`[Chat] Finalized message ${msgId} (Frontend + Backend sync)`);
-      loadConversationList();
+      if (isFirstMessage) loadConversationList();
     } catch (err) {
       console.error('[Finalize] Sync failed:', err);
     }
@@ -379,6 +498,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     const textToSend = typeof overrideText === 'string' ? overrideText : input;
     if ((!textToSend.trim() && !attachedImage) || isTyping) return;
 
+    const isFirstMessage = messages.length === 0;
     const model = selectedModelRef.current;
 
     const userMsg = {
@@ -472,7 +592,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         setMessages(prev => prev.map(m => m.id === aiMsgId ? finalMsg : m));
         
         // Ensure the partial or complete content is saved to DB
-        await syncFinalMessage(sessionId, aiMsgId, accumulated);
+        await syncFinalMessage(sessionId, aiMsgId, accumulated, isFirstMessage);
 
         if (summaryRefreshed) {
           setIsSummarizing(false);
@@ -487,7 +607,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
           setMessages(prev => prev.map(m => m.id === aiMsgId ? finalMsg : m));
           
           // Ensure the answer is saved to DB
-          await syncFinalMessage(sessionId, aiMsgId, data.content);
+          await syncFinalMessage(sessionId, aiMsgId, data.content, isFirstMessage);
 
           if (summaryRefreshed) {
             setIsSummarizing(false);
@@ -506,7 +626,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         setMessages(prev => prev.map(m => m.id === aiMsgId ? finalMsg : m));
 
         // Sync with DB
-        await syncFinalMessage(sessionId, aiMsgId, accumulated);
+        await syncFinalMessage(sessionId, aiMsgId, accumulated, isFirstMessage);
       } else {
         console.error(e);
         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: `Hiba: ${e.message}`, isStreaming: false } : m));
@@ -555,6 +675,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     loadingHistory, loadingConversationList, conversations, chatScrollRef, textareaRef,
     presets, activePresetId, applyPreset, onEnhance, onDechant,
     switchModel, createNewSession, handleStop, isSummarizing,
-    switchSession,
+    switchSession, deleteSession, renameSession,
+    loadConversationList, hasMore, isLoadingMore,
   };
 }

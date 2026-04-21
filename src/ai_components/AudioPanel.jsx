@@ -34,88 +34,114 @@ const MUSIC_GENRES = ["cinematic orchestral", "lo-fi hip hop", "electronic", "ja
 const MUSIC_MOODS = ["epic", "chill", "energetic", "melancholic", "happy", "dark", "romantic", "tense", "peaceful", "mysterious"];
 
 const RIVA_LANGUAGES = [
-  { code: "EN-US", label: "English (US)" },
-  { code: "ES-US", label: "Spanish (US)" },
-  { code: "FR-FR", label: "Français" },
-  { code: "DE-DE", label: "Deutsch" },
-  { code: "ZH-CN", label: "中文 (简体)" },
-  { code: "IT-IT", label: "Italiano" },
-  { code: "VI-VN", label: "Tiếng Việt" },
+  { code: "EN-US", label: "English" },
+  { code: "ES-US", label: "Spanish" },
+  { code: "FR-FR", label: "French" },
+  { code: "DE-DE", label: "German" },
+  { code: "ZH-CN", label: "Mandarin" },
+  { code: "IT-IT", label: "Italian" },
+  { code: "VI-VN", label: "Vietnamese" },
+  { code: "HI-IN", label: "Hindi" },
+  { code: "JA-JP", label: "Japanese" },
 ];
 
 const RIVA_VOICES = {
   "EN-US": [
-    { name: "Aria", desc: "Professzionális női", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
-    { name: "Diego", desc: "Férfi hang", emotions: [] },
-    { name: "Isabela", desc: "Spanyolos akcentus", emotions: [] },
-    { name: "Jason", desc: "Barátságos, fiatalos", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
-    { name: "Leo", desc: "Mély, nyugodt", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
-    { name: "Louise", desc: "Professzionális", emotions: [] },
-    { name: "Mia", desc: "Barátságos, meleg", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
-    { name: "Pascal", desc: "Neutrális férfi", emotions: [] },
-    { name: "Ray", desc: "Energikus férfi", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
-    { name: "Sofia", desc: "Kellemes női", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Leo", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
+    { name: "Louise", desc: "Női hang", emotions: [] },
+    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
   "ES-US": [
-    { name: "Aria", desc: "Spanyol női", emotions: [] },
-    { name: "Diego", desc: "Expresszív férfi", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprise"] },
-    { name: "Isabela", desc: "Expresszív női", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprise", "Sad"] },
-    { name: "Jason", desc: "Spanyol férfi", emotions: [] },
-    { name: "Leo", desc: "Spanyol férfi", emotions: [] },
-    { name: "Louise", desc: "Spanyol női", emotions: [] },
-    { name: "Mia", desc: "Spanyol női", emotions: [] },
-    { name: "Pascal", desc: "Spanyol férfi", emotions: [] },
-    { name: "Ray", desc: "Spanyol férfi", emotions: [] },
-    { name: "Sofia", desc: "Spanyol női", emotions: [] },
+    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Leo", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
+    { name: "Louise", desc: "Női hang", emotions: [] },
+    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
   "FR-FR": [
-    { name: "Aria", desc: "Francia női", emotions: [] },
-    { name: "Diego", desc: "Francia férfi", emotions: [] },
-    { name: "Isabela", desc: "Francia női", emotions: [] },
-    { name: "Jason", desc: "Francia férfi", emotions: [] },
-    { name: "Leo", desc: "Francia férfi", emotions: [] },
-    { name: "Louise", desc: "Francia női", emotions: [] },
-    { name: "Mia", desc: "Francia női", emotions: [] },
-    { name: "Pascal", desc: "Expresszív férfi", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
-    { name: "Ray", desc: "Francia férfi", emotions: [] },
-    { name: "Sofia", desc: "Francia női", emotions: [] },
+    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Leo", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
+    { name: "Louise", desc: "Női hang", emotions: [] },
+    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
   "DE-DE": [
-    { name: "Diego", desc: "Német férfi", emotions: [] },
-    { name: "Mia", desc: "Német női", emotions: [] },
-    { name: "Pascal", desc: "Német férfi", emotions: [] },
-    { name: "Sofia", desc: "Német női", emotions: [] },
+    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
   "ZH-CN": [
-    { name: "Aria", desc: "Kínai női", emotions: [] },
-    { name: "Diego", desc: "Kínai férfi", emotions: [] },
-    { name: "HouZhen", desc: "Kínai férfi", emotions: [] },
-    { name: "Isabela", desc: "Kínai női", emotions: [] },
-    { name: "Long", desc: "Kínai férfi", emotions: [] },
-    { name: "Louise", desc: "Kínai női", emotions: [] },
-    { name: "Mia", desc: "Kínai női", emotions: [] },
-    { name: "North", desc: "Kínai férfi", emotions: [] },
-    { name: "Pascal", desc: "Kínai férfi", emotions: [] },
-    { name: "Ray", desc: "Kínai férfi", emotions: [] },
-    { name: "Siwei", desc: "Kínai női", emotions: [] },
+    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "HouZhen", desc: "Férfi hang", emotions: [] },
+    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Long", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Louise", desc: "Női hang", emotions: [] },
+    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Siwei", desc: "Női hang", emotions: [] },
   ],
   "IT-IT": [
-    { name: "Isabela", desc: "Olasz női", emotions: [] },
-    { name: "Pascal", desc: "Olasz férfi", emotions: [] },
+    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
   ],
   "VI-VN": [
-    { name: "Aria", desc: "Vietnámi női", emotions: [] },
-    { name: "Diego", desc: "Vietnámi férfi", emotions: [] },
-    { name: "Isabela", desc: "Vietnámi női", emotions: [] },
-    { name: "Jason", desc: "Vietnámi férfi", emotions: [] },
-    { name: "Le", desc: "Vietnámi férfi", emotions: [] },
-    { name: "Long", desc: "Expresszív férfi", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Fearful", "Happy", "Sad"] },
-    { name: "Louise", desc: "Vietnámi női", emotions: [] },
-    { name: "Mia", desc: "Vietnámi női", emotions: [] },
-    { name: "North", desc: "Vietnámi férfi", emotions: [] },
-    { name: "Pascal", desc: "Vietnámi férfi", emotions: [] },
-    { name: "Ray", desc: "Vietnámi férfi", emotions: [] },
-    { name: "Sofia", desc: "Vietnámi női", emotions: [] },
+    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Leo", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
+    { name: "Long", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Phung", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+  ],
+  "HI-IN": [
+    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "HouZhen", desc: "Férfi hang", emotions: [] },
+    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Leo", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
+    { name: "Long", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Phung", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Siwei", desc: "Női hang", emotions: [] },
+    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+  ],
+  "JA-JP": [
+    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "HouZhen", desc: "Férfi hang", emotions: [] },
+    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Long", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Louise", desc: "Női hang", emotions: [] },
+    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Siwei", desc: "Női hang", emotions: [] },
+    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
 };
 
@@ -127,12 +153,26 @@ const EMOTION_EMOJI = {
   Sad: "😢",
   Fearful: "😨",
   Disgust: "🤢",
-  PleasantSurprise: "😲",
+  Disgusted: "🤢",
+  PleasantSurprised: "😲",
+};
+
+const EMOTION_LABELS = {
+  Neutral: "Semleges",
+  Angry: "Mérges",
+  Calm: "Nyugodt",
+  Happy: "Vidám",
+  Sad: "Szomorú",
+  Fearful: "Félő",
+  Disgust: "Undorodó",
+  Disgusted: "Undorodó",
+  PleasantSurprised: "Meglepett",
 };
 
 
 export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
-  const { addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError } = useJobs();
+  const { jobs, addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError } = useJobs();
+  const [currentJobId, setCurrentJobId] = useState(null);
   const startJob = (kind, title, targetTab) => {
     const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     addJob({ id, kind, panelType: 'audio', modelId: selectedModel.id, title, status: 'running', progress: 0, createdAt: Date.now(), updatedAt: Date.now(), errorMessage: null, completedAt: null, seenAt: null, targetTab });
@@ -215,11 +255,26 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
   const [leftOpen, setLeftOpen] = useState(true);
   useEffect(() => { setLeftOpen(isGlobalOpen); }, [isGlobalOpen]);
 
+  // Sync with global jobs for cancellation
+  useEffect(() => {
+    if (!currentJobId || !isGenerating) return;
+    const stillExists = jobs.some(j => j.id === currentJobId);
+    if (!stillExists) {
+      if (generationController.current) {
+        generationController.current.abort();
+        generationController.current = null;
+      }
+      setIsGenerating(false);
+      setCurrentJobId(null);
+    }
+  }, [jobs, currentJobId, isGenerating]);
+
   const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(false);
   const [offsets, setOffsets] = useState({ left: 320, right: 0 });
 
   const audioRef = useRef(null);
+  const generationController = useRef(null);
   const color = selectedModel.color || "#10b981";
 
   useEffect(() => { loadHistory(); }, [userId, selectedModel.id]);
@@ -258,7 +313,9 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
     setError(null);
     setAudioUrl(null);
     setIsPlaying(false);
-    const jobId = startJob(isTTS ? 'audio' : 'music', (content || 'Audio generation').slice(0, 48), 'audio');
+    const jobId = startJob(isTTS ? 'audio' : 'music', (content || 'Hanggenerálás').slice(0, 48), 'audio');
+    setCurrentJobId(jobId);
+    generationController.current = new AbortController();
 
     try {
       const token = getIdToken ? await getIdToken() : null;
@@ -274,18 +331,20 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
             text,
             voice: buildRivaVoiceName(),
             language_code: lc,
+            jobId,
           };
         } else {
-          body = { model: selectedModel.apiModel, provider: selectedModel.provider, text, voice: selectedVoice, speed, format: audioFormat };
+          body = { model: selectedModel.apiModel, provider: selectedModel.provider, text, voice: selectedVoice, speed, format: audioFormat, jobId };
         }
       } else {
-        body = { apiId: selectedModel.apiId, prompt: musicPrompt, genre, mood, duration, instrumental };
+        body = { apiId: selectedModel.apiId, prompt: musicPrompt, genre, mood, duration, instrumental, jobId };
       }
 
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(body),
+        signal: generationController.current?.signal,
       });
       if (!res.ok) {
         let errMsg = `HTTP ${res.status}`;
@@ -293,6 +352,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
         throw new Error(errMsg);
       }
       const data = await res.json();
+      if (generationController.current?.signal.aborted) return;
       if (!data.success) throw new Error(data.message);
 
       setAudioUrl(data.audioUrl);
@@ -329,7 +389,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
     <div className="space-y-2">
       <label className="text-[9px] font-black uppercase text-zinc-600">{label}</label>
       <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full bg-white/[0.02] border border-white/5 rounded-xl p-2 text-[11px] text-zinc-200 focus:outline-none">
-        <option value="">Select {label}</option>
+        <option value="">Válassz: {label}</option>
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
     </div>
@@ -354,14 +414,14 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
             {[
               {
                 id: 'forge',
-                label: 'FORGE',
+                label: 'ALKOTÁS',
                 icon: <Zap className="w-5 h-5" />,
                 isActive: view === 'forge',
                 onClick: () => { setView('forge'); setLeftSecondaryOpen(true); },
               },
               {
                 id: 'history',
-                label: 'LIBRARY',
+                label: 'ARCHÍVUM',
                 icon: <History className="w-5 h-5" />,
                 isActive: view === 'history',
                 onClick: () => setView('history'),
@@ -452,7 +512,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
             setIsPlaying(false);
           }}
         />
-        <audio ref={audioRef} src={audioUrl || ""} />
+        {audioUrl && <audio ref={audioRef} src={audioUrl} />}
       </div>
     </StudioLayout>
   );

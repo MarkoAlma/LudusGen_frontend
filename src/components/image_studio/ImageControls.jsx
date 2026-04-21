@@ -100,7 +100,7 @@ function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slotsAvaila
           <div>
             <h3 className="text-sm font-black text-white italic uppercase tracking-[0.2em]">Galéria</h3>
             <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1">
-              {selected.length > 0 ? `${selected.length} / ${slotsAvailable} kiválasztva` : `Max ${slotsAvailable} kép`}
+              {selected.length > 0 ? `${selected.length} / ${slotsAvailable} kiválasztva` : `Maximum ${slotsAvailable} kép`}
             </p>
           </div>
           <button
@@ -381,7 +381,7 @@ export default function ImageControls({
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic">
-                Positive Command
+                Pozitív leírás
               </label>
               <Sparkles className="w-3.5 h-3.5 text-primary opacity-30 animate-pulse" />
             </div>
@@ -405,12 +405,12 @@ export default function ImageControls({
           {isModelScopeEdit && !isGoogleImage && !isFlux && (
             <div className="space-y-3">
               <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic px-1">
-                Negative Constraints
+                Tiltott elemek (negatív prompt)
               </label>
               <textarea
                 value={negativePrompt}
                 onChange={(e) => setNegativePrompt(e.target.value)}
-                placeholder="Items to omit from frame..."
+                placeholder="Mit ne tartalmazzon a kép? (pl. torz végtagok, szöveg...)"
                 rows={1}
                 className="w-full bg-white/[0.01] border border-white/5 rounded-2xl p-4 text-[13px] text-zinc-500 placeholder-zinc-800 focus:outline-none focus:border-white/10 transition-all resize-none leading-relaxed"
               />
@@ -421,7 +421,7 @@ export default function ImageControls({
           {isModelScopeEdit && (
             <div className="space-y-3 pt-2">
               <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic px-1">
-                Reference Clusters
+                Referencia képek
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {inputImages.map((img, idx) => (
@@ -442,7 +442,7 @@ export default function ImageControls({
                       className="w-full h-full rounded-xl border border-dashed border-white/10 flex flex-col items-center justify-center text-zinc-700 hover:border-primary/40 hover:text-primary transition-all bg-white/[0.01] group"
                     >
                       <Plus className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" />
-                      <span className="text-[8px] font-black uppercase tracking-widest">Attach Asset ({3 - inputImages.length} free)</span>
+                      <span className="text-[8px] font-black uppercase tracking-widest">Kép csatolása ({3 - inputImages.length} szabad)</span>
                     </button>
 
                     <AnimatePresence>
@@ -496,7 +496,7 @@ export default function ImageControls({
         <div className="px-6 space-y-6 pb-24">
           <div className="flex items-center gap-2 px-1 mb-2">
             <Settings2 className="w-3.5 h-3.5 text-zinc-600" />
-            <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Core Parameters</span>
+            <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Alapbeállítások</span>
           </div>
 
           {/* Quality selector */}
@@ -504,7 +504,7 @@ export default function ImageControls({
             <div className="space-y-3">
               <div className="flex items-center gap-2 px-1">
                 <Layers className="w-3 h-3 text-zinc-600" />
-                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Process Fidelity</span>
+                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Kidolgozottság</span>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {Object.entries(QUALITY_PRESETS).map(([key, p]) => (
@@ -533,7 +533,7 @@ export default function ImageControls({
             <div className="space-y-3">
               <div className="flex items-center gap-2 px-1">
                 <Maximize2 className="w-3 h-3 text-zinc-600" />
-                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Composition Area</span>
+                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Képméret és arány</span>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {(isFlux ? FLUX_SIZES : ASPECT_RATIO_LIST).map((ar, idx) => {
@@ -566,7 +566,7 @@ export default function ImageControls({
           {isFal && !isModelScopeEdit && (
             <div className="space-y-3">
               <div className="flex justify-between items-center px-1">
-                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Asset Quantity</span>
+                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Képek száma</span>
                 <span className="text-[10px] font-black italic" style={{ color }}>{numImages}</span>
               </div>
               <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -590,7 +590,7 @@ export default function ImageControls({
           >
             <div className="flex items-center gap-2">
               <Settings2 className={`w-3.5 h-3.5 transition-transform duration-500 ${showAdvanced ? 'rotate-90' : ''}`} />
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] italic">Advanced Control</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] italic">Haladó beállítások</span>
             </div>
             <motion.div
               animate={{ rotate: showAdvanced ? 180 : 0 }}
@@ -611,14 +611,14 @@ export default function ImageControls({
                 {/* Seed */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
-                    <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Temporal Seed</span>
-                    <span className="text-[8px] text-zinc-800 font-bold uppercase tracking-widest">(Optional)</span>
+                    <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Véletlenszerűségi mag (Seed)</span>
+                    <span className="text-[8px] text-zinc-800 font-bold uppercase tracking-widest">(Opcionális)</span>
                   </div>
                   <input
                     type="number"
                     value={seed}
                     onChange={(e) => setSeed(e.target.value)}
-                    placeholder="Entropy value (e.g. 42)"
+                    placeholder="Entrópia érték (pl. 42)"
                     className="w-full bg-white/[0.01] border border-white/5 rounded-xl p-3 text-[12px] text-zinc-500 placeholder-zinc-800 focus:outline-none focus:border-white/10 transition-all font-mono"
                   />
                 </div>
@@ -628,7 +628,7 @@ export default function ImageControls({
                   <div className="space-y-6">
                     <div className="space-y-3">
                       <div className="flex justify-between items-center px-1">
-                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Inference Steps</span>
+                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Kidolgozási lépések</span>
                         <span className="text-[10px] font-black italic" style={{ color }}>{steps}</span>
                       </div>
                       <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -645,7 +645,7 @@ export default function ImageControls({
                     </div>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center px-1">
-                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Neural Guidance</span>
+                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">AI követési szigor</span>
                         <span className="text-[10px] font-black italic" style={{ color }}>{guidance}</span>
                       </div>
                       <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -663,28 +663,28 @@ export default function ImageControls({
                   </div>
                 )}
 
-                  {/* Prompt Extend Toggle Moved Here & Simplified */}
-                  {isModelScopeEdit && (
-                    <button
-                      onClick={() => setPromptExtend(!promptExtend)}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all duration-300 ${promptExtend ? 'bg-white/[0.04] border-white/10' : 'bg-transparent border-white/5 text-zinc-700'}`}
-                      style={promptExtend ? { borderColor: `${color}40`, color } : {}}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Sparkles className="w-3.5 h-3.5 opacity-40" />
-                        <span className="text-[10px] font-black uppercase tracking-widest italic">AI Expansion</span>
-                      </div>
-                      <div className="w-8 h-4 rounded-full relative transition-colors bg-white/5 shadow-inner">
-                        <motion.div
-                          animate={{ x: promptExtend ? 18 : 3 }}
-                          transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-                          className="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-md"
-                          style={{ backgroundColor: promptExtend ? color : '#52525b' }}
-                        />
-                      </div>
-                    </button>
-                  )}
-                </motion.div>
+                {/* Prompt Extend Toggle Moved Here & Simplified */}
+                {isModelScopeEdit && (
+                  <button
+                    onClick={() => setPromptExtend(!promptExtend)}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all duration-300 ${promptExtend ? 'bg-white/[0.04] border-white/10' : 'bg-transparent border-white/5 text-zinc-700'}`}
+                    style={promptExtend ? { borderColor: `${color}40`, color } : {}}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Sparkles className="w-3.5 h-3.5 opacity-40" />
+                      <span className="text-[10px] font-black uppercase tracking-widest italic">AI kiterjesztés</span>
+                    </div>
+                    <div className="w-8 h-4 rounded-full relative transition-colors bg-white/5 shadow-inner">
+                      <motion.div
+                        animate={{ x: promptExtend ? 18 : 3 }}
+                        transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                        className="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-md"
+                        style={{ backgroundColor: promptExtend ? color : '#52525b' }}
+                      />
+                    </div>
+                  </button>
+                )}
+              </motion.div>
             )}
           </AnimatePresence>
 
@@ -713,18 +713,18 @@ export default function ImageControls({
               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.5 }}>
                 <Activity className="w-4 h-4" />
               </motion.div>
-              <span>Forging...</span>
+              <span>Alkotás...</span>
             </>
           ) : isEnhancerBusy ? (
             <>
               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
                 <Sparkles className="w-4 h-4" />
               </motion.div>
-              <span>Analyzing...</span>
+              <span>Elemzés...</span>
             </>
           ) : (
             <>
-              <span>Forge Image</span> <Zap className="w-4 h-4 fill-current" />
+              <span>Kép létrehozása</span> <Zap className="w-4 h-4 fill-current" />
             </>
           )}
         </button>

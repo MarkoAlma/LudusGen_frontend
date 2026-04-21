@@ -71,6 +71,11 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
     handleStop,
     isSummarizing,
     switchSession,
+    deleteSession,
+    renameSession,
+    loadConversationList,
+    hasMore,
+    isLoadingMore,
   } = useChatLogic(selectedModel, userId, getIdToken, onModelChange);
 
   const [historySidebarOpen, setHistorySidebarOpen] = useState(true);
@@ -108,6 +113,11 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
             onSelectSession={(id) => {
               switchSession(id);
             }}
+            onDeleteSession={deleteSession}
+            onRenameSession={renameSession}
+            onLoadMore={() => loadConversationList(true)}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
             onClose={() => setHistorySidebarOpen(false)}
           />
         </div>

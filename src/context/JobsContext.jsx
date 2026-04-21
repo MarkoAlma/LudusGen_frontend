@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase/firebaseApp';
+import { API_BASE } from '../api/client';
 
 const JOBS_STORAGE_KEY = 'ludusgen_active_jobs';
 const JOBS_GUEST_KEY = 'guest';
@@ -117,10 +118,29 @@ export function JobsProvider({ children }) {
     cancelHandlersRef.current.delete(id);
   }, []);
 
-  const cancelJob = useCallback((id) => {
+  const cancelJob = useCallback(async (id) => {
+    // 1. Local cancel (stop poller/abort request)
     const fn = cancelHandlersRef.current.get(id);
-    if (fn) { fn(); cancelHandlersRef.current.delete(id); }
-  }, []);
+    if (fn) {
+      fn();
+      cancelHandlersRef.current.delete(id);
+    }
+
+    // 2. Backend cancel (stop server process)
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (token) {
+        fetch(`${API_BASE}/api/cancel-job`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ jobId: id }),
+        }).catch(() => {});
+      }
+    } catch (e) {}
+
+    // 3. UI cleanup
+    removeJob(id);
+  }, [removeJob]);
 
   const clearSeenCompletedJobs = useCallback((panelType) => {
     setJobs((prev) => normalizeJobs(prev.map((job) => (
@@ -134,6 +154,37 @@ export function JobsProvider({ children }) {
     })));
   }, []);
 
+  // ── Heartbeat a beragadt folyamatok ellen ────────────────────────────────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setJobs((prev) => {
+        let changed = false;
+        const next = prev.map((job) => {
+          if (job.status !== 'running' && job.status !== 'queued') return job;
+          
+          // Modellvagy Trellis generálásnál 30 perc, minden másnál 10 perc
+          const timeout = (job.panelType === 'threed' || job.panelType === 'trellis' || job.panelType === 'tripo' || job.panelType === 'meshy') ? 1800000 : 600000;
+          const lastUpdate = job.updatedAt || job.createdAt || 0;
+          
+          if (now - lastUpdate > timeout) {
+            changed = true;
+            return {
+              ...job,
+              status: 'error',
+              errorMessage: 'Időtúllépés (Beragadt folyamat)',
+              completedAt: now,
+              updatedAt: now
+            };
+          }
+          return job;
+        });
+        return changed ? normalizeJobs(next) : prev;
+      });
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const value = useMemo(() => ({
     jobs,
     addJob,
@@ -142,10 +193,10 @@ export function JobsProvider({ children }) {
     markJobDoneAndSeen,
     markJobError,
     removeJob,
+    cancelJob,
     clearSeenCompletedJobs,
     registerCancelHandler,
     unregisterCancelHandler,
-    cancelJob,
   }), [jobs, addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, removeJob, clearSeenCompletedJobs, registerCancelHandler, unregisterCancelHandler, cancelJob]);
 
   return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>;

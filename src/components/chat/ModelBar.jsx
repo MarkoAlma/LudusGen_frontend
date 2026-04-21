@@ -13,7 +13,7 @@ const CODE_MODELS = CODE_GROUP
 
 // Price map for Code models (fallback for models without badge)
 const MODEL_PRICES = {
-  'deepseek_code': 'Ingyenes',
+  'trinity-large': 'Ingyenes',
   'gemini-3-flash': 'Ingyenes',
   'gemini-2.5-pro': 'Prémium',
   'groq-gpt120b': '$0.50 / 1M tok',
@@ -135,9 +135,8 @@ export default function ModelBar({
                       <button
                         key={model.id}
                         onClick={() => handleModelSelect(model)}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all ${
-                          isActive ? 'bg-white/[0.05]' : 'hover:bg-white/[0.02]'
-                        }`}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all ${isActive ? 'bg-white/[0.05]' : 'hover:bg-white/[0.02]'
+                          }`}
                       >
                         {/* Color dot */}
                         <div

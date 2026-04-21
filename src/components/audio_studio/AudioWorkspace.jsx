@@ -66,8 +66,8 @@ export default function AudioWorkspace({
                   <History className="w-5 h-5 text-white/40" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-white italic uppercase tracking-[0.2em]">Asset Library</h2>
-                  <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mt-0.5">Neural Generations History</p>
+                  <h2 className="text-sm font-black text-white italic uppercase tracking-[0.2em]">Archívum</h2>
+                  <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mt-0.5">Neurális generálások előzményei</p>
                 </div>
               </div>
             </div>
@@ -85,7 +85,7 @@ export default function AudioWorkspace({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-[11px] font-bold text-white truncate mb-1">
-                        {item.text || item.prompt || "Untitled Fragment"}
+                        {item.text || item.prompt || "Névtelen töredék"}
                       </div>
                       <div className="flex items-center gap-3 text-[9px] font-black text-zinc-600 uppercase tracking-widest italic">
                         <span>{item.type || 'audio'}</span>
@@ -112,9 +112,9 @@ export default function AudioWorkspace({
                 <div className="flex flex-col items-center gap-2">
                   <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/10">
                     <Activity className="w-3.5 h-3.5 text-primary animate-pulse" />
-                    <span className="text-[10px] font-black text-white italic uppercase tracking-[0.2em]">Neural Processing</span>
+                    <span className="text-[10px] font-black text-white italic uppercase tracking-[0.2em]">Neurális feldolgozás</span>
                   </div>
-                  <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Synthesizing sonic frequencies...</p>
+                  <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Hangfrekvenciák szintézise...</p>
                 </div>
               </div>
             ) : audioUrl ? (
@@ -129,9 +129,9 @@ export default function AudioWorkspace({
 
                 <div className="flex-1 flex flex-col items-center justify-center p-12">
                   <div className="mb-12 flex flex-col items-center text-center gap-2">
-                    <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em] italic">Audio Output Forged</div>
+                    <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em] italic">Hang sikeresen létrehozva</div>
                     <h3 className="text-3xl font-black text-white uppercase tracking-wider line-clamp-1 italic">
-                      Neural Master v1
+                      Neurális Mester v1
                     </h3>
                   </div>
 
@@ -169,10 +169,10 @@ export default function AudioWorkspace({
                 <div className="px-10 py-5 bg-white/[0.02] border-t border-white/5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]" />
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">Signal Stable</span>
+                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">Stabil jel</span>
                   </div>
                   <div className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest">
-                    Lossless Compression 48kHz
+                    Veszteségmentes tömörítés 48kHz
                   </div>
                 </div>
               </motion.div>
@@ -182,8 +182,8 @@ export default function AudioWorkspace({
                   <Mic className="w-10 h-10" />
                 </div>
                 <div className="text-center">
-                  <h4 className="text-sm font-black uppercase tracking-[0.4em] italic mb-1">Awaiting Feed</h4>
-                  <p className="text-[9px] font-bold uppercase tracking-widest">Configure parameters to initiate forge</p>
+                  <h4 className="text-sm font-black uppercase tracking-[0.4em] italic mb-1">Bemenetre vár</h4>
+                  <p className="text-[9px] font-bold uppercase tracking-widest">Állítsd be a paramétereket a kezdéshez</p>
                 </div>
               </div>
             )}

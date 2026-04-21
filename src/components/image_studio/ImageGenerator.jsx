@@ -443,6 +443,8 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
   const [rightOpen, setRightOpen] = useState(false);
   const [offsets, setOffsets] = useState({ left: 320, right: 0 });
   const [view, setView] = useState('gen'); // gen | gallery
+  const [currentJobId, setCurrentJobId] = useState(null);
+  const abortControllerRef = useRef(null);
 
 
   // Master Sidebar Sync: If the user selects a new model from the master sidebar, 
@@ -462,6 +464,22 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
   useEffect(() => {
     setLeftOpen(isGlobalOpen);
   }, [isGlobalOpen]);
+
+  // Sync with global jobs for cancellation
+  useEffect(() => {
+    if (!currentJobId || !isGenerating) return;
+    const stillExists = jobs.some(j => j.id === currentJobId);
+    if (!stillExists) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      setIsGenerating(false);
+      setGenStatus('');
+      setGenProgress(0);
+      setCurrentJobId(null);
+    }
+  }, [jobs, currentJobId, isGenerating]);
 
   useEffect(() => {
     if (selectedModel?.panelType === 'image') {
@@ -560,10 +578,13 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
     setGenProgress(0);
     setGenStatus('');
     setGenElapsed(0);
-    const jobId = startJob('image', prompt.trim().slice(0, 48) || 'Image generation', 'image');
+    const jobId = startJob('image', prompt.trim().slice(0, 48) || 'Képgenerálás', 'image');
     // Azonnal mentjük az új job ID-t, hogy navigáció után is az aktuális generálást találja meg
     sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
     setSelectedJobId(jobId);
+    setCurrentJobId(jobId);
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
     updateJob(jobId, { progress: 0, updatedAt: Date.now() });
 
@@ -577,6 +598,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
       const res = await fetch(`${API_BASE}/api/generate-image`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        signal,
         body: JSON.stringify({
           prompt: prompt.trim(),
           provider,
@@ -592,6 +614,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
           prompt_extend: promptExtend,
           guidance_scale: guidance,
           ...(selectedModel.needsInputImage && inputImages.length > 0 ? { input_images: inputImages.map(img => img.dataUrl) } : {}),
+          jobId,
         }),
       });
 
@@ -635,6 +658,10 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
         }
       }
     } catch (err) {
+      if (err.name === 'AbortError' || signal.aborted) {
+        console.log('Image generation aborted by user.');
+        return;
+      }
       setError(err.message);
       markJobError(jobId, err.message || 'Hiba történt');
     } finally {
@@ -668,7 +695,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
             {[
               {
                 id: 'generate',
-                label: 'GENERATE',
+                label: 'GENERÁLÁS',
                 icon: <Sparkles className="w-5 h-5" />,
                 isActive: !selectedModel.needsInputImage && view === 'gen',
                 onClick: () => {
@@ -683,7 +710,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
               },
               {
                 id: 'edit',
-                label: 'EDIT',
+                label: 'SZERKESZTÉS',
                 icon: <Pencil className="w-5 h-5" />,
                 isActive: !!selectedModel.needsInputImage && view === 'gen',
                 onClick: () => {
@@ -698,7 +725,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
               },
               {
                 id: 'gallery',
-                label: 'GALLERY',
+                label: 'GALÉRIA',
                 icon: <History className="w-5 h-5" />,
                 isActive: view === 'gallery',
                 onClick: () => setView('gallery'),
@@ -712,8 +739,8 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
               >
                 <div
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${tool.isActive
-                      ? 'bg-white/5 border-white/10 shadow-xl'
-                      : 'bg-transparent border-transparent hover:bg-white/[0.03] hover:border-white/5'
+                    ? 'bg-white/5 border-white/10 shadow-xl'
+                    : 'bg-transparent border-transparent hover:bg-white/[0.03] hover:border-white/5'
                     }`}
                   style={tool.isActive ? { borderColor: `${themeColor}40`, color: themeColor } : { color: '#52525b' }}
                 >
@@ -801,8 +828,8 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
 
         <div className="flex-1 relative z-10 overflow-hidden">
           {view === 'gallery' ? (
-            <ImageGallery 
-              getIdToken={getIdToken} 
+            <ImageGallery
+              getIdToken={getIdToken}
               onUsePrompt={(p) => {
                 setPrompt(p);
                 setView('gen');

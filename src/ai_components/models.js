@@ -18,10 +18,10 @@ export const MODEL_GROUPS = [
                 label: null,
                 models: [
                     {
-                        id: "deepseek_code",
-                        name: "DeepSeek Code Free",
+                        id: "trinity-large",
+                        name: "Trinity Large",
                         tier: "lite", tierLabel: "Ingyenes",
-                        description: "Profi fejlesztőasszisztens DeepSeek ingyenes OpenRouter hozzáféréssel",
+                        description: "Profi fejlesztőasszisztens Trinity ingyenes OpenRouter hozzáféréssel",
                         badge: "Free / napi limit",
                         apiModel: "arcee-ai/trinity-large-preview:free",
                         provider: "openrouter",
@@ -70,6 +70,7 @@ export const MODEL_GROUPS = [
                     { id: "nvidia-glm4.7", name: "Z.ai GLM 4.7 (NVIDIA)", apiModel: "z-ai/glm4.7", provider: "nvidia", color: "#16f921", gradient: "from-lime-400 to-green-500", defaultTemperature: 0.7, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat" },
                     { id: "deepseek-v3.2", name: "DeepSeek v3.2 (NVIDIA)", apiModel: "deepseek-ai/deepseek-v3.2", provider: "nvidia", color: "#3b82f6", gradient: "from-blue-500 to-indigo-600", defaultTemperature: 0.3, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
                     { id: "google-gemma-3-27b-it", name: "(img) Gemma 3 27B IT (NVIDIA)", apiModel: "google/gemma-3-27b-it", provider: "nvidia", color: "#4285f4", gradient: "from-blue-400 to-red-400", supportsVision: true, defaultTemperature: 0.8, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
+
 
 
                     //                     {

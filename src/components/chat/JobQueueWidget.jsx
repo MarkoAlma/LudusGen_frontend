@@ -46,7 +46,12 @@ function SpinningRing({ color }) {
   );
 }
 
+<<<<<<< Updated upstream
 function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
+=======
+function JobRow({ job, onOpen }) {
+  const { cancelJob } = useJobs();
+>>>>>>> Stashed changes
   const panelMeta = PANEL_META[job.panelType] || PANEL_META.chat;
   const statusMeta = STATUS_META[job.status] || STATUS_META.queued;
   const PanelIcon = panelMeta.icon;
@@ -67,11 +72,19 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
     : panelMeta.color;
 
   return (
+<<<<<<< Updated upstream
     <motion.button
       onClick={() => { if (isDone || isError) onMarkSeen?.(job.id); onOpen(job); }}
+=======
+    <motion.div
+      onClick={() => onOpen(job)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpen(job); }}
+      role="button"
+      tabIndex={0}
+>>>>>>> Stashed changes
       whileHover={{ scale: 1.012 }}
       whileTap={{ scale: 0.985 }}
-      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left group/row relative overflow-hidden"
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left group/row relative overflow-hidden cursor-pointer outline-none"
       style={{
         background: 'rgba(255,255,255,0.035)',
         border: `1px solid rgba(255,255,255,0.07)`,
@@ -187,8 +200,20 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
         </div>
       </div>
 
-      <ChevronRight className="w-3.5 h-3.5 text-zinc-700 group-hover/row:text-zinc-400 transition-colors flex-shrink-0 relative z-10" />
-    </motion.button>
+      <div className="flex flex-col items-center gap-1.5 ml-auto relative z-10">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            cancelJob(job.id);
+          }}
+          className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-600 hover:text-white hover:bg-white/10 transition-all duration-200 active:scale-90 group/cancel"
+          title="Leállítás / Törlés"
+        >
+          <X className="w-3 h-3 transition-transform group-hover/cancel:scale-110" />
+        </button>
+        <ChevronRight className="w-3.5 h-3.5 text-zinc-700 group-hover/row:text-zinc-400 transition-colors" />
+      </div>
+    </motion.div>
   );
 }
 

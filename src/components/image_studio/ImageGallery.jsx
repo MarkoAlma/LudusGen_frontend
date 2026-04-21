@@ -99,8 +99,8 @@ function Lightbox({ images, startIndex, onClose }) {
                     </div>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                    <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em] italic">Retrieving Asset</p>
-                    <p className="text-[8px] font-bold text-white/10 uppercase tracking-widest leading-none">High Fidelity Archive</p>
+                    <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em] italic">Adat lekérése</p>
+                    <p className="text-[8px] font-bold text-white/10 uppercase tracking-widest leading-none">Nagy felbontású archívum</p>
                 </div>
               </div>
             )}
@@ -141,7 +141,7 @@ function Lightbox({ images, startIndex, onClose }) {
               document.body.removeChild(a);
             }}
             className="w-10 h-10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 transition-all"
-            title="Download Full Image"
+            title="Teljes kép letöltése"
           >
             <Download className="w-5 h-5" />
           </button>
@@ -208,7 +208,7 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title, message, isLoadi
               <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-start gap-4 text-left">
                 <Info className="w-5 h-5 text-zinc-500 shrink-0 mt-0.5" />
                 <p className="text-[10px] font-medium text-zinc-500 leading-relaxed uppercase tracking-wider">
-                  This action is permanent and cannot be reversed. All metadata and binary storage will be purged.
+                  Ez a művelet végleges és nem visszavonható. Minden metaadat és fájl törlődik.
                 </p>
               </div>
             </div>
@@ -220,14 +220,14 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title, message, isLoadi
                 disabled={isLoading}
                 className="py-4 rounded-2xl text-[10px] font-black text-white/40 uppercase tracking-[0.3em] hover:bg-white/5 hover:text-white transition-all disabled:opacity-50"
               >
-                Go Back
+                Mégse
               </button>
               <button
                 onClick={onConfirm}
                 disabled={isLoading}
                 className="py-4 rounded-2xl bg-red-500 text-[10px] font-black text-white uppercase tracking-[0.3em] hover:bg-red-400 hover:shadow-[0_0_30px_rgba(239,68,68,0.3)] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm Purge'}
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Törlés véglegesítése'}
               </button>
             </div>
           </motion.div>
@@ -323,7 +323,7 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-10 h-10 text-white/20 animate-spin" />
-        <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">Initializing Archive</p>
+        <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">Archívum betöltése...</p>
       </div>
     );
   }
@@ -335,9 +335,9 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
           <Inbox className="w-8 h-8" />
         </div>
         <div className="space-y-2">
-            <h3 className="text-sm font-black text-white/40 uppercase tracking-[0.5em] italic">Archive Empty</h3>
+            <h3 className="text-sm font-black text-white/40 uppercase tracking-[0.5em] italic">Az archívum üres</h3>
             <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest max-w-[200px] leading-relaxed">
-                Start generating to populate your persistent vault
+                Generálj képeket, hogy feltöltsd a személyes tárolódat
             </p>
         </div>
       </div>
@@ -354,15 +354,15 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
                 <Clock className="w-5 h-5" />
             </div>
             <div>
-                <h2 className="text-lg font-black text-white italic uppercase tracking-[0.2em] leading-none">Vault History</h2>
-                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1.5">{images.length} Persistent Assets</p>
+                <h2 className="text-lg font-black text-white italic uppercase tracking-[0.2em] leading-none">Generálási előzmények</h2>
+                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1.5">{images.length} mentett elem</p>
             </div>
         </div>
         
         <button 
             onClick={() => setConfirmModal({ isOpen: true, type: 'all', targetId: null })}
             disabled={deletingAll}
-            title="Delete All Assets"
+            title="Galéria ürítése"
             className="w-10 h-10 rounded-xl bg-red-500/5 border border-red-500/10 flex items-center justify-center text-red-500/40 hover:text-red-400 transition-all hover:bg-red-500/10 disabled:opacity-50"
         >
             {deletingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -444,10 +444,10 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal({ isOpen: false, type: null, targetId: null })}
         onConfirm={confirmModal.type === 'all' ? handleDeleteAll : handleDelete}
-        title={confirmModal.type === 'all' ? "Purge Gallery" : "Delete Asset"}
+        title={confirmModal.type === 'all' ? "Galéria ürítése" : "Elem törlése"}
         message={confirmModal.type === 'all' 
-            ? `Are you absolutely sure you want to delete all ${images.length} persistent assets?` 
-            : "Are you sure you want to delete this specific image from your vault?"}
+            ? `Biztosan törölni szeretnéd az összes (${images.length}) mentett elemet?` 
+            : "Biztosan törölni szeretnéd ezt a képet a tárolóból?"}
         isLoading={deletingAll || deletingId !== null}
       />
     </div>
