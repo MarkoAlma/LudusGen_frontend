@@ -225,8 +225,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const { user, refreshCredits } = useContext(MyUserContext);
   const userCredits = user?.credits ?? 0;
 
-  const [currentJobId, setCurrentJobId] = useState(null);
-
   // ── responsive breakpoints ──────────────────────────────────────────
   const isMobile640 = useMediaQuery("(max-width: 640px)");
   const isTablet1024 = useMediaQuery("(max-width: 1024px)");
@@ -259,20 +257,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   useEffect(() => {
     setLeftOpen(isGlobalOpen);
   }, [isGlobalOpen]);
-
-  // Sync with global jobs for cancellation
-  useEffect(() => {
-    if (!currentJobId || !isRunning) return;
-    const stillExists = jobs.some(j => j.id === currentJobId);
-    if (!stillExists) {
-      if (pollAb.current) pollAb.current.cancelled = true;
-      setIsRunning(false);
-      setGenStatus("idle");
-      setProgress(0);
-      setStatusMsg("");
-      setCurrentJobId(null);
-    }
-  }, [jobs, currentJobId, isRunning]);
 
   // nav — persist active tab across refresh
   const [mode, setMode] = useState(() => sessionStorage.getItem("tripo_mode") || "generate");
@@ -648,7 +632,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, [getIdToken]);
 
-  const pollTask = useCallback(async (taskId, pt, headers, onSuccess, { skipJumpCheck = false, jobId, onProgress = null } = {}) => {
+  const pollTask = useCallback(async (taskId, pt, headers, onSuccess, { skipJumpCheck = false, onProgress = null } = {}) => {
     let n = 0, prevProgress = 0, stuckSince = null;
     while (n < POLL_MAX) {
       if (pt.cancelled) return;
@@ -657,16 +641,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       n++;
       const res = await fetch(BASE_URL + "/api/tripo/task/" + taskId, { headers });
       const d = await res.json();
-      if (!d.success) {
-          if (jobId) markJobError(jobId, d.message ?? "Poll error");
-          throw new Error(d.message ?? "Poll error");
-      }
+      if (!d.success) throw new Error(d.message ?? "Poll error");
       const prog = d.progress ?? 0;
-      
-      if (jobId) {
-          updateJob(jobId, { progress: prog, status: 'running' });
-      }
-
       if (!skipJumpCheck && d.status !== "success" && prog - prevProgress > PROGRESS_JUMP_LIMIT) {
         throw Object.assign(new Error(`Auto-stopped: suspicious progress jump (${prevProgress}% → ${prog}%)`), { type: "auto_stop", autoStop: true });
       }
@@ -834,7 +810,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         if (d.status === "success" && (d.modelUrl || opType === "segment")) {
           await onSuccess(d);
         } else if (d.status === "failed" || d.status === "cancelled") {
-          if (jobId) markJobError(jobId, "Task " + d.status);
           setIsRunning(false); setProgress(0); setStatusMsg("");
           if (opType === "rig") setRigStep("idle");
           currentTaskId.current = null; clearPersistedGen();
@@ -1093,7 +1068,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
               try {
                 const headers = await authH();
-                const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify({ ...batchBody, jobId: batchInstanceId }) });
+                const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify(batchBody) });
                 const td = await tr.json();
                 if (!td.success) {
                   const msg = td.message ?? "Task failed";
@@ -1273,7 +1248,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
       try {
         const headers = await authH();
-        const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify({ ...body, jobId: instanceId }) });
+        const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify(body) });
         const td = await tr.json();
         if (!td.success) {
           const msg = td.message ?? "Task failed";
@@ -1303,16 +1278,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         else if (e.type === "nsfw") toast.error("Tartalom blokkolva: NSFW vagy irányelvek megsértése.");
       }
     } catch (e) {
-      if (!e.type && e.rawOutput) {
-        const reason = (e.rawOutput?.rawOutput?.error_msg ?? e.rawOutput?.rawOutput?.message ?? e.rawOutput?.rawOutput?.reason ?? "").toLowerCase();
-        if (reason.includes("nsfw") || reason.includes("content policy") || reason.includes("safety")) { e.type = "nsfw"; e.message = "Content blocked: NSFW or policy violation detected."; }
-        else if (reason.includes("insufficient") || reason.includes("credit")) { e.type = "credits"; e.message = "Insufficient credits. Please top up your balance."; }
-      }
       // Body-building errors (mask upload, switch default already returns early)
       console.warn("[handleGen] Unexpected error during body construction:", e.message);
       setErrorMsg(e.message ?? "Generation setup failed");
     }
-  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, userCredits, genCost, refineId, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, syncSelHist, forceUpdate, persistActiveTask, addJob, updateJob, markJobError]);
+  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, imgToken, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, syncSelHist, forceUpdate, persistActiveTask, addJob, updateJob, markJobError]);
 
   const { rigCompatRef, getCompatibility, handleAutoRig } = useTripoRig({
     activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl,
@@ -1711,7 +1681,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       pendingUrlTaskId.current = urlTaskIdParam;
       setLoadingId("__url_pending__");
     }
-  // Only re-run when the URL param itself changes (external navigation)
+    // Only re-run when the URL param itself changes (external navigation)
   }, [urlTaskIdParam, selHist]);
 
   return (
