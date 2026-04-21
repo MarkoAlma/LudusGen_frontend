@@ -9,7 +9,6 @@ import UpdatePassword from "../components/UpdatePassword";
 import { auth } from "../firebase/firebaseApp";
 import { motion, AnimatePresence } from "framer-motion";
 import { tokens } from "../styles/tokens";
-import CreditTopup from "../components/CreditTopup";
 
 // UI Components
 import Button from "../components/ui/Button";
@@ -22,7 +21,7 @@ import PageTransition from "../components/layout/PageTransition";
 import settings_bg from "../assets/backgrounds/settings_bg.png";
 
 export default function Settings() {
-  const { user, updateUser, is2FAEnabled, loading2FA, refresh2FAStatus } = useContext(MyUserContext);
+  const { user, updateUser, is2FAEnabled, loading2FA, refresh2FAStatus, setShowCreditTopup } = useContext(MyUserContext);
   const navigate = useNavigate();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const fileInputRef = useRef(null);
@@ -43,7 +42,6 @@ export default function Settings() {
   const [disable2FALoading, setDisable2FALoading] = useState(false);
   const [disable2FAError, setDisable2FAError] = useState("");
 
-  const [showCreditTopup, setShowCreditTopup] = useState(false);
 
   const [formData, setFormData] = useState({ name: "", displayName: "", email: "", bio: "" });
 
@@ -310,7 +308,7 @@ export default function Settings() {
         {/* Modals */}
         <UpdatePassword isOpen={showPasswordModal} onClose={() => setShowPasswordModal(false)} />
         <Enable2FA isOpen={show2FA} onClose={() => { setShow2FA(false); refresh2FAStatus();  }} />
-        <CreditTopup isOpen={showCreditTopup} onClose={() => setShowCreditTopup(false)} />
+        
         
         <Modal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} title="Profilkép frissítése">
           <div className="flex flex-col items-center p-6">

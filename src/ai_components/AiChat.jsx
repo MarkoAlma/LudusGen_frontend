@@ -142,7 +142,8 @@ export default function AIChat({ user, getIdToken }) {
     // If both are chat panel types, keep the same conversation session
     if (oldModel?.panelType === 'chat' && newModel?.panelType === 'chat') {
       const sessionId = sessionStorage.getItem("chat_session_current");
-      if (sessionId) {
+      // Only call switch-model if the model actually changed
+      if (sessionId && oldModel.id !== newModel.id) {
         getIdToken().then(async (token) => {
           try {
             await fetch(`${API_BASE}/api/chat/switch-model`, {
@@ -234,7 +235,7 @@ export default function AIChat({ user, getIdToken }) {
       forceViewGenSignal,
       initialDropdownOpen: modelDropdownOpen,
       onNewChatWithPicker: () => {
-        setModelDropdownOpen(true);
+        // model picker is intentionally disabled
       },
     };
     switch (selectedModel.panelType) {

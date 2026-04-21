@@ -22,6 +22,7 @@ const MyUserProvider = ({ children }) => {
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [loading2FA, setLoading2FA] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
+  const [showCreditTopup, setShowCreditTopup] = useState(false);
 // UserContext vagy valahol központilag
 // UserContext vagy valahol központilag
 const [navHeight, setNavHeight] = useState(0);
@@ -360,6 +361,8 @@ useEffect(() => {
         loadUserFromFirestore,
         signInWithGoogle,
         authLoading,
+        showCreditTopup,
+        setShowCreditTopup,
       }}
     >
       {children}

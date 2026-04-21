@@ -6,6 +6,7 @@ import { useChatLogic } from '../hooks/useChatLogic';
 import { findModelGroup } from './models';
 import ModelBar from '../components/chat/ModelBar';
 import MessageList from '../components/chat/MessageList';
+import WelcomeScreen from '../components/chat/WelcomeScreen';
 import ChatInput from '../components/chat/ChatInput';
 import ChatSidebar from '../components/chat/ChatSidebar';
 import ConfigPanel from '../components/chat/ConfigPanel';
@@ -45,6 +46,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
     attachedImage,
     setAttachedImage,
     loadingHistory,
+    loadingConversationList,
     conversations,
     chatScrollRef,
     textareaRef,
@@ -102,7 +104,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
         <div className="h-full flex flex-col overflow-hidden">
           <ChatSidebar
             conversations={conversations}
-            loadingHistory={loadingHistory}
+            loadingHistory={loadingConversationList}
             onSelectSession={(id) => {
               switchSession(id);
             }}
@@ -123,33 +125,36 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
         <div className="flex-1 flex flex-col min-w-0 relative h-full z-10 px-0 max-w-full">
 
           {/* Top Fade Mask replacing the old Header */}
-          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-[#03000a] via-[#03000a]/90 to-transparent z-30 pointer-events-none" />
+          <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-b from-[#03000a] via-[#03000a]/80 to-transparent z-30 pointer-events-none" />
 
           {/* Scrollable message area */}
           <div className="flex-1 relative overflow-hidden">
-            <div ref={chatScrollRef} className="h-full overflow-y-auto scrollbar-thin px-3 sm:px-6 lg:px-12">
-              <div
-                className="w-full pb-8 flex flex-col space-y-4 pt-16"
-              >
-                <MessageList
-                  messages={messages}
-                  loadingHistory={loadingHistory}
-                  selectedModel={selectedModel}
-                  onSuggestionClick={(text) => {
-                    setInput(text);
-                    setTimeout(() => {
-                      textareaRef?.current?.focus();
-                    }, 50);
-                  }}
-                />
+            {!loadingHistory && messages.length === 0 ? (
+              <WelcomeScreen 
+                themeColor={themeColor} 
+                selectedModel={selectedModel}
+                onSuggestionClick={handleSend}
+              />
+            ) : (
+              <div ref={chatScrollRef} className="h-full overflow-y-auto scrollbar-thin px-3 sm:px-6 lg:px-12">
+                <div className="w-full pt-24 pb-32 flex flex-col items-center space-y-4">
+                  <MessageList
+                    messages={messages}
+                    loadingHistory={loadingHistory}
+                    selectedModel={selectedModel}
+                    onSuggestionClick={handleSend}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Input area */}
-          <div className="px-3 sm:px-6 lg:px-12 pb-6 pt-2 relative z-20 flex flex-col items-center">
-            <SummaryIndicator isVisible={isSummarizing} />
-            <div className="w-full max-w-3xl flex flex-col items-center">
+          {/* Input area — floats over the message list */}
+          <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
+            <div className="absolute inset-0 bg-gradient-to-t from-[#03000a]/90 via-[#03000a]/40 to-transparent" />
+            <div className="relative pointer-events-auto px-3 sm:px-6 lg:px-12 pb-6 pt-8 flex flex-col items-center">
+              <SummaryIndicator isVisible={isSummarizing} />
+              <div className="w-full max-w-3xl flex flex-col items-center">
 
               {/* Floating Toolbar (Model Bar & Config) - On Top */}
               <div className="w-full mb-2 lg:mb-3 px-1">
@@ -168,7 +173,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
                 />
               </div>
 
-
               {/* Standalone Premium Chat Input */}
               <div className="w-full">
                 <ChatInput
@@ -183,6 +187,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
                 />
               </div>
 
+              </div>
             </div>
           </div>
 

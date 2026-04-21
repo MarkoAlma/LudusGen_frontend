@@ -112,9 +112,12 @@ export default function StudioLayout({
   const effectiveL1Width = getL1Width();
 
   // ── Transform hooks (Must be top-level for React) ────────────────────────
-  const desktopLX = useTransform(smoothL, v => (v <= 0.1 ? -1000 : 0));
-  const desktopRX = useTransform(smoothR, v => (rightWidth - v));
-  const contentWidthExpr = useTransform([smoothL, smoothR], ([l, r]) => `calc(100% - ${l + r}px)`);
+  const desktopLX = useTransform(smoothL, v => (v <= 0.5 ? -1000 : 0));
+  const desktopRX = useTransform(smoothR, v => {
+    const val = rightWidth - v;
+    return val < 0.5 ? 0 : val;
+  });
+  const contentWidthExpr = useTransform([smoothL, smoothR], ([l, r]) => `calc(100% - ${Math.round(l + r)}px)`);
 
   // ── Toggle handlers ──────────────────────────────────────────────────────
   const handleToggleL1 = () => effSetL1?.(!effL1);
@@ -142,7 +145,7 @@ export default function StudioLayout({
         {/* ── Desktop Sidebars (Transform-based for performance) ────────── */}
         {!activeOverlay && leftSidebar && (
           <motion.div
-            className="absolute left-0 top-0 bottom-0 z-40 flex border-r border-white/5 will-change-transform origin-left"
+            className="absolute left-0 top-0 bottom-0 z-40 flex border-r border-white/5 origin-left"
             style={{ 
               x: desktopLX,
               width: smoothL,
@@ -165,7 +168,7 @@ export default function StudioLayout({
 
         {!activeOverlay && rightSidebar && (
           <motion.div
-            className="absolute right-0 top-0 bottom-0 z-40 border-l border-white/5 will-change-transform"
+            className="absolute right-0 top-0 bottom-0 z-40 border-l border-white/5"
             style={{ 
               x: desktopRX,
               width: smoothR, 
@@ -204,7 +207,7 @@ export default function StudioLayout({
           <AnimatePresence>
             {mobileL1Open && (
               <motion.div
-                className="fixed top-0 left-0 bottom-0 z-35 bg-[#0a0a14] will-change-transform"
+                className="fixed top-0 left-0 bottom-0 z-35 bg-[#0a0a14]"
                 style={{ width: getL1Width() }}
                 initial={{ x: '-100%' }}
                 animate={{ x: 0 }}
@@ -223,7 +226,7 @@ export default function StudioLayout({
           <AnimatePresence>
             {mobileL2Open && (
               <motion.div
-                className="fixed top-0 bottom-0 z-35 bg-[#0a0a14] will-change-transform"
+                className="fixed top-0 bottom-0 z-35 bg-[#0a0a14]"
                 style={{
                   width: getL2Width(),
                   left: mobileL1Open ? effectiveL1Width : 0,
@@ -245,7 +248,7 @@ export default function StudioLayout({
           <AnimatePresence>
             {mobileROpen && (
               <motion.div
-                className="fixed top-0 right-0 bottom-0 z-35 bg-[#0a0a14] will-change-transform"
+                className="fixed top-0 right-0 bottom-0 z-35 bg-[#0a0a14]"
                 style={{ width: getRWidth() }}
                 initial={{ x: '100%' }}
                 animate={{ x: 0 }}
@@ -262,9 +265,10 @@ export default function StudioLayout({
 
         {/* ── Main content area ────────────────────────────────────────── */}
         <motion.div
-          className="h-full w-full relative z-10 will-change-transform shadow-inner"
+          className="h-full w-full relative z-10 shadow-inner"
           style={{
             x: activeOverlay ? 0 : smoothL,
+            transform: 'translateZ(0)',
             position: 'absolute',
             left: 0,
             right: 0,
@@ -275,72 +279,106 @@ export default function StudioLayout({
         </motion.div>
 
         {/* ── Toggle buttons (Desktop) ────────────────────────────────── */}
-        {!isMobile && leftSidebar && (
           <motion.div
-            className="absolute left-0 top-1/2 z-50 flex flex-col items-start"
+            className="absolute left-0 top-1/2 z-50 flex flex-col items-start gap-1.5"
             style={{ x: smoothL, y: '-50%' }}
           >
-            <button
+            {/* Master Toggle L1 */}
+            <motion.button
+              whileHover={{ x: 2, backgroundColor: 'rgba(255,255,255,0.06)' }}
+              whileTap={{ scale: 0.95 }}
               onClick={handleToggleL1}
-              className="p-1.5 rounded-r-lg bg-[#0a0a14] border border-l-0 border-white/5 text-zinc-500 hover:text-white transition-colors cursor-pointer"
-              aria-label={effL1 ? 'Close sidebar' : 'Open sidebar'}
+              className="group relative flex items-center justify-center w-6 h-14 rounded-r-2xl bg-white/[0.02] backdrop-blur-2xl border border-l-0 border-white/10 shadow-[4px_0_24px_rgba(0,0,0,0.5)] cursor-pointer transition-all duration-300"
+              style={{ borderColor: effL1 ? 'rgba(255,255,255,0.1)' : `${accentColor}40` }}
             >
-              {effL1 ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5" />}
-            </button>
+              <div className="absolute left-0 w-0.5 h-6 rounded-full bg-white/10 group-hover:bg-white/30 transition-colors" />
+              <div className="transition-all duration-300 transform group-hover:scale-110" style={{ color: effL1 ? 'rgba(255,255,255,0.4)' : accentColor }}>
+                {effL1 ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5" />}
+              </div>
+              
+              {/* Subtle accent glow on hover */}
+              <div className="absolute inset-0 rounded-r-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" 
+                style={{ boxShadow: `0 0 20px ${accentColor}15` }} 
+              />
+            </motion.button>
+
+            {/* Secondary Toggle L2 */}
             {leftSecondarySidebar && (
-              <button
+              <motion.button
+                whileHover={{ x: 2, backgroundColor: 'rgba(255,255,255,0.06)' }}
+                whileTap={{ scale: 0.95 }}
                 onClick={handleToggleL2}
-                className="p-1.5 rounded-r-lg bg-[#0a0a14] border border-l-0 border-white/5 text-zinc-500 hover:text-white transition-colors cursor-pointer mt-1"
-                aria-label={effL2 ? 'Close panel' : 'Open panel'}
+                className="group relative flex items-center justify-center w-6 h-10 rounded-r-xl bg-white/[0.02] backdrop-blur-xl border border-l-0 border-white/10 shadow-[4px_0_24px_rgba(0,0,0,0.5)] cursor-pointer transition-all duration-300"
+                style={{ borderColor: effL2 ? 'rgba(255,255,255,0.1)' : `${accentColor}40` }}
               >
-                {effL2 ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-              </button>
+                <div className="transition-all duration-300" style={{ color: effL2 ? 'rgba(255,255,255,0.4)' : accentColor }}>
+                  {effL2 ? <ChevronLeft className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                </div>
+              </motion.button>
             )}
           </motion.div>
-        )}
 
         {!isMobile && rightSidebar && (
-          <motion.button
-            className="absolute right-0 top-1/2 z-50 p-1.5 rounded-l-lg bg-[#0a0a14] border border-r-0 border-white/5 text-zinc-500 hover:text-white transition-colors cursor-pointer"
+          <motion.div
+            className="absolute right-0 top-1/2 z-50 flex flex-col items-end"
             style={{ x: rightToggleX, y: '-50%' }}
-            onClick={handleToggleR}
-            aria-label={effR ? 'Close archive' : 'Open archive'}
           >
-            {effR ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
-          </motion.button>
+            <motion.button
+              whileHover={{ x: -2, backgroundColor: 'rgba(255,255,255,0.06)' }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleToggleR}
+              className="group relative flex items-center justify-center w-6 h-14 rounded-l-2xl bg-white/[0.02] backdrop-blur-2xl border border-r-0 border-white/10 shadow-[-4px_0_24px_rgba(0,0,0,0.5)] cursor-pointer transition-all duration-300"
+              style={{ 
+                borderColor: effR ? 'rgba(255,255,255,0.1)' : `${accentColor}40`
+              }}
+            >
+              <div className="absolute right-0 w-0.5 h-6 rounded-full bg-white/10 group-hover:bg-white/30 transition-colors" />
+              <div className="transition-all duration-300 transform group-hover:scale-110" style={{ color: effR ? 'rgba(255,255,255,0.4)' : accentColor }}>
+                {effR ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
+              </div>
+              {/* Subtle accent glow on hover */}
+              <div className="absolute inset-0 rounded-l-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" 
+                style={{ boxShadow: `0 0 20px ${accentColor}15` }} 
+              />
+            </motion.button>
+          </motion.div>
         )}
 
         {/* ── Mobile Toggle Buttons (Left) ────────────────────────────── */}
         {isMobile && leftSidebar && (
           <motion.div
-            className="absolute left-0 top-1/2 z-50 flex flex-col items-start"
+            className="absolute left-0 top-1/2 z-50 flex flex-col items-start gap-12"
             style={{ 
               x: smoothL, 
               y: leftSecondarySidebar ? '-50%' : 'calc(-50% - 30px)' 
             }}
           >
-            <div className="flex flex-col shadow-2xl">
-              <button
+            <div className="flex flex-col gap-4">
+              <motion.button
+                whileTap={{ scale: 0.9 }}
                 onClick={handleToggleL1}
-                className="w-11 h-11 flex items-center justify-center bg-[#0a0a14] border border-l-0 border-white/10 text-zinc-400 rounded-r-xl"
+                className="w-12 h-14 flex items-center justify-center bg-[#0a0a14]/80 backdrop-blur-xl border border-l-0 border-white/10 text-zinc-400 rounded-r-2xl shadow-2xl"
+                style={{ color: mobileActive === 'L1' ? accentColor : 'white' }}
               >
                 {mobileActive === 'L1' ? (
-                  <X className="w-5 h-5 text-red-400/80" />
+                  <X className="w-6 h-6" />
                 ) : (
-                  (mobileActive === 'L2') ? <ArrowLeftRight className="w-5 h-5 text-indigo-400" /> : <PanelLeftOpen className="w-5 h-5" />
+                  (mobileActive === 'L2') ? <ArrowLeftRight className="w-6 h-6" /> : <PanelLeftOpen className="w-6 h-6" />
                 )}
-              </button>
+              </motion.button>
               {leftSecondarySidebar && (
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
                   onClick={handleToggleL2}
-                  className="w-11 h-11 mt-[50px] flex items-center justify-center bg-[#0a0a14] border border-l-0 border-white/10 text-zinc-400 rounded-r-xl"
+                  className="w-12 h-14 flex items-center justify-center bg-[#0a0a14]/80 backdrop-blur-xl border border-l-0 border-white/10 text-zinc-400 rounded-r-2xl shadow-2xl"
+                  style={{ color: mobileActive === 'L2' ? accentColor : 'white' }}
                 >
                   {mobileActive === 'L2' ? (
-                    <X className="w-5 h-5 text-red-400/80" />
+                    <X className="w-6 h-6" />
                   ) : (
-                    (mobileActive === 'L1') ? <ArrowLeftRight className="w-5 h-5 text-indigo-400" /> : <ChevronRight className="w-5 h-5" />
+                    (mobileActive === 'L1') ? <ArrowLeftRight className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />
                   )}
-                </button>
+                </motion.button>
               )}
             </div>
           </motion.div>
@@ -349,14 +387,16 @@ export default function StudioLayout({
         {/* ── Mobile Toggle Button (Right) ───────────────────────────── */}
         {isMobile && rightSidebar && (
           <motion.button
+            whileTap={{ scale: 0.9 }}
             onClick={handleToggleR}
-            className="absolute right-0 top-1/2 z-50 w-11 h-11 flex items-center justify-center bg-[#0a0a14] border border-r-0 border-white/10 text-zinc-400 shadow-2xl rounded-l-xl"
+            className="absolute right-0 top-1/2 z-50 w-12 h-14 flex items-center justify-center bg-[#0a0a14]/80 backdrop-blur-xl border border-r-0 border-white/10 text-zinc-400 shadow-2xl rounded-l-2xl"
             style={{ 
               x: rightToggleX, 
-              y: leftSecondarySidebar ? '-50%' : 'calc(-50% + 30px)' 
+              y: leftSecondarySidebar ? '-50%' : 'calc(-50% + 30px)',
+              color: effR ? accentColor : 'white'
             }}
           >
-            {effR ? <X className="w-5 h-5 text-red-400/80" /> : <PanelRightOpen className="w-5 h-5" />}
+            {effR ? <X className="w-6 h-6" /> : <PanelRightOpen className="w-6 h-6" />}
           </motion.button>
         )}
 

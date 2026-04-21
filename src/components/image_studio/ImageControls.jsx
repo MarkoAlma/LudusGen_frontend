@@ -1,8 +1,182 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ImageIcon, Wand2, Plus, X, Trash2, Zap, Settings2, Info, ArrowUpRight, Sparkles, Cpu, Activity, Layers, Target, Maximize2, ChevronDown, Pencil } from 'lucide-react';
+import { ImageIcon, Wand2, Plus, X, Trash2, Zap, Settings2, Info, ArrowUpRight, Sparkles, Cpu, Activity, Layers, Target, Maximize2, ChevronDown, Pencil, Upload, Images, Loader2 } from 'lucide-react';
 import Enhancer from '../../ai_components/Enhancer';
 import { ALL_MODELS } from '../../ai_components/models';
+import { createPortal } from 'react-dom';
+import { API_BASE } from '../../api/client';
+
+function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slotsAvailable }) {
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState([]);
+  const [adding, setAdding] = useState(false);
+  const abortRef = useRef(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const fetchGallery = async () => {
+      try {
+        const token = await getIdToken();
+        const res = await fetch(`${API_BASE}/api/image-gallery`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal
+        });
+        if (!res.ok) throw new Error(res.statusText);
+        const data = await res.json();
+        if (data.success) setImages(data.images);
+      } catch (err) {
+        if (err.name !== 'AbortError') console.error('Gallery fetch failed:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGallery();
+    return () => controller.abort();
+  }, []);
+
+  const toggleSelect = (img) => {
+    setSelected(prev => {
+      const isSelected = prev.some(i => i.id === img.id);
+      if (isSelected) return prev.filter(i => i.id !== img.id);
+      if (prev.length >= slotsAvailable) return prev;
+      return [...prev, img];
+    });
+  };
+
+  const handleAdd = async () => {
+    if (selected.length === 0) return;
+    setAdding(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const token = await getIdToken();
+      const results = await Promise.all(selected.map(async (img) => {
+        const res = await fetch(`${API_BASE}/api/image-gallery/proxy?key=${encodeURIComponent(img.full_key)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal
+        });
+        if (!res.ok) throw new Error(res.statusText);
+        const blob = await res.blob();
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve({ dataUrl: e.target.result, name: img.id + '.png' });
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }));
+      onSelectMultiple(results);
+      onClose();
+    } catch (err) {
+      if (err.name !== 'AbortError') console.error('Image load failed:', err);
+      setAdding(false);
+    }
+  };
+
+  const handleClose = () => {
+    abortRef.current?.abort();
+    onClose();
+  };
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-xl"
+      onClick={handleClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-2xl max-h-[80vh] flex flex-col rounded-[2rem] bg-[#0a0a14] border border-white/10 shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-5 border-b border-white/5">
+          <div>
+            <h3 className="text-sm font-black text-white italic uppercase tracking-[0.2em]">Galéria</h3>
+            <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1">
+              {selected.length > 0 ? `${selected.length} / ${slotsAvailable} kiválasztva` : `Max ${slotsAvailable} kép`}
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto scrollbar-hide p-6">
+          {loading ? (
+            <div className="flex items-center justify-center h-40">
+              <Loader2 className="w-8 h-8 text-white/20 animate-spin" />
+            </div>
+          ) : images.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
+              <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">Üres galéria</p>
+              <p className="text-[9px] font-bold text-white/10 uppercase tracking-widest">Generálj képeket először</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+              {images.map((img) => {
+                const isSelected = selected.some(i => i.id === img.id);
+                const isDisabled = !isSelected && selected.length >= slotsAvailable;
+                return (
+                  <button
+                    key={img.id}
+                    onClick={() => toggleSelect(img)}
+                    disabled={isDisabled || adding}
+                    className={`relative aspect-square rounded-xl overflow-hidden border transition-all group disabled:opacity-30 ${isSelected ? 'border-violet-500 ring-2 ring-violet-500/40' : 'border-white/5 hover:border-white/20'}`}
+                  >
+                    <img
+                      src={img.thumbUrl}
+                      alt={img.prompt}
+                      className="w-full h-full object-cover transition-transform duration-[2000ms] group-hover:scale-110"
+                      loading="lazy"
+                    />
+                    {isSelected && (
+                      <div className="absolute inset-0 bg-violet-500/20 flex items-center justify-center">
+                        <div className="w-6 h-6 rounded-full bg-violet-500 flex items-center justify-center text-white text-[10px] font-black">
+                          {selected.findIndex(i => i.id === img.id) + 1}
+                        </div>
+                      </div>
+                    )}
+                    {!isSelected && (
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                        <Plus className="w-6 h-6 text-white" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {selected.length > 0 && (
+          <div className="p-4 border-t border-white/5 bg-white/[0.02]">
+            <button
+              onClick={handleAdd}
+              disabled={adding}
+              className="w-full py-3 rounded-2xl bg-violet-600 text-white text-[11px] font-black uppercase tracking-[0.2em] hover:bg-violet-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {adding ? 'Betöltés...' : `${selected.length} kép hozzáadása`}
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>,
+    document.body
+  );
+}
 
 export default function ImageControls({
   selectedModel,
@@ -29,6 +203,9 @@ export default function ImageControls({
   const fileInputRef = useRef(null);
   const dropdownRef = useRef(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [galleryPickerOpen, setGalleryPickerOpen] = useState(false);
+  const popoverRef = useRef(null);
   const color = selectedModel.color || "#7c3aed";
 
   // Generáló vs szerkesztő mód
@@ -48,6 +225,17 @@ export default function ImageControls({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [dropdownOpen]);
+
+  useEffect(() => {
+    if (!popoverOpen) return;
+    const handler = (e) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        setPopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [popoverOpen]);
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files || []).slice(0, 3 - inputImages.length);
@@ -77,7 +265,7 @@ export default function ImageControls({
   const nvidiaType = isNvidia ? getNvidiaType(apiId) : null;
   const isFlux = nvidiaType === "flux";
   const isSD3 = nvidiaType === "sd3";
-  
+
   const currentRatio = isFlux ? FLUX_SIZES[fluxSizeIdx] : aspectRatio;
 
   return (
@@ -143,9 +331,8 @@ export default function ImageControls({
                           onModelChange?.(model);
                           setDropdownOpen(false);
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all ${
-                          isActive ? 'bg-white/[0.05]' : 'hover:bg-white/[0.02]'
-                        }`}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all ${isActive ? 'bg-white/[0.05]' : 'hover:bg-white/[0.02]'
+                          }`}
                       >
                         {/* Color dot */}
                         <div
@@ -189,301 +376,322 @@ export default function ImageControls({
       {/* Scrollable Configuration Area */}
       <div className="flex-1 overflow-y-auto scrollbar-hide py-4 h-full relative z-10">
 
-      {/* Section: Prompts */}
-      <div className="px-6 space-y-6 pb-6">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic">
-               Positive Command
-            </label>
-            <Sparkles className="w-3.5 h-3.5 text-primary opacity-30 animate-pulse" />
+        {/* Section: Prompts */}
+        <div className="px-6 space-y-6 pb-6">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic">
+                Positive Command
+              </label>
+              <Sparkles className="w-3.5 h-3.5 text-primary opacity-30 animate-pulse" />
+            </div>
+            <div className="relative group">
+              <Enhancer
+                value={prompt}
+                onChange={setPrompt}
+                onBusyChange={setIsEnhancerBusy}
+                enhancing_prompt={enhancingPrompt}
+                dechanting_prompt={dehancingPrompt}
+                gemmaVisionPrompt={gemmaVisionPrompt}
+                inputImages={inputImages}
+                color={color}
+                onSubmit={onGenerate}
+                onNegativeChange={setNegativePrompt}
+                getIdToken={getIdToken}
+              />
+            </div>
           </div>
-          <div className="relative group">
-             <Enhancer 
-               value={prompt}
-               onChange={setPrompt}
-               onBusyChange={setIsEnhancerBusy}
-               enhancing_prompt={enhancingPrompt}
-               dechanting_prompt={dehancingPrompt}
-               gemmaVisionPrompt={gemmaVisionPrompt}
-               inputImages={inputImages}
-               color={color}
-               onSubmit={onGenerate}
-               onNegativeChange={setNegativePrompt}
-               getIdToken={getIdToken}
-             />
-          </div>
+
+          {isModelScopeEdit && !isGoogleImage && !isFlux && (
+            <div className="space-y-3">
+              <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic px-1">
+                Negative Constraints
+              </label>
+              <textarea
+                value={negativePrompt}
+                onChange={(e) => setNegativePrompt(e.target.value)}
+                placeholder="Items to omit from frame..."
+                rows={1}
+                className="w-full bg-white/[0.01] border border-white/5 rounded-2xl p-4 text-[13px] text-zinc-500 placeholder-zinc-800 focus:outline-none focus:border-white/10 transition-all resize-none leading-relaxed"
+              />
+            </div>
+          )}
+
+          {/* Input Images */}
+          {isModelScopeEdit && (
+            <div className="space-y-3 pt-2">
+              <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic px-1">
+                Reference Clusters
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {inputImages.map((img, idx) => (
+                  <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-white/5 group shadow-lg">
+                    <img src={img.dataUrl || null} className="w-full h-full object-cover" alt="ref" />
+                    <button
+                      onClick={() => setInputImages(p => p.filter((_, i) => i !== idx))}
+                      className="absolute inset-0 bg-red-600/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    >
+                      <X className="w-5 h-5 text-white" />
+                    </button>
+                  </div>
+                ))}
+                {inputImages.length < 3 && (
+                  <div className="relative aspect-video" ref={popoverRef}>
+                    <button
+                      onClick={() => setPopoverOpen(p => !p)}
+                      className="w-full h-full rounded-xl border border-dashed border-white/10 flex flex-col items-center justify-center text-zinc-700 hover:border-primary/40 hover:text-primary transition-all bg-white/[0.01] group"
+                    >
+                      <Plus className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" />
+                      <span className="text-[8px] font-black uppercase tracking-widest">Attach Asset ({3 - inputImages.length} free)</span>
+                    </button>
+
+                    <AnimatePresence>
+                      {popoverOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 4, scale: 0.97 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 4, scale: 0.97 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute bottom-full left-0 mb-2 w-44 rounded-xl border border-white/10 bg-[#0d0d14]/98 backdrop-blur-xl shadow-2xl z-50 overflow-hidden"
+                        >
+                          <button
+                            onClick={() => { fileInputRef.current?.click(); setPopoverOpen(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.04] transition-all"
+                          >
+                            <Upload className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                            <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">Gépről</span>
+                          </button>
+                          <div className="h-px bg-white/5 mx-3" />
+                          <button
+                            onClick={() => { setGalleryPickerOpen(true); setPopoverOpen(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.04] transition-all"
+                          >
+                            <Images className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                            <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">Galériából</span>
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </div>
+              <input type="file" ref={fileInputRef} className="hidden" onChange={handleImageUpload} multiple />
+              <AnimatePresence>
+                {galleryPickerOpen && (
+                  <GalleryPickerModal
+                    onClose={() => setGalleryPickerOpen(false)}
+                    onSelectMultiple={(imgs) => setInputImages(prev => [...prev, ...imgs].slice(0, 3))}
+                    getIdToken={getIdToken}
+                    slotsAvailable={3 - inputImages.length}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
-        {isModelScopeEdit && !isGoogleImage && !isFlux && (
-          <div className="space-y-3">
-            <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic px-1">
-               Negative Constraints
-            </label>
-            <textarea
-              value={negativePrompt}
-              onChange={(e) => setNegativePrompt(e.target.value)}
-              placeholder="Items to omit from frame..."
-              rows={1}
-              className="w-full bg-white/[0.01] border border-white/5 rounded-2xl p-4 text-[13px] text-zinc-500 placeholder-zinc-800 focus:outline-none focus:border-white/10 transition-all resize-none leading-relaxed"
-            />
+        <div className="h-px bg-white/5 mx-6 mb-6" />
+
+        {/* Section: Configuration */}
+        <div className="px-6 space-y-6 pb-24">
+          <div className="flex items-center gap-2 px-1 mb-2">
+            <Settings2 className="w-3.5 h-3.5 text-zinc-600" />
+            <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Core Parameters</span>
           </div>
-        )}
 
-        {/* Input Images */}
-        {isModelScopeEdit && (
-          <div className="space-y-3 pt-2">
-            <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic px-1">
-               Reference Clusters
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {inputImages.map((img, idx) => (
-                <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-white/5 group shadow-lg">
-                  <img src={img.dataUrl || null} className="w-full h-full object-cover" alt="ref" />
-                  <button 
-                    onClick={() => setInputImages(p => p.filter((_, i) => i !== idx))}
-                    className="absolute inset-0 bg-red-600/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                  >
-                    <X className="w-5 h-5 text-white" />
-                  </button>
-                </div>
-              ))}
-              {inputImages.length < 3 && (
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="aspect-video rounded-xl border border-dashed border-white/10 flex flex-col items-center justify-center text-zinc-700 hover:border-primary/40 hover:text-primary transition-all bg-white/[0.01] group"
-                >
-                  <Plus className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" />
-                  <span className="text-[8px] font-black uppercase tracking-widest">Attach Asset ({3 - inputImages.length} free)</span>
-                </button>
-              )}
-            </div>
-            <input type="file" ref={fileInputRef} className="hidden" onChange={handleImageUpload} multiple />
-          </div>
-        )}
-      </div>
-
-      <div className="h-px bg-white/5 mx-6 mb-6" />
-
-      {/* Section: Configuration */}
-      <div className="px-6 space-y-6 pb-24">
-        <div className="flex items-center gap-2 px-1 mb-2">
-           <Settings2 className="w-3.5 h-3.5 text-zinc-600" />
-           <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Core Parameters</span>
-        </div>
-
-        {/* Quality selector */}
-        {(isSD3 || !isNvidia) && !isModelScopeEdit && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 px-1">
-               <Layers className="w-3 h-3 text-zinc-600" />
-               <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Process Fidelity</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {Object.entries(QUALITY_PRESETS).map(([key, p]) => (
-                <button
-                  key={key}
-                  onClick={() => setQuality(key)}
-                  className={`flex flex-col items-center py-2.5 rounded-xl border transition-all duration-300 ${
-                    quality === key ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10 hover:text-zinc-500'
-                  }`}
-                  style={quality === key ? {
-                    backgroundColor: `${color}15`,
-                    borderColor: `${color}40`,
-                    color: color,
-                    boxShadow: `0 0 15px ${color}08`
-                  } : {}}
-                >
-                  <span className="text-[10px] font-black uppercase tracking-tighter">{p.label}</span>
-                  <span className="text-[7px] font-bold opacity-40 uppercase tracking-widest mt-0.5">{p.sub}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Aspect Ratio */}
-        {((isSD3 || !isNvidia) || isFlux) && !isModelScopeEdit && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 px-1">
-               <Maximize2 className="w-3 h-3 text-zinc-600" />
-               <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Composition Area</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {(isFlux ? FLUX_SIZES : ASPECT_RATIO_LIST).map((ar, idx) => {
-                const isActive = isFlux ? fluxSizeIdx === idx : aspectRatio === ar.value;
-                const size = isFlux ? ar : QUALITY_PRESETS[quality].sizes[ar.value];
-                
-                return (
+          {/* Quality selector */}
+          {(isSD3 || !isNvidia) && !isModelScopeEdit && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <Layers className="w-3 h-3 text-zinc-600" />
+                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Process Fidelity</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {Object.entries(QUALITY_PRESETS).map(([key, p]) => (
                   <button
-                    key={idx}
-                    onClick={() => isFlux ? setFluxSizeIdx(idx) : setAspectRatio(ar.value)}
-                    className={`flex flex-col items-center py-2.5 rounded-xl text-[10px] font-black transition-all border duration-300 ${
-                      isActive ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700'
-                    }`}
-                    style={isActive ? {
+                    key={key}
+                    onClick={() => setQuality(key)}
+                    className={`flex flex-col items-center py-2.5 rounded-xl border transition-all duration-300 ${quality === key ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700 hover:border-white/10 hover:text-zinc-500'
+                      }`}
+                    style={quality === key ? {
                       backgroundColor: `${color}15`,
                       borderColor: `${color}40`,
                       color: color,
                       boxShadow: `0 0 15px ${color}08`
                     } : {}}
                   >
-                    <span className="uppercase tracking-widest">{ar.label}</span>
-                    <span className="text-[7px] font-bold opacity-40 mt-0.5">{size.w}x{size.h}</span>
+                    <span className="text-[10px] font-black uppercase tracking-tighter">{p.label}</span>
+                    <span className="text-[7px] font-bold opacity-40 uppercase tracking-widest mt-0.5">{p.sub}</span>
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Num images */}
-        {isFal && !isModelScopeEdit && (
-          <div className="space-y-3">
-            <div className="flex justify-between items-center px-1">
-              <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Asset Quantity</span>
-              <span className="text-[10px] font-black italic" style={{ color }}>{numImages}</span>
+          {/* Aspect Ratio */}
+          {((isSD3 || !isNvidia) || isFlux) && !isModelScopeEdit && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 px-1">
+                <Maximize2 className="w-3 h-3 text-zinc-600" />
+                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Composition Area</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {(isFlux ? FLUX_SIZES : ASPECT_RATIO_LIST).map((ar, idx) => {
+                  const isActive = isFlux ? fluxSizeIdx === idx : aspectRatio === ar.value;
+                  const size = isFlux ? ar : QUALITY_PRESETS[quality].sizes[ar.value];
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => isFlux ? setFluxSizeIdx(idx) : setAspectRatio(ar.value)}
+                      className={`flex flex-col items-center py-2.5 rounded-xl text-[10px] font-black transition-all border duration-300 ${isActive ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700'
+                        }`}
+                      style={isActive ? {
+                        backgroundColor: `${color}15`,
+                        borderColor: `${color}40`,
+                        color: color,
+                        boxShadow: `0 0 15px ${color}08`
+                      } : {}}
+                    >
+                      <span className="uppercase tracking-widest">{ar.label}</span>
+                      <span className="text-[7px] font-bold opacity-40 mt-0.5">{size.w}x{size.h}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
-              <div 
-                 className="absolute h-full transition-all duration-300" 
-                 style={{ width: `${(numImages/4)*100}%`, backgroundColor: color }} 
-              />
-              <input 
-                 type="range" min="1" max="4" step="1" 
-                 value={numImages} onChange={(e) => setNumImages(parseInt(e.target.value))}
-                 className="absolute inset-0 w-full opacity-0 cursor-pointer z-10" 
-              />
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Advanced Settings Toggle */}
-        <button 
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="w-full flex items-center justify-between py-2 px-1 text-zinc-600 hover:text-zinc-400 transition-colors group"
-        >
-          <div className="flex items-center gap-2">
-            <Settings2 className={`w-3.5 h-3.5 transition-transform duration-500 ${showAdvanced ? 'rotate-90' : ''}`} />
-            <span className="text-[9px] font-black uppercase tracking-[0.4em] italic">Advanced Control</span>
-          </div>
-          <motion.div
-            animate={{ rotate: showAdvanced ? 180 : 0 }}
-            className="flex items-center justify-center"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </motion.div>
-        </button>
-
-        <AnimatePresence>
-          {showAdvanced && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden space-y-6"
-            >
-              {/* Seed */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center px-1">
-                  <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Temporal Seed</span>
-                  <span className="text-[8px] text-zinc-800 font-bold uppercase tracking-widest">(Optional)</span>
-                </div>
-                <input 
-                  type="number"
-                  value={seed}
-                  onChange={(e) => setSeed(e.target.value)}
-                  placeholder="Entropy value (e.g. 42)"
-                  className="w-full bg-white/[0.01] border border-white/5 rounded-xl p-3 text-[12px] text-zinc-500 placeholder-zinc-800 focus:outline-none focus:border-white/10 transition-all font-mono"
+          {/* Num images */}
+          {isFal && !isModelScopeEdit && (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Asset Quantity</span>
+                <span className="text-[10px] font-black italic" style={{ color }}>{numImages}</span>
+              </div>
+              <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="absolute h-full transition-all duration-300"
+                  style={{ width: `${(numImages / 4) * 100}%`, backgroundColor: color }}
+                />
+                <input
+                  type="range" min="1" max="4" step="1"
+                  value={numImages} onChange={(e) => setNumImages(parseInt(e.target.value))}
+                  className="absolute inset-0 w-full opacity-0 cursor-pointer z-10"
                 />
               </div>
+            </div>
+          )}
 
-              {/* Parameters Sliders */}
-              {(isFal || isNvidia) && !isModelScopeEdit && (
-                <div className="space-y-6">
-                   <div className="space-y-3">
+          {/* Advanced Settings Toggle */}
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="w-full flex items-center justify-between py-2 px-1 text-zinc-600 hover:text-zinc-400 transition-colors group"
+          >
+            <div className="flex items-center gap-2">
+              <Settings2 className={`w-3.5 h-3.5 transition-transform duration-500 ${showAdvanced ? 'rotate-90' : ''}`} />
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] italic">Advanced Control</span>
+            </div>
+            <motion.div
+              animate={{ rotate: showAdvanced ? 180 : 0 }}
+              className="flex items-center justify-center"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </motion.div>
+          </button>
+
+          <AnimatePresence>
+            {showAdvanced && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden space-y-6"
+              >
+                {/* Seed */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Temporal Seed</span>
+                    <span className="text-[8px] text-zinc-800 font-bold uppercase tracking-widest">(Optional)</span>
+                  </div>
+                  <input
+                    type="number"
+                    value={seed}
+                    onChange={(e) => setSeed(e.target.value)}
+                    placeholder="Entropy value (e.g. 42)"
+                    className="w-full bg-white/[0.01] border border-white/5 rounded-xl p-3 text-[12px] text-zinc-500 placeholder-zinc-800 focus:outline-none focus:border-white/10 transition-all font-mono"
+                  />
+                </div>
+
+                {/* Parameters Sliders */}
+                {(isFal || isNvidia) && !isModelScopeEdit && (
+                  <div className="space-y-6">
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center px-1">
                         <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Inference Steps</span>
                         <span className="text-[10px] font-black italic" style={{ color }}>{steps}</span>
                       </div>
                       <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
-                        <div 
-                           className="absolute h-full transition-all duration-300" 
-                           style={{ width: `${(steps/50)*100}%`, backgroundColor: color }} 
+                        <div
+                          className="absolute h-full transition-all duration-300"
+                          style={{ width: `${(steps / 50) * 100}%`, backgroundColor: color }}
                         />
-                        <input 
-                           type="range" min="1" max="50" step="1" 
-                           value={steps} onChange={(e) => setSteps(parseInt(e.target.value))}
-                           className="absolute inset-0 w-full opacity-0 cursor-pointer z-10" 
+                        <input
+                          type="range" min="1" max="50" step="1"
+                          value={steps} onChange={(e) => setSteps(parseInt(e.target.value))}
+                          className="absolute inset-0 w-full opacity-0 cursor-pointer z-10"
                         />
                       </div>
-                   </div>
-                   <div className="space-y-3">
+                    </div>
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center px-1">
                         <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Neural Guidance</span>
                         <span className="text-[10px] font-black italic" style={{ color }}>{guidance}</span>
                       </div>
                       <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
-                        <div 
-                           className="absolute h-full transition-all duration-300" 
-                           style={{ width: `${(guidance/(isFlux ? 30 : 20))*100}%`, backgroundColor: color }} 
+                        <div
+                          className="absolute h-full transition-all duration-300"
+                          style={{ width: `${(guidance / (isFlux ? 30 : 20)) * 100}%`, backgroundColor: color }}
                         />
-                        <input 
-                          type="range" min="1.5" max={isFlux ? 30 : 20} step="0.5" 
+                        <input
+                          type="range" min="1.5" max={isFlux ? 30 : 20} step="0.5"
                           value={guidance} onChange={(e) => setGuidance(parseFloat(e.target.value))}
-                          className="absolute inset-0 w-full opacity-0 cursor-pointer z-10" 
+                          className="absolute inset-0 w-full opacity-0 cursor-pointer z-10"
                         />
                       </div>
-                   </div>
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                    </div>
+                  </div>
+                )}
 
-        {/* Prompt Extend Toggle */}
-        {isModelScopeEdit && (
-          <button 
-            onClick={() => setPromptExtend(!promptExtend)}
-            className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all duration-500 group ${
-              promptExtend ? '' : 'bg-white/[0.01] border-white/5 text-zinc-700'
-            }`}
-            style={promptExtend ? {
-              backgroundColor: `${color}08`,
-              borderColor: `${color}20`,
-              color: color
-            } : {}}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg transition-colors ${promptExtend ? 'bg-primary/20 text-white shadow-lg' : 'bg-white/10 text-zinc-800'}`}>
-                 <Sparkles className="w-3.5 h-3.5" />
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] italic">AI Expansion</span>
-            </div>
-            <div className="w-8 h-4 rounded-full relative transition-colors shadow-inner" style={{ backgroundColor: promptExtend ? color : 'rgba(255,255,255,0.05)' }}>
-              <motion.div 
-                animate={{ x: promptExtend ? 18 : 3 }}
-                transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-                className="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-md"
-              />
-            </div>
-          </button>
-        )}
+                  {/* Prompt Extend Toggle Moved Here & Simplified */}
+                  {isModelScopeEdit && (
+                    <button
+                      onClick={() => setPromptExtend(!promptExtend)}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all duration-300 ${promptExtend ? 'bg-white/[0.04] border-white/10' : 'bg-transparent border-white/5 text-zinc-700'}`}
+                      style={promptExtend ? { borderColor: `${color}40`, color } : {}}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Sparkles className="w-3.5 h-3.5 opacity-40" />
+                        <span className="text-[10px] font-black uppercase tracking-widest italic">AI Expansion</span>
+                      </div>
+                      <div className="w-8 h-4 rounded-full relative transition-colors bg-white/5 shadow-inner">
+                        <motion.div
+                          animate={{ x: promptExtend ? 18 : 3 }}
+                          transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                          className="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-md"
+                          style={{ backgroundColor: promptExtend ? color : '#52525b' }}
+                        />
+                      </div>
+                    </button>
+                  )}
+                </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Current Model Status Card */}
-        <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 relative overflow-hidden group">
-           <div className="relative z-10 flex items-center justify-between">
-              <div className="min-w-0">
-                 <p className="text-[8px] font-black text-zinc-700 uppercase tracking-[0.2em] mb-1">Active Neural Unit</p>
-                 <h4 className="text-xs font-black text-white italic truncate pr-2">{selectedModel.name}</h4>
-              </div>
-              <div className="flex flex-shrink-0 items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/5 border border-emerald-500/10">
-                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                 <span className="text-[8px] font-black text-emerald-500 tracking-tighter uppercase italic">Ready</span>
-              </div>
-           </div>
+
+          {/* Current Model Status Card */}
+
         </div>
-      </div>
 
       </div>
 
@@ -493,7 +701,7 @@ export default function ImageControls({
           onClick={onGenerate}
           disabled={isGenerating || isEnhancerBusy || !prompt.trim()}
           className="w-full py-4 rounded-[1.2rem] font-black text-sm uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-20 disabled:grayscale shadow-2xl relative overflow-hidden group/btn"
-          style={{ 
+          style={{
             backgroundColor: prompt.trim() && !isEnhancerBusy ? color : '#ffffff',
             color: prompt.trim() && !isEnhancerBusy ? '#ffffff' : '#000000',
             boxShadow: prompt.trim() && !isEnhancerBusy ? `0 10px 30px ${color}30` : 'none'

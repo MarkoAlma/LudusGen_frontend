@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
 import PageTransition from './components/layout/PageTransition';
@@ -20,9 +20,10 @@ import AIChat from './ai_components/AiChat';
 import { auth } from './firebase/firebaseApp';
 import Forum from './pages/Forum';
 import { AnimatePresence } from 'framer-motion';
+import CreditTopup from './components/CreditTopup';
 
 function App() {
-  const { showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled } = useContext(MyUserContext);
+  const { showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled, showCreditTopup, setShowCreditTopup } = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -55,6 +56,8 @@ function App() {
     setIsAuthOpen(false);
     setShowNavbar(true);
   };
+  
+  const getAuthToken = useCallback(() => auth.currentUser?.getIdToken(true), []);
 
   return (
     <div className="min-h-screen bg-black text-white relative">
@@ -66,7 +69,7 @@ function App() {
             <Route path="/chat" element={
               <PageTransition>
                 <ProtectedRoute>
-                  <AIChat user={user} getIdToken={() => auth.currentUser?.getIdToken(true)} />
+                  <AIChat user={user} getIdToken={getAuthToken} />
                 </ProtectedRoute>
               </PageTransition>
             } />
@@ -84,6 +87,7 @@ function App() {
 
       <LudusGenAdmin />
       <AuthModal isOpen={isAuthOpen} onClose={closeAuth} />
+      <CreditTopup isOpen={showCreditTopup} onClose={() => setShowCreditTopup(false)} />
 
       {msg && <MyToastify {...msg} />}
     </div>

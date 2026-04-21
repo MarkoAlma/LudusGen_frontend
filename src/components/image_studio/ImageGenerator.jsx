@@ -433,7 +433,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
   const [seed, setSeed] = useState("");
   const [steps, setSteps] = useState(35);
   const [guidance, setGuidance] = useState(3);
-  const [promptExtend, setPromptExtend] = useState(true);
+  const [promptExtend, setPromptExtend] = useState(false);
   const [fluxSizeIdx, setFluxSizeIdx] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState(null);

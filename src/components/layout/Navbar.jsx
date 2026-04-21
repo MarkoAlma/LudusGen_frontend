@@ -17,7 +17,7 @@ export default function Navbar() {
   const [studioDropdownOpen, setStudioDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
-  const { setIsAuthOpen, showNavbar, user, logoutUser } = useContext(MyUserContext);
+  const { setIsAuthOpen, showNavbar, user, logoutUser, setShowCreditTopup } = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
 

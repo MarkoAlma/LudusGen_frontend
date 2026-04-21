@@ -15,6 +15,8 @@ import BackgroundFilters from '../components/chat/BackgroundFilters';
 import AudioEngineBg from '../assets/backgrounds/motif_audio_bg.png';
 import StudioLayout from '../components/shared/StudioLayout';
 import { useStudioPanels } from '../context/StudioPanelContext';
+import AudioControls from '../components/audio_studio/AudioControls';
+import AudioWorkspace from '../components/audio_studio/AudioWorkspace';
 
 import { API_BASE } from "../api/client";
 
@@ -128,29 +130,6 @@ const EMOTION_EMOJI = {
   PleasantSurprise: "😲",
 };
 
-const MiniWaveform = ({ color, isPlaying }) => (
-  <div className="flex items-center justify-center gap-1.5 h-32 px-16 relative">
-    {Array.from({ length: 40 }).map((_, i) => (
-      <motion.div
-        key={i}
-        animate={{
-          height: isPlaying ? [10, Math.random() * 80 + 20, 10] : 8,
-          opacity: isPlaying ? [0.6, 1, 0.6] : 0.1
-        }}
-        transition={{
-          duration: 0.4 + Math.random() * 0.6,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: i * 0.02
-        }}
-        className="w-[3px] rounded-full shadow-lg"
-        style={{
-          backgroundColor: isPlaying ? color : 'rgba(255,255,255,0.05)',
-        }}
-      />
-    ))}
-  </div>
-);
 
 export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
   const { addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError } = useJobs();
@@ -176,6 +155,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
   const isNvidiaRiva = selectedModel.provider === "nvidia-riva";
 
   const [activeTab, setActiveTab] = useState("generate");
+  const [view, setView] = useState("forge");
 
   // OpenAI / ElevenLabs
   const [text, setText] = useState("");
@@ -364,185 +344,83 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
       rightOpen={rightOpen}
       setRightOpen={setRightOpen}
       leftWidth={320}
-      leftSecondaryWidth={392}
-      leftSecondaryClosedWidth={0}
+      leftSecondaryWidth={view === 'history' ? 72 : 392}
       onOffsetChange={setOffsets}
       leftSidebar={globalSidebar}
       leftSecondarySidebar={
         <div className="h-full flex flex-row overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
-          <div className="w-[72px] h-full flex flex-col bg-[#030308] border-r border-white/5 pt-6 items-center">
-            <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-lg mb-8"
-              style={{ backgroundColor: `${color}15`, borderColor: `${color}30`, color }}
-              title="Neural Forge"
-            >
-              {isTTS ? <Mic className="w-6 h-6" /> : <Music className="w-6 h-6" />}
-            </div>
-
-            <div className="flex flex-col gap-4">
-              {[
-                { id: "generate", label: "Forge", icon: Zap },
-                { id: "presets", label: "Presets", icon: Bookmark },
-                { id: "history", label: "History", icon: History },
-              ].map(tab => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setActiveTab(tab.id);
-                      setLeftSecondaryOpen(true);
-                    }}
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${activeTab === tab.id
-                        ? "bg-white/10 border-white/20 text-white shadow-lg"
-                        : "bg-transparent border-transparent text-zinc-600 hover:text-zinc-400"
-                      }`}
-                    title={tab.label}
-                    style={activeTab === tab.id ? { borderColor: `${color}40`, color } : {}}
-                  >
-                    <Icon className="w-5 h-5" />
-                  </button>
-                );
-              })}
-            </div>
-
+          {/* Tool Strip (72px) */}
+          <div className="w-[72px] h-full flex flex-col items-center pt-6 space-y-3 border-r border-white/5 bg-[#030308]">
+            {[
+              {
+                id: 'forge',
+                label: 'FORGE',
+                icon: <Zap className="w-5 h-5" />,
+                isActive: view === 'forge',
+                onClick: () => { setView('forge'); setLeftSecondaryOpen(true); },
+              },
+              {
+                id: 'history',
+                label: 'LIBRARY',
+                icon: <History className="w-5 h-5" />,
+                isActive: view === 'history',
+                onClick: () => setView('history'),
+              },
+            ].map((tool) => (
+              <button
+                key={tool.id}
+                onClick={tool.onClick}
+                title={tool.label}
+                className="group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer"
+              >
+                <div
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${tool.isActive
+                      ? 'bg-white/5 border-white/10 shadow-xl'
+                      : 'bg-transparent border-transparent hover:bg-white/[0.03] hover:border-white/5'
+                    }`}
+                  style={tool.isActive ? { borderColor: `${color}40`, color } : { color: '#52525b' }}
+                >
+                  {tool.icon}
+                </div>
+                <span className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 ${tool.isActive ? 'text-white' : 'text-zinc-700 group-hover:text-zinc-500'
+                  }`}>
+                  {tool.label}
+                </span>
+              </button>
+            ))}
             <div className="flex-1" />
-
-            <button
-              onClick={() => setLeftSecondaryOpen(!leftSecondaryOpen)}
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${leftSecondaryOpen
-                  ? "bg-white/10 border-white/20 text-white shadow-lg"
-                  : "bg-transparent border-transparent text-zinc-600 hover:text-zinc-400 mb-6"
-                }`}
-              title="Toggle Panel"
-            >
-              <Settings2 className="w-5 h-5" />
-            </button>
           </div>
 
-          <div className="flex-1 overflow-hidden">
-            <div className="h-full flex flex-col">
-              <div className="p-6 border-b border-white/5 bg-white/[0.02]">
-                <h3 className="text-white font-black text-xs uppercase tracking-[0.3em] italic leading-none">
-                  {activeTab === "generate" ? (isTTS ? "Audio Generator" : "Music Engineer") : activeTab.toUpperCase()}
-                </h3>
-                <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest mt-2">Neural Unit v4.0</p>
-              </div>
-
-              <div className="flex-1 overflow-y-auto scrollbar-hide p-6 space-y-8">
-                {activeTab === "generate" && (
-                  <div className="space-y-8">
-                    {isTTS ? (
-                      <div className="space-y-4">
-                        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Enter text to synthesize..." rows={4} className="w-full bg-white/[0.02] border border-white/5 rounded-xl p-4 text-[13px] text-zinc-200" />
-                        {isNvidiaRiva ? (
-                          <div className="space-y-6">
-                            <div className="space-y-4">
-                              <span className="text-[9px] font-black text-zinc-700 uppercase tracking-widest italic">Primary Language</span>
-                              <select value={rivaLang} onChange={(e) => setRivaLang(e.target.value)} className="w-full bg-white/[0.02] border border-white/5 rounded-xl p-3 text-[11px] text-zinc-200 focus:outline-none">
-                                {RIVA_LANGUAGES.map(lang => <option key={lang.code} value={lang.code} className="bg-zinc-900">{lang.label}</option>)}
-                              </select>
-                            </div>
-                            <div className="space-y-4">
-                              <span className="text-[9px] font-black text-zinc-700 uppercase tracking-widest italic">Voice Profile</span>
-                              <div className="grid grid-cols-2 gap-2">
-                                {rivaVoices.map(v => (
-                                  <button key={v.name} onClick={() => setRivaVoiceName(v.name)} className={`p-3 rounded-xl border text-left transition-all ${rivaVoiceName === v.name ? 'bg-white/5 border-white/20' : 'bg-transparent border-white/5'}`}>
-                                    <div className="text-[10px] font-bold text-white">{v.name}</div>
-                                    <div className="text-[8px] text-zinc-500">{v.desc}</div>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            {hasEmotions && (
-                              <div className="space-y-4">
-                                <span className="text-[9px] font-black text-zinc-700 uppercase tracking-widest italic">Emotional Inflection</span>
-                                <div className="flex flex-wrap gap-2">
-                                  {rivaVoiceObj.emotions.map(emo => (
-                                    <button key={emo} onClick={() => setRivaEmotion(emo)} className={`px-3 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${rivaEmotion === emo ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-white/5 text-zinc-500'}`}>
-                                      {EMOTION_EMOJI[emo] || ""} {emo}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="space-y-6">
-                            <div className="space-y-4">
-                              <span className="text-[9px] font-black text-zinc-700 uppercase tracking-widest italic">Voice Persona</span>
-                              <div className="grid grid-cols-2 gap-2">
-                                {TTS_VOICES.map(v => (
-                                  <button key={v.id} onClick={() => setSelectedVoice(v.id)} className={`p-3 rounded-xl border text-left transition-all ${selectedVoice === v.id ? 'bg-white/5 border-white/20' : 'bg-transparent border-white/5'}`}>
-                                    <div className="text-[10px] font-bold text-white mb-0.5">{v.label}</div>
-                                    <div className="text-[8px] text-zinc-500 line-clamp-1">{v.desc}</div>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="space-y-5">
-                              <div className="flex justify-between items-center px-1">
-                                <span className="text-[9px] font-black text-zinc-700 uppercase tracking-widest italic">Vocal Velocity</span>
-                                <span className="text-[10px] font-mono text-zinc-400">{speed}x</span>
-                              </div>
-                              <input type="range" min="0.5" max="2.0" step="0.1" value={speed} onChange={(e) => setSpeed(parseFloat(e.target.value))} className="w-full accent-white h-1 bg-white/5 rounded-full appearance-none cursor-pointer" />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        <div className="space-y-4">
-                          <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic">Command</label>
-                          <textarea value={musicPrompt} onChange={(e) => setMusicPrompt(e.target.value)} placeholder="Structural composition..." rows={3} className="w-full bg-white/[0.02] border border-white/5 rounded-xl p-4 text-[13px] text-zinc-200" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Select label="Genre" options={MUSIC_GENRES} value={genre} onChange={setGenre} />
-                          <Select label="Mood" options={MUSIC_MOODS} value={mood} onChange={setMood} />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black uppercase text-zinc-600">Duration ({duration}s)</label>
-                          <input type="range" min="10" max="60" step="5" value={duration} onChange={(e) => setDuration(parseInt(e.target.value))} className="w-full accent-white h-1 bg-white/5 rounded-full appearance-none cursor-pointer" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {activeTab === "presets" && (
-                  <div className="space-y-3">
-                    {presets.map(p => (
-                      <button key={p.id} onClick={() => applyPreset(p)} className="w-full p-4 rounded-xl border border-white/5 bg-white/[0.02] text-left hover:border-white/10 transition-all">
-                        <div className="text-[10px] font-black text-white uppercase">{p.name}</div>
-                        <div className="text-[8px] text-zinc-600 uppercase">{p.type}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {activeTab === "history" && (
-                  <div className="space-y-3">
-                    {history.map(h => (
-                      <div key={h.id} className="p-4 rounded-xl border border-white/5 bg-white/[0.02] text-[10px] text-zinc-500 italic">
-                        {h.text || h.prompt}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="p-6 border-t border-white/5 bg-white/[0.02]">
-                <button onClick={handleGenerate} disabled={isGenerating} className="w-full py-4 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all" style={{ backgroundColor: color }}>
-                  {isGenerating ? "Synthesizing..." : "Initiate Forge"}
-                </button>
-              </div>
-            </div>
+          <div className="flex-1 h-full overflow-hidden">
+            {view !== 'history' && (
+              <AudioControls
+                selectedModel={selectedModel}
+                onModelChange={(m) => { setAudioUrl(null); setIsPlaying(false); }} // Note: in real use this might be handled via parent
+                isGenerating={isGenerating}
+                onGenerate={handleGenerate}
+                text={text} setText={setText}
+                selectedVoice={selectedVoice} setSelectedVoice={setSelectedVoice}
+                speed={speed} setSpeed={setSpeed}
+                rivaLang={rivaLang} setRivaLang={setRivaLang}
+                rivaVoices={rivaVoices}
+                rivaVoiceName={rivaVoiceName} setRivaVoiceName={setRivaVoiceName}
+                rivaEmotion={rivaEmotion} setRivaEmotion={setRivaEmotion}
+                hasEmotions={hasEmotions}
+                musicPrompt={musicPrompt} setMusicPrompt={setMusicPrompt}
+                genre={genre} setGenre={setGenre}
+                mood={mood} setMood={setMood}
+                duration={duration} setDuration={setDuration}
+                instrumental={instrumental} setInstrumental={setInstrumental}
+              />
+            )}
           </div>
         </div>
       }
     >
       <div className="h-full w-full relative overflow-hidden flex flex-col">
         <BackgroundFilters />
+        
+        {/* Existing Background Logic - Preserved as requested */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
           <div className="absolute inset-0 liquid-wave opacity-60 scale-110 animate-[ken-burns_60s_infinite_alternate_ease-in-out]">
             <img src={AudioEngineBg} alt="bg" className="w-full h-full object-cover saturate-[1.2] brightness-[0.8]" />
@@ -560,31 +438,21 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
           <div className="absolute inset-0 bg-gradient-to-b from-[#03000a]/80 via-transparent to-[#03000a]" />
         </div>
 
-        <div className="flex-1 relative z-10 overflow-hidden flex flex-col items-center justify-center p-8">
-          <AnimatePresence mode="wait">
-            {isGenerating ? (
-              <motion.div key="generating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <MiniWaveform color={color} isPlaying={true} />
-              </motion.div>
-            ) : audioUrl ? (
-              <motion.div key="player" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-2xl p-8 rounded-[2rem] border border-white/5 bg-white/[0.01] backdrop-blur-xl">
-                <div className="flex justify-between items-start mb-8">
-                  <h3 className="text-2xl font-black text-white uppercase tracking-wider">Audio Forged</h3>
-                  <button onClick={togglePlay} className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: color }}>
-                    {isPlaying ? <Pause /> : <Play />}
-                  </button>
-                </div>
-                <MiniWaveform color={color} isPlaying={isPlaying} />
-              </motion.div>
-            ) : (
-              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center opacity-30">
-                <Mic className="w-12 h-12 mb-4" />
-                <h4 className="text-sm font-black uppercase tracking-widest">Awaiting Parameters</h4>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <audio ref={audioRef} src={audioUrl || ""} />
-        </div>
+        <AudioWorkspace 
+          view={view}
+          isGenerating={isGenerating}
+          audioUrl={audioUrl}
+          isPlaying={isPlaying}
+          togglePlay={togglePlay}
+          color={color}
+          history={history}
+          onHistorySelect={(item) => {
+            setAudioUrl(item.audioUrl);
+            setView('forge');
+            setIsPlaying(false);
+          }}
+        />
+        <audio ref={audioRef} src={audioUrl || ""} />
       </div>
     </StudioLayout>
   );

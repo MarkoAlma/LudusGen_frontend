@@ -1,7 +1,7 @@
 import React, { useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wand2, X, ChevronDown, Zap, Sparkles, Home, ImageIcon, Pencil } from 'lucide-react';
+import { Wand2, X, ChevronDown, Zap, Sparkles, Home, ImageIcon, Pencil, User } from 'lucide-react';
 import { MODEL_GROUPS, ALL_MODELS, getModel, findModelGroup } from '../../ai_components/models';
 import bgChat from '../../assets/bg-chat.png';
 import bgCode from '../../assets/bg-code.png';
@@ -55,7 +55,7 @@ export default function AiStudioSidebar({
   isImageGallery
 }) {
   const selectedModel = getModel(selectedAI);
-  const { user } = useContext(MyUserContext);
+  const { user, setShowCreditTopup } = useContext(MyUserContext);
   const { clearSeenCompletedJobs } = useJobs();
   const activeColor = selectedModel?.color || '#8b5cf6';
   const currentGroupId = findModelGroup(selectedAI) || 'chat';
@@ -103,91 +103,93 @@ export default function AiStudioSidebar({
         <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-[#000000] to-transparent opacity-80" />
       </div>
 
-      {/* ── Header ─ */}
+      {/* ── Header ── */}
       <div className="relative z-30 border-b border-white/5">
-        <div className="px-5 py-5 flex flex-col gap-4">
+        <div className="px-4 py-3">
+          <div
+            className="relative rounded-2xl overflow-hidden border border-white/[0.07]"
+            style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)' }}
+          >
+            {/* Glow */}
+            <div
+              className="absolute -top-8 -left-8 w-36 h-36 rounded-full blur-3xl opacity-[0.15] pointer-events-none transition-all duration-1000"
+              style={{ background: activeColor }}
+            />
 
-          {/* Top Row: AI Workspace Branding */}
-          <div className="flex items-center justify-between z-20 relative">
-            <div className="flex items-center gap-3.5 pt-1">
-              <div className="relative">
-                <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center border transition-all duration-700 relative z-10"
-                  style={{
-                    background: `linear-gradient(135deg, ${activeColor}15, ${activeColor}05)`,
-                    borderColor: `${activeColor}30`,
-                    color: activeColor,
-                    boxShadow: `0 8px 24px ${activeColor}10, inset 0 1px 0 rgba(255,255,255,0.1)`
-                  }}
-                >
-                  <Wand2 className="w-5 h-5 flex-shrink-0" />
-                </div>
-                <div
-                  className="absolute -inset-2 rounded-full opacity-20 blur-xl transition-all duration-700"
-                  style={{ background: activeColor }}
+            {/* Single row */}
+            <div className="relative flex items-center gap-3 px-3 py-2.5">
+
+              {/* Avatar */}
+              <div
+                className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 border"
+                style={{ borderColor: `${activeColor}50` }}
+              >
+                <img
+                  src={user?.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.email}`}
+                  alt="User"
+                  className="w-full h-full object-cover"
                 />
               </div>
-              <div className="flex flex-col justify-center">
-                <p className="text-[8px] font-black uppercase tracking-[0.3em] italic mb-0.5" style={{ color: activeColor }}>
-                  Workspace
-                </p>
-                <h2 className="text-white font-black text-[13px] uppercase tracking-widest leading-none flex items-center gap-2">
-                  Intelligence
-                  <Sparkles className="w-3 h-3 text-primary" style={{ fill: `${activeColor}30` }} />
-                </h2>
-              </div>
+
+              {/* Credit number */}
+              <span
+                className="text-[20px] font-black italic leading-none tracking-tighter flex-shrink-0"
+                style={{ color: activeColor, textShadow: `0 0 24px ${activeColor}50` }}
+              >
+                {(user?.credits ?? 0).toLocaleString()}
+              </span>
+
+              {/* Spacer */}
+              <div className="flex-1" />
+
+              {/* Top up */}
+              <button
+                onClick={() => setShowCreditTopup(true)}
+                className="flex items-center gap-1.5 rounded-xl border transition-all duration-200 active:scale-95 whitespace-nowrap flex-shrink-0 cursor-pointer"
+                style={{
+                  background: `${activeColor}15`,
+                  borderColor: `${activeColor}40`,
+                  color: activeColor,
+                  fontSize: '10px',
+                  fontWeight: 900,
+                  letterSpacing: '0.15em',
+                  textTransform: 'uppercase',
+                  padding: '6px 12px',
+                }}
+              >
+                <Zap className="w-3 h-3 flex-shrink-0" />
+                Top up
+              </button>
+
+              {/* Home */}
+              <Link
+                to="/"
+                className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.10] hover:border-white/20 transition-all duration-200 active:scale-95 flex-shrink-0"
+              >
+                <Home className="w-3.5 h-3.5" />
+              </Link>
+
+              {isMobile && (
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.10] transition-all duration-200 flex-shrink-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            {isMobile && (
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="flex-shrink-0 w-9 h-9 rounded-[10px] flex items-center justify-center border border-white/5 bg-white/[0.02] text-zinc-500 hover:text-white hover:bg-white/[0.05] transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
+            {/* Energy bar */}
+            <div className="mx-3 mb-2 h-[2px] rounded-full bg-white/[0.05] overflow-hidden">
+              <motion.div
+                className="h-full rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min(100, ((user?.credits ?? 0) / 5000) * 100)}%` }}
+                transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+                style={{ background: `linear-gradient(90deg, ${activeColor}60, ${activeColor})` }}
+              />
+            </div>
           </div>
-
-          {/* Super Premium Separator */}
-          <div className="relative flex items-center justify-center">
-            <div className="w-full h-px bg-white/5" />
-            <div className="absolute w-24 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent blur-[1px]" />
-          </div>
-
-          {/* Bottom Row: User & Platform Nav */}
-          <div className="flex items-center justify-between gap-3 relative z-10">
-            {/* Balance / Profile */}
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              className="flex-1 flex items-center justify-between px-3.5 py-2 rounded-[14px] bg-white/[0.03] border border-white/5 backdrop-blur-md relative overflow-hidden group/balance cursor-default"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover/balance:opacity-100 transition-opacity duration-500" />
-              <div className="flex items-center gap-2.5 relative z-10">
-                <CoinIcon size={18} />
-                <div className="flex flex-col">
-                  <span className="text-[11px] font-black text-white italic tracking-tighter leading-none">
-                    {(user?.credits ?? 0).toLocaleString()}
-                  </span>
-                  <span className="text-[7px] font-bold text-zinc-600 uppercase tracking-widest mt-0.5">Available</span>
-                </div>
-              </div>
-              <Link to="/pricing" className="relative z-10 p-1.5 rounded-lg bg-white/[0.04] text-zinc-500 hover:text-white hover:bg-primary/20 transition-all">
-                <Zap className="w-3 h-3" />
-              </Link>
-            </motion.div>
-
-            {/* Home Button (House Icon) */}
-            <Link
-              to="/"
-              className="flex-shrink-0 w-9 h-9 rounded-[10px] flex items-center justify-center relative overflow-hidden group border border-white/5 hover:border-white/20 transition-all duration-300"
-              style={{ background: 'rgba(255,255,255,0.02)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <Home className="w-[18px] h-[18px] text-zinc-500 group-hover:text-white transition-colors relative z-10" />
-              <div className="absolute bottom-0 inset-x-1 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500" />
-            </Link>
-          </div>
-
         </div>
       </div>
 
@@ -234,21 +236,18 @@ export default function AiStudioSidebar({
                     const firstCodeModel = group.categories[0]?.models[0];
                     if (firstCodeModel) handleSelectModel(firstCodeModel.id);
                   }}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border transition-all duration-300 cursor-pointer ${
-                    hasActive
-                      ? 'bg-white/[0.04] border-white/10'
-                      : 'bg-transparent border-transparent hover:bg-white/[0.02]'
-                  }`}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border transition-all duration-300 cursor-pointer ${hasActive
+                    ? 'bg-white/[0.04] border-white/10'
+                    : 'bg-transparent border-transparent hover:bg-white/[0.02]'
+                    }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-all ${
-                      hasActive ? 'bg-white/[0.06] scale-100' : 'bg-transparent opacity-40 scale-90'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-all ${hasActive ? 'bg-white/[0.06] scale-100' : 'bg-transparent opacity-40 scale-90'
+                      }`}>
                       {group.emoji}
                     </div>
-                    <span className={`text-[12px] font-black uppercase tracking-[0.15em] transition-colors ${
-                      hasActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
-                    }`}>
+                    <span className={`text-[12px] font-black uppercase tracking-[0.15em] transition-colors ${hasActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+                      }`}>
                       {group.label}
                     </span>
                   </div>
@@ -303,8 +302,8 @@ export default function AiStudioSidebar({
                               if (targetId) handleSelectModel(targetId);
                             }}
                             className={`w-full relative rounded-2xl border overflow-hidden transition-all duration-300 group/item ${isActive
-                                ? 'border-white/10'
-                                : 'border-transparent hover:border-white/5 hover:bg-white/[0.02]'
+                              ? 'border-white/10'
+                              : 'border-transparent hover:border-white/5 hover:bg-white/[0.02]'
                               }`}
                             style={isActive ? { background: 'rgba(255,255,255,0.06)' } : {}}
                           >
