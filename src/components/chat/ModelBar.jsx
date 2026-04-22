@@ -29,7 +29,6 @@ const MODEL_PRICES = {
 
 export default function ModelBar({
   selectedModel,
-  setSidebarOpen,
   setHistorySidebarOpen,
   onConfigOpen,
   navHeight,
@@ -74,15 +73,6 @@ export default function ModelBar({
       transition={{ duration: 0.3 }}
     >
       <div className="flex items-center gap-2">
-        {/* Mobile sidebar toggle */}
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="xl:hidden p-2 rounded-xl text-gray-500 hover:text-white hover:bg-white/10 transition-all duration-300"
-          aria-label="Oldalsáv megnyitása"
-        >
-          <Sparkles className="w-4 h-4" />
-        </button>
-
         {/* Model selector */}
         <div className="relative flex items-center gap-2" ref={dropdownRef}>
           <button

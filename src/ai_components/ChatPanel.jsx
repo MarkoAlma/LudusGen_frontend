@@ -21,7 +21,7 @@ const CONTENT_MAX_W = 'max-w-3xl';
 const HISTORY_SIDEBAR_W = 288; // px, matches w-72
 const SIDEBAR_W = 320; // AiStudioSidebar width
 
-export default function ChatPanel({ selectedModel, userId, getIdToken, setSidebarOpen, isGlobalOpen, toggleGlobalSidebar, globalSidebar, onModelChange, initialDropdownOpen = false, onNewChatWithPicker }) {
+export default function ChatPanel({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar, onModelChange, initialDropdownOpen = false, onNewChatWithPicker }) {
   const { registerPanel, unregisterPanel } = useStudioPanels();
 
   // Register panels (Chat has L1 + R, no L2)
@@ -170,7 +170,6 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, setSideba
               <div className="w-full mb-2 lg:mb-3 px-1">
                 <ModelBar
                   selectedModel={selectedModel}
-                  setSidebarOpen={setSidebarOpen}
                   setHistorySidebarOpen={() => setHistorySidebarOpen(true)}
                   onConfigOpen={() => setConfigOpen(true)}
                   navHeight={navHeight}

@@ -1,7 +1,7 @@
 import React, { useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wand2, X, ChevronDown, Zap, Sparkles, Home, ImageIcon, Pencil, User } from 'lucide-react';
+import { Wand2, ChevronDown, Zap, Sparkles, Home, ImageIcon, Pencil, User } from 'lucide-react';
 import { MODEL_GROUPS, ALL_MODELS, getModel, findModelGroup } from '../../ai_components/models';
 import bgChat from '../../assets/bg-chat.png';
 import bgCode from '../../assets/bg-code.png';
@@ -12,6 +12,7 @@ import neuralCoin from '../../assets/neural-coin.png';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { useJobs } from '../../context/JobsContext';
 import JobQueueWidget from './JobQueueWidget';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 // Kép generáló modellek (nem szerkesztők)
 const IMAGE_GEN_MODELS = ALL_MODELS.filter(m => m.panelType === 'image' && !m.needsInputImage);
@@ -57,6 +58,8 @@ export default function AiStudioSidebar({
   const selectedModel = getModel(selectedAI);
   const { user, setShowCreditTopup } = useContext(MyUserContext);
   const { clearSeenCompletedJobs } = useJobs();
+  const isMobileViewport = useMediaQuery('(max-width: 767px)');
+  const useMobileHeader = Boolean(isMobile || isMobileViewport);
   const activeColor = selectedModel?.color || '#8b5cf6';
   const currentGroupId = findModelGroup(selectedAI) || 'chat';
   const currentBg = CATEGORY_BGS[currentGroupId] || bgChat;
@@ -116,68 +119,102 @@ export default function AiStudioSidebar({
               style={{ background: activeColor }}
             />
 
-            {/* Single row */}
-            <div className="relative flex items-center gap-3 px-3 py-2.5">
+            {/* Header content */}
+            {useMobileHeader ? (
+              <div className="relative px-2.5 py-2.5">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 border"
+                    style={{ borderColor: `${activeColor}50` }}
+                  >
+                    <img
+                      src={user?.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.email}`}
+                      alt="User"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
 
-              {/* Avatar */}
-              <div
-                className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 border"
-                style={{ borderColor: `${activeColor}50` }}
-              >
-                <img
-                  src={user?.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.email}`}
-                  alt="User"
-                  className="w-full h-full object-cover"
-                />
+                  <span
+                    className="text-[18px] font-black italic leading-none tracking-tighter flex-shrink-0"
+                    style={{ color: activeColor, textShadow: `0 0 24px ${activeColor}50` }}
+                  >
+                    {(user?.credits ?? 0).toLocaleString()}
+                  </span>
+                </div>
+
+                <div className="mt-2 flex items-center justify-between gap-1.5">
+                  <button
+                    onClick={() => setShowCreditTopup(true)}
+                    className="flex flex-shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-[8.5px] font-black uppercase tracking-[0.12em] whitespace-nowrap transition-all duration-200 active:scale-95 cursor-pointer"
+                    style={{
+                      background: `${activeColor}15`,
+                      borderColor: `${activeColor}40`,
+                      color: activeColor,
+                    }}
+                  >
+                    <Zap className="w-3 h-3 flex-shrink-0" />
+                    <span>Top up</span>
+                  </button>
+
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Link
+                      to="/"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center border border-white/10 bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.10] hover:border-white/20 transition-all duration-200 active:scale-95"
+                    >
+                      <Home className="w-3 h-3" />
+                    </Link>
+                  </div>
+                </div>
               </div>
-
-              {/* Credit number */}
-              <span
-                className="text-[20px] font-black italic leading-none tracking-tighter flex-shrink-0"
-                style={{ color: activeColor, textShadow: `0 0 24px ${activeColor}50` }}
-              >
-                {(user?.credits ?? 0).toLocaleString()}
-              </span>
-
-              {/* Spacer */}
-              <div className="flex-1" />
-
-              {/* Top up */}
-              <button
-                onClick={() => setShowCreditTopup(true)}
-                className="flex items-center gap-1.5 rounded-xl border transition-all duration-200 active:scale-95 whitespace-nowrap flex-shrink-0 cursor-pointer"
-                style={{
-                  background: `${activeColor}15`,
-                  borderColor: `${activeColor}40`,
-                  color: activeColor,
-                  fontSize: '10px',
-                  fontWeight: 900,
-                  letterSpacing: '0.15em',
-                  textTransform: 'uppercase',
-                  padding: '6px 12px',
-                }}
-              >
-                <Zap className="w-3 h-3 flex-shrink-0" />
-                Top up
-              </button>
-
-              {/* Home */}
-              <Link
-                to="/"
-                className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.10] hover:border-white/20 transition-all duration-200 active:scale-95 flex-shrink-0"
-              >
-                <Home className="w-3.5 h-3.5" />
-              </Link>
-
-              {isMobile && (
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.10] transition-all duration-200 flex-shrink-0"
+            ) : (
+              <div className="relative flex items-center gap-2.5 px-3 py-2.5 min-w-0">
+                <div
+                  className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 border"
+                  style={{ borderColor: `${activeColor}50` }}
                 >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+                  <img
+                    src={user?.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user?.email}`}
+                    alt="User"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                <span
+                  className="min-w-0 flex-1 truncate text-[18px] sm:text-[20px] font-black italic leading-none tracking-tighter"
+                  style={{ color: activeColor, textShadow: `0 0 24px ${activeColor}50` }}
+                  title={(user?.credits ?? 0).toLocaleString()}
+                >
+                  {(user?.credits ?? 0).toLocaleString()}
+                </span>
+
+                <div className="ml-1 flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => setShowCreditTopup(true)}
+                    className="flex items-center gap-1 rounded-xl border transition-all duration-200 active:scale-95 whitespace-nowrap flex-shrink-0 cursor-pointer"
+                    style={{
+                      background: `${activeColor}15`,
+                      borderColor: `${activeColor}40`,
+                      color: activeColor,
+                      fontSize: '9px',
+                      fontWeight: 900,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      padding: '6px 8px',
+                    }}
+                  >
+                    <Zap className="w-3 h-3 flex-shrink-0" />
+                    Top up
+                  </button>
+
+                  <Link
+                    to="/"
+                    className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/10 bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.10] hover:border-white/20 transition-all duration-200 active:scale-95 flex-shrink-0"
+                  >
+                    <Home className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* Energy bar */}
             <div className="mx-3 mb-2 h-[2px] rounded-full bg-white/[0.05] overflow-hidden">

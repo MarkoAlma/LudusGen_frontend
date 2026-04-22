@@ -11,6 +11,7 @@ import BackgroundFilters from '../chat/BackgroundFilters';
 import StudioLayout from '../shared/StudioLayout';
 import { useSidebarState } from '../../hooks/useSidebarState';
 import { ALL_MODELS } from '../../ai_components/models';
+import { useStudioPanels } from '../../context/StudioPanelContext';
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const ENHANCING_PROMPT_EDIT = `
@@ -406,6 +407,7 @@ const getNvidiaType = (apiId = "") => {
 
 export default function ImageGenerator({ selectedModel, onModelChange, onGalleryChange, forceViewGenSignal, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
   const { addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, removeJob, jobs, clearSeenCompletedJobs } = useJobs();
+  const { isMobile, isTablet, setPanelOpen, setPanelsOpen, mobileActive, panelState } = useStudioPanels();
   const startJob = (kind, title, targetTab) => {
     const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     addJob({ id, kind, panelType: 'image', modelId: selectedModel.id, title, status: 'running', progress: 0, createdAt: Date.now(), updatedAt: Date.now(), errorMessage: null, completedAt: null, seenAt: null, targetTab });
@@ -445,6 +447,35 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
   const [view, setView] = useState('gen'); // gen | gallery
   const [currentJobId, setCurrentJobId] = useState(null);
   const abortControllerRef = useRef(null);
+
+  const closeMobileStudioPanel = () => {
+    if (isMobile) {
+      setPanelOpen('L2', false);
+    }
+  };
+
+  const closeNarrowStudioPanel = () => {
+    if (isMobile || isTablet) {
+      setPanelsOpen({ L1: false, L2: false });
+    }
+  };
+
+  const isNarrowL2Visible = isMobile
+    ? mobileActive === 'L2' && panelState.L2
+    : isTablet
+      ? panelState.L2
+      : false;
+  const prevNarrowL2VisibleRef = useRef(isNarrowL2Visible);
+
+  useEffect(() => {
+    const wasVisible = prevNarrowL2VisibleRef.current;
+
+    if (!wasVisible && isNarrowL2Visible && view === 'gallery') {
+      setView('gen');
+    }
+
+    prevNarrowL2VisibleRef.current = isNarrowL2Visible;
+  }, [isNarrowL2Visible, view]);
 
 
   // Master Sidebar Sync: If the user selects a new model from the master sidebar, 
@@ -578,6 +609,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
     setGenProgress(0);
     setGenStatus('');
     setGenElapsed(0);
+    closeMobileStudioPanel();
     const jobId = startJob('image', prompt.trim().slice(0, 48) || 'Képgenerálás', 'image');
     // Azonnal mentjük az új job ID-t, hogy navigáció után is az aktuális generálást találja meg
     sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
@@ -684,14 +716,16 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
       rightOpen={rightOpen}
       setRightOpen={setRightOpen}
       leftWidth={320}
-      leftSecondaryWidth={view === 'gallery' ? 72 : 392}
+      leftSecondaryWidth={isMobile ? 392 : view === 'gallery' ? 72 : 392}
       onOffsetChange={setOffsets}
       leftSidebar={globalSidebar}
       leftSecondarySidebar={
-        <div className="h-full flex flex-row overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
+        <div className={`h-full flex overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5 ${isMobile ? 'flex-col' : 'flex-row'}`}>
           {/* Tool Strip (72px) */}
           {/* Tool Strip (72px) — 2 mód gomb */}
-          <div className="w-[72px] h-full flex flex-col items-center pt-6 space-y-3 border-r border-white/5 bg-[#030308]">
+          <div className={isMobile
+            ? "w-full shrink-0 grid grid-cols-3 gap-2 border-b border-white/5 bg-[#030308] px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+4.5rem)]"
+            : "w-[72px] h-full flex flex-col items-center pt-6 space-y-3 border-r border-white/5 bg-[#030308]"}>
             {[
               {
                 id: 'generate',
@@ -728,17 +762,28 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
                 label: 'GALÉRIA',
                 icon: <History className="w-5 h-5" />,
                 isActive: view === 'gallery',
-                onClick: () => setView('gallery'),
+                onClick: () => {
+                  if (isMobile || isTablet) {
+                    if (view !== 'gallery') {
+                      setView('gallery');
+                    }
+                    closeNarrowStudioPanel();
+                    return;
+                  }
+                  setView('gallery');
+                },
               },
             ].map((tool) => (
               <button
                 key={tool.id}
                 onClick={tool.onClick}
                 title={tool.label}
-                className="group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer"
+                className={isMobile
+                  ? "group flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/5 bg-white/[0.02] px-2 py-2.5 transition-all duration-300 cursor-pointer"
+                  : "group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer"}
               >
                 <div
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${tool.isActive
+                  className={`${isMobile ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-2xl'} flex items-center justify-center transition-all duration-500 border ${tool.isActive
                     ? 'bg-white/5 border-white/10 shadow-xl'
                     : 'bg-transparent border-transparent hover:bg-white/[0.03] hover:border-white/5'
                     }`}
@@ -746,16 +791,16 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
                 >
                   {tool.icon}
                 </div>
-                <span className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 ${tool.isActive ? 'text-white' : 'text-zinc-700 group-hover:text-zinc-500'
+                <span className={`${isMobile ? 'text-[8px] tracking-[0.14em] text-center leading-tight' : 'text-[8px] tracking-[0.2em]'} font-black transition-all duration-500 ${tool.isActive ? 'text-white' : 'text-zinc-700 group-hover:text-zinc-500'
                   }`}>
                   {tool.label}
                 </span>
               </button>
             ))}
-            <div className="flex-1" />
+            <div className={isMobile ? "hidden" : "flex-1"} />
           </div>
 
-          <div className="flex-1 h-full overflow-hidden">
+          <div className="flex-1 h-full min-h-0 overflow-hidden">
             {view !== 'gallery' && (
               <ImageControls
                 selectedModel={selectedModel}

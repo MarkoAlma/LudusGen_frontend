@@ -53,6 +53,8 @@ export default function StudioLayout({
   const effL2 = isMobile 
     ? (mobileActive === 'L2' && (usingCtx ? panelCtx.panelState.L2 : true))
     : (usingCtx ? panelCtx.panelState.L2 : leftSecondaryOpen);
+  const hasTabletL2Content = !isTablet || Boolean(leftSecondarySidebar);
+  const resolvedL2Open = hasTabletL2Content ? effL2 : false;
     
   const effR = isMobile 
     ? (mobileActive === 'R' && (usingCtx ? panelCtx.panelState.R : true))
@@ -65,7 +67,7 @@ export default function StudioLayout({
 
   // On mobile, only one panel is "open" at a time
   const mobileL1Open = isMobile ? showL1Mobile && effL1 : effL1;
-  const mobileL2Open = isMobile ? showL2Mobile && effL2 : effL2;
+  const mobileL2Open = isMobile ? showL2Mobile && effL2 : resolvedL2Open;
   const mobileROpen  = isMobile ? showRMobile  && effR  : effR;
 
   // ── Spring animations ────────────────────────────────────────────────────
@@ -80,8 +82,17 @@ export default function StudioLayout({
     return leftWidth;
   };
   const getL2Width = () => {
-    if (isMobile) return typeof window !== 'undefined' ? window.innerWidth - 72 : 248;
-    if (isTablet) return Math.min(typeof window !== 'undefined' ? window.innerWidth * 0.55 : 400, 400);
+    if (isMobile) {
+      const mobileFullWidth = typeof window !== 'undefined' ? window.innerWidth : 320;
+      // Respect compact toolstrip-only mobile layouts (e.g. gallery/history mode).
+      if (leftSecondaryWidth <= 96) return leftSecondaryWidth;
+      return mobileFullWidth;
+    }
+    if (isTablet) {
+      // Respect compact toolstrip-only tablet layouts (e.g. gallery/history mode).
+      if (leftSecondaryWidth <= 96) return leftSecondaryWidth;
+      return Math.min(typeof window !== 'undefined' ? window.innerWidth * 0.55 : 400, 400);
+    }
     return leftSecondaryWidth;
   };
   const getRWidth = () => {
@@ -110,6 +121,11 @@ export default function StudioLayout({
 
   const rightToggleX = useTransform(smoothR, v => v * -1);
   const effectiveL1Width = getL1Width();
+  const mobilePanels = [
+    leftSidebar ? 'L1' : null,
+    leftSecondarySidebar ? 'L2' : null,
+    rightSidebar ? 'R' : null,
+  ].filter(Boolean);
 
   // ── Transform hooks (Must be top-level for React) ────────────────────────
   const desktopLX = useTransform(smoothL, v => (v <= 0.5 ? -1000 : 0));
@@ -121,7 +137,7 @@ export default function StudioLayout({
 
   // ── Toggle handlers ──────────────────────────────────────────────────────
   const handleToggleL1 = () => effSetL1?.(!effL1);
-  const handleToggleL2 = () => effSetL2?.(!effL2);
+  const handleToggleL2 = () => effSetL2?.(!resolvedL2Open);
   const handleToggleR  = () => effSetR?.(!effR);
 
   // ── Mobile close handler ─────────────────────────────────────────────────
@@ -203,7 +219,38 @@ export default function StudioLayout({
         </AnimatePresence>
 
         {/* ── Overlay panels (mobile/tablet slide-in) ──────────────────── */}
-        {activeOverlay && leftSidebar && (
+        {activeOverlay && isTablet && (leftSidebar || leftSecondarySidebar) && (
+          <AnimatePresence>
+            {(effL1 || effL2) && (
+              <motion.div
+                className="fixed top-0 left-0 bottom-0 z-35 flex overflow-hidden border-r border-white/5 bg-[#0a0a14]"
+                style={{ width: smoothL }}
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+              >
+                {leftSidebar && (
+                  <motion.div className="h-full flex-shrink-0" style={{ width: smoothL1 }}>
+                    <div className="h-full overflow-hidden" style={{ background: '#0a0a14' }}>
+                      {leftSidebar}
+                    </div>
+                  </motion.div>
+                )}
+
+                {leftSecondarySidebar && (
+                  <motion.div className="h-full flex-shrink-0" style={{ width: smoothL2 }}>
+                    <div className="h-full overflow-hidden" style={{ background: '#0a0a14' }}>
+                      {leftSecondarySidebar}
+                    </div>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+
+        {activeOverlay && isMobile && leftSidebar && (
           <AnimatePresence>
             {mobileL1Open && (
               <motion.div
@@ -222,7 +269,7 @@ export default function StudioLayout({
           </AnimatePresence>
         )}
 
-        {activeOverlay && leftSecondarySidebar && (
+        {activeOverlay && isMobile && leftSecondarySidebar && (
           <AnimatePresence>
             {mobileL2Open && (
               <motion.div
@@ -278,7 +325,10 @@ export default function StudioLayout({
           {children}
         </motion.div>
 
+        <MobilePanelControls color={accentColor} panels={mobilePanels} />
+
         {/* ── Toggle buttons (Desktop) ────────────────────────────────── */}
+        {!isMobile && (
           <motion.div
             className="absolute left-0 top-1/2 z-50 flex flex-col items-start gap-1.5"
             style={{ x: smoothL, y: '-50%' }}
@@ -296,7 +346,6 @@ export default function StudioLayout({
                 {effL1 ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5" />}
               </div>
               
-              {/* Subtle accent glow on hover */}
               <div className="absolute inset-0 rounded-r-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" 
                 style={{ boxShadow: `0 0 20px ${accentColor}15` }} 
               />
@@ -317,6 +366,7 @@ export default function StudioLayout({
               </motion.button>
             )}
           </motion.div>
+        )}
 
         {!isMobile && rightSidebar && (
           <motion.div
@@ -345,38 +395,38 @@ export default function StudioLayout({
         )}
 
         {/* ── Mobile Toggle Buttons (Left) ────────────────────────────── */}
-        {isMobile && leftSidebar && (
+        {false && isMobile && leftSidebar && (
           <motion.div
-            className="absolute left-0 top-1/2 z-50 flex flex-col items-start gap-12"
+            className="absolute left-0 top-[42%] z-50 flex flex-col items-start gap-8"
             style={{ 
               x: smoothL, 
-              y: leftSecondarySidebar ? '-50%' : 'calc(-50% - 30px)' 
+              y: '-50%'
             }}
           >
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               <motion.button
                 whileTap={{ scale: 0.9 }}
                 onClick={handleToggleL1}
-                className="w-12 h-14 flex items-center justify-center bg-[#0a0a14]/80 backdrop-blur-xl border border-l-0 border-white/10 text-zinc-400 rounded-r-2xl shadow-2xl"
+                className="w-10 h-11 flex items-center justify-center bg-[#0a0a14]/80 backdrop-blur-xl border border-l-0 border-white/10 text-zinc-400 rounded-r-xl shadow-2xl"
                 style={{ color: mobileActive === 'L1' ? accentColor : 'white' }}
               >
                 {mobileActive === 'L1' ? (
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 ) : (
-                  (mobileActive === 'L2') ? <ArrowLeftRight className="w-6 h-6" /> : <PanelLeftOpen className="w-6 h-6" />
+                  (mobileActive === 'L2') ? <ArrowLeftRight className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />
                 )}
               </motion.button>
               {leftSecondarySidebar && (
                 <motion.button
                   whileTap={{ scale: 0.9 }}
                   onClick={handleToggleL2}
-                  className="w-12 h-14 flex items-center justify-center bg-[#0a0a14]/80 backdrop-blur-xl border border-l-0 border-white/10 text-zinc-400 rounded-r-2xl shadow-2xl"
+                  className="w-10 h-11 flex items-center justify-center bg-[#0a0a14]/80 backdrop-blur-xl border border-l-0 border-white/10 text-zinc-400 rounded-r-xl shadow-2xl"
                   style={{ color: mobileActive === 'L2' ? accentColor : 'white' }}
                 >
                   {mobileActive === 'L2' ? (
-                    <X className="w-6 h-6" />
+                    <X className="w-5 h-5" />
                   ) : (
-                    (mobileActive === 'L1') ? <ArrowLeftRight className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />
+                    (mobileActive === 'L1') ? <ArrowLeftRight className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />
                   )}
                 </motion.button>
               )}
@@ -385,18 +435,18 @@ export default function StudioLayout({
         )}
 
         {/* ── Mobile Toggle Button (Right) ───────────────────────────── */}
-        {isMobile && rightSidebar && (
+        {false && isMobile && rightSidebar && (
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={handleToggleR}
-            className="absolute right-0 top-1/2 z-50 w-12 h-14 flex items-center justify-center bg-[#0a0a14]/80 backdrop-blur-xl border border-r-0 border-white/10 text-zinc-400 shadow-2xl rounded-l-2xl"
+            className="absolute right-0 top-[42%] z-50 w-10 h-11 flex items-center justify-center bg-[#0a0a14]/80 backdrop-blur-xl border border-r-0 border-white/10 text-zinc-400 shadow-2xl rounded-l-xl"
             style={{ 
               x: rightToggleX, 
-              y: leftSecondarySidebar ? '-50%' : 'calc(-50% + 30px)',
+              y: '-50%',
               color: effR ? accentColor : 'white'
             }}
           >
-            {effR ? <X className="w-6 h-6" /> : <PanelRightOpen className="w-6 h-6" />}
+            {effR ? <X className="w-5 h-5" /> : <PanelRightOpen className="w-5 h-5" />}
           </motion.button>
         )}
 

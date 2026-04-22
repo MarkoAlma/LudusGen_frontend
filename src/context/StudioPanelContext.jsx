@@ -167,6 +167,60 @@ export function StudioPanelProvider({ children }) {
     });
   }, [isMobile, isTablet, mobileActive, activeStack, availablePanels]);
 
+  const setPanelsOpen = useCallback((updates) => {
+    setPanelState(prev => {
+      const changedIds = Object.keys(updates);
+      if (changedIds.length === 0) return prev;
+
+      const nextState = { ...prev };
+      let hasChanges = false;
+
+      changedIds.forEach((id) => {
+        if (nextState[id] !== updates[id]) {
+          nextState[id] = updates[id];
+          hasChanges = true;
+        }
+      });
+
+      if (!hasChanges) return prev;
+
+      const openedIds = changedIds.filter((id) => updates[id] && !prev[id]);
+      const closedIds = changedIds.filter((id) => !updates[id] && prev[id]);
+
+      setActiveStack((stack) => {
+        let newStack = stack.filter((id) => !closedIds.includes(id));
+
+        openedIds.forEach((id) => {
+          newStack = newStack.filter((panelId) => panelId !== id).concat(id);
+        });
+
+        if (isMobile) {
+          const lastOpen = [...newStack].reverse().find((id) => nextState[id]) || null;
+          setMobileActive(lastOpen);
+
+          if (lastOpen) {
+            Object.keys(nextState).forEach((id) => {
+              nextState[id] = id === lastOpen;
+            });
+            return [lastOpen];
+          }
+
+          return [];
+        }
+
+        if (isTablet && newStack.length > 2) {
+          const evicted = newStack.includes('L1') ? 'L1' : newStack[0];
+          nextState[evicted] = false;
+          return newStack.filter((id) => id !== evicted);
+        }
+
+        return newStack;
+      });
+
+      return nextState;
+    });
+  }, [isMobile, isTablet]);
+
   // ── Mobile swap: cycle between L1 and L2 only ──────────────────────────
   const swapMobilePanel = useCallback(() => {
     // Swap only between left panels (L1 ↔ L2), never Archive
@@ -196,6 +250,7 @@ export function StudioPanelProvider({ children }) {
       panelState,
       togglePanel,
       setPanelOpen,
+      setPanelsOpen,
       swapMobilePanel,
       registerPanel,
       unregisterPanel,
