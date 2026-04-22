@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Loader2, CheckCircle2, XCircle, ChevronDown, RefreshCw } from "lucide-react";
 
@@ -33,53 +33,71 @@ function StatusIcon({ status }) {
 
 function TaskCard({ inst, isFocused, onFocus, onStop, onRetry, onLoad, onDismiss }) {
   const isActive = inst.status === "running" || inst.status === "pending";
+  const isDone = inst.status === "done";
+  const isFailed = inst.status === "failed";
 
   useEffect(() => {
-    if (inst.status !== "done") return;
+    if (!isDone) return;
     const t = setTimeout(() => onDismiss(inst.instanceId), 60_000);
     return () => clearTimeout(t);
-  }, [inst.status, inst.instanceId, onDismiss]);
+  }, [isDone, inst.instanceId, onDismiss]);
 
   return (
     <motion.div
       initial={{ y: 10, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
+      animate={{ 
+        y: 0, 
+        opacity: 1,
+        border: isDone ? "1px solid rgba(16,185,129,0.3)" : (isFocused ? "1px solid rgba(139,92,246,0.35)" : "1px solid rgba(255,255,255,0.07)"),
+        boxShadow: isDone ? "0 0 15px rgba(16,185,129,0.08)" : (isFocused ? "0 0 12px rgba(139,92,246,0.15)" : "none")
+      }}
       exit={{ y: -6, opacity: 0 }}
       transition={{ duration: 0.2 }}
       onClick={() => onFocus(inst.instanceId)}
       style={{
-        padding: "8px 10px",
-        borderRadius: 10,
-        background: isFocused ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.03)",
-        border: `1px solid ${isFocused ? "rgba(139,92,246,0.35)" : "rgba(255,255,255,0.07)"}`,
+        padding: "10px 12px",
+        borderRadius: 12,
+        background: isDone ? "rgba(16,185,129,0.04)" : (isFocused ? "rgba(139,92,246,0.12)" : "rgba(255,255,255,0.03)"),
         cursor: "pointer",
-        marginBottom: 5,
-        transition: "background 0.15s, border-color 0.15s",
-        boxShadow: isFocused ? "0 0 12px rgba(139,92,246,0.15)" : "none",
+        marginBottom: 6,
+        transition: "background 0.2s, border-color 0.2s, box-shadow 0.2s",
+        position: "relative",
+        overflow: "hidden"
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: isActive ? 4 : 0 }}>
+      {isDone && <div style={{ position: "absolute", top: 0, left: 0, width: 2, height: "100%", background: "#10b981" }} />}
+      
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: (isActive || isFailed) ? 6 : 0 }}>
         <StatusIcon status={inst.status} />
         <span style={{
-          fontSize: 10, fontWeight: 700, color: "#e2e8f0", flex: 1,
-          letterSpacing: "0.03em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          fontSize: 10, fontWeight: 800, color: isDone ? "#ecfdf5" : "#e2e8f0", flex: 1,
+          letterSpacing: "0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          textTransform: "uppercase"
         }}>
           {inst.label}
         </span>
 
-        {inst.status === "done" && inst.result && (
+        {isDone && inst.result && (
           <button
             onClick={e => { e.stopPropagation(); onLoad(inst); }}
-            style={{ fontSize: 9, color: "#00e5ff", background: "rgba(0,229,255,0.1)", border: "1px solid rgba(0,229,255,0.2)", borderRadius: 6, padding: "2px 7px", cursor: "pointer", fontWeight: 700, letterSpacing: "0.05em" }}
+            style={{ 
+              fontSize: 9, color: "#fff", 
+              background: "rgba(16,185,129,0.2)", 
+              border: "1px solid rgba(16,185,129,0.4)", 
+              borderRadius: 6, padding: "3px 9px", 
+              cursor: "pointer", fontWeight: 700, 
+              letterSpacing: "0.05em",
+              display: "flex", alignItems: "center", gap: 4
+            }}
           >
-            LOAD →
+            VIEW RESULT
           </button>
         )}
 
-        {inst.status === "done" && (
+        {isDone && (
           <button
             onClick={e => { e.stopPropagation(); onDismiss(inst.instanceId); }}
-            style={{ fontSize: 12, color: "#475569", background: "none", border: "none", cursor: "pointer", padding: "0 3px", lineHeight: 1, flexShrink: 0 }}
+            style={{ fontSize: 14, color: "#475569", background: "none", border: "none", cursor: "pointer", padding: "0 5px", lineHeight: 1, flexShrink: 0, marginLeft: 4 }}
             title="Dismiss"
           >
             ×
@@ -95,10 +113,10 @@ function TaskCard({ inst, isFocused, onFocus, onStop, onRetry, onLoad, onDismiss
           </button>
         )}
 
-        {inst.status === "failed" && inst.snapshot && (
+        {isFailed && inst.snapshot && (
           <button
             onClick={e => { e.stopPropagation(); onRetry(inst); }}
-            style={{ fontSize: 9, color: "#a78bfa", background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: 6, padding: "2px 7px", cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}
+            style={{ fontSize: 9, color: "#a78bfa", background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontWeight: 700, display: "flex", alignItems: "center", gap: 3 }}
           >
             <RefreshCw size={8} /> RETRY
           </button>
@@ -106,23 +124,30 @@ function TaskCard({ inst, isFocused, onFocus, onStop, onRetry, onLoad, onDismiss
       </div>
 
       {isActive && (
-        <div style={{ width: "100%", height: 3, borderRadius: 99, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
-          <motion.div
-            animate={{ width: `${inst.progress ?? 0}%` }}
-            transition={{ duration: 0.4 }}
-            style={{ height: "100%", borderRadius: 99, background: "linear-gradient(90deg,#8b5cf6,#00e5ff)" }}
-          />
+        <div style={{ padding: "2px 0 0" }}>
+          <div style={{ width: "100%", height: 3, borderRadius: 99, background: "rgba(255,255,255,0.07)", overflow: "hidden", marginBottom: 2 }}>
+            <motion.div
+              animate={{ width: `${inst.progress ?? 0}%` }}
+              transition={{ duration: 0.4 }}
+              style={{ height: "100%", borderRadius: 99, background: "linear-gradient(90deg,#8b5cf6,#00e5ff)" }}
+            />
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <span style={{ fontSize: 8, fontWeight: 900, color: "#8b5cf6", fontFamily: "monospace" }}>{Math.round(inst.progress ?? 0)}%</span>
+          </div>
         </div>
       )}
 
-      {inst.status === "failed" && inst.errorMsg && (
-        <p style={{ fontSize: 9, color: "#ef4444", margin: "4px 0 0", lineHeight: 1.4 }}>{inst.errorMsg}</p>
+      {isFailed && inst.errorMsg && (
+        <p style={{ fontSize: 9, color: "#fca5a5", margin: "4px 0 0", lineHeight: 1.4, background: "rgba(239,68,68,0.1)", padding: "4px 6px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.15)" }}>
+          {inst.errorMsg}
+        </p>
       )}
     </motion.div>
   );
 }
 
-export default function ActiveTasksPanel({
+export default memo(function ActiveTasksPanel({
   activeTasks,
   focusedInstanceId,
   onFocus,
@@ -193,3 +218,4 @@ export default function ActiveTasksPanel({
     </div>
   );
 }
+});

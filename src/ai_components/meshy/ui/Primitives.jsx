@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Box, Loader2, CheckCircle2, AlertCircle, X } from 'lucide-react';
 
 // ─── Tooltip ────────────────────────────────────────────────────────────────
-export function Tooltip({ text, children, side = 'top', delay = 300 }) {
+export function Tooltip({ text, children, side = 'top', delay = 300, style, className }) {
   const [vis, setVis] = useState(false);
   const t = useRef(null);
   const show = () => { t.current = setTimeout(() => setVis(true), delay); };
@@ -16,10 +16,15 @@ export function Tooltip({ text, children, side = 'top', delay = 300 }) {
   }[side];
 
   return (
-    <div className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide}>
+    <div 
+      className={`relative inline-flex ${className || ''}`} 
+      onMouseEnter={show} 
+      onMouseLeave={hide}
+      style={style}
+    >
       {children}
       {vis && (
-        <div className="absolute z-[10000] pointer-events-none bg-zinc-950/90 text-zinc-200 text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg white-space-nowrap backdrop-blur-md border border-white/10 shadow-2xl"
+        <div className="absolute z-[10000] pointer-events-none bg-zinc-950/90 text-zinc-200 text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg white-space-nowrap border border-white/10 shadow-2xl"
           style={pos}
         >
           {text}

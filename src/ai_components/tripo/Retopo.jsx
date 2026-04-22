@@ -1,6 +1,7 @@
 // trellis/Retopo.jsx
 import React from "react";
-import { HelpCircle, Zap, ChevronDown } from "lucide-react";
+import { HelpCircle, Zap, ChevronDown, Info } from "lucide-react";
+import { Tooltip } from "../meshy/ui/Primitives";
 import { getFaceLimitConfig } from "./GeneratePanel";
 
 /*
@@ -133,7 +134,11 @@ export default function Retopo({
           <CoinIcon />
           <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Smart Low Poly</span>
           <span style={{ background: "linear-gradient(135deg,#c026d3,#a21caf)", color: "#fff", fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 4 }}>v2</span>
-          <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+          <Info 
+            size={13} 
+            style={{ color: "#4a4a68", cursor: "help" }} 
+            title="Advanced mesh simplification that preserves surface detail on flat areas while keeping density on high-curvature areas."
+          />
         </div>
         <div className={"tp-switch" + (smartLowPoly ? " on" : "")} style={{ background: smartLowPoly ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
       </div>
@@ -153,7 +158,11 @@ export default function Retopo({
       {/* ── Topology ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, marginTop: 8 }}>
         <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Topology</span>
-        <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+        <Info 
+          size={13} 
+          style={{ color: "#4a4a68", cursor: "help" }} 
+          title="Output the mesh using 4-sided faces (quads). Forces FBX format output."
+        />
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
         <button className={"tp-topo-btn" + (quad ? " sel" : "")} onClick={() => handleSetQuad(true)}>Quad</button>
@@ -175,7 +184,10 @@ export default function Retopo({
         <div style={{ marginBottom: 12, position: "relative" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
             <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Output Format</span>
-            <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+            <HelpCircle 
+              style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+              title="Select the primary file format for your exported 3D model. Note: Quads force FBX format."
+            />
           </div>
           <button
             disabled={quad}
@@ -233,7 +245,10 @@ export default function Retopo({
       <div style={{ marginTop: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
           <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Face Limit</span>
-          <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+          <HelpCircle 
+            style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+            title="Defines the target polygon count. Auto uses adaptive density. Fixed values force specific counts."
+          />
           <span style={{ marginLeft: "auto", color: "#2d2d48", fontSize: 9, fontFamily: "monospace" }}>
             {cfg.allowAuto
               ? `Auto – ${(cfg.max / 1000).toFixed(0)}k`
@@ -285,7 +300,10 @@ export default function Retopo({
         >
           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
             <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Pivot to Center Bottom</span>
-            <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+            <HelpCircle 
+              style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+              title="Repositions the model's origin to the center of its base (feet level). Essential for game engines."
+            />
           </div>
           <div className={"tp-switch" + (pivotToBottom ? " on" : "")} style={{ background: pivotToBottom ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
         </div>

@@ -9,6 +9,7 @@ import {
   syncCamera, buildPlaceholder,
   createSunLight,
   applyLights, applyViewMode, applyWireframeOverlay, applyRigSkeletonOverlay,
+  applySegmentHighlight,
   updateRigOverlay,
   setSceneBg, setGridColor, loadGLB,
   focusOnHit, applyExponentialZoom,
@@ -37,6 +38,8 @@ const ThreeViewer = forwardRef(({
   bgColor = 'default',
   gridColor1 = '#1e1e3a',
   gridColor2 = '#111128',
+  segmentHighlight = false,
+  segmentEdgeColor = 0x00ff88,
   // 3D Paint Props
   paintMode = false,
   paintColor = '#ffffff',
@@ -339,6 +342,11 @@ const ThreeViewer = forwardRef(({
     if (!S.current?.scene) return;
     applyViewMode(S.current, viewMode);
     applyWireframeOverlay(S.current, wireframeOverlay, wireOpacity, wireHexColor);
+    
+    // If either viewMode is 'segment' OR the toggle is on, show the highlight
+    const shouldShowSeg = segmentHighlight || viewMode === 'segment';
+    applySegmentHighlight(S.current, shouldShowSeg, segmentEdgeColor);
+
     const p = lightParamsRef.current;
     applyLights(S.current, p.lightMode, p.color, p.lightStrength, p.lightRotation, p.dramaticColor, viewMode, p.lightElevation);
   }, [viewMode]); // eslint-disable-line
@@ -347,6 +355,14 @@ const ThreeViewer = forwardRef(({
     if (!S.current?.scene) return;
     applyWireframeOverlay(S.current, wireframeOverlay, wireOpacity, wireHexColor);
   }, [wireframeOverlay, wireOpacity, wireHexColor]);
+
+  useEffect(() => {
+    if (S.current) { S.current._segmentHighlight = segmentHighlight; S.current._segmentEdgeColor = segmentEdgeColor; }
+    if (!S.current?.scene) return;
+    // Highlight if EITHER the toggle is on OR viewMode is 'segment'
+    const shouldShowSeg = segmentHighlight || viewMode === 'segment';
+    applySegmentHighlight(S.current, shouldShowSeg, segmentEdgeColor);
+  }, [segmentHighlight, segmentEdgeColor, viewMode]);
 
   useEffect(() => {
     if (!S.current?.scene) return;
@@ -384,7 +400,7 @@ const ThreeViewer = forwardRef(({
         return;
       }
     }
-    loadGLB(S.current, modelUrl, viewMode, autoSpin, wireframeOverlay, wireOpacity, wireHexColor, showRig, onRigDetected);
+    loadGLB(S.current, modelUrl, viewMode, autoSpin, wireframeOverlay, wireOpacity, wireHexColor, showRig, onRigDetected, segmentHighlight, segmentEdgeColor);
     if (onAnimClipsDetected) {
       const clips = S.current._animClips || [];
       onAnimClipsDetected(clips.map((c, i) => ({ index: i, name: c.name || `Clip ${i + 1}`, duration: c.duration })));
@@ -420,7 +436,7 @@ const ThreeViewer = forwardRef(({
     const cw = canvas.clientWidth;
     const ch = canvas.clientHeight;
     if (!cw || !ch) return;
-    
+
     // Reset view offset to centered (full canvas)
     S.current.camera.clearViewOffset();
     S.current.camera.updateProjectionMatrix();
@@ -428,10 +444,10 @@ const ThreeViewer = forwardRef(({
   };
 
   // Synchronize with motion values if they exist
-  useMotionValueEvent(smoothL || { get: () => leftOffset, on: () => {} }, "change", (latest) => {
+  useMotionValueEvent(smoothL || { get: () => leftOffset, on: () => { } }, "change", (latest) => {
     updateCameraOffset(latest, smoothR?.get() || 0);
   });
-  useMotionValueEvent(smoothR || { get: () => rightOffset, on: () => {} }, "change", (latest) => {
+  useMotionValueEvent(smoothR || { get: () => rightOffset, on: () => { } }, "change", (latest) => {
     updateCameraOffset(smoothL?.get() || 0, latest);
   });
 
@@ -704,3 +720,4 @@ const ThreeViewer = forwardRef(({
 });
 
 export default ThreeViewer;
+

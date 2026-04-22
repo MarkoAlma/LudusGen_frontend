@@ -3,6 +3,7 @@ import React from "react";
 import {
   Scissors, Boxes, Box, ChevronRight, HelpCircle, AlertTriangle, Check, Upload,
 } from "lucide-react";
+import { Tooltip } from "../meshy/ui/Primitives";
 
 /*
  *  Tripo API restrictions for mesh_segmentation:
@@ -19,7 +20,7 @@ import {
  *  - Cannot be applied to rigged models.
  */
 
-export default function Segment({ segSub, activeTaskId, isRiggedInput }) {
+export default function Segment({ segSub, activeTaskId, isRiggedInput, isSegmentOutput }) {
   return (
     <>
       {/* ── SEGMENT (mesh_segmentation) ── */}
@@ -42,10 +43,13 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput }) {
           {activeTaskId ? (
             /* ── Selected model — Ready state ── */
             <div style={{ width: "100%" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)", marginBottom: 14 }}>
-                <Check style={{ width: 14, height: 14, color: "#22c55e", flexShrink: 0 }} />
-                <span style={{ color: "#86efac", fontSize: 12, fontWeight: 700 }}>Ready to Segment</span>
-              </div>
+                <div 
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)", marginBottom: 14 }}
+                  title="The model is suitable for AI-driven segmentation into discrete parts."
+                >
+                  <Check style={{ width: 14, height: 14, color: "#22c55e", flexShrink: 0 }} />
+                  <span style={{ color: "#86efac", fontSize: 12, fontWeight: 700 }}>Ready to Segment</span>
+                </div>
               <div style={{ padding: "8px 10px", borderRadius: 9, background: "rgba(108,99,255,0.08)", border: "1px solid rgba(108,99,255,0.25)", marginBottom: 10 }}>
                 <p style={{ color: "#a5a0ff", fontSize: 11, fontWeight: 600, margin: 0 }}>Selected model</p>
                 <p style={{ color: "#2d2d48", fontSize: 9, margin: "2px 0 0", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeTaskId}</p>
@@ -102,13 +106,29 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput }) {
             </div>
           )}
 
-          {activeTaskId ? (
+          {/* Not segmented blocker */}
+          {activeTaskId && !isSegmentOutput && !isRiggedInput && (
+            <div style={{ width: "100%", padding: "8px 12px", borderRadius: 11, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", marginBottom: 14, textAlign: "left", display: "flex", gap: 8 }}>
+              <AlertTriangle style={{ width: 13, height: 13, color: "#f87171", flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <p style={{ color: "#f87171", fontSize: 11, fontWeight: 600, margin: 0 }}>Incompatible model</p>
+                <p style={{ color: "#ef4444", fontSize: 10, margin: "3px 0 0", lineHeight: 1.5 }}>
+                  Part Completion requires a segmented model. Please run the Segment task first.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {activeTaskId && isSegmentOutput ? (
             /* ── Selected model — Ready state ── */
             <div style={{ width: "100%" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)", marginBottom: 14 }}>
-                <Check style={{ width: 14, height: 14, color: "#22c55e", flexShrink: 0 }} />
-                <span style={{ color: "#86efac", fontSize: 12, fontWeight: 700 }}>Ready for Part Completion</span>
-              </div>
+                <div 
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)", marginBottom: 14 }}
+                  title="This segmented model can now be completed with part-specific details."
+                >
+                  <Check style={{ width: 14, height: 14, color: "#22c55e", flexShrink: 0 }} />
+                  <span style={{ color: "#86efac", fontSize: 12, fontWeight: 700 }}>Ready for Part Completion</span>
+                </div>
               <div style={{ padding: "8px 10px", borderRadius: 9, background: "rgba(108,99,255,0.08)", border: "1px solid rgba(108,99,255,0.25)", marginBottom: 10 }}>
                 <p style={{ color: "#a5a0ff", fontSize: 11, fontWeight: 600, margin: 0 }}>Selected model</p>
                 <p style={{ color: "#2d2d48", fontSize: 9, margin: "2px 0 0", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeTaskId}</p>

@@ -4,8 +4,9 @@ import { motion } from "framer-motion";
 import {
   Image, Cpu, Pencil, HelpCircle, Check, Loader2,
   PersonStanding, Upload, X, RotateCcw,
-  Paintbrush, Wand2,
+  Paintbrush, Wand2, Info,
 } from "lucide-react";
+import { Tooltip } from "../meshy/ui/Primitives";
 
 /* ─── color helpers ─────────────────────────────────────────────────────── */
 export function hslToHex(h, s, l) {
@@ -169,9 +170,9 @@ function GlassSwitch({ on, onChange }) {
 
 /* ─── Tab definitions ───────────────────────────────────────────────────── */
 const TEX_INPUT_TABS = [
-  { id: "image", icon: Image, tip: "Image reference" },
-  { id: "multi", icon: Cpu, tip: "Multi-view" },
-  { id: "text", icon: Pencil, tip: "Text prompt" },
+  { id: "image", icon: Image, label: "Reference", tip: "Generate texture from a single image" },
+  { id: "multi", icon: Cpu, label: "Multi-view", tip: "Generate texture from 4 specific angles" },
+  { id: "text", icon: Pencil, label: "Text", tip: "Generate texture from a text prompt" },
 ];
 
 /* ─── SelectedModelBadge ─────────────────────────────────────────────────── */
@@ -250,7 +251,7 @@ export function TexInputBox({
               background: tab === t.id ? "rgba(139,92,246,0.15)" : "transparent",
               color: tab === t.id ? "#c4b5fd" : T.textDim,
               borderBottom: tab === t.id ? `2px solid ${T.purple}` : "2px solid transparent",
-              transition: "all 0.18s",
+              transition: "background 0.18s, color 0.18s, border-bottom 0.18s",
             }}
           >
             <t.icon style={{ width: 13, height: 13 }} />
@@ -725,7 +726,9 @@ export function MagicBrushPanel({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <SectionLabel>Creativity Strength</SectionLabel>
-                <HelpCircle style={{ width: 12, height: 12, color: T.textDim, flexShrink: 0 }} />
+                <Tooltip text="Higher values give the AI more freedom to reimagine the painted area. Lower values stay closer to the original.">
+                  <Info style={{ width: 12, height: 12, color: T.textDim, flexShrink: 0, cursor: "help" }} />
+                </Tooltip>
               </div>
               <ValueBadge>{creativity.toFixed(2)}</ValueBadge>
             </div>
@@ -932,9 +935,12 @@ export default function Texture({
             }}
             onClick={() => setTex4K(v => !v)}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>4K Texture</span>
-              <HelpCircle style={{ width: 13, height: 13, color: T.textDim }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>4K Texture</span>
+              <HelpCircle 
+                style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                title="Generates high-resolution 4096x4096px textures. Significantly better detail but takes longer to process."
+              />
             </div>
             <GlassSwitch on={tex4K} onChange={() => setTex4K(v => !v)} />
           </motion.div>
@@ -961,9 +967,12 @@ export default function Texture({
             }}
             onClick={() => setPbrOn(v => !v)}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700 }}>PBR Maps</span>
-              <HelpCircle style={{ width: 13, height: 13, color: T.textDim }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>PBR</span>
+              <HelpCircle 
+                style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                title="Physically Based Rendering: Generates a full material set including Metallic, Roughness, and Normal maps."
+              />
             </div>
             <GlassSwitch on={pbrOn} onChange={() => setPbrOn(v => !v)} />
           </motion.div>

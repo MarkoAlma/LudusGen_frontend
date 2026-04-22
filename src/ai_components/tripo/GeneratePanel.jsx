@@ -1,27 +1,28 @@
 // trellis/GeneratePanel.jsx
 import React, { useState, useRef, useEffect } from "react";
 import {
-  Image, Boxes, Grid3x3, Pencil, HelpCircle, Upload, Check, X,
+  Image, Boxes, Grid3x3, Pencil, HelpCircle, Upload, Check, X, Plus,
   Loader2, Globe, Lock, ChevronDown, ChevronUp, PersonStanding, Zap, Images, Lightbulb,
   Camera, Box, Gamepad2, FlaskConical, Triangle, Palette, Sparkles, ToyBrick, Mountain, Dice5,
+  Type, User, ChevronLeft, ChevronRight, Info,
 } from "lucide-react";
 import Enhancer from "../Enhancer";
+import { Tooltip } from "../meshy/ui/Primitives";
 
 /* ─── Tab definitions ─────────────────────────────────────────────────── */
 export const GEN_TABS = [
-  { id: "image", icon: Image, tip: "Image to 3D" },
-  { id: "multi", icon: Boxes, tip: "Multi-view to 3D" },
-  { id: "batch", icon: Images, tip: "Batch Images to 3D" },
-  { id: "text", icon: Pencil, tip: "Text to 3D" },
+  { id: "image", icon: Images, label: "Image(s)", tip: "Upload 1-10 source images for high-fidelity reconstruction" },
+  { id: "multi", icon: Box, label: "Multi-view", tip: "Upload 4 specific angles (Front, Left, Right, Back) for maximum control" },
+  { id: "text", icon: Type, label: "Text", tip: "AI-driven Text-to-3D generation via descriptive prompts" },
 ];
 
 /* "Make Image Better" (enable_image_autofix) only on image-based tabs */
-const TABS_WITH_MAKE_BETTER = new Set(["image", "batch"]);
+const TABS_WITH_MAKE_BETTER = new Set(["image"]);
 
 /* ─── Model versions — real Tripo API strings ─────────────────────────── */
 export const MODEL_VERSIONS = [
-  { id: "P1-20260311", label: "P1-20260311 (Latest Model)" },
-  { id: "v3.1-20260211", label: "V3.1" },
+  { id: "v3.1-20260211", label: "V3.1 (Latest)" },
+  { id: "P1-20260311", label: "P1-20260311" },
   { id: "v3.0-20250812", label: "V3.0" },
   { id: "v2.5-20250123", label: "V2.5" },
   { id: "Turbo-v1.0-20250506", label: "Turbo V1.0" },
@@ -34,64 +35,16 @@ export const MODEL_VERSIONS = [
  *  UI elements receive the .model-na class (dimmed, blocked) when the
  *  currently selected model doesn't support that feature.
  * ─────────────────────────────────────────────────────────────────────── */
-export const MODEL_CAPS = {
-  "P1-20260311": {
-    ultraMesh: true, texture: true, pbr: true, tex4K: false,
-    multiview: true, batch: true, tPose: false, inParts: true,
-    negPrompt: true, smartLowPoly: false, quad: false,
-    autoSize: true, exportUv: true, makeBetter: true,
-    modelSeed: true, imageSeed: true, textureSeed: true,
-  },
-  "v3.1-20260211": {
-    ultraMesh: true, texture: true, pbr: true, tex4K: true,
-    multiview: true, batch: true, tPose: true, inParts: true,
-    negPrompt: true, smartLowPoly: true, quad: true,
-    autoSize: true, exportUv: true, makeBetter: true,
-    modelSeed: true, imageSeed: true, textureSeed: true,
-  },
-  "v3.0-20250812": {
-    ultraMesh: true, texture: true, pbr: true, tex4K: true,
-    multiview: true, batch: true, tPose: true, inParts: true,
-    negPrompt: true, smartLowPoly: true, quad: true,
-    autoSize: true, exportUv: true, makeBetter: true,
-    modelSeed: true, imageSeed: true, textureSeed: true,
-  },
-  "v2.5-20250123": {
-    ultraMesh: false, texture: true, pbr: true, tex4K: true,
-    multiview: true, batch: true, tPose: false, inParts: true,
-    negPrompt: true, smartLowPoly: false, quad: true,
-    autoSize: true, exportUv: true, makeBetter: true,
-    modelSeed: true, imageSeed: true, textureSeed: true,
-  },
-  "Turbo-v1.0-20250506": {
-    ultraMesh: false, texture: false, pbr: false, tex4K: false,
-    multiview: false, batch: true, tPose: false, inParts: false,
-    negPrompt: false, smartLowPoly: false, quad: false,
-    autoSize: false, exportUv: true, makeBetter: true,
-    modelSeed: true, imageSeed: false, textureSeed: false,
-  },
-  "v2.0-20240919": {
-    ultraMesh: false, texture: true, pbr: true, tex4K: true,
-    multiview: true, batch: true, tPose: false, inParts: true,
-    negPrompt: true, smartLowPoly: false, quad: true,
-    autoSize: true, exportUv: true, makeBetter: true,
-    modelSeed: true, imageSeed: true, textureSeed: true,
-  },
-  "v1.4-20240625": {
-    ultraMesh: false, texture: true, pbr: false, tex4K: false,
-    multiview: false, batch: false, tPose: false, inParts: false,
-    negPrompt: false, smartLowPoly: false, quad: false,
-    autoSize: false, exportUv: true, makeBetter: true,
-    modelSeed: false, imageSeed: false, textureSeed: false,
-  },
+export const UNIVERSAL_CAPS = {
+  ultraMesh:    true,  texture:   true,  pbr:        true,  tex4K:       true,
+  multiview:    true,  batch:     true,  tPose:      true,  inParts:     true,
+  negPrompt:    true,  smartLowPoly: true, quad:     true,
+  autoSize:     true,  exportUv:  true,  makeBetter: true,
+  modelSeed:    true,  imageSeed: true,  textureSeed: true,
 };
 
-// Every entry in MODEL_VERSIONS must have a corresponding MODEL_CAPS entry
-export function getModelCaps(modelVer) {
-  if (!(modelVer in MODEL_CAPS)) {
-    console.warn(`[getModelCaps] Unknown model version "${modelVer}" — falling back to v2.5 caps. Add an entry to MODEL_CAPS.`);
-  }
-  return MODEL_CAPS[modelVer] ?? MODEL_CAPS["v2.5-20250123"];
+export function getModelCaps() {
+  return UNIVERSAL_CAPS;
 }
 
 /* ─── API face_limit constraints ─────────────────────────────────────── */
@@ -106,17 +59,8 @@ export function getFaceLimitConfig(smartLowPoly, quad) {
  *  Renders children inside a .model-na wrapper when `unsupported` is true.
  *  The tooltip is still accessible via the wrapper's title attribute.
  * ─────────────────────────────────────────────────────────────────────── */
-function Na({ unsupported, tip, children }) {
-  if (!unsupported) return <>{children}</>;
-  return (
-    <div
-      className="model-na"
-      title={tip ?? "Not available with this model"}
-      style={{ cursor: "not-allowed" }}
-    >
-      {children}
-    </div>
-  );
+function Na({ children }) {
+  return <>{children}</>;
 }
 
 /* ─── helpers ─────────────────────────────────────────────────────────── */
@@ -289,9 +233,11 @@ function TopoControls({
       )}
 
       {/* Topology */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, marginTop: 4 }}>
+      <div style={{ margin: "14px 0 8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Topology</span>
-        <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+        <Tooltip text="Triangles are standard. Quads provide better flow for sculpting/animation but are slower to generate." side="left">
+          <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+        </Tooltip>
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
         {/* Quad */}
@@ -399,7 +345,7 @@ function ModelDropdown({ modelVer, setModelVer }) {
 
       {open && (
         <div style={{
-          position: "absolute", left: 0, right: 0, bottom: "calc(100% + 4px)",
+          position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)",
           background: "#131327", border: "1px solid rgba(255,255,255,0.1)",
           borderRadius: 12, overflow: "hidden", zIndex: 50,
           boxShadow: "0 10px 30px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)",
@@ -548,7 +494,6 @@ export default function GeneratePanel({
   genTab, setGenTab,
   prompt, setPrompt,
   makeBetter, setMakeBetter,
-  imgPrev, setImgPrev, imgToken, setImgToken, imgUploading, handleImg, fileRef, setImgFile,
   multiImages, setMultiImages,
   batchImages, setBatchImages,
   meshQ, setMeshQ,
@@ -575,15 +520,15 @@ export default function GeneratePanel({
   imageSeed, setImageSeed,
   autoSize, setAutoSize,
   exportUv, setExportUv,
-  // backendCaps: capability map fetched from backend.
-  // If provided, overrides the static MODEL_CAPS fallback.
-  // Shape: { [modelVersionId]: { ultraMesh, texture, negPrompt, ... } }
-  backendCaps = null,
-  // Style prefix state — managed by parent (TripoPanel)
   activeStyles = [],
   onStyleToggle = () => { },
 }) {
-  const MV_SLOTS = ["Front", "Left", "Right", "Back"];
+  const MV_SLOTS = [
+    { label: "Front", icon: <User style={{ width: 14, height: 14 }} /> },
+    { label: "Left", icon: <ChevronLeft style={{ width: 14, height: 14 }} /> },
+    { label: "Right", icon: <ChevronRight style={{ width: 14, height: 14 }} /> },
+    { label: "Back", icon: <User style={{ width: 14, height: 14, opacity: 0.5 }} /> },
+  ];
   const batchInputRef = useRef(null);
 
   /* ─── Capabilities for current model ──────────────────────────────────
@@ -591,15 +536,14 @@ export default function GeneratePanel({
    * This makes the frontend dynamically adapt to backend-defined capabilities
    * without any hardcoded model-specific logic here.
    * ────────────────────────────────────────────────────────────────────── */
-  const caps = backendCaps
-    ? (backendCaps[modelVer] ?? backendCaps["v2.5-20250123"] ?? getModelCaps(modelVer))
-    : getModelCaps(modelVer);
+  const caps = UNIVERSAL_CAPS;
+  const cfg = React.useMemo(() => getFaceLimitConfig(smartLowPoly, quadMesh), [smartLowPoly, quadMesh]);
 
   /* ─── Auto-reset incompatible settings when model changes ─────────── */
   useEffect(() => {
     const c = getModelCaps(modelVer);
     if (!c.multiview && genTab === "multi") setGenTab("image");
-    if (!c.batch && genTab === "batch") setGenTab("image");
+    if (genTab === "batch") setGenTab("image"); // Auto-redirect deprecated tab
     if (!c.tPose && tPose) setTPose(false);
     if (!c.negPrompt) setNegPrompt("");
     if (!c.inParts && inParts) setInParts(false);
@@ -641,35 +585,42 @@ export default function GeneratePanel({
   return (
     <>
       {/* ── Tab bar ── */}
-      <div style={{ display: "flex", gap: 3, padding: "4px", background: "rgba(255,255,255,0.05)", borderRadius: 13, marginBottom: 14, boxShadow: "inset 0 1px 2px rgba(0,0,0,0.15)" }}>
+      <div style={{ display: "flex", gap: 3, padding: "3px", background: "rgba(255,255,255,0.06)", borderRadius: 11, marginBottom: 14 }}>
         {GEN_TABS.map(t => {
-          const tabCap = { image: true, text: true, multi: caps.multiview, batch: caps.batch };
+          const tabCap = { image: true, text: true, multi: caps.multiview };
           const disabled = !tabCap[t.id];
           return (
             <button
               key={t.id}
               className={"tp-inp-tab" + (genTab === t.id ? " active" : "") + (disabled ? " model-na" : "")}
               onClick={() => {
-                if (!disabled) {
-                  setGenTab(t.id);
-                  // P1-20260311 consistently fails for text_to_model ("Failed to call LLM API").
-                  // Auto-switch to v3.1 when user selects text tab with P1.
-                  if (t.id === "text" && modelVer === "P1-20260311") {
-                    setModelVer("v3.1-20260211");
-                  }
+                setGenTab(t.id);
+                if (t.id === "text" && modelVer === "P1-20260311") {
+                  setModelVer("v3.1-20260211");
                 }
               }}
               title={disabled ? `Not available with ${modelVer}` : t.tip}
               style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
                 color: genTab === t.id ? "#0a0a1a" : "#4a4a68",
                 cursor: disabled ? "not-allowed" : "pointer",
+                padding: "8px 0",
               }}
             >
-              <t.icon style={{ width: 15, height: 15 }} />
+              <t.icon size={15} />
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{t.label}</span>
             </button>
           );
         })}
       </div>
+
+      {/* ── AI Model ── */}
+      <ModelDropdown modelVer={modelVer} setModelVer={setModelVer} />
+
 
       {/* ── Text tab ── */}
       {genTab === "text" && (
@@ -775,147 +726,150 @@ export default function GeneratePanel({
 
       {/* ── Multi-view tab ── */}
       {genTab === "multi" && (
-        <div style={{ border: "1.5px solid rgba(139,92,246,0.3)", borderRadius: 14, overflow: "hidden", background: "rgba(139,92,246,0.03)", marginBottom: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
-          <div className="mv-grid">
-            {MV_SLOTS.map((slot, i) => {
-              const prev = multiImages?.[i]?.preview;
-              return (
-                <div key={slot} className="mv-cell checker"
-                  onClick={() => {
-                    const inp = document.createElement("input");
-                    inp.type = "file"; inp.accept = "image/*";
-                    inp.onchange = e => {
-                      const f = e.target.files[0];
-                      if (f) {
-                        const r = new FileReader();
-                        r.onload = ev => {
-                          const next = [...(multiImages ?? [])];
-                          next[i] = { file: f, preview: ev.target.result, token: null };
-                          setMultiImages(next);
-                          handleMultiImg && handleMultiImg(f).then(token => {
-                            setMultiImages(prev => {
-                              const updated = [...prev];
-                              if (updated[i]) updated[i] = { ...updated[i], token };
-                              return updated;
-                            });
-                          }).catch(() => { });
-                        };
-                        r.readAsDataURL(f);
-                      }
-                    };
-                    inp.click();
-                  }}>
-                  {prev ? (
-                    <img src={prev} alt={slot} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 6 }} />
-                  ) : (
-                    <>
-                      <PersonStanding style={{ width: 20, height: 20, color: "#2d2d48" }} />
-                      <span style={{ color: "#2d2d48", fontSize: 10, fontWeight: 500 }}>{slot}</span>
-                      <span style={{ color: "#1a1a30", fontSize: 9 }}>JPG, PNG, WEBP, Size ≤ 20MB</span>
-                    </>
-                  )}
-                </div>
-              );
-            })}
+        <div style={{ marginBottom: 14 }}>
+          {multiImages?.some(i => i) && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+              <button
+                onClick={() => setMultiImages([])}
+                style={{ background: "none", border: "none", color: "#ef4444", fontSize: 10, fontWeight: 700, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.05em", padding: "2px 6px" }}
+              >
+                Clear all views
+              </button>
+            </div>
+          )}
+          <div style={{ border: "1.5px solid rgba(139,92,246,0.3)", borderRadius: 14, overflow: "hidden", background: "rgba(139,92,246,0.03)", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
+            <div className="mv-grid">
+              {MV_SLOTS.map((slot, i) => {
+                const prev = multiImages?.[i]?.preview;
+                const isUploading = multiImages?.[i] && !multiImages[i].token;
+                return (
+                  <div key={slot.label} className={"mv-cell checker" + (prev ? " has-img" : "")}
+                    onClick={() => {
+                      const inp = document.createElement("input");
+                      inp.type = "file"; inp.accept = "image/*";
+                      inp.onchange = e => {
+                        const f = e.target.files[0];
+                        if (f) {
+                          const r = new FileReader();
+                          r.onload = ev => {
+                            const next = [...(multiImages ?? [])];
+                            next[i] = { file: f, preview: ev.target.result, token: null };
+                            setMultiImages(next);
+                            handleMultiImg && handleMultiImg(f).then(token => {
+                              setMultiImages(prev => {
+                                const updated = [...prev];
+                                if (updated[i]) updated[i] = { ...updated[i], token };
+                                return updated;
+                              });
+                            }).catch(() => { });
+                          };
+                          r.readAsDataURL(f);
+                        }
+                      };
+                      inp.click();
+                    }}>
+                    {prev ? (
+                      <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                        <img src={prev} alt={slot.label} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        {isUploading && (
+                          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Loader2 style={{ width: 14, height: 14, color: "#6c63ff" }} className="anim-spin" />
+                          </div>
+                        )}
+                        <div style={{ position: "absolute", bottom: 4, left: 4, padding: "2px 6px", borderRadius: 4, background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 8, fontWeight: 700, textTransform: "uppercase" }}>
+                          {slot.label}
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ width: 24, height: 24, borderRadius: "50%", background: "rgba(255,255,255,0.03)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 4 }}>
+                          {slot.icon}
+                        </div>
+                        <span style={{ color: "#e2e2f0", fontSize: 9, fontWeight: 700, textTransform: "uppercase" }}>{slot.label}</span>
+                        <span style={{ color: "#475569", fontSize: 7, fontWeight: 500 }}>CLICK TO UPLOAD</span>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── Image tab ── */}
+      {/* ── Image tab (Unified Single/Batch) ── */}
       {genTab === "image" && (
-        <div
-          className="tp-drop checker"
-          onClick={() => !imgUploading && fileRef.current?.click()}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImg(f); }}
-          style={{
-            width: "100%", aspectRatio: "1/1", borderRadius: 14,
-            border: "1.5px dashed rgba(255,255,255,0.08)",
-            cursor: imgUploading ? "wait" : "pointer", overflow: "hidden",
-            marginBottom: 14, position: "relative",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-          {imgPrev ? (
-            <>
-              <img src={imgPrev} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              {imgUploading && (
-                <div style={{ position: "absolute", inset: 0, background: "rgba(9,9,18,0.75)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Loader2 style={{ width: 24, height: 24, color: "#6c63ff" }} className="anim-spin" />
-                </div>
-              )}
-              {imgToken && (
-                <div style={{ position: "absolute", bottom: 8, right: 8, width: 22, height: 22, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Check style={{ width: 12, height: 12, color: "#fff" }} />
-                </div>
-              )}
-              <button onClick={e => { e.stopPropagation(); setImgPrev(null); setImgToken(null); setImgFile(null); if (fileRef?.current) fileRef.current.value = ""; }}
-                style={{ position: "absolute", top: 8, right: 8, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.65)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
-                <X style={{ width: 11, height: 11 }} />
-              </button>
-            </>
-          ) : (
-            <div style={{ textAlign: "center", pointerEvents: "none" }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 9px" }}>
-                <Upload style={{ width: 18, height: 18, color: "#2d2d48" }} />
-              </div>
-              <p style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>Upload</p>
-              <p style={{ color: "#2d2d48", fontSize: 10, margin: 0 }}>JPG, PNG, WEBP  Size ≤ 20MB</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Batch tab ── */}
-      {genTab === "batch" && (
         <div style={{ marginBottom: 14 }}>
           <div
             className="tp-drop checker"
             style={{
-              width: "100%", aspectRatio: "1/1", borderRadius: 12,
-              border: "1.5px dashed rgba(108,99,255,0.35)",
-              background: "rgba(108,99,255,0.04)",
+              width: "100%", aspectRatio: (batchImages?.length > 3) ? "1/1" : "1.6/1", borderRadius: 14,
+              border: "1.5px dashed rgba(255,255,255,0.08)",
+              background: "rgba(255,255,255,0.02)",
               cursor: "pointer", overflow: "hidden", position: "relative",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
+              transition: "aspect-ratio 0.3s ease",
             }}
             onClick={() => batchInputRef.current?.click()}
             onDragOver={e => e.preventDefault()}
             onDrop={e => { e.preventDefault(); handleBatchFiles(e.dataTransfer.files); }}
           >
-            <div style={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}>
-              <Lightbulb style={{ width: 16, height: 16, color: "#4a4a68" }} />
-            </div>
             {batchImages && batchImages.length > 0 ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 4, width: "100%", height: "100%", padding: 8, boxSizing: "border-box" }}>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: batchImages.length === 1 ? "1fr" : "repeat(auto-fill, minmax(80px, 1fr))",
+                gap: 6, width: "100%", height: "100%", padding: 8, boxSizing: "border-box",
+                overflowY: "auto"
+              }}>
                 {batchImages.map((img, i) => (
-                  <div key={i} style={{ position: "relative", borderRadius: 6, overflow: "hidden", aspectRatio: "1/1" }}>
+                  <div key={i} style={{
+                    position: "relative", borderRadius: 8, overflow: "hidden",
+                    aspectRatio: "1/1",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+                  }}>
                     <img src={img.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     <button
                       onClick={e => { e.stopPropagation(); setBatchImages(prev => prev.filter((_, idx) => idx !== i)); }}
-                      style={{ position: "absolute", top: 3, right: 3, width: 18, height: 18, borderRadius: "50%", background: "rgba(0,0,0,0.7)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <X style={{ width: 9, height: 9, color: "#fff" }} />
+                      style={{ position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.7)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", backdropFilter: "blur(4px)" }}>
+                      <X style={{ width: 10, height: 10 }} />
                     </button>
+                    {!img.token && (
+                      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Loader2 style={{ width: 16, height: 16, color: "#6c63ff" }} className="anim-spin" />
+                      </div>
+                    )}
+                    {img.token && (
+                      <div style={{ position: "absolute", bottom: 4, right: 4, width: 14, height: 14, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #10b981" }}>
+                        <Check style={{ width: 8, height: 8, color: "#fff" }} />
+                      </div>
+                    )}
                   </div>
                 ))}
                 {batchImages.length < 10 && (
-                  <div style={{ borderRadius: 6, border: "1.5px dashed rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", aspectRatio: "1/1", cursor: "pointer" }}>
-                    <Upload style={{ width: 14, height: 14, color: "#4a4a68" }} />
+                  <div style={{ borderRadius: 8, border: "1.5px dashed rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)", display: "flex", alignItems: "center", justifyContent: "center", aspectRatio: "1/1", cursor: "pointer" }}>
+                    <Plus style={{ width: 20, height: 20, color: "#4a4a68" }} />
                   </div>
                 )}
               </div>
             ) : (
-              <>
-                <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Upload style={{ width: 18, height: 18, color: "#2d2d48" }} />
+              <div style={{ textAlign: "center", pointerEvents: "none" }}>
+                <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(108,99,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
+                  <Upload style={{ width: 20, height: 20, color: "#6c63ff" }} />
                 </div>
-                <p style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 600, margin: 0 }}>Upload — up to 10</p>
-                <p style={{ color: "#2d2d48", fontSize: 10, margin: 0 }}>JPG, PNG, WEBP  Size ≤ 20MB</p>
-              </>
+                <p style={{ color: "#e2e2f0", fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>Upload Image(s)</p>
+                <p style={{ color: "#4a4a68", fontSize: 11, margin: 0 }}>JPG, PNG, WEBP · Up to 10 images</p>
+              </div>
             )}
           </div>
           {batchImages && batchImages.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
-              <span style={{ color: "#4a4a68", fontSize: 11 }}>{batchImages.length}/10 images</span>
-              <button onClick={() => setBatchImages([])} style={{ color: "#f87171", fontSize: 11, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Clear all</button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, padding: "0 2px" }}>
+              <span style={{ color: "#4a4a68", fontSize: 11, fontWeight: 500 }}>
+                {batchImages.length === 1 ? "1 image ready" : `${batchImages.length} images ready`}
+              </span>
+              <button onClick={() => setBatchImages([])} style={{ color: "#ef4444", fontSize: 11, background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }}>
+                Clear all
+              </button>
             </div>
           )}
           <input ref={batchInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple style={{ display: "none" }}
@@ -923,25 +877,47 @@ export default function GeneratePanel({
         </div>
       )}
 
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) handleImg(f); }} />
-
       {/* ── Make Image Better ── */}
       {TABS_WITH_MAKE_BETTER.has(genTab) && (
         <Na unsupported={!caps.makeBetter} tip={`Make Image Better not supported by ${modelVer}`}>
-          <Toggle label="Make Image Better" value={makeBetter} onChange={setMakeBetter} hint disabled={!caps.makeBetter} />
+          <div
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.06)", marginBottom: 14,
+              cursor: caps.makeBetter ? "pointer" : "not-allowed",
+              opacity: caps.makeBetter ? 1 : 0.5
+            }}
+            onClick={() => caps.makeBetter && setMakeBetter(!makeBetter)}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(108,99,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Sparkles style={{ width: 16, height: 16, color: "#6c63ff" }} />
+              </div>
+              <div>
+                <p 
+                  style={{ color: "#e2e2f0", fontSize: 12, fontWeight: 600, margin: 0, cursor: "help" }}
+                  title="AI identifies and fixes common issues in your source image before 3D generation for better accuracy."
+                >
+                  Make Image Better
+                </p>
+                <p style={{ color: "#4a4a68", fontSize: 10, margin: 0 }}>AI optimizes input before generation</p>
+              </div>
+            </div>
+            <div className={"tp-switch" + (makeBetter && caps.makeBetter ? " on" : "")} />
+          </div>
         </Na>
       )}
-      {TABS_WITH_MAKE_BETTER.has(genTab) && makeBetter && caps.makeBetter && (
-        <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 6px", lineHeight: 1.5 }}>
-          AI optimizes the input image before generation. Slower but may improve quality.
-        </p>
-      )}
+
+
 
       {/* ── Mesh Quality ── */}
       <div style={{ margin: "14px 0 8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Mesh Quality</span>
-        <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+        <HelpCircle 
+          style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+          title="Ultra uses detailed geometry refinement. Standard is faster but with fewer polygons."
+        />
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 2 }}>
         {/* Ultra — model-na when not supported */}
@@ -998,7 +974,10 @@ export default function GeneratePanel({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
           <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Privacy</span>
-          <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+            <HelpCircle 
+              style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+              title="Private models are only visible to you. Public models appear in the community gallery."
+            />
         </div>
         <button onClick={() => setPrivacy(v => v === "public" ? "private" : "public")}
           style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 7, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", cursor: "pointer", color: "#8a8aaa", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>
@@ -1029,7 +1008,10 @@ export default function GeneratePanel({
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>4K Texture</span>
-                <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+                <HelpCircle 
+                  style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                  title="Generates 4096x4096px textures. Significantly higher detail but takes more time."
+                />
               </div>
               <div className={"tp-switch" + (tex4K && (texOn || pbrOn) && caps.tex4K ? " on" : "")}
                 style={{ background: tex4K && texOn && caps.tex4K ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
@@ -1054,7 +1036,10 @@ export default function GeneratePanel({
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>PBR</span>
-                <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+                <HelpCircle 
+                  style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                  title="Physically Based Rendering: Includes Metallic, Roughness and Normal maps."
+                />
               </div>
               <div className={"tp-switch" + (pbrOn && texOn && caps.pbr ? " on" : "")}
                 style={{ background: pbrOn && texOn && caps.pbr ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
@@ -1088,7 +1073,10 @@ export default function GeneratePanel({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Model Seed</span>
-                <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+                <HelpCircle 
+                  style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                  title="Controls the geometric variation of the 3D model. Fixed seed ensures reproducible results."
+                />
               </div>
               <SeedSpinner value={modelSeed} onChange={v => caps.modelSeed && setModelSeed(v)} disabled={!caps.modelSeed} />
             </div>
@@ -1099,7 +1087,10 @@ export default function GeneratePanel({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Image Seed</span>
-                <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+                <HelpCircle 
+                  style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                  title="Controls how the AI interprets the source image. Fixed seed keeps interpretation consistent."
+                />
               </div>
               <SeedSpinner value={imageSeed} onChange={v => caps.imageSeed && setImageSeed(v)} disabled={!caps.imageSeed} />
             </div>
@@ -1111,7 +1102,10 @@ export default function GeneratePanel({
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                   <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Texture Seed</span>
-                  <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+                  <HelpCircle 
+                    style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                    title="Controls the randomness of texture generation and UV mapping layout."
+                  />
                 </div>
                 <SeedSpinner value={textureSeed} onChange={v => caps.textureSeed && setTextureSeed(v)} disabled={!caps.textureSeed} />
               </div>
@@ -1139,8 +1133,7 @@ export default function GeneratePanel({
         </div>
       </Collapsible>
 
-      {/* ── AI Model ── */}
-      <ModelDropdown modelVer={modelVer} setModelVer={setModelVer} />
+
     </>
   );
 }

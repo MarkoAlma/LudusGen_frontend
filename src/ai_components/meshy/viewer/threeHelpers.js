@@ -138,6 +138,7 @@ export function applyViewMode(s, mode) {
 
   if (!s._clayMats) s._clayMats = new Map();
   if (!s._uvMats) s._uvMats = new Map();
+  if (!s._segmentMats) s._segmentMats = new Map();
 
   scene.traverse((node) => {
     // Ground: merged here — no second traverse needed
@@ -173,6 +174,7 @@ export function applyViewMode(s, mode) {
         s._uvMats.set(node.uuid, Array.isArray(orig) ? orig.map(m => buildBasic(m)) : buildBasic(orig));
       }
       node.material = s._uvMats.get(node.uuid);
+
     }
   });
 
@@ -378,7 +380,7 @@ export function disposeModel(scene, model, origMaterials, wireCache, clayMats, u
   scene.remove(model);
 }
 
-export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOverlay = false, wireOpacity = 0.22, wireHexColor = 0xffffff, showRig = false, onRigDetected = null) {
+export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOverlay = false, wireOpacity = 0.22, wireHexColor = 0xffffff, showRig = false, onRigDetected = null, segmentHighlight = false, segmentEdgeColor = 0x00ff88) {
   const { THREE, scene, placeholder } = s;
   if (!THREE) return;
   if (placeholder) placeholder.visible = false;
@@ -392,6 +394,8 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     disposeModel(scene, s.model, s.origMaterials, s._wireCache, s._clayMats, s._uvMats);
     s.model = null;
     s.origMaterials.clear();
+    s._segOrigMats?.clear();
+    s._segEdgeCache?.clear();
     // Clean up rig overlay
     if (s._rigOverlay) {
       scene.remove(s._rigOverlay);
@@ -433,13 +437,53 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     model.traverse((n) => {
       if (n.isMesh) {
         if (n.geometry && !n.geometry.attributes.normal) n.geometry.computeVertexNormals();
-        const mats = Array.isArray(n.material) ? n.material : [n.material];
-        mats.forEach((m) => {
-          if (m?.isMeshStandardMaterial) {
-            if (!m.roughnessMap) m.roughness = Math.max(m.roughness, 0.8);
-            m.envMapIntensity = 0.6;
+
+        // FBX often comes with Phong/Lambert materials which lack PBR features
+        // or have black base color. We convert them to Standard for consistent PBR look.
+        const sanitizeMat = (m) => {
+          if (!m) return m;
+          let sm = m;
+          if (!m.isMeshStandardMaterial) {
+            sm = new THREE.MeshStandardMaterial();
+            // Copy basic maps - FBXLoader sometimes puts diffuse in 'map'
+            const maps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'bumpMap'];
+            maps.forEach(mapName => {
+              if (m[mapName]) {
+                sm[mapName] = m[mapName];
+                if (sm[mapName].isTexture) {
+                  sm[mapName].colorSpace = THREE.SRGBColorSpace;
+                }
+              }
+            });
+            sm.color.copy(m.color || new THREE.Color(0xffffff));
+            sm.opacity = m.opacity ?? 1;
+            sm.transparent = m.transparent ?? false;
+            sm.side = THREE.DoubleSide; // Often needed for retopo/converted models
           }
-        });
+
+          // FIX: Tripo FBX/GLB sometimes has black color multiplication with texture
+          if (sm.map && (sm.color.r === 0 && sm.color.g === 0 && sm.color.b === 0)) {
+            sm.color.set(0xffffff);
+          }
+
+          // Ensure colorSpace for existing standard materials too
+          if (sm.isMeshStandardMaterial) {
+            ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'bumpMap'].forEach(mn => {
+              if (sm[mn] && sm[mn].isTexture) sm[mn].colorSpace = THREE.SRGBColorSpace;
+            });
+          }
+
+          // PBR polish
+          if (!sm.roughnessMap) sm.roughness = Math.max(sm.roughness || 0, 0.5);
+          sm.envMapIntensity = 1.0;
+          return sm;
+        };
+
+        if (Array.isArray(n.material)) {
+          n.material = n.material.map(sanitizeMat);
+        } else {
+          n.material = sanitizeMat(n.material);
+        }
         s.origMaterials.set(n.uuid, n.material);
       }
     });
@@ -481,6 +525,9 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     applyViewMode(s, currentViewMode);
     if (wireframeOverlay) applyWireframeOverlay(s, true, wireOpacity, wireHexColor);
     if (showRig) applyRigSkeletonOverlay(s, true);
+    const _segHL = segmentHighlight || s._segmentHighlight;
+    const _segEC = segmentEdgeColor ?? s._segmentEdgeColor ?? 0x00ff88;
+    if (_segHL) applySegmentHighlight(s, true, _segEC);
     s.autoSpin = autoSpin;
     s.markDirty?.();
   };
@@ -530,6 +577,83 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     .catch((err) => console.error("Model fetch error:", err));
 }
 
+export function applySegmentHighlight(s, show, edgeColor = 0x00ff88) {
+  if (!s?.scene) return;
+
+  const root = s.model || s.placeholder;
+  if (!root) return;
+
+  // Remove any existing segment edges
+  root.traverse((node) => {
+    if (node.userData.isSegEdge) {
+      node.parent?.remove(node);
+      node.geometry?.dispose();
+      if (Array.isArray(node.material)) node.material.forEach(m => m.dispose());
+      else node.material?.dispose();
+    }
+  });
+
+  if (!show) {
+    // Restore original materials
+    if (s._segOrigMats) {
+      root.traverse((node) => {
+        if (!node.isMesh) return;
+        const orig = s._segOrigMats.get(node.uuid);
+        if (orig !== undefined) node.material = orig;
+      });
+    }
+    s._segOrigMats = null;
+    s.markDirty?.();
+    return;
+  }
+
+  // Collect meshes (exclude overlays/ground)
+  const meshes = [];
+  root.traverse((node) => {
+    if (
+      node.isMesh &&
+      !node.userData.isGround &&
+      !node.userData.isBgLight &&
+      !node.userData.isWireframeOverlay &&
+      !node.userData.isRigOverlay &&
+      !node.userData.isPaintOverlay &&
+      !node.userData.isSegEdge
+    ) meshes.push(node);
+  });
+
+  if (!s._segOrigMats) s._segOrigMats = new Map();
+
+  meshes.forEach((mesh, i) => {
+    // Save original material once
+    if (!s._segOrigMats.has(mesh.uuid)) s._segOrigMats.set(mesh.uuid, mesh.material);
+
+    // Use golden ratio for more distinct colors between segments
+    const hue = (i * 0.618033988749895) % 1;
+    const color = new THREE.Color().setHSL(hue, 0.85, 0.55);
+
+    const segMat = new THREE.MeshPhysicalMaterial({
+      color: color,
+      roughness: 0.05,
+      metalness: 0.3,
+      transmission: 0.5,
+      thickness: 0.5,
+      transparent: true,
+      opacity: 0.5,
+    });
+    mesh.material = segMat;
+
+    // Add edge outline
+    const edges = new THREE.EdgesGeometry(mesh.geometry, 15);
+    const lineMat = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
+    const lines = new THREE.LineSegments(edges, lineMat);
+    lines.userData.isSegEdge = true;
+    lines.renderOrder = 1;
+    mesh.add(lines);
+  });
+
+  s.markDirty?.();
+}
+
 export function setCameraPreset(s, preset) {
   if (!s) return;
   s.autoSpin = false;
@@ -557,7 +681,7 @@ export function focusOnHit(s, ndcX, ndcY) {
   if (!root) return false;
   root.traverse(node => {
     if (node.isMesh && !node.userData.isGround && !node.userData.isWireframeOverlay
-        && !node.userData.isRigOverlay && !node.userData.isPaintOverlay) {
+      && !node.userData.isRigOverlay && !node.userData.isPaintOverlay) {
       targets.push(node);
     }
   });
@@ -593,4 +717,4 @@ export function modelHasTextures(model) {
     mats.forEach((m) => { if (m?.map) texturedCount++; });
   });
   return meshCount > 0 && texturedCount > 0;
-}
+}

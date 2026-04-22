@@ -147,40 +147,6 @@ export function generateGlbThumbnail(source, options = {}) {
         } finally {
           console.warn = _origWarn;
         }
-
-        // Normalize FBX materials to MeshStandardMaterial — FBXLoader creates
-        // MeshPhongMaterial/LambertMaterial which render black in this renderer
-        if (model) {
-          model.traverse((node) => {
-            if (!node.isMesh) return;
-            const origMats = Array.isArray(node.material) ? node.material : [node.material];
-            const newMats = origMats.map((orig) => {
-              try {
-                const colorMap = orig?.map ?? null;
-                const normalMap = orig?.normalMap ?? null;
-                const color = colorMap
-                  ? 0xffffff
-                  : (orig?.color ? orig.color.getHex() : 0xcccccc);
-                const hasAlpha = !!orig?.alphaMap || orig?.transparent === true || (orig?.opacity != null && orig.opacity < 1);
-
-                return new THREE.MeshStandardMaterial({
-                  map: colorMap,
-                  normalMap,
-                  color,
-                  metalness: 0.3,
-                  roughness: 0.7,
-                  transparent: hasAlpha,
-                  side: orig?.side ?? THREE.FrontSide,
-                });
-              } catch (_) {
-                return new THREE.MeshStandardMaterial({
-                  color: 0x7c3aed, metalness: 0.4, roughness: 0.3,
-                });
-              }
-            });
-            node.material = Array.isArray(node.material) ? newMats : newMats[0];
-          });
-        }
       } else {
         const gltf = await new Promise((res, rej) => {
           new GLTFLoader().parse(buffer, '', res, rej);
@@ -190,37 +156,46 @@ export function generateGlbThumbnail(source, options = {}) {
 
       if (!model) throw new Error('Parser returned null model');
 
-      // ── Normalize GLB materials — same approach as FBX ───────────────
-      // GLTFLoader can produce MeshBasicMaterial or materials with wrong
-      // color space that render completely black in this renderer.
+      // ── Material Normalization — same for FBX and GLB ──────────────
       model.traverse((node) => {
         if (!node.isMesh) return;
-        const origMats = Array.isArray(node.material) ? node.material : [node.material];
-        const newMats = origMats.map((orig) => {
-          try {
-            const colorMap = orig?.map ?? null;
-            const normalMap = orig?.normalMap ?? null;
-            const color = colorMap
-              ? 0xffffff
-              : (orig?.color ? orig.color.getHex() : 0xcccccc);
-            const hasAlpha = !!orig?.alphaMap || orig?.transparent === true || (orig?.opacity != null && orig.opacity < 1);
 
-            return new THREE.MeshStandardMaterial({
-              map: colorMap,
-              normalMap,
-              color,
-              metalness: orig?.metalness ?? 0.3,
-              roughness: orig?.roughness ?? 0.7,
-              transparent: hasAlpha,
-              side: orig?.side ?? THREE.FrontSide,
+        const sanitize = (orig) => {
+          if (!orig) return orig;
+          let sm = orig;
+          if (!orig.isMeshStandardMaterial) {
+            sm = new THREE.MeshStandardMaterial();
+            const maps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'bumpMap'];
+            maps.forEach(mapName => {
+              if (orig[mapName]) {
+                sm[mapName] = orig[mapName];
+                if (sm[mapName].isTexture) {
+                  sm[mapName].colorSpace = THREE.SRGBColorSpace;
+                }
+              }
             });
-          } catch (_) {
-            return new THREE.MeshStandardMaterial({
-              color: 0x7c3aed, metalness: 0.4, roughness: 0.3,
-            });
+            sm.color.copy(orig.color || new THREE.Color(0xffffff));
+            sm.opacity = orig.opacity ?? 1;
+            sm.transparent = orig.transparent ?? (orig.opacity < 1);
+            sm.side = THREE.DoubleSide; // Fix visibility for retopo
           }
-        });
-        node.material = Array.isArray(node.material) ? newMats : newMats[0];
+
+          // Force white color if texture exists but color is black
+          if (sm.map && (sm.color.r === 0 && sm.color.g === 0 && sm.color.b === 0)) {
+            sm.color.set(0xffffff);
+          }
+
+          // PBR polish for consistent thumbnail lighting
+          if (!sm.roughnessMap) sm.roughness = Math.max(sm.roughness || 0, 0.6);
+          sm.envMapIntensity = 1.0;
+          return sm;
+        };
+
+        if (Array.isArray(node.material)) {
+          node.material = node.material.map(sanitize);
+        } else {
+          node.material = sanitize(node.material);
+        }
       });
 
       // ── Configure meshes ─────────────────────────────────────────────

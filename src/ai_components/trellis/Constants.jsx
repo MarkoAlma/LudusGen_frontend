@@ -3,6 +3,7 @@ export const VIEW_MODES = [
   { id: 'clay', label: 'Clay', tip: 'Clay — semleges szürke agyag' },
   { id: 'uv', label: 'Base Color', tip: 'Base Color — textúra árnyék nélkül' },
   { id: 'normal', label: 'RGB', tip: 'RGB — textúra + árnyék' },
+  { id: 'segment', label: 'Segment', tip: 'Segment — modell részek véletlenszerű színezése' },
 ];
 
 export const BG_OPTIONS = [

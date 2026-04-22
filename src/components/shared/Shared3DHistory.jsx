@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   History, Search, Box, ChevronDown, Sparkles, Info, Eraser, Loader2, Download,
-  PersonStanding, Wand2, LayoutGrid, X, Upload
+  PersonStanding, Wand2, LayoutGrid, X, Upload, Scissors, Boxes
 } from 'lucide-react';
 import { collection, query, where, orderBy, getDocs, limit, startAfter, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseApp';
@@ -21,6 +21,7 @@ const TYPE_COLORS = {
   model: { rail: "#64748b", glow: "#475569" },
   rigged: { rail: "#f472b6", glow: "#db2777" },
   animation: { rail: "#22d3ee", glow: "#0891b2" },
+  segment: { rail: "#f59e0b", glow: "#d97706" },
   trellis: { rail: "#34d399", glow: "#059669" },
   upload: { rail: "#94a3b8", glow: "#475569" },
 };
@@ -119,6 +120,8 @@ const SUBTABS = [
   { id: 'models', label: 'Models', icon: Box, from: "#64748b", to: "#334155" },
   { id: 'rigged', label: 'Rig', icon: PersonStanding, from: "#f472b6", to: "#db2777" },
   { id: 'animations', label: 'Anim', icon: Wand2, from: "#22d3ee", to: "#0891b2" },
+  { id: 'segment', label: 'Segment', icon: Scissors, from: "#f59e0b", to: "#d97706" },
+  { id: 'fill_parts', label: 'Fill Parts', icon: Boxes, from: "#c084fc", to: "#9333ea" },
 ];
 
 
@@ -243,9 +246,13 @@ export default function Shared3DHistory({
       if (src !== 'tripo') return false;
       const isRig = item.mode === 'rig' || item.params?.rigged === true || item.params?.type === 'animate_rig';
       const isAnim = item.mode === 'animate' && !isRig || item.params?.animated === true || item.params?.type === 'animate_retarget';
-      if (subTab === 'models') return !isRig && !isAnim;
+      const isSeg = item.mode === 'segment';
+      const isFill = item.mode === 'fill_parts';
+      if (subTab === 'models') return !isRig && !isAnim && !isSeg && !isFill;
       if (subTab === 'rigged') return isRig;
       if (subTab === 'animations') return isAnim;
+      if (subTab === 'segment') return isSeg;
+      if (subTab === 'fill_parts') return isFill;
       return true;
     }
     if (activeTab === 'trellis') return src === 'trellis';
@@ -263,15 +270,19 @@ export default function Shared3DHistory({
 
   const tripoSections = useMemo(() => {
     if (activeTab !== 'tripo') return null;
-    const generated = [], rigged = [], animations = [];
+    const generated = [], rigged = [], animations = [], segments = [], fillParts = [];
     for (const item of filtHist) {
       const isRig = item.mode === 'rig' || item.params?.rigged === true || item.params?.type === 'animate_rig';
       const isAnim = (item.mode === 'animate' && !isRig) || item.params?.animated === true || item.params?.type === 'animate_retarget';
+      const isSeg = item.mode === 'segment';
+      const isFill = item.mode === 'fill_parts';
       if (isAnim) animations.push(item);
       else if (isRig) rigged.push(item);
+      else if (isSeg) segments.push(item);
+      else if (isFill) fillParts.push(item);
       else generated.push(item);
     }
-    return { generated, rigged, animations };
+    return { generated, rigged, animations, segments, fillParts };
   }, [filtHist, activeTab]);
 
   const activeTabDef = TABS.find(t => t.id === activeTab) || TABS[0];
@@ -300,7 +311,7 @@ export default function Shared3DHistory({
         }} />
 
         {/* Title */}
-        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 9, marginBottom: 12 }}>
           {/* Logo mark */}
           <div style={{
             width: 28, height: 28, borderRadius: 6, flexShrink: 0, position: "relative",
@@ -362,8 +373,8 @@ export default function Shared3DHistory({
 
         {/* Source tabs — pill style */}
         <div style={{
-          display: "flex", gap: 2, marginBottom: 10,
-          background: "rgba(0,0,0,0.4)", padding: 3, borderRadius: 99,
+          display: "flex", flexWrap: "wrap", gap: 2, marginBottom: 10,
+          background: "rgba(0,0,0,0.4)", padding: 3, borderRadius: 10,
           border: "1px solid rgba(255,255,255,0.05)",
         }}>
           {TABS.map(tab => {
@@ -375,7 +386,7 @@ export default function Shared3DHistory({
                 className={isAct ? "arch-tab-active" : ""}
                 style={{
                   "--arch-tab-color": tab.color,
-                  flex: 1, padding: "6px 0", borderRadius: 99,
+                  flex: "1 1 80px", padding: "6px 0", borderRadius: 8,
                   fontSize: 9.5, fontWeight: 600, cursor: "pointer",
                   border: "none", transition: "all 0.2s",
                   fontFamily: "'Rajdhani', sans-serif",
@@ -404,7 +415,7 @@ export default function Shared3DHistory({
               transition={{ duration: 0.2, ease: "easeOut" }}
               style={{ overflow: "hidden" }}
             >
-              <div style={{ display: "flex", gap: 3 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                 {SUBTABS.map(st => {
                   const isAct = subTab === st.id;
                   const Icon = st.icon;
@@ -413,7 +424,7 @@ export default function Shared3DHistory({
                       key={st.id}
                       onClick={() => setSubTab(st.id)}
                       style={{
-                        flex: 1, padding: "5px 4px",
+                        flex: "1 1 auto", padding: "5px 8px",
                         borderRadius: 6, cursor: "pointer",
                         fontFamily: "'Rajdhani', sans-serif",
                         fontSize: 8.5, fontWeight: 700,
@@ -551,7 +562,9 @@ export default function Shared3DHistory({
                   {[...filtHist].sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0)).map(item => {
                     const isRig = item.mode === 'rig' || item.params?.rigged === true || item.params?.type === 'animate_rig';
                     const isAnim = (item.mode === 'animate' && !isRig) || item.params?.animated === true || item.params?.type === 'animate_retarget';
-                    const cardColor = isAnim ? TYPE_COLORS.animation.rail : isRig ? TYPE_COLORS.rigged.rail : accent;
+                    const isSeg = item.mode === 'segment';
+                    const isFill = item.mode === 'fill_parts';
+                    const cardColor = isAnim ? TYPE_COLORS.animation.rail : isRig ? TYPE_COLORS.rigged.rail : isSeg ? TYPE_COLORS.segment.rail : isFill ? "#c084fc" : accent;
                     return (
                       <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={cardColor} getIdToken={getIdToken} />
                     );
@@ -585,6 +598,26 @@ export default function Shared3DHistory({
                       <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
                         {tripoSections.animations.map(item => (
                           <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={TYPE_COLORS.animation.rail} getIdToken={getIdToken} />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {tripoSections.segments.length > 0 && (
+                    <>
+                      <SectionHeader label="Segmented" icon={Scissors} typeColor={TYPE_COLORS.segment} count={tripoSections.segments.length} />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
+                        {tripoSections.segments.map(item => (
+                          <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={TYPE_COLORS.segment.rail} getIdToken={getIdToken} />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {tripoSections.fillParts.length > 0 && (
+                    <>
+                      <SectionHeader label="Completed Parts" icon={Boxes} typeColor={{ rail: "#c084fc" }} count={tripoSections.fillParts.length} />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
+                        {tripoSections.fillParts.map(item => (
+                          <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={onSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color="#c084fc" getIdToken={getIdToken} />
                         ))}
                       </div>
                     </>

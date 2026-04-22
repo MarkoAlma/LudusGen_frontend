@@ -1,6 +1,6 @@
 // shared/HistoryCard.jsx  — DAW / Game Asset Browser aesthetic
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Download, RotateCcw, Trash2, Box, Sparkles, AlertCircle, PersonStanding, Wand2 } from "lucide-react";
+import { Download, RotateCcw, Trash2, Box, Sparkles, AlertCircle, PersonStanding, Wand2, Scissors, Boxes } from "lucide-react";
 import { getCachedThumbnail, checkThumbnailCache } from "../trellis/Glbthumbnail";
 import { fetchModelData } from "../trellis/utils";
 
@@ -87,9 +87,16 @@ function useContainerWidth(ref) {
 const EXPIRED_URLS = new Set();
 
 /* ─── Type config ────────────────────────────────────────────────────────── */
-const getTypeConfig = (isAnimated, isRigged) => {
-  if (isAnimated) return { rail: "#22d3ee", glow: "#0891b2", label: "ANIM", Icon: Wand2 };
-  if (isRigged) return { rail: "#f472b6", glow: "#db2777", label: "RIG", Icon: PersonStanding };
+const getTypeConfig = (item) => {
+  const mode = item?.mode;
+  const params = item?.params || {};
+  const isRig = mode === 'rig' || params.rigged === true || params.type === 'animate_rig';
+  const isAnim = (mode === 'animate' && !isRig) || params.animated === true || params.type === 'animate_retarget';
+  
+  if (isAnim) return { rail: "#22d3ee", glow: "#0891b2", label: "ANIM", Icon: Wand2 };
+  if (isRig) return { rail: "#f472b6", glow: "#db2777", label: "RIG", Icon: PersonStanding };
+  if (mode === "segment") return { rail: "#f59e0b", glow: "#d97706", label: "SEGMENT", Icon: Scissors };
+  if (mode === "fill_parts") return { rail: "#c084fc", glow: "#9333ea", label: "FILL", Icon: Boxes };
   return { rail: "#64748b", glow: "#475569", label: "MODEL", Icon: Box };
 };
 
@@ -187,9 +194,7 @@ const HistoryCard = React.memo(function HistoryCard({
   const handleDownload = useCallback((e) => { e.stopPropagation(); onDownload?.(item); }, [onDownload, item]);
   const handleDelete = useCallback((e) => { e.stopPropagation(); onDelete?.(item); }, [onDelete, item]);
 
-  const isAnimated = !!item?.params?.animated;
-  const isRigged = !!item?.params?.rigged;
-  const typeConfig = getTypeConfig(isAnimated, isRigged);
+  const typeConfig = getTypeConfig(item);
   const rail = typeConfig.rail;
   const glow = typeConfig.glow;
   const hasAiName = !!item?.name;
