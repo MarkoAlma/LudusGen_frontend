@@ -2,6 +2,26 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
+function normalizeMaterialTextureColorSpaces(THREE, material) {
+  if (!THREE || !material) return;
+
+  ['map', 'emissiveMap'].forEach((slot) => {
+    const texture = material[slot];
+    if (texture?.isTexture) {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+    }
+  });
+
+  ['normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'alphaMap', 'bumpMap', 'displacementMap'].forEach((slot) => {
+    const texture = material[slot];
+    if (texture?.isTexture) {
+      texture.colorSpace = THREE.NoColorSpace;
+      texture.needsUpdate = true;
+    }
+  });
+}
+
 let _activeCount = 0;
 const _MAX = 3;
 const _queue = [];
@@ -169,12 +189,11 @@ export function generateGlbThumbnail(source, options = {}) {
             maps.forEach(mapName => {
               if (orig[mapName]) {
                 sm[mapName] = orig[mapName];
-                if (sm[mapName].isTexture) {
-                  sm[mapName].colorSpace = THREE.SRGBColorSpace;
-                }
               }
             });
             sm.color.copy(orig.color || new THREE.Color(0xffffff));
+            if (orig.emissive && sm.emissive) sm.emissive.copy(orig.emissive);
+            if (orig.normalScale && sm.normalScale) sm.normalScale.copy(orig.normalScale);
             sm.opacity = orig.opacity ?? 1;
             sm.transparent = orig.transparent ?? (orig.opacity < 1);
             sm.side = THREE.DoubleSide; // Fix visibility for retopo
@@ -184,6 +203,8 @@ export function generateGlbThumbnail(source, options = {}) {
           if (sm.map && (sm.color.r === 0 && sm.color.g === 0 && sm.color.b === 0)) {
             sm.color.set(0xffffff);
           }
+
+          normalizeMaterialTextureColorSpaces(THREE, sm);
 
           // PBR polish for consistent thumbnail lighting
           if (!sm.roughnessMap) sm.roughness = Math.max(sm.roughness || 0, 0.6);

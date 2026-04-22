@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useContext, forwardRef, useImperativeHandle } from "react";
+import React, { useRef, useEffect, useCallback, useContext, forwardRef, useImperativeHandle, memo } from "react";
 import { useMotionValueEvent } from "framer-motion";
 import { StudioLayoutContext } from "../../../components/shared/StudioLayout";
 import * as THREE from 'three';
@@ -15,9 +15,10 @@ import {
   focusOnHit, applyExponentialZoom,
 } from './threeHelpers';
 
-const ThreeViewer = forwardRef(({
+const ThreeViewer = memo(forwardRef(({
   color, viewMode, lightMode, showGrid,
   modelUrl, onReady,
+  onSegmentProcessing,
   leftOffset = 0,
   rightOffset = 0,
   lightStrength = 1,
@@ -50,6 +51,7 @@ const ThreeViewer = forwardRef(({
 }, ref) => {
   const mountRef = useRef(null);
   const S = useRef(null);
+  const segmentTimerRef = useRef(null);
 
   const lightParamsRef = useRef({ lightMode, color, lightStrength, lightRotation, lightElevation, dramaticColor });
   useEffect(() => {
@@ -60,6 +62,11 @@ const ThreeViewer = forwardRef(({
   useEffect(() => {
     paintRef.current = { paintMode, paintColor, paintSize, paintOpacity, paintHardness, paintCanvasRef };
   }, [paintMode, paintColor, paintSize, paintOpacity, paintHardness, paintCanvasRef]);
+
+  useEffect(() => () => {
+    if (segmentTimerRef.current) clearTimeout(segmentTimerRef.current);
+    if (onSegmentProcessing) onSegmentProcessing(false);
+  }, []);
 
   useEffect(() => {
     const el = mountRef.current;
@@ -149,7 +156,7 @@ const ThreeViewer = forwardRef(({
         THREE, scene, camera, renderer, grid, lightGroup, placeholder,
         model: null, origMaterials: new Map(), cam,
         sunLight, _camDir: null,
-        _wireCache: new Map(), _clayMats: new Map(), _uvMats: new Map(),
+        _wireCache: new Map(), _clayMats: new Map(), _uvMats: new Map(), _segEdgeCache: new Map(),
         autoSpin, lightAutoRotate, lightAutoRotateSpeed,
         drag: { active: false, mode: 'orbit', x: 0, y: 0 },
         // 3D Paint
@@ -342,10 +349,6 @@ const ThreeViewer = forwardRef(({
     if (!S.current?.scene) return;
     applyViewMode(S.current, viewMode);
     applyWireframeOverlay(S.current, wireframeOverlay, wireOpacity, wireHexColor);
-    
-    // If either viewMode is 'segment' OR the toggle is on, show the highlight
-    const shouldShowSeg = segmentHighlight || viewMode === 'segment';
-    applySegmentHighlight(S.current, shouldShowSeg, segmentEdgeColor);
 
     const p = lightParamsRef.current;
     applyLights(S.current, p.lightMode, p.color, p.lightStrength, p.lightRotation, p.dramaticColor, viewMode, p.lightElevation);
@@ -359,9 +362,33 @@ const ThreeViewer = forwardRef(({
   useEffect(() => {
     if (S.current) { S.current._segmentHighlight = segmentHighlight; S.current._segmentEdgeColor = segmentEdgeColor; }
     if (!S.current?.scene) return;
+    if (segmentTimerRef.current) {
+      clearTimeout(segmentTimerRef.current);
+      segmentTimerRef.current = null;
+    }
     // Highlight if EITHER the toggle is on OR viewMode is 'segment'
     const shouldShowSeg = segmentHighlight || viewMode === 'segment';
-    applySegmentHighlight(S.current, shouldShowSeg, segmentEdgeColor);
+
+    if (!shouldShowSeg) {
+      applySegmentHighlight(S.current, false, segmentEdgeColor, {
+        onComplete: () => { if (onSegmentProcessing) onSegmentProcessing(false); },
+      });
+      return;
+    }
+
+    const isFirstTime = !!(S.current.model && !S.current._segEdgeCache?.size);
+
+    if (isFirstTime && onSegmentProcessing) onSegmentProcessing(true);
+    segmentTimerRef.current = setTimeout(() => {
+      segmentTimerRef.current = null;
+      applySegmentHighlight(S.current, true, segmentEdgeColor, {
+        async: isFirstTime,
+        batchSize: 2,
+        edgeBatchSize: 1,
+        frameBudget: 5,
+        onComplete: () => { if (onSegmentProcessing) onSegmentProcessing(false); },
+      });
+    }, isFirstTime ? 140 : 0);
   }, [segmentHighlight, segmentEdgeColor, viewMode]);
 
   useEffect(() => {
@@ -717,7 +744,7 @@ const ThreeViewer = forwardRef(({
       onContextMenu={e => e.preventDefault()}
     />
   );
-});
+}));
 
 export default ThreeViewer;
-
+

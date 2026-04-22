@@ -20,7 +20,14 @@ import { Tooltip } from "../meshy/ui/Primitives";
  *  - Cannot be applied to rigged models.
  */
 
-export default function Segment({ segSub, activeTaskId, isRiggedInput, isSegmentOutput }) {
+export default function Segment({
+  segSub,
+  activeTaskId,
+  isRiggedInput,
+  isSegmentOutput,
+  isGeneratedInParts,
+  isFillPartsCompatible,
+}) {
   return (
     <>
       {/* ── SEGMENT (mesh_segmentation) ── */}
@@ -106,20 +113,20 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput, isSegment
             </div>
           )}
 
-          {/* Not segmented blocker */}
-          {activeTaskId && !isSegmentOutput && !isRiggedInput && (
+          {/* Not compatible blocker */}
+          {activeTaskId && !isFillPartsCompatible && !isRiggedInput && (
             <div style={{ width: "100%", padding: "8px 12px", borderRadius: 11, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", marginBottom: 14, textAlign: "left", display: "flex", gap: 8 }}>
               <AlertTriangle style={{ width: 13, height: 13, color: "#f87171", flexShrink: 0, marginTop: 1 }} />
               <div>
                 <p style={{ color: "#f87171", fontSize: 11, fontWeight: 600, margin: 0 }}>Incompatible model</p>
                 <p style={{ color: "#ef4444", fontSize: 10, margin: "3px 0 0", lineHeight: 1.5 }}>
-                  Part Completion requires a segmented model. Please run the Segment task first.
+                  Part Completion requires a segmented or generate-parts model.
                 </p>
               </div>
             </div>
           )}
 
-          {activeTaskId && isSegmentOutput ? (
+          {activeTaskId && isFillPartsCompatible ? (
             /* ── Selected model — Ready state ── */
             <div style={{ width: "100%" }}>
                 <div 
@@ -127,7 +134,9 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput, isSegment
                   title="This segmented model can now be completed with part-specific details."
                 >
                   <Check style={{ width: 14, height: 14, color: "#22c55e", flexShrink: 0 }} />
-                  <span style={{ color: "#86efac", fontSize: 12, fontWeight: 700 }}>Ready for Part Completion</span>
+                  <span style={{ color: "#86efac", fontSize: 12, fontWeight: 700 }}>
+                    {isSegmentOutput ? "Ready for Part Completion" : "Ready for Fill Parts"}
+                  </span>
                 </div>
               <div style={{ padding: "8px 10px", borderRadius: 9, background: "rgba(108,99,255,0.08)", border: "1px solid rgba(108,99,255,0.25)", marginBottom: 10 }}>
                 <p style={{ color: "#a5a0ff", fontSize: 11, fontWeight: 600, margin: 0 }}>Selected model</p>
@@ -135,7 +144,11 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput, isSegment
               </div>
               <div style={{ width: "100%", padding: "6px 9px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", textAlign: "left" }}>
                 <p style={{ color: "#2d2d48", fontSize: 9, margin: 0, lineHeight: 1.6 }}>
-                  Source must be a segmented model (mesh_segmentation output).
+                  {isSegmentOutput
+                    ? "Source: segmented model (mesh_segmentation output)."
+                    : isGeneratedInParts
+                      ? "Source: generate-parts model."
+                      : "Source: segmented or generate-parts model."}
                 </p>
               </div>
             </div>
@@ -160,7 +173,7 @@ export default function Segment({ segSub, activeTaskId, isRiggedInput, isSegment
 
               <div style={{ width: "100%", padding: "6px 10px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", textAlign: "left", marginBottom: 10 }}>
                 <p style={{ color: "#2d2d48", fontSize: 9, margin: 0, lineHeight: 1.6 }}>
-                  Source must be a segmented model (mesh_segmentation output).
+                  Source must be segmented or generated in parts.
                 </p>
               </div>
             </>

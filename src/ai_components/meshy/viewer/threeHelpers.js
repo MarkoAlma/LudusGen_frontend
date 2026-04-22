@@ -81,13 +81,69 @@ export function setGridColor(s, c1, c2) {
   s.markDirty?.();
 }
 
+function normalizeMaterialTextureColorSpaces(THREE, material) {
+  if (!THREE || !material) return;
+
+  ['map', 'emissiveMap'].forEach((slot) => {
+    const texture = material[slot];
+    if (texture?.isTexture) {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+    }
+  });
+
+  ['normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'alphaMap', 'bumpMap', 'displacementMap'].forEach((slot) => {
+    const texture = material[slot];
+    if (texture?.isTexture) {
+      texture.colorSpace = THREE.NoColorSpace;
+      texture.needsUpdate = true;
+    }
+  });
+}
+
+function cloneSegmentMaterial(THREE, _originalMaterial, tintColor) {
+  // Upgraded to MeshPhysicalMaterial for a premium glass effect with transmission.
+  // We force emissive to black and use a lower opacity to avoid the 'white silhouette' issue.
+  const segmentMaterial = new THREE.MeshPhysicalMaterial({
+    color: tintColor,
+    emissive: tintColor,
+    emissiveIntensity: 0.25, // Boosted for more vibrant "pop"
+    metalness: 0.1,
+    roughness: 0.05,
+    transmission: 0.4,
+    thickness: 1.0,
+    ior: 1.45,
+    side: THREE.FrontSide,
+    depthTest: true,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.55, // Increased for stronger visibility
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
+  });
+
+  segmentMaterial.toneMapped = true;
+  segmentMaterial.needsUpdate = true;
+
+  return segmentMaterial;
+}
+
 export function applyLights(s, mode, color, strength = 1, rotation = 0, dramaticColor = null, viewMode = "normal", elevation = 45) {
   const { THREE, lightGroup } = s;
   if (!THREE) return;
   const toRemove = lightGroup.children.filter((c) => !c.userData.isBackLight);
   toRemove.forEach((c) => lightGroup.remove(c));
 
-  if (viewMode === 'uv') { lightGroup.rotation.y = 0; lightGroup.rotation.x = 0; s.markDirty?.(); return; }
+  if (viewMode === 'uv') {
+    lightGroup.add(new THREE.AmbientLight(0xffffff, 1.1));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.4);
+    sun.position.set(5, 10, 7);
+    lightGroup.add(sun);
+    lightGroup.rotation.y = 0; lightGroup.rotation.x = 0;
+    s.markDirty?.();
+    return;
+  }
 
   if (viewMode === 'clay') {
     lightGroup.add(new THREE.HemisphereLight(0xc8c0b8, 0x302820, 0.18));
@@ -135,6 +191,7 @@ export function applyLights(s, mode, color, strength = 1, rotation = 0, dramatic
 export function applyViewMode(s, mode) {
   const { THREE, scene, origMaterials } = s;
   if (!THREE) return;
+  s._currentViewMode = mode;
 
   if (!s._clayMats) s._clayMats = new Map();
   if (!s._uvMats) s._uvMats = new Map();
@@ -145,15 +202,20 @@ export function applyViewMode(s, mode) {
     if (node.userData.isGround) { node.receiveShadow = true; return; }
     if (!node.isMesh || node.userData.isBgLight) return;
 
-    if (!origMaterials.has(node.uuid)) origMaterials.set(node.uuid, node.material);
     const orig = origMaterials.get(node.uuid);
+    if (!orig) return; // Should have been set in loadGLB
     node.castShadow = true;
 
     if (mode === 'clay') {
       if (!s._clayMats.has(node.uuid)) {
         if (node.geometry && !node.geometry.attributes.normal) node.geometry.computeVertexNormals();
         const buildClay = () => new THREE.MeshStandardMaterial({
-          color: 0x7a7a7a, metalness: 0, roughness: 0.82, envMapIntensity: 0, side: THREE.DoubleSide,
+          color: 0xcccccc, // Lighter, more neutral clay gray
+          metalness: 0,
+          roughness: 1.0, // Perfectly matte
+          envMapIntensity: 0.1, // Minimal reflections
+          side: THREE.DoubleSide,
+          vertexColors: false, // Force off vertex colors for pure clay look
         });
         s._clayMats.set(node.uuid, Array.isArray(orig) ? orig.map(() => buildClay()) : buildClay());
       }
@@ -164,14 +226,19 @@ export function applyViewMode(s, mode) {
 
     } else if (mode === 'uv') {
       if (!s._uvMats.has(node.uuid)) {
-        const buildBasic = (m) => {
+        const buildLitUV = (m) => {
           const map = (m?.map) ?? null;
           if (map) { map.colorSpace = THREE.SRGBColorSpace; map.needsUpdate = true; }
-          return new THREE.MeshBasicMaterial({
-            map, color: map ? 0xffffff : (m?.color ?? new THREE.Color(0xe0dbd5)),
+          return new THREE.MeshStandardMaterial({
+            map,
+            color: map ? 0xffffff : (m?.color ?? new THREE.Color(0xe0dbd5)),
+            roughness: 0.6,
+            metalness: 0.0,
+            envMapIntensity: 0.5,
+            side: THREE.DoubleSide,
           });
         };
-        s._uvMats.set(node.uuid, Array.isArray(orig) ? orig.map(m => buildBasic(m)) : buildBasic(orig));
+        s._uvMats.set(node.uuid, Array.isArray(orig) ? orig.map(m => buildLitUV(m)) : buildLitUV(orig));
       }
       node.material = s._uvMats.get(node.uuid);
 
@@ -347,7 +414,7 @@ export function switchAnimationClip(s, index) {
   s.markDirty?.();
 }
 
-export function disposeModel(scene, model, origMaterials, wireCache, clayMats, uvMats) {
+export function disposeModel(scene, model, origMaterials, wireCache, clayMats, uvMats, segmentMats, segEdgeCache) {
   if (!model) return;
   const disposeMat = (mat) => {
     if (!mat) return;
@@ -374,6 +441,15 @@ export function disposeModel(scene, model, origMaterials, wireCache, clayMats, u
       (Array.isArray(um) ? um : [um]).forEach(disposeMat);
       uvMats.delete(node.uuid);
     }
+    if (segmentMats?.has(node.uuid)) {
+      const sm = segmentMats.get(node.uuid);
+      (Array.isArray(sm) ? sm : [sm]).forEach(disposeMat);
+      segmentMats.delete(node.uuid);
+    }
+    if (segEdgeCache?.has(node.uuid)) {
+      segEdgeCache.get(node.uuid)?.dispose?.();
+      segEdgeCache.delete(node.uuid);
+    }
     if (wireCache?.has(node.uuid)) { wireCache.get(node.uuid).dispose(); wireCache.delete(node.uuid); }
     origMaterials?.delete(node.uuid);
   });
@@ -391,11 +467,13 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
   s._loadToken = token;
 
   if (s.model) {
-    disposeModel(scene, s.model, s.origMaterials, s._wireCache, s._clayMats, s._uvMats);
+    disposeModel(scene, s.model, s.origMaterials, s._wireCache, s._clayMats, s._uvMats, s._segmentMats, s._segEdgeCache);
     s.model = null;
+    s._segmentMeshes = null;
     s.origMaterials.clear();
     s._segOrigMats?.clear();
     s._segEdgeCache?.clear();
+    s._segmentMats?.clear();
     // Clean up rig overlay
     if (s._rigOverlay) {
       scene.remove(s._rigOverlay);
@@ -434,8 +512,10 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     const scaledMin = scaledBox.isEmpty() ? new THREE.Vector3(0, -1, 0) : scaledBox.min;
     model.position.y = -1 - scaledMin.y;
 
+    const segmentMeshes = [];
     model.traverse((n) => {
       if (n.isMesh) {
+        segmentMeshes.push(n);
         if (n.geometry && !n.geometry.attributes.normal) n.geometry.computeVertexNormals();
 
         // FBX often comes with Phong/Lambert materials which lack PBR features
@@ -450,32 +530,35 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
             maps.forEach(mapName => {
               if (m[mapName]) {
                 sm[mapName] = m[mapName];
-                if (sm[mapName].isTexture) {
-                  sm[mapName].colorSpace = THREE.SRGBColorSpace;
-                }
               }
             });
             sm.color.copy(m.color || new THREE.Color(0xffffff));
-            sm.opacity = m.opacity ?? 1;
-            sm.transparent = m.transparent ?? false;
-            sm.side = THREE.DoubleSide; // Often needed for retopo/converted models
+            if (m.emissive && sm.emissive) sm.emissive.copy(m.emissive);
+            if (m.normalScale && sm.normalScale) sm.normalScale.copy(m.normalScale);
+            // FORCE OPAQUE: Tripo FBX/GLB often accidentally sets alphaMode: BLEND 
+            // even for solid skin, causing 'ghostly' artifacts. 
+            sm.opacity = 1.0;
+            sm.transparent = false;
+            sm.depthWrite = true;
+            sm.side = THREE.DoubleSide;
           }
 
-          // FIX: Tripo FBX/GLB sometimes has black color multiplication with texture
-          if (sm.map && (sm.color.r === 0 && sm.color.g === 0 && sm.color.b === 0)) {
+          // FIX: Tripo FBX/GLB often has a base color tint that interferes with the texture.
+          // We force it to white if a map is present to ensure true RGB rendering.
+          if (sm.map) {
             sm.color.set(0xffffff);
           }
 
-          // Ensure colorSpace for existing standard materials too
-          if (sm.isMeshStandardMaterial) {
-            ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'bumpMap'].forEach(mn => {
-              if (sm[mn] && sm[mn].isTexture) sm[mn].colorSpace = THREE.SRGBColorSpace;
-            });
-          }
+          normalizeMaterialTextureColorSpaces(THREE, sm);
 
           // PBR polish
           if (!sm.roughnessMap) sm.roughness = Math.max(sm.roughness || 0, 0.5);
           sm.envMapIntensity = 1.0;
+          // Ensure transparency is OFF for base models unless explicitly required
+          if (!sm.alphaMap && sm.opacity > 0.9) {
+            sm.transparent = false;
+            sm.depthWrite = true;
+          }
           return sm;
         };
 
@@ -487,12 +570,14 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
         s.origMaterials.set(n.uuid, n.material);
       }
     });
+    s._segmentMeshes = segmentMeshes;
 
     scene.add(model);
     s.model = model;
     s.cam.radius = 7;
     s.cam.panX = 0; s.cam.panY = 0; s.cam.panZ = 0;
     if (s.camTarget) { s.camTarget.radius = 7; s.camTarget.panX = 0; s.camTarget.panY = 0; s.camTarget.panZ = 0; }
+    s._defaultCam = { theta: s.cam.theta, phi: s.cam.phi, radius: 7, panX: 0, panY: 0, panZ: 0 };
     syncCamera(s.camera, s.cam);
 
     // ── ANIMATION PLAYBACK ──────────────────────────────────────────────
@@ -525,9 +610,9 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     applyViewMode(s, currentViewMode);
     if (wireframeOverlay) applyWireframeOverlay(s, true, wireOpacity, wireHexColor);
     if (showRig) applyRigSkeletonOverlay(s, true);
-    const _segHL = segmentHighlight || s._segmentHighlight;
+    const _segHL = currentViewMode === 'segment' || segmentHighlight || s._segmentHighlight;
     const _segEC = segmentEdgeColor ?? s._segmentEdgeColor ?? 0x00ff88;
-    if (_segHL) applySegmentHighlight(s, true, _segEC);
+    if (_segHL) applySegmentHighlight(s, true, _segEC, { async: true, batchSize: 2, edgeBatchSize: 1, frameBudget: 5 });
     s.autoSpin = autoSpin;
     s.markDirty?.();
   };
@@ -577,11 +662,18 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     .catch((err) => console.error("Model fetch error:", err));
 }
 
-export function applySegmentHighlight(s, show, edgeColor = 0x00ff88) {
+export function applySegmentHighlight(s, show, edgeColor = 0x00ff88, options = {}) {
   if (!s?.scene) return;
+  const { async = false, onComplete = null, batchSize = 8, edgeBatchSize = 2, frameBudget = 6 } = options;
 
   const root = s.model || s.placeholder;
   if (!root) return;
+
+  if (s._segmentBuildToken) {
+    s._segmentBuildToken.cancelled = true;
+    s._segmentBuildToken.cancelScheduled?.();
+    s._segmentBuildToken = null;
+  }
 
   // Remove any existing segment edges
   root.traverse((node) => {
@@ -594,71 +686,206 @@ export function applySegmentHighlight(s, show, edgeColor = 0x00ff88) {
   });
 
   if (!show) {
-    // Restore original materials
-    if (s._segOrigMats) {
-      root.traverse((node) => {
-        if (!node.isMesh) return;
-        const orig = s._segOrigMats.get(node.uuid);
-        if (orig !== undefined) node.material = orig;
-      });
-    }
-    s._segOrigMats = null;
-    s.markDirty?.();
+    // Restore the materials based on the current view mode (Clay, UV, or Normal)
+    // instead of always forcing the original textured materials.
+    const currentMode = s._currentViewMode || 'normal';
+    applyViewMode(s, currentMode);
+    onComplete?.();
     return;
   }
 
-  // Collect meshes (exclude overlays/ground)
-  const meshes = [];
-  root.traverse((node) => {
-    if (
-      node.isMesh &&
+  const meshes = Array.isArray(s._segmentMeshes)
+    ? s._segmentMeshes.filter((node) =>
+      node?.isMesh &&
+      node.geometry &&
+      node.parent &&
       !node.userData.isGround &&
       !node.userData.isBgLight &&
       !node.userData.isWireframeOverlay &&
       !node.userData.isRigOverlay &&
       !node.userData.isPaintOverlay &&
       !node.userData.isSegEdge
-    ) meshes.push(node);
-  });
+    )
+    : [];
 
-  if (!s._segOrigMats) s._segOrigMats = new Map();
-
-  meshes.forEach((mesh, i) => {
-    // Save original material once
-    if (!s._segOrigMats.has(mesh.uuid)) s._segOrigMats.set(mesh.uuid, mesh.material);
-
-    // Use golden ratio for more distinct colors between segments
-    const hue = (i * 0.618033988749895) % 1;
-    const color = new THREE.Color().setHSL(hue, 0.85, 0.55);
-
-    const segMat = new THREE.MeshPhysicalMaterial({
-      color: color,
-      roughness: 0.05,
-      metalness: 0.3,
-      transmission: 0.5,
-      thickness: 0.5,
-      transparent: true,
-      opacity: 0.5,
+  if (meshes.length === 0) {
+    root.traverse((node) => {
+      if (
+        node.isMesh &&
+        !node.userData.isGround &&
+        !node.userData.isBgLight &&
+        !node.userData.isWireframeOverlay &&
+        !node.userData.isRigOverlay &&
+        !node.userData.isPaintOverlay &&
+        !node.userData.isSegEdge
+      ) meshes.push(node);
     });
-    mesh.material = segMat;
+  }
 
-    // Add edge outline
-    const edges = new THREE.EdgesGeometry(mesh.geometry, 15);
-    const lineMat = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 1 });
+  if (!s._segmentMats) s._segmentMats = new Map();
+
+  const getSegmentTint = (mesh, index = 0) => {
+    // We combine the name and the index to ensure unique colors even if names are identical.
+    const name = (mesh.name || 'segment').toLowerCase().replace(/(_l|_r|left|right)$/, '');
+    let hash = index; // Start with index to differentiate identical names
+    for (let j = 0; j < name.length; j++) {
+      hash = ((hash << 5) - hash) + name.charCodeAt(j);
+      hash |= 0;
+    }
+    const hue = Math.abs(hash % 360) / 360;
+    return new THREE.Color().setHSL(hue, 0.8, 0.62);
+  };
+
+  const applyMaterialToMesh = (mesh, index = 0) => {
+    // Tripo models often group many segments into a single mesh with multiple material slots
+    // or multiple geometry groups. We must ensure each part gets its own color.
+    
+    // If the mesh has multiple geometry groups but only one material, 
+    // expand it to a material array so each group can have a unique color.
+    if (!Array.isArray(mesh.material) && mesh.geometry?.groups?.length > 1) {
+      mesh.material = new Array(mesh.geometry.groups.length).fill(mesh.material);
+    }
+
+    if (Array.isArray(mesh.material)) {
+      mesh.material = mesh.material.map((oldMat, matIdx) => {
+        // Use a composite index for sub-materials to ensure unique tints
+        const tint = getSegmentTint(mesh, index + (matIdx + 1) * 1000);
+        return cloneSegmentMaterial(THREE, oldMat, tint);
+      });
+    } else {
+      let segMat = s._segmentMats.get(mesh.uuid);
+      if (!segMat) {
+        const tint = getSegmentTint(mesh, index);
+        segMat = cloneSegmentMaterial(THREE, mesh.material, tint);
+        s._segmentMats.set(mesh.uuid, segMat);
+      }
+      mesh.material = segMat;
+    }
+  };
+
+  const attachEdgesToMesh = (mesh) => {
+    // Using the pure edgeColor for a stronger, more saturated look (less white)
+    const wireColor = new THREE.Color(edgeColor);
+    let edges = s._segEdgeCache?.get(mesh.uuid);
+    if (!edges) {
+      edges = new THREE.EdgesGeometry(mesh.geometry, 15); // 15-degree threshold for clean lines
+      s._segEdgeCache?.set(mesh.uuid, edges);
+    }
+    const lineMat = new THREE.LineBasicMaterial({
+      color: wireColor,
+      linewidth: 1,
+      transparent: true,
+      opacity: 0.8, // Increased because EdgesGeometry is much sparser than Wireframe
+      depthTest: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+    });
     const lines = new THREE.LineSegments(edges, lineMat);
     lines.userData.isSegEdge = true;
-    lines.renderOrder = 1;
+    lines.renderOrder = 4;
     mesh.add(lines);
+  };
+
+  const scheduleSegmentChunk = (token, cb) => {
+    let rafId = null;
+    let timeoutId = null;
+    let idleId = null;
+    const run = () => { rafId = requestAnimationFrame(cb); };
+
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(run, { timeout: 48 });
+    } else {
+      timeoutId = setTimeout(run, 0);
+    }
+
+    token.cancelScheduled = () => {
+      if (idleId != null && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) clearTimeout(timeoutId);
+      if (rafId != null) cancelAnimationFrame(rafId);
+      token.cancelScheduled = null;
+    };
+  };
+
+  if (async) {
+    const token = { cancelled: false, cancelScheduled: null };
+    s._segmentBuildToken = token;
+    let materialIndex = 0;
+    let edgeIndex = 0;
+
+    const runBatch = () => {
+      if (token.cancelled) return;
+      token.cancelScheduled = null;
+
+      if (materialIndex < meshes.length) {
+        const start = performance.now();
+        let processed = 0;
+        while (
+          materialIndex < meshes.length &&
+          processed < batchSize &&
+          (processed === 0 || (performance.now() - start) < frameBudget)
+        ) {
+          applyMaterialToMesh(meshes[materialIndex], materialIndex);
+          materialIndex += 1;
+          processed += 1;
+        }
+        s.markDirty?.();
+        if (materialIndex < meshes.length) {
+          scheduleSegmentChunk(token, runBatch);
+          return;
+        }
+      }
+
+      if (edgeIndex < meshes.length) {
+        const start = performance.now();
+        let processed = 0;
+        while (
+          edgeIndex < meshes.length &&
+          processed < edgeBatchSize &&
+          (processed === 0 || (performance.now() - start) < Math.max(3, frameBudget - 1))
+        ) {
+          attachEdgesToMesh(meshes[edgeIndex]);
+          edgeIndex += 1;
+          processed += 1;
+        }
+        s.markDirty?.();
+        if (edgeIndex < meshes.length) {
+          scheduleSegmentChunk(token, runBatch);
+          return;
+        }
+      }
+
+      s._segmentBuildToken = null;
+      onComplete?.();
+    };
+    scheduleSegmentChunk(token, runBatch);
+    return;
+  }
+
+  meshes.forEach((mesh, idx) => {
+    applyMaterialToMesh(mesh, idx);
+    attachEdgesToMesh(mesh);
   });
 
   s.markDirty?.();
+  onComplete?.();
 }
 
 export function setCameraPreset(s, preset) {
   if (!s) return;
   s.autoSpin = false;
   const t = s.camTarget ?? s.cam;
-  if (preset === "reset") { t.theta = 0.4; t.phi = Math.PI / 3; t.panX = 0; t.panY = 0; t.panZ = 0; }
+  if (preset === "reset") {
+    const base = s._defaultCam ?? { theta: 0.4, phi: Math.PI / 3, radius: 8, panX: 0, panY: 0, panZ: 0 };
+    t.theta = base.theta;
+    t.phi = base.phi;
+    t.radius = base.radius;
+    t.panX = base.panX;
+    t.panY = base.panY;
+    t.panZ = base.panZ;
+  }
   if (preset === "front") { t.theta = 0; t.phi = Math.PI / 2; }
   if (preset === "side") { t.theta = Math.PI / 2; t.phi = Math.PI / 2; }
   if (preset === "top") { t.theta = 0; t.phi = 0.05; }

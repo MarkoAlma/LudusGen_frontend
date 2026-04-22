@@ -215,13 +215,17 @@ export default function AIChat({ user, getIdToken }) {
             const targetTab = job?.targetTab || PANEL_TYPE_TO_TAB[job?.panelType];
             if (targetTab) {
               const next = new URLSearchParams(searchParams);
+              const targetModelId = job?.modelId
+                || ALL_MODELS.find(m => m.panelType === job?.panelType)?.id
+                || resolveTargetModel(targetTab, null);
               next.set('tab', targetTab);
-              next.delete('model');
+              if (targetModelId) next.set('model', targetModelId);
+              else next.delete('model');
               if (job?.panelType === 'tripo' && job.taskId) {
                 next.set('tripoTaskId', job.taskId);
               }
-              if (job.modelId) {
-                sessionStorage.setItem(`ludusgen_last_model:${targetTab}`, job.modelId);
+              if (targetModelId) {
+                sessionStorage.setItem(`ludusgen_last_model:${targetTab}`, targetModelId);
               }
               setSearchParams(next);
               sessionStorage.setItem(`ludusgen_open_job:${user?.uid || 'guest'}`, job.id);

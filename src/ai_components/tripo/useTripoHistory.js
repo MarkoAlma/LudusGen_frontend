@@ -8,6 +8,10 @@ import { saveHistoryToFirestore } from "../trellis/utils";
 // Shared at module level so it survives re-renders but resets on full page reload
 const _savedUrls = new Set();
 
+const omitUndefined = (obj) => Object.fromEntries(
+  Object.entries(obj).filter(([, value]) => value !== undefined)
+);
+
 /**
  * @param {{
  *   userId: string,
@@ -20,7 +24,6 @@ const _savedUrls = new Set();
  *   histInit: React.MutableRefObject,
  *   setOptimisticItems: Function,
  *   setHistory: Function,
- *   setSelHistId: Function,
  * }} params
  */
 export function useTripoHistory({
@@ -34,7 +37,6 @@ export function useTripoHistory({
   histInit,
   setOptimisticItems,
   setHistory,
-  setSelHistId,
 }) {
   const saveHist = useCallback(async (taskId, rawUrl, extra = {}) => {
     const dedupKey = rawUrl + "|" + taskId;
@@ -44,6 +46,7 @@ export function useTripoHistory({
     const effectivePrompt = extra.prompt ?? prompt;
     const effectiveMode = extra.mode ?? mode;
     const effectiveModelVer = extra.modelVer ?? modelVer;
+    const cleanExtra = omitUndefined(extra);
     const autoName = cap2(effectivePrompt.trim());
     const resolvedName = cap2(extra.name) || autoName || null;
     const item = {
@@ -56,7 +59,7 @@ export function useTripoHistory({
       taskId,
       styleId: activeStyle || null,
       negPrompt: (extra.negPrompt ?? negPrompt) || null,
-      params: { model_version: effectiveModelVer, mode: effectiveMode, ...extra },
+      params: omitUndefined({ model_version: effectiveModelVer, mode: effectiveMode, ...cleanExtra }),
       ts: Date.now(),
     };
     const stableDocId = extra.animationIndex != null
@@ -66,10 +69,9 @@ export function useTripoHistory({
     const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
     setOptimisticItems(prev => prev.filter(o => o.id !== stableDocId));
     setHistory(h => [ni, ...h]);
-    setSelHistId(ni.id);
     histInit.current = true;
     return ni;
-  }, [userId, prompt, negPrompt, mode, modelVer, activeStyle, setOptimisticItems, setHistory, setSelHistId, histInit]);
+  }, [userId, prompt, negPrompt, mode, modelVer, activeStyle, setOptimisticItems, setHistory, histInit]);
 
   const saveRigHist = useCallback(async (taskId, rawUrl, extra = {}) => {
     const dedupKey = rawUrl + "|" + taskId;
@@ -79,14 +81,14 @@ export function useTripoHistory({
     const srcPrompt = srcItem?.name || srcItem?.prompt || extra.prompt || "model";
     const srcShort = srcPrompt.trim().split(/\s+/).slice(0, 2).join(" ");
     const rigName = extra.aiName || `Rig:${srcShort}`;
-    const params = {
+    const params = omitUndefined({
       rigModelVer: extra.rigModelVer,
       rigType: extra.rigType,
       rigSpec: extra.rigSpec,
       originalModelTaskId: extra.originalModelTaskId,
       mode: "rig",
       rigged: true,
-    };
+    });
     const item = {
       prompt: extra.prompt || "auto-rig",
       name: rigName,
@@ -104,10 +106,9 @@ export function useTripoHistory({
     const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
     setOptimisticItems(prev => prev.filter(o => o.id !== stableDocId));
     setHistory(h => [ni, ...h]);
-    setSelHistId(ni.id);
     histInit.current = true;
     return ni;
-  }, [userId, history, activeStyle, setOptimisticItems, setHistory, setSelHistId, histInit]);
+  }, [userId, history, activeStyle, setOptimisticItems, setHistory, histInit]);
 
   return { saveHist, saveRigHist };
 }

@@ -9,21 +9,21 @@ import { useJobs } from '../../context/JobsContext';
 
 // ── Panel-type → icon & palette ──────────────────────────────────
 const PANEL_META = {
-  chat:   { icon: MessageSquare, label: 'Chat',    color: '#8b5cf6', glow: 'rgba(139,92,246,0.35)' },
-  image:  { icon: Image,        label: 'Kép',     color: '#f59e0b', glow: 'rgba(245,158,11,0.35)' },
-  audio:  { icon: Volume2,      label: 'Hang',    color: '#10b981', glow: 'rgba(16,185,129,0.35)' },
-  music:  { icon: Music2,       label: 'Zene',    color: '#06b6d4', glow: 'rgba(6,182,212,0.35)'  },
-  threed: { icon: Box,          label: '3D',      color: '#a78bfa', glow: 'rgba(167,139,250,0.35)' },
-  trellis:{ icon: Layers,       label: 'Trellis', color: '#38bdf8', glow: 'rgba(56,189,248,0.35)' },
-  tripo:  { icon: Cpu,          label: 'Tripo',   color: '#d946ef', glow: 'rgba(217,70,239,0.35)' },
-  meshy:  { icon: LayoutGrid,   label: 'Meshy',   color: '#f97316', glow: 'rgba(249,115,22,0.35)' },
+  chat: { icon: MessageSquare, label: 'Chat', color: '#8b5cf6', glow: 'rgba(139,92,246,0.35)' },
+  image: { icon: Image, label: 'Kép', color: '#f59e0b', glow: 'rgba(245,158,11,0.35)' },
+  audio: { icon: Volume2, label: 'Hang', color: '#10b981', glow: 'rgba(16,185,129,0.35)' },
+  music: { icon: Music2, label: 'Zene', color: '#06b6d4', glow: 'rgba(6,182,212,0.35)' },
+  threed: { icon: Box, label: '3D', color: '#a78bfa', glow: 'rgba(167,139,250,0.35)' },
+  trellis: { icon: Layers, label: 'Trellis', color: '#38bdf8', glow: 'rgba(56,189,248,0.35)' },
+  tripo: { icon: Cpu, label: 'Tripo', color: '#d946ef', glow: 'rgba(217,70,239,0.35)' },
+  meshy: { icon: LayoutGrid, label: 'Meshy', color: '#f97316', glow: 'rgba(249,115,22,0.35)' },
 };
 
 const STATUS_META = {
-  running: { label: 'Folyamat',  ring: true  },
-  queued:  { label: 'Várólista', ring: false },
-  done:    { label: 'Kész',      ring: false },
-  error:   { label: 'Hiba',      ring: false },
+  running: { label: 'Folyamat', ring: true },
+  queued: { label: 'Várólista', ring: false },
+  done: { label: 'Kész', ring: false },
+  error: { label: 'Hiba', ring: false },
 };
 
 // Animated spinning ring for running jobs
@@ -54,18 +54,18 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
   const progress = Math.max(0, Math.min(job.progress ?? 0, 100));
 
   const isRunning = job.status === 'running';
-  const isDone    = job.status === 'done';
-  const isError   = job.status === 'error';
-  const isQueued  = job.status === 'queued';
+  const isDone = job.status === 'done';
+  const isError = job.status === 'error';
+  const isQueued = job.status === 'queued';
   const hasCountdown = isQueued && job.countdown != null;
 
   const statusColor = isDone
     ? '#34d399'
     : isError
-    ? '#f87171'
-    : isQueued
-    ? '#71717a'
-    : panelMeta.color;
+      ? '#f87171'
+      : isQueued
+        ? '#71717a'
+        : panelMeta.color;
 
   return (
     <motion.div
@@ -165,8 +165,8 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
               background: isError
                 ? '#f87171'
                 : isDone
-                ? `linear-gradient(90deg, #34d399, #10b981)`
-                : `linear-gradient(90deg, ${panelMeta.color}, ${panelMeta.color}cc)`,
+                  ? `linear-gradient(90deg, #34d399, #10b981)`
+                  : `linear-gradient(90deg, ${panelMeta.color}, ${panelMeta.color}cc)`,
               boxShadow: isRunning ? `0 0 8px ${panelMeta.color}90` : 'none',
             }}
           />

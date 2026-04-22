@@ -92,7 +92,7 @@ const getTypeConfig = (item) => {
   const params = item?.params || {};
   const isRig = mode === 'rig' || params.rigged === true || params.type === 'animate_rig';
   const isAnim = (mode === 'animate' && !isRig) || params.animated === true || params.type === 'animate_retarget';
-  
+
   if (isAnim) return { rail: "#22d3ee", glow: "#0891b2", label: "ANIM", Icon: Wand2 };
   if (isRig) return { rail: "#f472b6", glow: "#db2777", label: "RIG", Icon: PersonStanding };
   if (mode === "segment") return { rail: "#f59e0b", glow: "#d97706", label: "SEGMENT", Icon: Scissors };
@@ -213,15 +213,15 @@ const HistoryCard = React.memo(function HistoryCard({
       style={{
         flexShrink: 0, borderRadius: 8, cursor: "pointer",
         position: "relative", overflow: "hidden",
-        transition: "box-shadow 0.25s ease, transform 0.2s ease",
-        transform: hovered ? "translateY(-2px)" : "translateY(0)",
+        transition: "box-shadow 0.25s ease, transform 0.2s ease, border-color 0.2s ease",
+        transform: isActive ? "translateY(-2px) scale(1.01)" : hovered ? "translateY(-2px)" : "translateY(0)",
         /* Colored left-rail border by type */
-        border: `1px solid ${isActive ? rail + "60" : hovered ? rail + "28" : "rgba(255,255,255,0.07)"}`,
+        border: `1px solid ${isActive ? rail + "95" : hovered ? rail + "28" : "rgba(255,255,255,0.07)"}`,
         background: isActive
-          ? `linear-gradient(135deg, ${rail}0f 0%, rgba(0,0,0,0.6) 100%)`
+          ? `linear-gradient(135deg, ${rail}18 0%, rgba(0,0,0,0.72) 100%)`
           : "rgba(8,5,20,0.9)",
         boxShadow: isActive
-          ? `0 0 40px ${glow}30, 0 0 80px ${glow}10, 0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 ${rail}25`
+          ? `0 0 0 1px ${rail}35, 0 0 32px ${glow}35, 0 0 80px ${glow}15, 0 10px 28px rgba(0,0,0,0.55), inset 0 1px 0 ${rail}30`
           : hovered
             ? `0 8px 24px rgba(0,0,0,0.4), 0 0 20px ${glow}15, inset 0 1px 0 ${rail}12`
             : "0 2px 8px rgba(0,0,0,0.3)",
@@ -322,6 +322,33 @@ const HistoryCard = React.memo(function HistoryCard({
               boxShadow: `0 0 8px ${rail}`,
               pointerEvents: "none",
             }} />
+          )}
+
+          {isActive && (
+            <div style={{
+              position: "absolute", top: 8, right: 8, zIndex: 3,
+              display: "flex", alignItems: "center", gap: 4,
+              padding: "3px 7px",
+              borderRadius: 999,
+              background: "rgba(5,5,10,0.82)",
+              border: `1px solid ${rail}70`,
+              boxShadow: `0 0 18px ${glow}25`,
+            }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: 999,
+                background: rail,
+                boxShadow: `0 0 10px ${rail}`,
+              }} />
+              <span style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 7,
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                color: "#f8f5ff",
+              }}>
+                SELECTED
+              </span>
+            </div>
           )}
 
           {/* Type badge — bottom left */}

@@ -1,6 +1,7 @@
 // tripo/Texture.jsx
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
+import Enhancer from "../Enhancer";
 import {
   Image, Cpu, Pencil, HelpCircle, Check, Loader2,
   PersonStanding, Upload, X, RotateCcw,
@@ -175,6 +176,37 @@ const TEX_INPUT_TABS = [
   { id: "text", icon: Pencil, label: "Text", tip: "Generate texture from a text prompt" },
 ];
 
+const TRIPO_TEXTURE_ENHANCE_PROMPT = `You are a Tripo3D texture prompt engineer.
+Improve the user's text-to-texture instruction.
+
+Output raw JSON only:
+{"prompt":"..."}
+
+Rules:
+- Focus only on texture and material behavior, not mesh shape.
+- Include material type, surface finish, micro details, and color palette.
+- Use practical terms for albedo/roughness/metalness feel.
+- Keep it concise and production-ready.
+- English only. Max 700 characters.`;
+
+const TRIPO_TEXTURE_SUPER_ENHANCE_PROMPT = `You are an elite Tripo3D texture prompt engineer.
+Expand the user's texture instruction into a rich, art-directable texture brief.
+
+Output raw JSON only:
+{"prompt":"..."}
+
+Rules:
+- Preserve original intent.
+- Add material hierarchy, wear patterns, variation scale, and finish details.
+- Do not describe geometry or silhouette changes.
+- English only. Max 800 characters.`;
+
+const TRIPO_TEXTURE_SIMPLIFY_PROMPT = `You are a texture prompt editor.
+Simplify the user's texture instruction to a short, clear texture generation prompt.
+Return raw JSON only:
+{"prompt":"..."}
+English only. Max 220 characters.`;
+
 /* ─── SelectedModelBadge ─────────────────────────────────────────────────── */
 export function SelectedModelBadge({ activeTaskId }) {
   if (!activeTaskId) return null;
@@ -211,6 +243,7 @@ export function TexInputBox({
   texPrompt, setTexPrompt,
   imgPrev, imgToken, imgUploading, handleImg, fileRef,
   multiImages, setMultiImages,
+  getIdToken,
 }) {
   const VIEW_SLOTS = ["Front", "Left", "Right", "Back"];
 
@@ -371,18 +404,18 @@ export function TexInputBox({
 
       {/* Text tab */}
       {tab === "text" && (
-        <div style={{ padding: "10px 10px 6px" }}>
-          <textarea
-            className="tp-ta"
+        <div style={{ padding: "10px 10px 8px" }}>
+          <Enhancer
             value={texPrompt}
-            onChange={e => setTexPrompt(e.target.value.slice(0, 1000))}
-            placeholder="Describe the texture style you want to generate…"
-            rows={7}
-            style={{ minHeight: 150, background: "transparent", border: "none", resize: "none", width: "100%", padding: "2px 4px" }}
+            onChange={val => setTexPrompt(val.slice(0, 1000))}
+            onSubmit={() => {}}
+            color="#8b5cf6"
+            getIdToken={getIdToken}
+            enhancing_prompt={TRIPO_TEXTURE_ENHANCE_PROMPT}
+            super_enhancing_prompt={TRIPO_TEXTURE_SUPER_ENHANCE_PROMPT}
+            dechanting_prompt={TRIPO_TEXTURE_SIMPLIFY_PROMPT}
+            onBusyChange={() => {}}
           />
-          <div style={{ display: "flex", justifyContent: "flex-end", paddingBottom: 4 }}>
-            <span style={{ color: T.textDim, fontSize: 10, fontFamily: "monospace", fontWeight: 600 }}>{texPrompt.length}/1000</span>
-          </div>
         </div>
       )}
     </div>
@@ -902,6 +935,7 @@ export default function Texture({
   brushHardness, setBrushHardness,
   canvasRef,
   onUndo,
+  getIdToken,
 }) {
   return (
     <>
@@ -916,6 +950,7 @@ export default function Texture({
             imgPrev={imgPrev} imgToken={imgToken}
             imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef}
             multiImages={multiImages} setMultiImages={setMultiImages}
+            getIdToken={getIdToken}
           />
 
           {/* 4K Texture */}

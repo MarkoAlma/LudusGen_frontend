@@ -29,7 +29,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
  *   animAnimateInPlace: boolean,
  *   history: Array,
  *   prompt: string,
- *   syncSelHist: Function,
+ *   setViewerHistId: Function,
  *   addJob: Function,
  *   updateJob: Function,
  *   markJobDoneAndSeen: Function,
@@ -73,7 +73,7 @@ export function useTripoRig({
   animAnimateInPlace,
   history,
   prompt,
-  syncSelHist,
+  setViewerHistId,
   addJob,
   updateJob,
   markJobDoneAndSeen,
@@ -218,7 +218,7 @@ export function useTripoRig({
         };
         setOptimisticItems(prev => [rigOptEntry, ...prev.filter(o => o.id !== mockStableId)]);
         setHistory(h => h.some(x => x.id === mockStableId) ? h : [rigOptEntry, ...h]);
-        syncSelHist(rigOptEntry);
+        setViewerHistId(mockStableId);
 
         currentTaskId.current = null;
         markJobDoneAndSeen(jobId, { title: "Auto Rig", progress: 100 });
@@ -227,6 +227,7 @@ export function useTripoRig({
         const rigBasePrompt = srcItemForRig?.prompt?.trim() || srcItemForRig?.name?.trim() || prompt.trim();
         const aiRigName = await generateAIName(rigBasePrompt, "rig");
         const _ni4 = await saveRigHist(rd.taskId, d.modelUrl, { prompt: "auto-rig", originalModelTaskId: srcId, aiName: aiRigName ?? undefined, rigModelVer: animModelVer, rigType: actualRigType, rigSpec });
+        if (_ni4) setViewerHistId(_ni4.id);
         markHistorySaved();
         if (_ni4) getIdToken().then(tok => fetch(`${BASE_URL}/api/tripo/task/${rd.taskId}/ack`, { method: "POST", headers: { Authorization: `Bearer ${tok}` } }).catch(() => { }));
       }, { skipJumpCheck: true, onProgress: dp => updateJob(jobId, { status: "running", progress: dp }) });
@@ -235,7 +236,7 @@ export function useTripoRig({
       if (pt.cancelled) { markJobError(jobId, "Cancelled"); return; }
       setRigStep("idle"); setRiggedId(null); setShowRig(false); setErrorMsg(e.message); setStatusMsg(""); markJobError(jobId, e.message);
     }
-  }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl, saveRigHist, generateAIName, getIdToken, rigSpec, animOutFormat, rigType, animModelVer, animBakeAnimation, animExportGeometry, animAnimateInPlace, syncSelHist, addJob, updateJob, markJobDoneAndSeen, markJobError, getCompatibility, history, prompt, pollAb, prevUrl, currentTaskId, userStoppedRef, setRigBtnLocked, setErrorMsg, setRigCompat, setRigStep, setDetectedRigModelVer, setDetectedRigType, setDetectedRigSpec, setStatusMsg, setModelUrl, setRiggedId, setShowRig, setGenStatus, setOptimisticItems, setHistory]);
+  }, [activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl, saveRigHist, generateAIName, getIdToken, rigSpec, animOutFormat, rigType, animModelVer, animBakeAnimation, animExportGeometry, animAnimateInPlace, setViewerHistId, addJob, updateJob, markJobDoneAndSeen, markJobError, getCompatibility, history, prompt, pollAb, prevUrl, currentTaskId, userStoppedRef, setRigBtnLocked, setErrorMsg, setRigCompat, setRigStep, setDetectedRigModelVer, setDetectedRigType, setDetectedRigSpec, setStatusMsg, setModelUrl, setRiggedId, setShowRig, setGenStatus, setOptimisticItems, setHistory]);
 
   return { rigCompatRef, getCompatibility, handleAutoRig };
 }

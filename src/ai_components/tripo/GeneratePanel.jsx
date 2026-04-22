@@ -1,5 +1,5 @@
 // trellis/GeneratePanel.jsx
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, memo } from "react";
 import {
   Image, Boxes, Grid3x3, Pencil, HelpCircle, Upload, Check, X, Plus,
   Loader2, Globe, Lock, ChevronDown, ChevronUp, PersonStanding, Zap, Images, Lightbulb,
@@ -490,7 +490,7 @@ The user gives you a long or complex prompt. Simplify it to a clear, concise Eng
 Respond ONLY with plain text, no JSON, no explanation.`;
 
 /* ─── GeneratePanel ───────────────────────────────────────────────────── */
-export default function GeneratePanel({
+const GeneratePanel = memo(({
   genTab, setGenTab,
   prompt, setPrompt,
   makeBetter, setMakeBetter,
@@ -522,7 +522,7 @@ export default function GeneratePanel({
   exportUv, setExportUv,
   activeStyles = [],
   onStyleToggle = () => { },
-}) {
+}) => {
   const MV_SLOTS = [
     { label: "Front", icon: <User style={{ width: 14, height: 14 }} /> },
     { label: "Left", icon: <ChevronLeft style={{ width: 14, height: 14 }} /> },
@@ -1136,4 +1136,6 @@ export default function GeneratePanel({
 
     </>
   );
-}
+});
+
+export default GeneratePanel;
