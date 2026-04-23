@@ -653,6 +653,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       || activeH
       || null;
   }, [findHistoryItemByTaskKey, textureEditTaskId, activeH]);
+  const textureEditHasTexture = itemHasTexture(textureEditItem);
   const textureEditDisplayName = useMemo(() => resolveHistoryDisplayName(textureEditItem), [textureEditItem, resolveHistoryDisplayName]);
 
   useEffect(() => {
@@ -683,6 +684,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [texNeg, setTexNeg] = useState("");
   const [texPbr, setTexPbr] = useState(false);
   const [texAlignment, setTexAlignment] = useState("original_image");
+
+  useEffect(() => {
+    if (mode === "texture" && texSub === "paint" && !textureEditHasTexture) {
+      setTexSub("generate");
+    }
+  }, [mode, texSub, textureEditHasTexture]);
 
   // texture_edit — Magic Brush (viewport inpainting)
   const [brushMode, setBrushMode] = useState("Gen Mode");
@@ -798,7 +805,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       case "retopo": return !!(retopoId.trim() || activeTaskId);
       case "texture":
         if (texSub === "paint") {
-          return !!(editId.trim() || activeTaskId) &&
+          return textureEditHasTexture &&
+            !!(editId.trim() || activeTaskId) &&
             (brushMode === "Paint Mode" || !!brushPrompt.trim());
         }
         {
@@ -829,7 +837,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, [mode, genTab, prompt, batchImages, segId, fillId, retopoId, isFillPartsCompatible,
     texId, texSub, texInputTab, texPrompt, imgToken, multiImages, editId, brushMode, brushPrompt,
-    refineId, stylizeId, riggedId, selAnim, activeTaskId, activeH, texPbr, textureSourceHasTexture, refineBlockedBySelectedSource, focusedInstanceId, _taskTick, submitLocked]);
+    refineId, stylizeId, riggedId, selAnim, activeTaskId, activeH, texPbr, textureSourceHasTexture, textureEditHasTexture, refineBlockedBySelectedSource, focusedInstanceId, _taskTick, submitLocked]);
 
 
 
@@ -1609,6 +1617,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 ? !!imgToken
                 : multiImages.length > 0;
           if (texSub === "paint") {
+            if (!textureEditHasTexture) {
+              throw new Error("Paint csak mar texturazott modellen hasznalhato.");
+            }
             body = {
               type: "texture_model",
               original_model_task_id: (editId.trim() || srcId),
@@ -1848,7 +1859,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       submitLockedRef.current = false;
       setSubmitLocked(false);
     }
-  }, [canGen, mode, texSub, refineBlockedBySelectedSource, refineDisableReason, refineSourceTaskId, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError, textureSourceHasTexture, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH]);
+  }, [canGen, mode, texSub, refineBlockedBySelectedSource, refineDisableReason, refineSourceTaskId, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError, textureSourceHasTexture, textureEditHasTexture, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH]);
 
   const { rigCompatRef, getCompatibility, handleAutoRig } = useTripoRig({
     activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl,
@@ -2310,7 +2321,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               {mode === "texture" && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 10 }}>
                   {TEXTURE_SUBS.map(s => {
-                    const isDisabled = s.id === "paint" && !hasTexture;
+                    const isDisabled = s.id === "paint" && !textureEditHasTexture;
                     return (
                       <button
                         key={s.id}
@@ -2761,7 +2772,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         activeClipIdx={activeClipIdx}
         onSwitchClip={handleSwitchClip}
         // 3D Paint
-        paintMode={mode === "texture" && texSub === "paint" && brushMode === "Paint Mode"}
+        paintMode={mode === "texture" && texSub === "paint" && textureEditHasTexture && brushMode === "Paint Mode"}
         paintColor={brushColor}
         paintSize={brushSize}
         paintOpacity={brushOpacity}
