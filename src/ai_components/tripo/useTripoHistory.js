@@ -47,6 +47,14 @@ export function useTripoHistory({
     const effectiveMode = extra.mode ?? mode;
     const effectiveModelVer = extra.modelVer ?? modelVer;
     const cleanExtra = omitUndefined(extra);
+    const topLevelType = cleanExtra.type ?? null;
+    const marksTexturedOutput =
+      cleanExtra.texture === true ||
+      cleanExtra.texture === "true" ||
+      cleanExtra.pbr === true ||
+      cleanExtra.pbr === "true" ||
+      cleanExtra.type === "texture_model";
+    const marksPbrOutput = cleanExtra.pbr === true || cleanExtra.pbr === "true";
     const autoName = cap2(effectivePrompt.trim());
     const resolvedName = cap2(extra.name) || autoName || null;
     const item = {
@@ -57,11 +65,22 @@ export function useTripoHistory({
       source: "tripo",
       mode: effectiveMode,
       taskId,
+      ...(topLevelType && { type: topLevelType }),
+      ...(marksTexturedOutput && { texture: true }),
+      ...(marksPbrOutput && { pbr: true }),
       styleId: activeStyle || null,
       negPrompt: (extra.negPrompt ?? negPrompt) || null,
       params: omitUndefined({ model_version: effectiveModelVer, mode: effectiveMode, ...cleanExtra }),
       ts: Date.now(),
     };
+    console.log("[useTripoHistory][saveHist]", {
+      taskId,
+      mode: effectiveMode,
+      type: item.params?.type ?? null,
+      originalModelTaskId: item.params?.originalModelTaskId ?? null,
+      texture: item.params?.texture ?? null,
+      pbr: item.params?.pbr ?? null,
+    });
     const stableDocId = extra.animationIndex != null
       ? `tripo_${taskId}_${extra.animationIndex}`
       : `tripo_${taskId}`;

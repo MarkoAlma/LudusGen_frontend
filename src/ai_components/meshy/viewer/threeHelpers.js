@@ -775,7 +775,7 @@ export function applySegmentHighlight(s, show, edgeColor = 0x00ff88, options = {
       color: wireColor,
       linewidth: 1,
       transparent: true,
-      opacity: 0.8, // Increased because EdgesGeometry is much sparser than Wireframe
+      opacity: 0.35, // Reduced for a more subtle, paler look
       depthTest: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
