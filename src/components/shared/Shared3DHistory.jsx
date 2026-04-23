@@ -263,8 +263,8 @@ export default function Shared3DHistory({
   }), [mergedHistory, histQ, activeTab, subTab]);
 
   const getDisplayName = useCallback((item) => {
-    const origPrompt = mergedHistory.find(h => h.taskId === item.params?.originalModelTaskId)?.prompt;
-    const base = origPrompt ?? item.prompt ?? "Model";
+    const originalItem = mergedHistory.find(h => h.taskId === item.params?.originalModelTaskId || h.id === item.params?.originalModelTaskId);
+    const base = originalItem?.name || originalItem?.prompt || item.name || item.prompt || "Model";
     if (item.params?.animated) { const slug = item.params?.animation ?? ""; const l = slug.split(":").pop() || slug; return l ? `${base}_${l}` : base; }
     if (item.params?.rigged) return `${base}_rigged`;
     return base;

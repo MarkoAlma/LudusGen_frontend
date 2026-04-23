@@ -134,22 +134,29 @@ function StyledSlider({ min, max, step, value, onChange, color = T.purple }) {
   );
 }
 
-function GlassSwitch({ on, onChange }) {
+function GlassSwitch({ on, onChange, disabled = false }) {
   return (
     <motion.div
-      onClick={onChange}
+      onClick={e => {
+        e.stopPropagation();
+        if (disabled) return;
+        onChange?.();
+      }}
       whileTap={{ scale: 0.95 }}
       style={{
         width: 38,
         height: 22,
         borderRadius: 11,
-        background: on ? T.purple : "rgba(255,255,255,0.1)",
-        border: `1px solid ${on ? "rgba(139,92,246,0.5)" : T.glassBorder}`,
-        cursor: "pointer",
+        background: disabled
+          ? "rgba(255,255,255,0.05)"
+          : on ? T.purple : "rgba(255,255,255,0.1)",
+        border: `1px solid ${disabled ? "rgba(255,255,255,0.08)" : on ? "rgba(139,92,246,0.5)" : T.glassBorder}`,
+        cursor: disabled ? "not-allowed" : "pointer",
         position: "relative",
         flexShrink: 0,
-        transition: "background 0.2s, border-color 0.2s",
-        boxShadow: on ? `0 0 10px rgba(139,92,246,0.3)` : "none",
+        transition: "background 0.2s, border-color 0.2s, opacity 0.2s",
+        boxShadow: disabled ? "none" : on ? `0 0 10px rgba(139,92,246,0.3)` : "none",
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       <motion.div
@@ -208,8 +215,16 @@ Return raw JSON only:
 English only. Max 220 characters.`;
 
 /* ─── SelectedModelBadge ─────────────────────────────────────────────────── */
-export function SelectedModelBadge({ activeTaskId }) {
-  if (!activeTaskId) return null;
+export function SelectedModelBadge({
+  title = "Selected Model",
+  name = "",
+  activeTaskId,
+  badgeLabel = null,
+  badgeColor = "rgba(139,92,246,0.22)",
+  badgeBg = "rgba(139,92,246,0.12)",
+  hint = "",
+}) {
+  if (!activeTaskId && !name && !hint) return null;
   return (
     <div style={{
       padding: "10px 14px",
@@ -219,9 +234,38 @@ export function SelectedModelBadge({ activeTaskId }) {
       marginBottom: 14,
       boxShadow: "0 0 16px rgba(139,92,246,0.08), inset 0 1px 0 rgba(255,255,255,0.04)",
     }}>
-      <p style={{ color: "#b5a8ff", fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 3px" }}>
-        Selected Model
-      </p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 }}>
+        <p style={{ color: "#b5a8ff", fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.12em", margin: 0 }}>
+          {title}
+        </p>
+        {badgeLabel && (
+          <span style={{
+            color: "#f5f3ff",
+            fontSize: 8,
+            fontWeight: 900,
+            textTransform: "uppercase",
+            letterSpacing: "0.12em",
+            borderRadius: 999,
+            padding: "3px 7px",
+            background: badgeBg,
+            border: `1px solid ${badgeColor}`,
+            whiteSpace: "nowrap",
+          }}>
+            {badgeLabel}
+          </span>
+        )}
+      </div>
+      {!!name && (
+        <p style={{
+          color: T.textPrimary,
+          fontSize: 12,
+          fontWeight: 800,
+          margin: "0 0 4px",
+          lineHeight: 1.35,
+        }}>
+          {name}
+        </p>
+      )}
       <p style={{
         color: T.textMuted,
         fontSize: 10,
@@ -233,6 +277,17 @@ export function SelectedModelBadge({ activeTaskId }) {
       }}>
         {activeTaskId}
       </p>
+      {!!hint && (
+        <p style={{
+          color: T.textDim,
+          fontSize: 10,
+          fontWeight: 700,
+          margin: "6px 0 0",
+          lineHeight: 1.55,
+        }}>
+          {hint}
+        </p>
+      )}
     </div>
   );
 }
@@ -256,6 +311,18 @@ export function TexInputBox({
       marginBottom: 14,
       backdropFilter: "blur(16px)",
     }}>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/avif"
+        onChange={e => {
+          const f = e.target.files?.[0];
+          if (f) handleImg(f);
+          e.target.value = "";
+        }}
+        style={{ display: "none" }}
+      />
+
       {/* Tab bar */}
       <div style={{
         display: "flex",
@@ -337,6 +404,7 @@ export function TexInputBox({
                 <Upload style={{ width: 18, height: 18, color: "#a78bfa" }} />
               </div>
               <p style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700, margin: "0 0 4px" }}>Upload reference image</p>
+              <p style={{ color: T.textDim, fontSize: 10, fontWeight: 600, margin: "2px 0 0" }}>AVIF supported too</p>
               <p style={{ color: T.textDim, fontSize: 10, fontWeight: 600, margin: 0 }}>JPG · PNG · WEBP &nbsp;≤ 20 MB</p>
             </div>
           )}
@@ -354,7 +422,7 @@ export function TexInputBox({
                 whileTap={{ scale: 0.97 }}
                 onClick={() => {
                   const inp = document.createElement("input");
-                  inp.type = "file"; inp.accept = "image/*";
+                  inp.type = "file"; inp.accept = "image/jpeg,image/png,image/webp,image/avif";
                   inp.onchange = e => {
                     const f = e.target.files[0];
                     if (f) {
@@ -919,12 +987,19 @@ export function MagicBrushPanel({
 export default function Texture({
   mode,
   activeTaskId,
+  activeModelName = "",
+  textureTargetTaskId = "",
+  textureTargetName = "",
+  pbrTargetTaskId = "",
+  pbrTargetName = "",
+  pbrTargetResolved = false,
   texInputTab, setTexInputTab,
   texPrompt, setTexPrompt,
   imgPrev, imgToken, imgUploading, handleImg, fileRef,
   multiImages, setMultiImages,
   tex4K, setTex4K,
   pbrOn, setPbrOn,
+  pbrAvailable = true,
   texAlignment, setTexAlignment,
   brushMode, setBrushMode,
   brushPrompt, setBrushPrompt,
@@ -942,8 +1017,34 @@ export default function Texture({
       {/* ── TEXTURE MODE ── */}
       {mode === "texture" && (
         <>
-          <SelectedModelBadge activeTaskId={activeTaskId} />
-
+          <SelectedModelBadge
+            title="Texture Target"
+            name={textureTargetName || activeModelName}
+            activeTaskId={textureTargetTaskId || activeTaskId}
+            badgeLabel={pbrAvailable ? "Textured model" : "Draft mesh"}
+            badgeColor={pbrAvailable ? "rgba(0,229,255,0.28)" : "rgba(139,92,246,0.20)"}
+            badgeBg={pbrAvailable ? "rgba(0,229,255,0.12)" : "rgba(139,92,246,0.10)"}
+            hint={
+              pbrAvailable
+                ? "Ez a kijelolt asset mar texturazott modell, ezert uj texture pass vagy PBR is indithato ra."
+                : "Adj meg kepet vagy promptot, es ezen a modellen fog lefutni az elso texture generalas."
+            }
+          />
+          <SelectedModelBadge
+            title="PBR Target"
+            name={pbrTargetName || textureTargetName || activeModelName}
+            activeTaskId={pbrTargetTaskId || textureTargetTaskId || activeTaskId}
+            badgeLabel={pbrAvailable ? "PBR ready" : "PBR with texture"}
+            badgeColor={pbrAvailable ? "rgba(0,229,255,0.28)" : "rgba(139,92,246,0.24)"}
+            badgeBg={pbrAvailable ? "rgba(0,229,255,0.12)" : "rgba(139,92,246,0.10)"}
+            hint={
+              pbrAvailable
+                ? (pbrTargetResolved
+                  ? "A PBR az upstream texturazott modellen fog futni, nem a nyers downstream exporton."
+                  : "Ez mar egy texturazott modell, ugyhogy a PBR kozvetlenul kapcsolhato.")
+                : "Kapcsold be a PBR-t a texture passhez; draft modellen is egyutt generalodik a material map keszlet."
+            }
+          />
           <TexInputBox
             tab={texInputTab} setTab={setTexInputTab}
             texPrompt={texPrompt} setTexPrompt={setTexPrompt}
@@ -999,6 +1100,7 @@ export default function Texture({
               cursor: "pointer",
               marginBottom: 8,
               transition: "all 0.18s",
+              opacity: 1,
             }}
             onClick={() => setPbrOn(v => !v)}
           >
@@ -1013,7 +1115,7 @@ export default function Texture({
           </motion.div>
           {pbrOn && (
             <p style={{ color: T.textDim, fontSize: 10, fontWeight: 600, margin: "-2px 0 10px 2px", lineHeight: 1.6 }}>
-              Generates albedo, normal, roughness &amp; metallic maps. Overrides standard texture output.
+              Generates albedo, normal, roughness &amp; metallic maps with this texture pass. Textured models can also run a PBR-only pass.
             </p>
           )}
 
@@ -1063,7 +1165,11 @@ export default function Texture({
       {/* ── MAGIC BRUSH MODE ── */}
       {mode === "texture_edit" && (
         <>
-          <SelectedModelBadge activeTaskId={activeTaskId} />
+          <SelectedModelBadge
+            title="Selected Model"
+            name={activeModelName}
+            activeTaskId={activeTaskId}
+          />
           <MagicBrushPanel
             brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt}
             creativity={creativity} setCreativity={setCreativity}

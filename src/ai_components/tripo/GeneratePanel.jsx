@@ -384,7 +384,13 @@ function ModelDropdown({ modelVer, setModelVer }) {
  * prompt at submission time. Only ONE style can be active at a time.
  * ─────────────────────────────────────────────────────────────────────── */
 export const STYLE_PREFIX = [
-  { id: "photo", label: "Photo", icon: "📷", prefix: "photorealistic, high detail photography, professional 3D render, cinematic lighting, 8k resolution, ultra-detailed textures, realistic materials, " },
+  {
+    id: "photo",
+    label: "Photo",
+    icon: "📷",
+    prefix: "photorealistic, high detail photography, professional 3D render, cinematic lighting, 8k resolution, ultra-detailed textures, realistic materials, ",
+    draftPrefix: "photorealistic, high detail shape study, realistic proportions, clean silhouette, high-fidelity geometry, fine surface detail, ",
+  },
   { id: "voxel", label: "Voxel", icon: "🧊", prefix: "precise voxel art style, cubic voxel grid construction, blocky 3D modular design, clean voxel geometry, isometric voxel aesthetic, " },
   { id: "pixel", label: "Pixel", icon: "👾", prefix: "retro 32-bit pixel art style, conversion of 2D sprite to 3D volume, stylized jagged edges, vibrant limited palette, nostalgic game aesthetic, " },
   { id: "clay", label: "Clay", icon: "🏺", prefix: "claymation style, authentic clay surface with fingerprints, hand-sculpted plasticine texture, soft rounded organic forms, stop-motion aesthetic, " },
@@ -746,7 +752,7 @@ const GeneratePanel = memo(({
                   <div key={slot.label} className={"mv-cell checker" + (prev ? " has-img" : "")}
                     onClick={() => {
                       const inp = document.createElement("input");
-                      inp.type = "file"; inp.accept = "image/*";
+                      inp.type = "file"; inp.accept = "image/jpeg,image/png,image/webp,image/avif";
                       inp.onchange = e => {
                         const f = e.target.files[0];
                         if (f) {
@@ -858,6 +864,7 @@ const GeneratePanel = memo(({
                   <Upload style={{ width: 20, height: 20, color: "#6c63ff" }} />
                 </div>
                 <p style={{ color: "#e2e2f0", fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>Upload Image(s)</p>
+                <p style={{ color: "#4a4a68", fontSize: 11, margin: "2px 0 0" }}>AVIF supported too</p>
                 <p style={{ color: "#4a4a68", fontSize: 11, margin: 0 }}>JPG, PNG, WEBP · Up to 10 images</p>
               </div>
             )}
@@ -872,7 +879,7 @@ const GeneratePanel = memo(({
               </button>
             </div>
           )}
-          <input ref={batchInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple style={{ display: "none" }}
+          <input ref={batchInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple style={{ display: "none" }}
             onChange={e => { if (e.target.files) handleBatchFiles(e.target.files); }} />
         </div>
       )}
