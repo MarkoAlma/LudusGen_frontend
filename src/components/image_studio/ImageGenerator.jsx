@@ -470,12 +470,14 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
   useEffect(() => {
     const wasVisible = prevNarrowL2VisibleRef.current;
 
-    if (!wasVisible && isNarrowL2Visible && view === 'gallery') {
+    // Mobile keeps the legacy reset-to-generator behavior when reopening L2,
+    // but tablet should preserve the current gallery view.
+    if (isMobile && !wasVisible && isNarrowL2Visible && view === 'gallery') {
       setView('gen');
     }
 
     prevNarrowL2VisibleRef.current = isNarrowL2Visible;
-  }, [isNarrowL2Visible, view]);
+  }, [isMobile, isNarrowL2Visible, view]);
 
 
   // Master Sidebar Sync: If the user selects a new model from the master sidebar, 

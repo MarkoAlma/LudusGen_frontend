@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Play, Pause, Download, Mic, Music, Layout, 
-  Sparkles, History, Activity, Share2, Trash2, X
+  Sparkles, History, Activity, Share2, Trash2, X, AlertCircle
 } from 'lucide-react';
 
 const MiniWaveform = ({ color, isPlaying }) => (
@@ -29,10 +29,51 @@ const MiniWaveform = ({ color, isPlaying }) => (
   </div>
 );
 
+const MIME_TO_EXTENSION = {
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/wave": "wav",
+  "audio/pcm": "pcm",
+};
+
+const formatSampleRate = (sampleRate) => {
+  if (!sampleRate) return null;
+  if (sampleRate >= 1000) {
+    const kiloHertz = sampleRate / 1000;
+    return `${Number.isInteger(kiloHertz) ? kiloHertz : kiloHertz.toFixed(1)} kHz`;
+  }
+  return `${sampleRate} Hz`;
+};
+
+const formatBitrate = (bitrate) => {
+  if (!bitrate) return null;
+  return `${Math.round(bitrate / 1000)} kbps`;
+};
+
+const guessExtensionFromUrl = (audioUrl) => {
+  if (!audioUrl) return "mp3";
+  if (audioUrl.startsWith("data:")) {
+    const mime = audioUrl.slice(5, audioUrl.indexOf(";"));
+    return MIME_TO_EXTENSION[mime] || "mp3";
+  }
+
+  try {
+    const url = new URL(audioUrl);
+    const match = url.pathname.match(/\.([a-z0-9]+)$/i);
+    if (match?.[1]) return match[1].toLowerCase();
+  } catch {}
+
+  return "mp3";
+};
+
 export default function AudioWorkspace({ 
   view, 
   isGenerating, 
   audioUrl, 
+  audioInfo,
+  error,
   isPlaying, 
   togglePlay, 
   color, 
@@ -41,13 +82,20 @@ export default function AudioWorkspace({
 }) {
   const handleDownload = () => {
     if (!audioUrl) return;
+    const extension = audioInfo?.fileFormat || guessExtensionFromUrl(audioUrl);
     const link = document.createElement('a');
     link.href = audioUrl;
-    link.download = `neural_audio_${Date.now()}.mp3`;
+    link.download = `neural_audio_${Date.now()}.${extension}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
+
+  const playbackDetails = [
+    audioInfo?.fileFormat ? audioInfo.fileFormat.toUpperCase() : null,
+    formatSampleRate(audioInfo?.sampleRate),
+    formatBitrate(audioInfo?.bitrate),
+  ].filter(Boolean).join(" • ");
 
   return (
     <div className="h-full w-full relative z-10 flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
@@ -96,6 +144,24 @@ export default function AudioWorkspace({
                   </button>
                 ))}
               </div>
+            </div>
+          </motion.div>
+        ) : error ? (
+          <motion.div
+            key="audio-error"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative z-10 flex flex-1 flex-col items-center justify-center gap-6 text-center"
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-[1.5rem] border border-red-500/20 bg-red-500/5 text-red-500 shadow-2xl">
+              <AlertCircle className="h-8 w-8" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black uppercase tracking-tight text-white italic">Protokoll hiba</h3>
+              <p className="max-w-md text-[11px] font-bold uppercase tracking-widest leading-relaxed text-zinc-600">
+                {error}
+              </p>
             </div>
           </motion.div>
         ) : (
@@ -169,10 +235,12 @@ export default function AudioWorkspace({
                 <div className="px-4 py-3 sm:px-6 sm:py-4 md:px-10 md:py-5 bg-white/[0.02] border-t border-white/5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]" />
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">Stabil jel</span>
+                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">
+                      {audioInfo?.stream ? 'Streamelt jel' : 'Stabil jel'}
+                    </span>
                   </div>
                   <div className="text-[8px] sm:text-[9px] font-bold text-zinc-700 uppercase tracking-[0.18em] sm:tracking-widest sm:text-right">
-                    Veszteségmentes tömörítés 48kHz
+                    {playbackDetails || 'AI audio kimenet'}
                   </div>
                 </div>
               </motion.div>

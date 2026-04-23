@@ -1,7 +1,7 @@
 import React, { useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wand2, ChevronDown, Zap, Sparkles, Home, ImageIcon, Pencil, User } from 'lucide-react';
+import { Wand2, ChevronDown, Zap, Sparkles, Home, ImageIcon, Pencil, User, Mic, Music } from 'lucide-react';
 import { MODEL_GROUPS, ALL_MODELS, getModel, findModelGroup } from '../../ai_components/models';
 import bgChat from '../../assets/bg-chat.png';
 import bgCode from '../../assets/bg-code.png';
@@ -18,6 +18,14 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 const IMAGE_GEN_MODELS = ALL_MODELS.filter(m => m.panelType === 'image' && !m.needsInputImage);
 // Kép szerkesztő modellek (needsInputImage: true)
 const IMAGE_EDIT_MODELS = ALL_MODELS.filter(m => m.panelType === 'image' && m.needsInputImage);
+const AUDIO_SPEECH_MODELS = ALL_MODELS
+  .filter(m => m.panelType === 'audio' && m.audioType === 'tts')
+  .sort((a, b) => {
+    if (a.id === 'nvidia_magpie_tts') return -1;
+    if (b.id === 'nvidia_magpie_tts') return 1;
+    return 0;
+  });
+const AUDIO_MUSIC_MODELS = ALL_MODELS.filter(m => m.panelType === 'audio' && m.audioType === 'music');
 
 const CATEGORY_BGS = {
   chat: bgChat,
@@ -300,7 +308,78 @@ export default function AiStudioSidebar({
                   className="overflow-hidden"
                 >
                   {/* Kép group: csak 2 gomb */}
-                  {group.id === 'image' ? (
+                  {group.id === 'audio' ? (
+                    <div className="pt-3 pb-1 space-y-1.5">
+                      {[
+                        {
+                          label: 'Beszéd',
+                          icon: <Mic className="w-4 h-4" />,
+                          models: AUDIO_SPEECH_MODELS,
+                          getRestoredId: () => {
+                            const specific = sessionStorage.getItem('ludusgen_last_model:audio_speech');
+                            if (specific && AUDIO_SPEECH_MODELS.some(m => m.id === specific)) return specific;
+                            const generic = sessionStorage.getItem('ludusgen_last_model:audio');
+                            if (generic && AUDIO_SPEECH_MODELS.some(m => m.id === generic)) return generic;
+                            return AUDIO_SPEECH_MODELS[0]?.id;
+                          }
+                        },
+                        {
+                          label: 'Zene',
+                          icon: <Music className="w-4 h-4" />,
+                          models: AUDIO_MUSIC_MODELS,
+                          getRestoredId: () => {
+                            const specific = sessionStorage.getItem('ludusgen_last_model:audio_music');
+                            if (specific && AUDIO_MUSIC_MODELS.some(m => m.id === specific)) return specific;
+                            const generic = sessionStorage.getItem('ludusgen_last_model:audio');
+                            if (generic && AUDIO_MUSIC_MODELS.some(m => m.id === generic)) return generic;
+                            return AUDIO_MUSIC_MODELS[0]?.id;
+                          }
+                        },
+                      ].map((item) => {
+                        const isActive = item.models.some(m => m.id === selectedAI);
+                        const activeModel = isActive ? getModel(selectedAI) : null;
+                        const color = activeModel?.color || '#10b981';
+                        return (
+                          <button
+                            key={item.label}
+                            onClick={() => {
+                              const targetId = item.getRestoredId();
+                              if (targetId) handleSelectModel(targetId);
+                            }}
+                            className={`w-full relative rounded-2xl border overflow-hidden transition-all duration-300 group/item ${isActive
+                              ? 'border-white/10'
+                              : 'border-transparent hover:border-white/5 hover:bg-white/[0.02]'
+                              }`}
+                            style={isActive ? { background: 'rgba(255,255,255,0.06)' } : {}}
+                          >
+                            {isActive && (
+                              <div
+                                className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full"
+                                style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}60` }}
+                              />
+                            )}
+                            <div className="flex items-center gap-3 pl-5 pr-4 py-3">
+                              <span
+                                className="flex-shrink-0"
+                                style={{ color: isActive ? color : '#52525b' }}
+                              >
+                                {item.icon}
+                              </span>
+                              <span
+                                className={`text-[12px] font-black uppercase tracking-tight transition-colors ${isActive ? 'text-white italic' : 'text-zinc-500 group-hover/item:text-zinc-300'
+                                  }`}
+                              >
+                                {item.label}
+                              </span>
+                              <span className="ml-auto text-[8px] font-bold text-zinc-700 uppercase tracking-widest">
+                                {item.models.length} modell
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : group.id === 'image' ? (
                     <div className="pt-3 pb-1 space-y-1.5">
                       {[
                         {

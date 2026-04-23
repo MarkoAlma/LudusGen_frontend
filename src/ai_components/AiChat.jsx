@@ -124,6 +124,11 @@ export default function AIChat({ user, getIdToken }) {
         const subKey = selectedModel.needsInputImage ? "image_edit" : "image_gen";
         sessionStorage.setItem(`ludusgen_last_model:${subKey}`, selectedAI);
       }
+
+      if (tab === "audio" && selectedModel.audioType) {
+        const subKey = selectedModel.audioType === "tts" ? "audio_speech" : "audio_music";
+        sessionStorage.setItem(`ludusgen_last_model:${subKey}`, selectedAI);
+      }
     }
   }, [selectedAI, selectedModel]);
 
@@ -136,6 +141,10 @@ export default function AIChat({ user, getIdToken }) {
     sessionStorage.setItem(`ludusgen_last_model:${tab}`, modelId);
     if (tab === "image" && newModel) {
       const subKey = newModel.needsInputImage ? "image_edit" : "image_gen";
+      sessionStorage.setItem(`ludusgen_last_model:${subKey}`, modelId);
+    }
+    if (tab === "audio" && newModel?.audioType) {
+      const subKey = newModel.audioType === "tts" ? "audio_speech" : "audio_music";
       sessionStorage.setItem(`ludusgen_last_model:${subKey}`, modelId);
     }
 
