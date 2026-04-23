@@ -345,12 +345,12 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
   }
 
   return (
-    <div className="flex-1 h-full overflow-y-auto scrollbar-hide px-8 pb-40 pt-10 relative z-10">
+    <div className="relative z-10 flex-1 h-full overflow-y-auto scrollbar-hide px-4 pb-40 pt-[calc(env(safe-area-inset-top,0px)+5rem)] sm:px-8 sm:pt-10">
       
       {/* Header Info */}
-      <div className="flex items-center justify-between mb-12 border-b border-white/5 pb-8">
+      <div className="mb-8 flex flex-col gap-4 border-b border-white/5 pb-6 sm:mb-12 sm:flex-row sm:items-center sm:justify-between sm:pb-8">
         <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
+            <div className="h-10 w-10 shrink-0 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
                 <Clock className="w-5 h-5" />
             </div>
             <div>
@@ -363,7 +363,7 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
             onClick={() => setConfirmModal({ isOpen: true, type: 'all', targetId: null })}
             disabled={deletingAll}
             title="Galéria ürítése"
-            className="w-10 h-10 rounded-xl bg-red-500/5 border border-red-500/10 flex items-center justify-center text-red-500/40 hover:text-red-400 transition-all hover:bg-red-500/10 disabled:opacity-50"
+            className="h-10 w-10 shrink-0 rounded-xl bg-red-500/5 border border-red-500/10 flex items-center justify-center self-end text-red-500/40 hover:text-red-400 transition-all hover:bg-red-500/10 disabled:opacity-50 sm:self-auto"
         >
             {deletingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
         </button>
@@ -396,7 +396,7 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
                         onUsePrompt(img.prompt);
                         toast.success('Prompt betöltve');
                     }}
-                    className="w-9 h-9 rounded-lg bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white/20"
+                    className="h-9 w-9 shrink-0 rounded-lg bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white/20"
                     title="Use Prompt"
                 >
                     <Copy className="w-4 h-4" />
@@ -404,7 +404,7 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
                 <button 
                     onClick={(e) => handleDeleteStart(e, img.id)}
                     disabled={deletingId === img.id}
-                    className="w-9 h-9 rounded-lg bg-red-500/20 backdrop-blur-md border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/40"
+                    className="h-9 w-9 shrink-0 rounded-lg bg-red-500/20 backdrop-blur-md border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/40"
                     title="Delete Image"
                 >
                     {deletingId === img.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash className="w-4 h-4" />}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
 import PageTransition from './components/layout/PageTransition';
 import Home from './pages/Home';
@@ -76,10 +76,15 @@ function App() {
             <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
             <Route path="/verify-email" element={<PageTransition><VerifyEmail /></PageTransition>} />
             <Route path="/forum/*" element={<PageTransition><Forum /></PageTransition>} />
-            <Route path="/settings" element={
+            <Route path="/profile" element={
               <PageTransition>
                 <ProtectedRoute><Settings /></ProtectedRoute>
               </PageTransition>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Navigate to="/profile" replace />
+              </ProtectedRoute>
             } />
           </Routes>
         </AnimatePresence>

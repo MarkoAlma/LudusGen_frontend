@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles, Menu, X, LogOut, Settings,
+  Sparkles, Menu, X, LogOut,
   ChevronDown, LayoutDashboard, MessageSquare,
   Image as ImageIcon, Music, Box, Users, Home,
   Zap, Plus, User as UserIcon
@@ -278,16 +278,10 @@ export default function Navbar() {
                           {/* MenÃ¼ gombok */}
                           <div className="p-2">
                             <button
-                              onClick={() => { setUserDropdownOpen(false); navigate("/settings"); }}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#9ca3af] hover:text-white hover:bg-white/[0.06] transition-all text-[13px] font-medium"
-                            >
-                              <Settings className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> Beállítások
-                            </button>
-                            <button
                               onClick={() => { setUserDropdownOpen(false); navigate("/profile"); }}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#9ca3af] hover:text-white hover:bg-white/[0.06] transition-all text-[13px] font-medium"
                             >
-                              <UserIcon className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> Profilom
+                              <UserIcon className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> Profil
                             </button>
                             <div className="my-1 mx-3 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
                             <button
@@ -485,16 +479,16 @@ export default function Navbar() {
                   {user && (
                     <motion.a
                       variants={itemVariants}
-                      onClick={() => { setMobileMenuOpen(false); navigate('/settings'); }}
+                      onClick={() => { setMobileMenuOpen(false); navigate('/profile'); }}
                       className="group relative overflow-hidden rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer shadow-2xl"
                     >
                       <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500 rounded-3xl blur-xl" />
                       <div className="relative z-10">
                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-                          <Settings className="w-6 h-6 text-white" />
+                          <UserIcon className="w-6 h-6 text-white" />
                         </div>
-                        <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-widest italic md:mb-1">System</h3>
-                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">Core_Settings</p>
+                        <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-widest italic md:mb-1">Profil</h3>
+                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">Account_Hub</p>
                       </div>
                     </motion.a>
                   )}

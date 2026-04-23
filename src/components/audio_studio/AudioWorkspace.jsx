@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 const MiniWaveform = ({ color, isPlaying }) => (
-  <div className="flex items-center justify-center gap-1.5 h-32 px-16 relative">
+  <div className="flex items-center justify-center gap-[2px] sm:gap-1 md:gap-1.5 h-20 sm:h-24 md:h-32 px-4 sm:px-8 md:px-16 relative overflow-hidden">
     {Array.from({ length: 40 }).map((_, i) => (
       <motion.div
         key={i}
@@ -20,7 +20,7 @@ const MiniWaveform = ({ color, isPlaying }) => (
           ease: "easeInOut",
           delay: i * 0.02
         }}
-        className="w-[3px] rounded-full shadow-lg"
+        className="w-[2px] sm:w-[2.5px] md:w-[3px] rounded-full shadow-lg"
         style={{
           backgroundColor: isPlaying ? color : 'rgba(255,255,255,0.05)',
         }}
@@ -50,7 +50,7 @@ export default function AudioWorkspace({
   };
 
   return (
-    <div className="h-full w-full relative z-10 flex flex-col items-center justify-center p-8 overflow-hidden">
+    <div className="h-full w-full relative z-10 flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
       <AnimatePresence mode="wait">
         {view === 'history' ? (
           <motion.div 
@@ -121,14 +121,14 @@ export default function AudioWorkspace({
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                className="w-full max-w-3xl aspect-[16/10] flex flex-col rounded-[2.5rem] bg-white/[0.01] backdrop-blur-2xl border border-white/5 shadow-2xl relative overflow-hidden"
+                className="w-full max-w-3xl min-h-[420px] sm:min-h-[460px] md:min-h-0 md:aspect-[16/10] flex flex-col rounded-[2rem] md:rounded-[2.5rem] bg-white/[0.01] backdrop-blur-2xl border border-white/5 shadow-2xl relative overflow-hidden"
               >
                 {/* Visual Flair */}
                 <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
 
-                <div className="flex-1 flex flex-col items-center justify-center p-12">
-                  <div className="mb-12 flex flex-col items-center text-center gap-2">
+                <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 sm:px-8 sm:py-8 md:p-12">
+                  <div className="mb-6 sm:mb-8 md:mb-12 flex flex-col items-center text-center gap-2">
                     <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em] italic">Hang sikeresen létrehozva</div>
                     <h3 className="text-3xl font-black text-white uppercase tracking-wider line-clamp-1 italic">
                       Neurális Mester v1
@@ -140,25 +140,25 @@ export default function AudioWorkspace({
                     <MiniWaveform color={color} isPlaying={isPlaying} />
                   </div>
 
-                  <div className="mt-12 flex items-center gap-6">
+                  <div className="mt-6 md:mt-12 flex items-center gap-4 sm:gap-6">
                     <button 
                       onClick={togglePlay} 
-                      className="w-20 h-20 rounded-[1.8rem] flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-2xl shadow-primary/25"
+                      className="w-16 h-16 sm:w-20 sm:h-20 rounded-[1.4rem] sm:rounded-[1.8rem] flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-2xl shadow-primary/25"
                       style={{ backgroundColor: color }}
                     >
-                      {isPlaying ? <Pause className="w-8 h-8 text-white fill-current" /> : <Play className="w-8 h-8 text-white fill-current ml-1" />}
+                      {isPlaying ? <Pause className="w-6 h-6 sm:w-8 sm:h-8 text-white fill-current" /> : <Play className="w-6 h-6 sm:w-8 sm:h-8 text-white fill-current ml-0.5 sm:ml-1" />}
                     </button>
 
                     <div className="flex flex-col gap-2">
                       <div className="flex gap-2">
                         <button 
                           onClick={handleDownload}
-                          className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                          className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all"
                         >
-                          <Download className="w-5 h-5" />
+                          <Download className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
-                        <button className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all">
-                          <Share2 className="w-5 h-5" />
+                        <button className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                          <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                       </div>
                     </div>
@@ -166,12 +166,12 @@ export default function AudioWorkspace({
                 </div>
 
                 {/* Status Bar */}
-                <div className="px-10 py-5 bg-white/[0.02] border-t border-white/5 flex items-center justify-between">
+                <div className="px-4 py-3 sm:px-6 sm:py-4 md:px-10 md:py-5 bg-white/[0.02] border-t border-white/5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]" />
                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">Stabil jel</span>
                   </div>
-                  <div className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest">
+                  <div className="text-[8px] sm:text-[9px] font-bold text-zinc-700 uppercase tracking-[0.18em] sm:tracking-widest sm:text-right">
                     Veszteségmentes tömörítés 48kHz
                   </div>
                 </div>

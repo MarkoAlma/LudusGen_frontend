@@ -61,6 +61,18 @@ const formatFirebaseTime = (timestamp) => {
   return `${Math.floor(d / 7)} hete`;
 };
 
+const buildPreviewText = (value, maxLen = 140) => {
+  const plain = String(value || "").replace(/\s+/g, " ").trim();
+  if (!plain) return "";
+  if (plain.length <= maxLen) return plain;
+  return `${plain.slice(0, maxLen).trimEnd()}...`;
+};
+
+const asCount = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+};
+
 // ─── Adatok ───────────────────────────────────────────────────────
 const CATEGORIES = [
   { id: "all", label: "Összes", emoji: "🌐", color: "#6366f1", icon: Globe },
@@ -199,6 +211,7 @@ export const MOCK_POSTS = [
 MOCK_POSTS.forEach(p => { if (!p.slug) p.slug = generateSlug(p.title); });
 
 // ─── Router segédfüggvények ───────────────────────────────────────
+const POSTS_BATCH_SIZE = 20;
 const BASE_PATH = "/forum";
 
 function getPostInfoFromURL() {
@@ -398,7 +411,7 @@ const PostCard = ({
       }}
       onClick={onClick}
     >
-      <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-5">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-3 sm:gap-5">
 
         {/* Left Column (Icon + Decorative) */}
         <div className="flex flex-col items-center mt-0.5 flex-shrink-0 self-stretch">
@@ -440,7 +453,7 @@ const PostCard = ({
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+        <div className="w-full flex-1 min-w-0 flex flex-col gap-1.5">
 
           {/* Header: Cat Pill & Time */}
           <div className="flex items-center justify-between gap-2">
@@ -448,7 +461,7 @@ const PostCard = ({
               style={{ background: `${cat.color}15`, color: cat.color, border: `1px solid ${cat.color}25` }}>
               {cat.label}
             </span>
-            <div className="flex items-center gap-1 sm:gap-2 text-[0.6rem] text-zinc-500 font-bold tracking-widest uppercase relative flex-shrink-0" ref={menuRef}>
+            <div className="flex items-center gap-1.5 text-[0.6rem] text-zinc-500 font-bold tracking-widest uppercase relative flex-shrink-0" ref={menuRef}>
               <span className="flex items-center gap-1 opacity-70">
                 <Clock className="w-3 h-3" /> {post.time}
               </span>
@@ -456,7 +469,7 @@ const PostCard = ({
 
               {/* MORE / Menu Button */}
               <button onClick={e => { e.stopPropagation(); setShowMenu(v => !v); }}
-                className="flex items-center gap-0.5 cursor-pointer hover:text-zinc-300 transition-colors">
+                className="flex items-center gap-0.5 cursor-pointer hover:text-zinc-300 transition-colors px-1 py-0.5 rounded-md border border-white/5 bg-white/[0.02]">
                 TÖBB
               </button>
 
@@ -503,22 +516,22 @@ const PostCard = ({
           </div>
 
           {/* Title */}
-          <h3 className="text-base sm:text-lg font-black italic leading-tight py-1 transition-all duration-300 group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] line-clamp-2"
+          <h3 className="text-base sm:text-lg font-black italic leading-tight py-1 transition-all duration-300 group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] line-clamp-2 min-h-[2.4rem] sm:min-h-[2.8rem]"
             style={{ color: cat.color }}>
             {post.title}
           </h3>
 
           {/* Preview text */}
-          <p className="text-zinc-400 text-[12px] sm:text-[13px] font-medium leading-relaxed line-clamp-2 mb-1">
-            {post.preview || post.content?.slice(0, 160) || "Olvasás megkezdése..."}
+          <p className="text-zinc-400 text-[12px] sm:text-[13px] font-medium leading-relaxed line-clamp-2 mb-1 min-h-[2.3rem] sm:min-h-[2.7rem]">
+            {buildPreviewText(post.preview || post.content, 160) || "Olvasas megkezdese..."}
           </p>
 
           {/* Footer row */}
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5 flex-wrap gap-2">
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5 gap-2">
 
-            <div className="flex items-center gap-2 sm:gap-5 flex-wrap">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
               {/* Author Pill */}
-              <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg pr-2 sm:pr-3 pl-1 py-1 transition-all"
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg pr-2 sm:pr-3 pl-1 py-1 transition-all min-w-0 max-w-[9.5rem] sm:max-w-none"
                 style={{ background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)" }}>
                 {post.avatarUrl || post.authorPhotoUrl ? (
                   <img src={post.avatarUrl || post.authorPhotoUrl} alt={post.author} className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover border border-white/10" />
@@ -528,11 +541,11 @@ const PostCard = ({
                     {post.avatar || post.author?.[0] || "U"}
                   </div>
                 )}
-                <span className="text-[0.55rem] sm:text-[0.6rem] font-black text-zinc-500 tracking-[0.2em] uppercase italic opacity-80 truncate max-w-[80px] sm:max-w-none">{post.author}</span>
+                <span className="text-[0.55rem] sm:text-[0.6rem] font-black text-zinc-500 tracking-[0.2em] uppercase italic opacity-80 truncate max-w-[72px] sm:max-w-[110px] md:max-w-none">{post.author}</span>
               </div>
 
               {/* Stats */}
-              <div className="flex items-center gap-2 sm:gap-4 text-zinc-500 text-[0.65rem] sm:text-[0.7rem] font-bold">
+              <div className="flex items-center gap-2 sm:gap-4 text-zinc-500 text-[0.65rem] sm:text-[0.7rem] font-bold flex-shrink-0">
                 <span className="flex items-center gap-1 sm:gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><MessageSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{post.comments}</span>
                 <span className="flex items-center gap-1 sm:gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><Heart className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{post.likes}</span>
                 <span className="flex items-center gap-1 sm:gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{post.views?.toLocaleString()}</span>
@@ -892,11 +905,10 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
       onPointerDown={(e) => e.preventDefault()}
       onClick={onClick}
       title={label}
-      className={`cursor-pointer p-1.5 rounded-lg transition-all active:scale-90 group relative ${
-        active
-          ? 'bg-white/10 text-white'
-          : 'text-gray-500 hover:text-white hover:bg-white/5'
-      }`}>
+      className={`cursor-pointer p-1.5 rounded-lg transition-all active:scale-90 group relative ${active
+        ? 'bg-white/10 text-white'
+        : 'text-gray-500 hover:text-white hover:bg-white/5'
+        }`}>
       <Icon className={`w-3.5 h-3.5 ${active ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}`} />
       <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black text-[0.6rem] text-white opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
         {label}
@@ -1166,7 +1178,7 @@ export default function Forum() {
   const [notifications, setNotifications] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [visiblePostCount, setVisiblePostCount] = useState(POSTS_BATCH_SIZE);
 
   // ─── Optimized Popular Tags (Firestore Aggregation) ──────────────
   const [popularTags, setPopularTags] = useState([]);
@@ -1202,6 +1214,8 @@ export default function Forum() {
   const notifRef = useRef(null);
   const userMenuRef = useRef(null);
   const initialSlugRef = useRef(false);
+  const loadMoreSentinelRef = useRef(null);
+  const loadMoreThrottleRef = useRef(0);
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const accentColor = CATEGORIES.find(c => c.id === activeCategory)?.color || "#a78bfa";
@@ -1315,6 +1329,11 @@ export default function Forum() {
             id: d.id,
             time: formatFirebaseTime(data.createdAt),
             slug: data.slug || generateSlug(data.title || ""),
+            preview: buildPreviewText(data.preview || data.content, 160),
+            author: data.author || "Nevtelen",
+            comments: asCount(data.comments),
+            likes: asCount(data.likes),
+            views: asCount(data.views),
           };
         });
         dbg(`Firebase: ${fbPosts.length} poszt betöltve`);
@@ -1563,7 +1582,7 @@ export default function Forum() {
         category: data.category,
         tags: data.tags,
         poll: data.poll,
-        preview: data.content?.slice(0, 120) || "",
+        preview: buildPreviewText(data.content, 120),
         slug: generateSlug(data.title),
       };
 
@@ -1607,7 +1626,7 @@ export default function Forum() {
       avatarColor: accentColor,
       authorId: currentUser?.uid || null,
       time: "Most", views: 1, likes: 0, comments: 0, readTime: 1,
-      preview: data.content?.slice(0, 120) || "",
+      preview: buildPreviewText(data.content, 120),
     };
 
     let finalId = `local_${Date.now()}`;
@@ -1651,34 +1670,40 @@ export default function Forum() {
 
     const postIdStr = String(postId);
     const isFbPost = !postIdStr.startsWith("local_") && isNaN(Number(postIdStr));
+    let deleteSucceeded = !isFbPost;
 
     if (isFbPost) {
+      deleteSucceeded = true;
       try {
         // Poszt adatok lekérése a tagek miatt a törlés előtt
         const postSnap = await getDoc(doc(db, "forum_posts", postIdStr));
-        if (postSnap.exists()) {
-          const postTags = postSnap.data().tags || [];
+        const postTags = postSnap.exists() ? (postSnap.data().tags || []) : [];
 
-          await deleteDoc(doc(db, "forum_posts", postIdStr));
-          dbg("Firebase törlés OK:", postIdStr);
+        await deleteDoc(doc(db, "forum_posts", postIdStr));
+        dbg("Firebase törlés OK:", postIdStr);
 
-          // ─── TAG STATS UPDATE ─────────────────────────────────────
-          if (postTags.length > 0) {
-            const batch = writeBatch(db);
-            postTags.forEach(tag => {
-              const cleanTag = tag.trim().toLowerCase();
-              if (cleanTag) {
-                const tagRef = doc(db, "forum_tag_stats", cleanTag);
-                batch.set(tagRef, { count: increment(-1) }, { merge: true });
-              }
-            });
-            await batch.commit();
-            dbg("Tag statisztikák frissítve (decrement)");
-          }
+        // ─── TAG STATS UPDATE ─────────────────────────────────────
+        if (postTags.length > 0) {
+          const batch = writeBatch(db);
+          postTags.forEach(tag => {
+            const cleanTag = tag.trim().toLowerCase();
+            if (cleanTag) {
+              const tagRef = doc(db, "forum_tag_stats", cleanTag);
+              batch.set(tagRef, { count: increment(-1) }, { merge: true });
+            }
+          });
+          await batch.commit();
+          dbg("Tag statisztikák frissítve (decrement)");
         }
       } catch (e) {
         console.error("Firebase törlési hiba:", e);
+        deleteSucceeded = false;
       }
+    }
+
+    if (!deleteSucceeded) {
+      setConfirmDelete(null);
+      return;
     }
 
     setPosts(p => {
@@ -1778,24 +1803,44 @@ export default function Forum() {
 
 
   // ── Szűrés + rendezés ────────────────────────────────────────────
-  const filteredPosts = posts.filter(p => {
-    if (showOnlyBookmarks && !bookmarks.has(p.id)) return false;
-    if (activeCategory !== "all" && p.category !== activeCategory) return false;
-    if (activeTagFilters.length > 0 && !activeTagFilters.every(t => p.tags?.includes(t))) return false;
-    if (filterOwn && p.authorId !== currentUserId) return false;
-    if (filterFollowed && !followingIds.has(p.authorId)) return false;
-    if (filterSolved && !p.solved) return false;
-    if (filterPinned && !p.pinned) return false;
-    if (filterHot && !p.hot) return false;
-    if (search && !p.title.toLowerCase().includes(search.toLowerCase()) && !p.tags.some(t => t.includes(search.toLowerCase()))) return false;
-    return true;
-  }).sort((a, b) => {
-    if (sortBy === "hot") return (b.likes * 3 + b.views / 10 + b.comments * 2) - (a.likes * 3 + a.views / 10 + a.comments * 2);
-    if (sortBy === "new") return String(b.id) > String(a.id) ? 1 : -1;
-    if (sortBy === "top") return b.likes - a.likes;
-    if (sortBy === "views") return b.views - a.views;
-    return 0;
-  });
+  const filteredPosts = useMemo(() => (
+    posts.filter(p => {
+      if (showOnlyBookmarks && !bookmarks.has(p.id)) return false;
+      if (activeCategory !== "all" && p.category !== activeCategory) return false;
+      if (activeTagFilters.length > 0 && !activeTagFilters.every(t => p.tags?.includes(t))) return false;
+      if (filterOwn && p.authorId !== currentUserId) return false;
+      if (filterFollowed && !followingIds.has(p.authorId)) return false;
+      if (filterSolved && !p.solved) return false;
+      if (filterPinned && !p.pinned) return false;
+      if (filterHot && !p.hot) return false;
+      if (search && !p.title.toLowerCase().includes(search.toLowerCase()) && !p.tags.some(t => t.includes(search.toLowerCase()))) return false;
+      return true;
+    }).sort((a, b) => {
+      if (sortBy === "hot") return (b.likes * 3 + b.views / 10 + b.comments * 2) - (a.likes * 3 + a.views / 10 + a.comments * 2);
+      if (sortBy === "new") return String(b.id) > String(a.id) ? 1 : -1;
+      if (sortBy === "top") return b.likes - a.likes;
+      if (sortBy === "views") return b.views - a.views;
+      return 0;
+    })
+  ), [
+    posts,
+    showOnlyBookmarks,
+    bookmarks,
+    activeCategory,
+    activeTagFilters,
+    filterOwn,
+    currentUserId,
+    filterFollowed,
+    followingIds,
+    filterSolved,
+    filterPinned,
+    filterHot,
+    search,
+    sortBy,
+  ]);
+
+  const visiblePosts = filteredPosts.slice(0, visiblePostCount);
+  const hasMorePosts = visiblePostCount < filteredPosts.length;
 
   const categoryCounts = useMemo(() => {
     const counts = {};
@@ -1821,6 +1866,51 @@ export default function Forum() {
     setSortBy("hot");
     setSearch("");
   };
+
+  useEffect(() => {
+    loadMoreThrottleRef.current = 0;
+    setVisiblePostCount(POSTS_BATCH_SIZE);
+  }, [
+    activeCategory,
+    activeTagFilters,
+    showOnlyBookmarks,
+    filterOwn,
+    filterFollowed,
+    filterSolved,
+    filterPinned,
+    filterHot,
+    search,
+    sortBy,
+    showOnlyBookmarks ? bookmarks : null,
+    filterFollowed ? followingIds : null,
+    filterOwn ? currentUserId : null,
+  ]);
+
+  useEffect(() => {
+    if (!hasMorePosts) return undefined;
+
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel) return undefined;
+
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      const now = Date.now();
+
+      if (!entry?.isIntersecting || now - loadMoreThrottleRef.current < 250) {
+        return;
+      }
+
+      loadMoreThrottleRef.current = now;
+      setVisiblePostCount(prev => Math.min(prev + POSTS_BATCH_SIZE, filteredPosts.length));
+    }, {
+      threshold: 0.1,
+      rootMargin: "240px 0px",
+    });
+
+    observer.observe(sentinel);
+
+    return () => observer.disconnect();
+  }, [hasMorePosts, filteredPosts.length]);
 
   // ── Közös modálok (mindkét nézetben renderelve) ──────────────────
   // FIX: ezek korábban az early-return UTÁN voltak, így poszt-nézetben
@@ -1932,9 +2022,7 @@ export default function Forum() {
           {/* Action buttons — separate row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs text-gray-500">
-              <span className="font-medium">{posts.length} téma</span>
-              <span className="text-gray-700">·</span>
-              <span>{totalThreads.toLocaleString()} összesen</span>
+              <span className="font-medium">{totalThreads.toLocaleString()} téma</span>
             </div>
 
             <div className="flex items-center gap-3">
@@ -2024,115 +2112,125 @@ export default function Forum() {
                       >
                         Szűrők törlése
                       </button>
+                      <button
+                        onClick={() => setShowAdvancedFilter(v => !v)}
+                        className="lg:hidden cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all flex items-center gap-1.5"
+                        style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}25`, color: "#cfc4ea" }}
+                      >
+                        <span>{showAdvancedFilter ? "Kevesebb" : "Részletek"}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvancedFilter ? "rotate-180" : ""}`} />
+                      </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div
-                      className="rounded-xl p-3"
-                      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
-                    >
-                      <div className="mb-2.5 flex items-center gap-2 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
-                        <Zap className="w-3 h-3" />
-                        Gyorsszűrők
+                  <div className={`${showAdvancedFilter ? "block" : "hidden"} lg:block`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div
+                        className="rounded-xl p-3"
+                        style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+                      >
+                        <div className="mb-2.5 flex items-center gap-2 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
+                          <Zap className="w-3 h-3" />
+                          Gyorsszűrők
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            {
+                              key: "bookmarks",
+                              active: showOnlyBookmarks,
+                              onClick: () => setShowOnlyBookmarks(v => !v),
+                              label: "Könyvjelző",
+                              icon: Bookmark,
+                              color: "#fbbf24",
+                              fill: true,
+                            },
+                            {
+                              key: "pinned",
+                              active: filterPinned,
+                              onClick: () => setFilterPinned(v => !v),
+                              label: "Kitűzött",
+                              icon: Pin,
+                              color: "#f59e0b",
+                            },
+                            {
+                              key: "solved",
+                              active: filterSolved,
+                              onClick: () => setFilterSolved(v => !v),
+                              label: "Megoldott",
+                              icon: CheckCircle,
+                              color: "#4ade80",
+                            },
+                            {
+                              key: "own",
+                              active: filterOwn,
+                              onClick: () => setFilterOwn(v => !v),
+                              label: "Saját",
+                              icon: User,
+                              color: "#a855f7",
+                            },
+                            {
+                              key: "followed",
+                              active: filterFollowed,
+                              onClick: () => setFilterFollowed(v => !v),
+                              label: "Követett",
+                              icon: Rss,
+                              color: "#38bdf8",
+                            },
+                          ].map(item => {
+                            const Icon = item.icon;
+                            return (
+                              <button
+                                key={item.key}
+                                onClick={item.onClick}
+                                className="cursor-pointer group flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                                style={{
+                                  background: item.active ? `${item.color}10` : "transparent",
+                                  border: `1px solid ${item.active ? `${item.color}25` : "rgba(255,255,255,0.05)"}`,
+                                  color: item.active ? "#ffffff" : "#7a7490",
+                                }}
+                              >
+                                <Icon className={`w-3.5 h-3.5 ${item.fill && item.active ? "fill-current" : ""}`} style={{ color: item.color }} />
+                                <span>{item.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          {
-                            key: "bookmarks",
-                            active: showOnlyBookmarks,
-                            onClick: () => setShowOnlyBookmarks(v => !v),
-                            label: "Könyvjelző",
-                            icon: Bookmark,
-                            color: "#fbbf24",
-                            fill: true,
-                          },
-                          {
-                            key: "pinned",
-                            active: filterPinned,
-                            onClick: () => setFilterPinned(v => !v),
-                            label: "Kitűzött",
-                            icon: Pin,
-                            color: "#f59e0b",
-                          },
-                          {
-                            key: "solved",
-                            active: filterSolved,
-                            onClick: () => setFilterSolved(v => !v),
-                            label: "Megoldott",
-                            icon: CheckCircle,
-                            color: "#4ade80",
-                          },
-                          {
-                            key: "own",
-                            active: filterOwn,
-                            onClick: () => setFilterOwn(v => !v),
-                            label: "Saját",
-                            icon: User,
-                            color: "#a855f7",
-                          },
-                          {
-                            key: "followed",
-                            active: filterFollowed,
-                            onClick: () => setFilterFollowed(v => !v),
-                            label: "Követett",
-                            icon: Rss,
-                            color: "#38bdf8",
-                          },
-                        ].map(item => {
-                          const Icon = item.icon;
-                          return (
-                            <button
-                              key={item.key}
-                              onClick={item.onClick}
-                              className="cursor-pointer group flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all"
-                              style={{
-                                background: item.active ? `${item.color}10` : "transparent",
-                                border: `1px solid ${item.active ? `${item.color}25` : "rgba(255,255,255,0.05)"}`,
-                                color: item.active ? "#ffffff" : "#7a7490",
-                              }}
-                            >
-                              <Icon className={`w-3.5 h-3.5 ${item.fill && item.active ? "fill-current" : ""}`} style={{ color: item.color }} />
-                              <span>{item.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
 
-                    <div
-                      className="rounded-xl p-3"
-                      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
-                    >
-                      <div className="mb-2.5 flex items-center gap-2 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
-                        <TrendingUp className="w-3 h-3" />
-                        Rendezés
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { id: "hot", label: "Felkapott", icon: Flame, tone: "#fb923c" },
-                          { id: "top", label: "Legjobb", icon: Trophy, tone: "#a78bfa" },
-                          { id: "new", label: "Legújabb", icon: Clock, tone: "#38bdf8" },
-                          { id: "views", label: "Népszerű", icon: Eye, tone: "#34d399" },
-                        ].map(option => {
-                          const Icon = option.icon;
-                          const active = sortBy === option.id;
-                          return (
-                            <button
-                              key={option.id}
-                              onClick={() => setSortBy(option.id)}
-                              className="cursor-pointer flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all"
-                              style={{
-                                background: active ? `${option.tone}10` : "transparent",
-                                border: `1px solid ${active ? `${option.tone}25` : "rgba(255,255,255,0.05)"}`,
-                                color: active ? "#ffffff" : "#7a7490",
-                              }}
-                            >
-                              <Icon className="w-3.5 h-3.5" style={{ color: option.tone }} />
-                              <span>{option.label}</span>
-                            </button>
-                          );
-                        })}
+                      <div
+                        className="rounded-xl p-3"
+                        style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+                      >
+                        <div className="mb-2.5 flex items-center gap-2 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
+                          <TrendingUp className="w-3 h-3" />
+                          Rendezés
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { id: "hot", label: "Felkapott", icon: Flame, tone: "#fb923c" },
+                            { id: "top", label: "Legjobb", icon: Trophy, tone: "#a78bfa" },
+                            { id: "new", label: "Legújabb", icon: Clock, tone: "#38bdf8" },
+                            { id: "views", label: "Népszerű", icon: Eye, tone: "#34d399" },
+                          ].map(option => {
+                            const Icon = option.icon;
+                            const active = sortBy === option.id;
+                            return (
+                              <button
+                                key={option.id}
+                                onClick={() => setSortBy(option.id)}
+                                className="cursor-pointer flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all"
+                                style={{
+                                  background: active ? `${option.tone}10` : "transparent",
+                                  border: `1px solid ${active ? `${option.tone}25` : "rgba(255,255,255,0.05)"}`,
+                                  color: active ? "#ffffff" : "#7a7490",
+                                }}
+                              >
+                                <Icon className="w-3.5 h-3.5" style={{ color: option.tone }} />
+                                <span>{option.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2186,6 +2284,75 @@ export default function Forum() {
                 </div>
               </div>
 
+              {/* Mobile: compact categories + hashtags */}
+              <div className="lg:hidden">
+                <SurfaceCard style={{ padding: "0.75rem" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Hash className="w-3.5 h-3.5 text-purple-400" />
+                      <span className="text-xs font-semibold text-white/80">Kategóriák</span>
+                    </div>
+                    <span className="text-[0.65rem] text-gray-600">{totalThreads.toLocaleString()} téma</span>
+                  </div>
+                  <div className="overflow-x-auto pb-1 -mx-0.5">
+                    <div className="flex items-center gap-1.5 min-w-max px-0.5">
+                      {CATEGORIES.map((cat) => {
+                        const isActive = activeCategory === cat.id;
+                        const count = cat.id === "all" ? posts.length : categoryCounts[cat.id] || 0;
+                        return (
+                          <button
+                            key={cat.id}
+                            onClick={() => setActiveCategory(cat.id)}
+                            className="cursor-pointer rounded-full px-2.5 py-1.5 text-left transition-all active:scale-[0.98] whitespace-nowrap"
+                            style={{
+                              background: isActive ? `${cat.color}12` : "rgba(255,255,255,0.02)",
+                              border: `1px solid ${isActive ? `${cat.color}35` : "rgba(255,255,255,0.06)"}`,
+                            }}
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-sm" style={{ color: cat.color }}>{cat.emoji}</span>
+                                <span
+                                  className="text-[0.72rem] font-medium"
+                                  style={{ color: isActive ? "#ffffff" : "#b7b3c8" }}
+                                >
+                                  {cat.label}
+                                </span>
+                              </div>
+                              <span className="text-[0.64rem] text-gray-500">{count}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-2.5 mb-2">
+                    <Tag className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="text-xs font-semibold text-white/80">Népszerű hashtagek</span>
+                  </div>
+                  <div className="overflow-x-auto pb-1 -mx-0.5">
+                    <div className="flex items-center gap-1.5 min-w-max px-0.5">
+                      {popularTags.slice(0, 12).map(tag => (
+                        <TagPill
+                          key={tag.label}
+                          label={tag.label}
+                          count={tag.count}
+                          color={tag.color}
+                          active={activeTagFilters.includes(tag.label)}
+                          onClick={() => setActiveTagFilters(prev =>
+                            prev.includes(tag.label) ? prev.filter(t => t !== tag.label) : [...prev, tag.label]
+                          )}
+                        />
+                      ))}
+                    </div>
+                    {popularTags.length === 0 && (
+                      <p className="text-[0.65rem] text-gray-600 italic px-0.5">Nincsenek elérhető tagek...</p>
+                    )}
+                  </div>
+                </SurfaceCard>
+              </div>
+
               {filteredPosts.length === 0 && (
                 <div className="bg-[#13111c] border border-white/5 rounded-xl p-8 text-center">
                   <HelpCircle className="w-8 h-8 mx-auto mb-3 text-gray-700" />
@@ -2203,7 +2370,7 @@ export default function Forum() {
             </div>
 
             <div className="space-y-2">
-              {filteredPosts.map(post => (
+              {visiblePosts.map(post => (
                 <PostCard
                   key={post.id}
                   post={post}
@@ -2220,11 +2387,7 @@ export default function Forum() {
               ))}
             </div>
 
-            <div className="flex justify-center mt-10">
-              <button className="bg-white/5 border border-white/5 text-gray-500 px-8 py-3 rounded-xl text-xs font-medium hover:bg-white/8 hover:text-gray-300 transition-all">
-                További témák betöltése
-              </button>
-            </div>
+            {hasMorePosts && <div ref={loadMoreSentinelRef} className="h-6 w-full" aria-hidden="true" />}
           </div>
 
           {/* Right Column: Sidebar - hidden on mobile, shown on lg+ */}
@@ -2308,114 +2471,6 @@ export default function Forum() {
             </SurfaceCard>
           </div>
 
-          {/* Mobile Sidebar Toggle Button */}
-          <button
-            onClick={() => setMobileSidebarOpen(true)}
-            className="lg:hidden fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all hover:scale-110 active:scale-95"
-            style={{ background: "linear-gradient(135deg, #7c3aed, #4c1d95)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 8px 32px rgba(124,58,237,0.4)" }}
-          >
-            <SlidersHorizontal className="w-5 h-5" />
-          </button>
-
-          {/* Mobile Sidebar Overlay */}
-          <AnimatePresence>
-            {mobileSidebarOpen && (
-              <>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
-                  onClick={() => setMobileSidebarOpen(false)}
-                />
-                <motion.div
-                  initial={{ x: "100%" }}
-                  animate={{ x: 0 }}
-                  exit={{ x: "100%" }}
-                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                  className="lg:hidden fixed right-0 top-0 bottom-0 z-50 w-80 max-w-[85vw] overflow-y-auto p-4"
-                  style={{ background: "#0a0814", borderLeft: "1px solid rgba(255,255,255,0.08)" }}
-                  onClick={e => e.stopPropagation()}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-white font-bold text-sm">Szűrők és Kategóriák</h3>
-                    <button onClick={() => setMobileSidebarOpen(false)} className="p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all">
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <div className="space-y-4">
-                    {/* Categories Widget (Mobile) */}
-                    <SurfaceCard style={{ padding: "1rem" }}>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Hash className="w-3.5 h-3.5 text-purple-400" />
-                          <span className="text-xs font-semibold text-white/80">Kategóriák</span>
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        {CATEGORIES.map(cat => (
-                          <CatSidebarCard
-                            key={cat.id}
-                            cat={cat}
-                            isActive={activeCategory === cat.id}
-                            onClick={(id) => { setActiveCategory(id); setMobileSidebarOpen(false); }}
-                            threadCount={cat.id === "all" ? posts.length : categoryCounts[cat.id] || 0}
-                          />
-                        ))}
-                      </div>
-                    </SurfaceCard>
-
-                    {/* Tags Widget (Mobile) */}
-                    <SurfaceCard style={{ padding: "1rem" }}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <Tag className="w-3.5 h-3.5 text-purple-400" />
-                        <span className="text-xs font-semibold text-white/80">Népszerű tagek</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {popularTags.map(tag => (
-                          <TagPill
-                            key={tag.label}
-                            label={tag.label}
-                            count={tag.count}
-                            color={tag.color}
-                            active={activeTagFilters.includes(tag.label)}
-                            onClick={() => setActiveTagFilters(prev =>
-                              prev.includes(tag.label) ? prev.filter(t => t !== tag.label) : [...prev, tag.label]
-                            )}
-                          />
-                        ))}
-                      </div>
-                    </SurfaceCard>
-
-                    {/* Activity (Mobile) */}
-                    <SurfaceCard style={{ padding: "1rem" }}>
-                      <div className="flex items-center gap-2 mb-4">
-                        <Activity className="w-3.5 h-3.5 text-orange-400" />
-                        <span className="text-xs font-semibold text-white/80">Aktivitás</span>
-                      </div>
-                      <div className="space-y-4 relative">
-                        <div className="absolute left-[11px] top-2 bottom-2 w-px bg-white/5" />
-                        {RECENT_ACTIVITY.slice(0, 3).map((a, i) => (
-                          <div key={i} className="flex gap-3 relative z-10">
-                            <div className="w-[22px] h-[22px] rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#0c0a12", border: "2px solid #1a1129" }}>
-                              <div className="w-1.5 h-1.5 rounded-full" style={{ background: a.color }} />
-                            </div>
-                            <div>
-                              <p className="text-[0.68rem] text-gray-500">
-                                <span className="font-medium text-white/80">{a.user}</span> {a.action}
-                              </p>
-                              <p className="text-xs font-medium text-white/70 mt-0.5">"{a.post}"</p>
-                              <span className="text-[0.6rem] text-gray-700 mt-0.5 block">{a.time}P</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </SurfaceCard>
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
         </main>
       </div>
 

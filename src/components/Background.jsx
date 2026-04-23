@@ -13,6 +13,8 @@ export default function Background() {
   const isWorkspace = isChat || isImage || isAudio;
   const isForum = location.pathname.startsWith('/forum');
   const isSettings = location.pathname.startsWith('/settings');
+  const isProfile = location.pathname.startsWith('/profile');
+  const isAccountPage = isSettings || isProfile;
   const isHome = location.pathname === '/';
 
   const orbs = [
@@ -61,12 +63,12 @@ export default function Background() {
           <div
             className="absolute inset-0 transition-all duration-1000 ease-in-out"
             style={{
-              backgroundImage: `url(${isForum ? ForumBg : isSettings ? SettingsBg : HeroBg})`,
+              backgroundImage: `url(${isForum ? ForumBg : isAccountPage ? SettingsBg : HeroBg})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              opacity: isHome ? 0 : (isForum || isSettings ? 0.2 : 0.35),
-              filter: isForum || isSettings ? 'blur(20px) saturate(0.4)' : 'none',
-              transform: isForum || isSettings ? 'scale(1.1)' : 'scale(1)',
+              opacity: isHome ? 0 : (isForum || isAccountPage ? 0.2 : 0.35),
+              filter: isForum || isAccountPage ? 'blur(20px) saturate(0.4)' : 'none',
+              transform: isForum || isAccountPage ? 'scale(1.1)' : 'scale(1)',
             }}
           />
         )}

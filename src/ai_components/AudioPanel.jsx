@@ -179,7 +179,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
     return id;
   };
 
-  const { registerPanel, unregisterPanel } = useStudioPanels();
+  const { registerPanel, unregisterPanel, isMobile, isTablet, setPanelOpen, setPanelsOpen, mobileActive, panelState } = useStudioPanels();
 
   // Register panels (Audio only has L1 + L2, no archive)
   useEffect(() => {
@@ -196,6 +196,35 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
 
   const [activeTab, setActiveTab] = useState("generate");
   const [view, setView] = useState("forge");
+
+  const closeMobileStudioPanel = () => {
+    if (isMobile) {
+      setPanelOpen('L2', false);
+    }
+  };
+
+  const closeNarrowStudioPanel = () => {
+    if (isMobile || isTablet) {
+      setPanelsOpen({ L1: false, L2: false });
+    }
+  };
+
+  const isNarrowL2Visible = isMobile
+    ? mobileActive === 'L2' && panelState.L2
+    : isTablet
+      ? panelState.L2
+      : false;
+  const prevNarrowL2VisibleRef = useRef(isNarrowL2Visible);
+
+  useEffect(() => {
+    const wasVisible = prevNarrowL2VisibleRef.current;
+
+    if (!wasVisible && isNarrowL2Visible && view === 'history') {
+      setView('forge');
+    }
+
+    prevNarrowL2VisibleRef.current = isNarrowL2Visible;
+  }, [isNarrowL2Visible, view]);
 
   // OpenAI / ElevenLabs
   const [text, setText] = useState("");
@@ -313,6 +342,7 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
     setError(null);
     setAudioUrl(null);
     setIsPlaying(false);
+    closeMobileStudioPanel();
     const jobId = startJob(isTTS ? 'audio' : 'music', (content || 'Hanggenerálás').slice(0, 48), 'audio');
     setCurrentJobId(jobId);
     generationController.current = new AbortController();
@@ -404,13 +434,15 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
       rightOpen={rightOpen}
       setRightOpen={setRightOpen}
       leftWidth={320}
-      leftSecondaryWidth={view === 'history' ? 72 : 392}
+      leftSecondaryWidth={isMobile ? 392 : view === 'history' ? 72 : 392}
       onOffsetChange={setOffsets}
       leftSidebar={globalSidebar}
       leftSecondarySidebar={
-        <div className="h-full flex flex-row overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
+        <div className={`h-full flex overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5 ${isMobile ? 'flex-col' : 'flex-row'}`}>
           {/* Tool Strip (72px) */}
-          <div className="w-[72px] h-full flex flex-col items-center pt-6 space-y-3 border-r border-white/5 bg-[#030308]">
+          <div className={isMobile
+            ? "w-full shrink-0 grid grid-cols-2 gap-2 border-b border-white/5 bg-[#030308] px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+4.5rem)]"
+            : "w-[72px] h-full flex flex-col items-center pt-6 space-y-3 border-r border-white/5 bg-[#030308]"}>
             {[
               {
                 id: 'forge',
@@ -424,17 +456,28 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
                 label: 'ARCHÍVUM',
                 icon: <History className="w-5 h-5" />,
                 isActive: view === 'history',
-                onClick: () => setView('history'),
+                onClick: () => {
+                  if (isMobile || isTablet) {
+                    if (view !== 'history') {
+                      setView('history');
+                    }
+                    closeNarrowStudioPanel();
+                    return;
+                  }
+                  setView('history');
+                },
               },
             ].map((tool) => (
               <button
                 key={tool.id}
                 onClick={tool.onClick}
                 title={tool.label}
-                className="group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer"
+                className={isMobile
+                  ? "group flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl border border-white/5 bg-white/[0.02] px-2 py-2.5 transition-all duration-300 cursor-pointer"
+                  : "group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer"}
               >
                 <div
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${tool.isActive
+                  className={`${isMobile ? 'w-10 h-10 rounded-xl' : 'w-12 h-12 rounded-2xl'} flex items-center justify-center transition-all duration-500 border ${tool.isActive
                       ? 'bg-white/5 border-white/10 shadow-xl'
                       : 'bg-transparent border-transparent hover:bg-white/[0.03] hover:border-white/5'
                     }`}
@@ -442,16 +485,16 @@ export default function AudioPanel({ selectedModel, userId, getIdToken, isGlobal
                 >
                   {tool.icon}
                 </div>
-                <span className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 ${tool.isActive ? 'text-white' : 'text-zinc-700 group-hover:text-zinc-500'
+                <span className={`${isMobile ? 'text-[8px] tracking-[0.14em] text-center leading-tight' : 'text-[8px] tracking-[0.2em]'} font-black transition-all duration-500 ${tool.isActive ? 'text-white' : 'text-zinc-700 group-hover:text-zinc-500'
                   }`}>
                   {tool.label}
                 </span>
               </button>
             ))}
-            <div className="flex-1" />
+            <div className={isMobile ? "hidden" : "flex-1"} />
           </div>
 
-          <div className="flex-1 h-full overflow-hidden">
+          <div className="flex-1 h-full min-h-0 overflow-hidden">
             {view !== 'history' && (
               <AudioControls
                 selectedModel={selectedModel}
