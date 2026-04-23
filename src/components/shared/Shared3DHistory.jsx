@@ -248,10 +248,12 @@ export default function Shared3DHistory({
       const isAnim = item.mode === 'animate' && !isRig || item.params?.animated === true || item.params?.type === 'animate_retarget';
       const isSeg = item.mode === 'segment';
       const isFill = item.mode === 'fill_parts';
-      if (subTab === 'models') return !isRig && !isAnim && !isSeg && !isFill;
+      const isGenerateParts = item.params?.generate_parts === true || item.params?.inParts === true;
+      const isSegmentFamily = isSeg || isGenerateParts;
+      if (subTab === 'models') return !isRig && !isAnim && !isSegmentFamily && !isFill;
       if (subTab === 'rigged') return isRig;
       if (subTab === 'animations') return isAnim;
-      if (subTab === 'segment') return isSeg;
+      if (subTab === 'segment') return isSegmentFamily;
       if (subTab === 'fill_parts') return isFill;
       return true;
     }
@@ -281,10 +283,11 @@ export default function Shared3DHistory({
       const isRig = item.mode === 'rig' || item.params?.rigged === true || item.params?.type === 'animate_rig';
       const isAnim = (item.mode === 'animate' && !isRig) || item.params?.animated === true || item.params?.type === 'animate_retarget';
       const isSeg = item.mode === 'segment';
+      const isGenerateParts = item.params?.generate_parts === true || item.params?.inParts === true;
       const isFill = item.mode === 'fill_parts';
       if (isAnim) animations.push(item);
       else if (isRig) rigged.push(item);
-      else if (isSeg) segments.push(item);
+      else if (isSeg || isGenerateParts) segments.push(item);
       else if (isFill) fillParts.push(item);
       else generated.push(item);
     }

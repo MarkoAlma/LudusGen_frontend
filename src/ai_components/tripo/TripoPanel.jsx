@@ -3,7 +3,7 @@ import React, {
 } from "react";
 import {
   Download, Loader2, AlertCircle, Trash2, RotateCcw,
-  Camera, Move3d, Layers, Play, Square, ChevronRight, ChevronLeft, Box, Zap, ChevronDown,
+  Camera, Move3d, Layers, Play, Square, ChevronRight, ChevronLeft, Box, Zap, ChevronDown, Info,
   Sparkles, Grid3x3, Scissors, PaintBucket,
   Boxes, PersonStanding, Wand2, Activity,
   PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen
@@ -27,7 +27,8 @@ import { useActiveTasksPoller } from "./useActiveTasksPoller";
 import { checkThumbnailCache, getCachedThumbnail } from "../trellis/Glbthumbnail";
 import { useTripoHistory } from "./useTripoHistory";
 import { useTripoRig } from "./useTripoRig";
-import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX } from "./GeneratePanel";
+import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX, TRIPO_ENHANCE_PROMPT, TRIPO_SUPER_ENHANCE_PROMPT, TRIPO_SIMPLIFY_PROMPT } from "./GeneratePanel";
+import Enhancer from "../Enhancer";
 import Segment from "./Segment";
 import Retopo from "./Retopo";
 import Texture from "./Texture";
@@ -330,6 +331,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [texId, setTexId] = useState("");
   const [editId, setEditId] = useState("");
   const [refineId, setRefineId] = useState("");
+  const [refineManualOverride, setRefineManualOverride] = useState(false);
+  const [refinePrompt, setRefinePrompt] = useState("");
+  const [refineNegPrompt, setRefineNegPrompt] = useState("");
   const [stylizeId, setStylizeId] = useState("");
   const [stylizeStyle, setStylizeStyle] = useState("lego");
   const [animId, setAnimId] = useState("");
@@ -429,7 +433,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (!id) return null;
     return history.find(h => h.id === id) || optimisticItems.find(h => h.id === id) || null;
   }, [history, optimisticItems]);
+
   const activeH = useMemo(() => findHistoryItemById(selHistId), [findHistoryItemById, selHistId]);
+
+  useEffect(() => {
+    if (mode === "refine" && !refinePrompt && activeH?.prompt) {
+      setRefinePrompt(activeH.prompt);
+    }
+  }, [mode, activeH, refinePrompt]);
   const viewerH = useMemo(() => findHistoryItemById(viewerHistId), [findHistoryItemById, viewerHistId]);
   const selectedPreviewItem = useMemo(() => {
     if (manualSelectedItem) {
@@ -479,7 +490,49 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const isSegOutput = activeH?.mode === "segment";
   const isGeneratedInParts = activeH?.params?.generate_parts === true || activeH?.params?.inParts === true;
   const isFillPartsCompatible = isSegOutput || isGeneratedInParts;
-  const hasTexture = activeH?.params?.texture === true;
+  const refineSourceTaskId = (((refineManualOverride || !activeTaskId) ? refineId.trim() : activeTaskId) || "").trim();
+  const refineSourceItem = useMemo(() => {
+    if (!refineSourceTaskId) return null;
+    return history.find(h => h.taskId === refineSourceTaskId || h.id === refineSourceTaskId)
+      || optimisticItems.find(h => h.taskId === refineSourceTaskId || h.id === refineSourceTaskId)
+      || (activeH?.taskId === refineSourceTaskId || activeH?.id === refineSourceTaskId ? activeH : null);
+  }, [refineSourceTaskId, history, optimisticItems, activeH]);
+
+  const sourceForRefine = refineSourceItem || activeH;
+  const hasTexture = (
+    sourceForRefine?.mode === "texture" ||
+    sourceForRefine?.params?.mode === "texture" ||
+    sourceForRefine?.params?.type === "texture_model" ||
+    sourceForRefine?.params?.texture === true ||
+    sourceForRefine?.params?.texture === "true" ||
+    sourceForRefine?.params?.pbr === true ||
+    sourceForRefine?.params?.pbr === "true"
+  );
+  const activeSourceType = sourceForRefine?.params?.type || null;
+  const isRefineSourceTypeSupported = !activeSourceType || ["text_to_model", "image_to_model", "multiview_to_model"].includes(activeSourceType);
+  const refineBlockedBySelectedSource = mode === "refine" && (hasTexture || !isRefineSourceTypeSupported);
+  const refineDisableReason = hasTexture
+    ? "Refine csak draft (texture OFF) modellen használható."
+    : (!isRefineSourceTypeSupported ? `Refine ehhez a forrástípushoz nem támogatott: ${activeSourceType}` : "");
+
+  useEffect(() => {
+    if (mode !== "refine") return;
+    console.log("[TripoPanel][refine-debug]", {
+      refineId,
+      refineManualOverride,
+      activeTaskId,
+      refineSourceTaskId,
+      sourceTaskId: sourceForRefine?.taskId || sourceForRefine?.id || null,
+      sourceMode: sourceForRefine?.mode || sourceForRefine?.params?.mode || null,
+      sourceType: sourceForRefine?.params?.type || null,
+      sourceTexture: sourceForRefine?.params?.texture ?? null,
+      sourcePbr: sourceForRefine?.params?.pbr ?? null,
+      hasTexture,
+      isRefineSourceTypeSupported,
+      refineBlockedBySelectedSource,
+      refineDisableReason,
+    });
+  }, [mode, refineId, refineManualOverride, activeTaskId, refineSourceTaskId, sourceForRefine, hasTexture, isRefineSourceTypeSupported, refineBlockedBySelectedSource, refineDisableReason]);
 
   // Segment highlight state controlled manually via top-right toggle
   const [segmentHighlight, setSegmentHighlight] = useState(false);
@@ -609,7 +662,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         return !!(editId.trim() || activeTaskId) &&
           (brushMode === "Paint Mode" || !!brushPrompt.trim());
       case "refine": {
-        if (!refineId.trim() && activeH?.params?.texture === true) return false;
+        if (refineBlockedBySelectedSource) return false;
         return !!(refineId.trim() || activeTaskId);
       }
       case "stylize": return !!(stylizeId.trim() || activeTaskId);
@@ -618,7 +671,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, [mode, genTab, prompt, batchImages, segId, fillId, retopoId, isFillPartsCompatible,
     texId, texInputTab, texPrompt, multiImages, editId, brushMode, brushPrompt,
-    refineId, stylizeId, riggedId, selAnim, activeTaskId, activeH, focusedInstanceId, _taskTick]);
+    refineId, stylizeId, riggedId, selAnim, activeTaskId, activeH, refineBlockedBySelectedSource, focusedInstanceId, _taskTick]);
 
 
 
@@ -1059,8 +1112,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (item?.taskId) {
       setSegId(item.taskId); setFillId(item.taskId); setRetopoId(item.taskId);
       setTexId(item.taskId); setAnimId(item.taskId); setEditId(item.taskId);
-      setRefineId(item.taskId); setStylizeId(item.taskId);
+      setRefineId(item.taskId); setRefineManualOverride(false); setStylizeId(item.taskId);
     }
+    console.log("[TripoPanel][history-select]", {
+      taskId: item?.taskId || null,
+      mode: item?.mode || item?.params?.mode || null,
+      type: item?.params?.type || null,
+      texture: item?.params?.texture ?? null,
+      pbr: item?.params?.pbr ?? null,
+    });
 
     const isRigItem = item?.mode === "rig" || item?.params?.rigged === true || item?.params?.type === "animate_rig";
     const isAnimItem = item?.params?.animated === true || item?.params?.type === "animate_retarget";
@@ -1098,6 +1158,19 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   const handleGen = useCallback(async () => {
     if (!canGen) return;
+    if (mode === "refine" && refineBlockedBySelectedSource) {
+      const msg = refineDisableReason || "Refine cannot run on this selected model.";
+      console.warn("[TripoPanel][refine-blocked-at-submit]", {
+        msg,
+        refineId,
+        refineManualOverride,
+        activeTaskId,
+        refineSourceTaskId,
+      });
+      setErrorMsg(msg);
+      toast.error(msg);
+      return;
+    }
 
     if (histAbort.current) histAbort.current.cancelled = true;
     histAbort.current = null;
@@ -1246,16 +1319,22 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           break;
         }
         case "retopo": {
-          const _retopoSrc = history.find(h => h.taskId === (retopoId.trim() || srcId));
+          const retopoSourceTaskId = (retopoId.trim() || srcId);
+          const _retopoSrc = history.find(h => h.taskId === retopoSourceTaskId);
           const _retopoName = _retopoSrc?.name || _retopoSrc?.prompt || "";
-          body = {
+          body = smartLowPoly ? {
+            type: "smart_low_poly",
+            original_model_task_id: retopoSourceTaskId,
+            ...(quadMesh && { quad: true }),
+            ...(polycount > 0 && { face_limit: polycount }),
+            _sourceName: _retopoName,
+          } : {
             type: "convert_model",
-            original_model_task_id: (retopoId.trim() || srcId),
+            original_model_task_id: retopoSourceTaskId,
             format: quadMesh ? "fbx" : (outFormat || "glb"),
             ...(quadMesh && { quad: true }),
             ...(polycount > 0 && { face_limit: polycount }),
-            ...(pivotToBottom && !smartLowPoly && { pivot_to_center_bottom: true }),
-            ...(smartLowPoly && { smart_low_poly: true }),
+            ...(pivotToBottom && { pivot_to_center_bottom: true }),
             _sourceName: _retopoName,
           };
           break;
@@ -1283,7 +1362,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             };
           }
           break;
-        case "refine": body = { type: "refine_model", draft_model_task_id: (refineId.trim() || srcId) }; break;
+        case "refine": 
+          body = { 
+            type: "refine_model", 
+            draft_model_task_id: refineSourceTaskId,
+            ...(refinePrompt.trim() && { prompt: refinePrompt.trim() }),
+            ...(refineNegPrompt.trim() && { negative_prompt: refineNegPrompt.trim() }),
+          }; 
+          break;
         case "stylize": body = { type: "stylize_model", original_model_task_id: (stylizeId.trim() || srcId), style: stylizeStyle }; break;
         case "animate": {
           const baseModelId = riggedId || activeH?.params?.originalModelTaskId || activeTaskId;
@@ -1376,6 +1462,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
       try {
         const headers = await authH();
+        if (mode === "refine") {
+          console.log("[TripoPanel][refine-debug] submitting refine body:", {
+            type: body?.type,
+            draft_model_task_id: body?.draft_model_task_id ?? null,
+            original_model_task_id: body?.original_model_task_id ?? null,
+            prompt: body?.prompt ?? null,
+            negative_prompt: body?.negative_prompt ?? null,
+          });
+        }
         const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify(body) });
         const td = await tr.json();
 
@@ -1449,7 +1544,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       console.warn("[handleGen] Unexpected error during body construction:", e.message);
       setErrorMsg(e.message ?? "Generation setup failed");
     }
-  }, [canGen, mode, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError]);
+  }, [canGen, mode, refineBlockedBySelectedSource, refineDisableReason, refineSourceTaskId, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError]);
 
   const { rigCompatRef, getCompatibility, handleAutoRig } = useTripoRig({
     activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl,
@@ -1608,9 +1703,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           name: _sourceName ? (_modeLabel ? `${_modeLabel}/${_sourceName}` : _sourceName) : undefined,
           label: inst.label,
           mode: inst.mode,
+          type: inst.snapshot?.type ?? undefined,
           modelVer: inst.snapshot?.model_version ?? undefined,
+          originalModelTaskId: inst.snapshot?.original_model_task_id ?? undefined,
           ...(inst.snapshot?.generate_parts === true && { generate_parts: true, inParts: true }),
-          ...(inst.snapshot?.texture === true && { texture: true }),
+          ...((inst.mode === "texture" || inst.snapshot?.type === "texture_model" || inst.snapshot?.texture === true) && { texture: true }),
+          ...(inst.snapshot?.pbr === true && { pbr: true }),
         });
         if (ni) {
           setViewerHistId(ni.id);
@@ -1699,7 +1797,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (item?.taskId) {
       setSegId(item.taskId); setFillId(item.taskId); setRetopoId(item.taskId);
       setTexId(item.taskId); setAnimId(item.taskId); setEditId(item.taskId);
-      setRefineId(item.taskId); setStylizeId(item.taskId);
+      setRefineId(item.taskId); setRefineManualOverride(false); setStylizeId(item.taskId);
     }
     setActiveStyle(item?.styleId || "");
     setErrorMsg("");
@@ -1987,36 +2085,94 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} rigBtnLocked={rigBtnLocked} handleAutoRig={handleAutoRig} rigType={rigType} setRigType={setRigType} rigSpec={rigSpec} setRigSpec={setRigSpec} detectedRigType={detectedRigType} detectedRigModelVer={detectedRigModelVer} detectedRigSpec={detectedRigSpec} rigCompat={rigCompat} animOutFormat={animOutFormat} setAnimOutFormat={setAnimOutFormat} animBakeAnimation={animBakeAnimation} setAnimBakeAnimation={setAnimBakeAnimation} animExportGeometry={animExportGeometry} setAnimExportGeometry={setAnimExportGeometry} animAnimateInPlace={animAnimateInPlace} setAnimAnimateInPlace={setAnimAnimateInPlace} color={color} />
               </div>
               {mode === "refine" && (
-                <div>
+                <div className="flex flex-col gap-4">
                   {activeTaskId && (
-                    <div className="p-2 px-3 rounded-lg bg-primary/10 border border-primary/25 mb-4">
-                      <p className="text-primary font-bold text-[11px] m-0">Selected model</p>
-                      <p className="text-[#2d2d48] text-[9px] mt-1 font-mono truncate">{activeTaskId}</p>
+                    <div className="p-3 rounded-xl bg-primary/5 border border-primary/15 shadow-sm">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Box className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-primary font-black uppercase tracking-wider text-[10px]">Active Mesh for Refinement</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-white/90 text-[11px] font-bold truncate max-w-[200px]">{activeH?.name || activeH?.prompt || "Untitled Model"}</p>
+                        <p className="text-[#2d2d48] text-[9px] font-mono">{activeTaskId.slice(0, 8)}...</p>
+                      </div>
                     </div>
                   )}
-                  <div className="flex items-center gap-2 mb-3 p-1.5 px-2 rounded bg-white/5 border border-white/10 font-mono text-[10px] text-primary italic">
-                    task: "refine_model"
+
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                      <span className="text-zinc-400 font-black uppercase tracking-wider text-[10px]">Refinement Guide</span>
+                    </div>
+                    <p className="text-zinc-500 text-[11px] leading-relaxed italic">
+                      Tripo Refine uses high-fidelity geometry reconstruction to fix mesh artifacts, sharpen edges, and optimize topology.
+                    </p>
                   </div>
-                  <p className="text-zinc-500 text-[11px] leading-relaxed mb-4 italic">
-                    Enhance mesh quality, fix topology issues, and improve geometry detail. Uses Tripo refine_model (30 credits).
-                  </p>
-                  {activeH?.params?.texture === true ? (
-                    <div className="p-2 px-3 rounded-lg bg-red-500/10 border border-red-500/30 mb-4">
-                      <p className="text-red-400 font-bold text-[10px] m-0 uppercase tracking-widest">Not Refinable</p>
-                      <p className="text-red-300/70 text-[10px] mt-1 leading-relaxed">This model was generated <span className="font-bold">with texture</span>. Refine only works on draft meshes (no texture). Generate a new model without texture, then apply Refine.</p>
+
+                  {refineBlockedBySelectedSource ? (
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Info className="w-3.5 h-3.5 text-red-400" />
+                        <span className="text-red-400 font-black uppercase tracking-wider text-[10px]">Incompatibility Detected</span>
+                      </div>
+                      <p className="text-red-300/70 text-[10px] leading-relaxed">
+                        {refineDisableReason || "Refine only works on compatible draft sources."}
+                      </p>
                     </div>
                   ) : (
-                    <div className="p-2 px-3 rounded-lg bg-yellow-500/10 border border-yellow-500/25 mb-4">
-                      <p className="text-yellow-400 font-bold text-[10px] m-0 uppercase tracking-widest">Requirement</p>
-                      <p className="text-yellow-300/70 text-[10px] mt-1 leading-relaxed">Only works on models generated <span className="font-bold">without texture</span>. Turn off Texture in Generate before using Refine.</p>
-                    </div>
+                    <>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-zinc-500 font-black uppercase tracking-widest text-[9px] block mb-2 px-1">Refinement Prompt</label>
+                          <Enhancer
+                            value={refinePrompt}
+                            onChange={val => { setRefinePrompt(val); setErrorMsg?.(""); }}
+                            onNegativeChange={setRefineNegPrompt}
+                            onSubmit={() => canGen && handleGen()}
+                            color="#8b5cf6"
+                            getIdToken={getIdToken}
+                            enhancing_prompt={TRIPO_ENHANCE_PROMPT}
+                            super_enhancing_prompt={TRIPO_SUPER_ENHANCE_PROMPT}
+                            dechanting_prompt={TRIPO_SIMPLIFY_PROMPT}
+                            onBusyChange={() => { }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-zinc-500 font-black uppercase tracking-widest text-[9px] block mb-2 px-1">Negative Prompt</label>
+                          <textarea
+                            className="tp-ta"
+                            placeholder="Specify details to remove during refinement..."
+                            value={refineNegPrompt}
+                            onChange={e => setRefineNegPrompt(e.target.value.slice(0, 250))}
+                            rows={2}
+                            maxLength={250}
+                            style={{
+                              border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12,
+                              background: "rgba(255,255,255,0.03)", fontSize: 11, resize: "none", width: "100%",
+                              boxSizing: "border-box", padding: "10px 12px",
+                              color: "#e8e0ff"
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </>
                   )}
-                  <input
-                    className="tp-input"
-                    placeholder="Or enter task ID manually..."
-                    value={refineId}
-                    onChange={e => setRefineId(e.target.value)}
-                  />
+
+                  <div className="mt-2">
+                    <label className="text-zinc-600 font-bold text-[9px] block mb-2 px-1">MANUAL TASK OVERRIDE (OPTIONAL)</label>
+                    <input
+                      className="tp-input"
+                      placeholder="Paste a draft task ID here..."
+                      value={refineId}
+                      onChange={e => {
+                        const nextValue = e.target.value;
+                        setRefineId(nextValue);
+                        setRefineManualOverride(!!nextValue.trim());
+                      }}
+                      style={{ height: 32, fontSize: 10, background: "rgba(0,0,0,0.2)" }}
+                    />
+                  </div>
                 </div>
               )}
               {mode === "stylize" && (
@@ -2168,7 +2324,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                         title={
                           activeTasksRunningCount >= PARALLEL_LIMIT
                             ? `Maximum párhuzamos taskok elérve (${PARALLEL_LIMIT}/${PARALLEL_LIMIT})`
-                            : undefined
+                            : (mode === "refine" && refineBlockedBySelectedSource ? refineDisableReason : undefined)
                         }
                       >
                         {genLabel}
@@ -2473,7 +2629,7 @@ function TripoWorkspaceWrapper({
         )}
 
         {selectedItem && (
-          <SelectedHistoryPreview item={selectedItem} color={selectedPreviewColor || color} viewerItemId={viewerH?.id} />
+                <SelectedHistoryPreview item={selectedItem} color={selectedPreviewColor || color} viewerItemId={viewerH?.id} selectedItemId={activeH?.id} />
         )}
       </div>
 
@@ -2538,7 +2694,7 @@ function TripoWorkspaceWrapper({
   );
 }
 
-function SelectedHistoryPreview({ item, color, viewerItemId }) {
+function SelectedHistoryPreview({ item, color, viewerItemId, selectedItemId }) {
   const [thumbnail, setThumbnail] = useState(() => checkThumbnailCache(item?.model_url) || item?.thumbnail || item?.thumbnail_url || null);
 
   useEffect(() => {
@@ -2555,9 +2711,12 @@ function SelectedHistoryPreview({ item, color, viewerItemId }) {
   const displayName = item?.name || item?.prompt || item?.mode || "Selected";
   const modeLabel = (item?.mode || item?.params?.mode || "model").replace(/_/g, " ");
   const isMirroringViewer = viewerItemId === item.id;
+  const isSelected = selectedItemId === item.id;
   const aura = `${color}85`;
   const border = `${color}aa`;
   const panelBg = `${color}1a`;
+  const statusColor = isSelected ? color : (isMirroringViewer ? "#22d3ee" : color);
+  const statusLabel = isSelected ? "selected" : (isMirroringViewer ? "viewer loaded" : "preview");
 
   return (
     <motion.div
@@ -2603,12 +2762,12 @@ function SelectedHistoryPreview({ item, color, viewerItemId }) {
           <div className="truncate text-[10px] font-black tracking-[0.01em] text-white drop-shadow-[0_1px_6px_rgba(0,0,0,0.7)]">
             {displayName}
           </div>
-          <div className="mt-1 flex items-center gap-1.5 text-[7px] font-black uppercase tracking-[0.12em]" style={{ color: `${color}db` }}>
+          <div className="mt-1 flex items-center gap-1.5 text-[7px] font-black uppercase tracking-[0.12em]" style={{ color: `${statusColor}db` }}>
             <span
               className="inline-flex h-1.5 w-1.5 rounded-full"
-              style={{ background: isMirroringViewer ? "#22d3ee" : color, boxShadow: `0 0 8px ${isMirroringViewer ? "#22d3ee" : color}` }}
+              style={{ background: statusColor, boxShadow: `0 0 8px ${statusColor}` }}
             />
-            {isMirroringViewer ? "viewer sync" : "selected source"}
+            {statusLabel}
           </div>
         </div>
       </div>

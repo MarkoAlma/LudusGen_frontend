@@ -119,6 +119,8 @@ export function JobsProvider({ children }) {
   }, []);
 
   const cancelJob = useCallback(async (id) => {
+    const job = jobs.find((item) => item.id === id);
+
     // 1. Local cancel (stop poller/abort request)
     const fn = cancelHandlersRef.current.get(id);
     if (fn) {
@@ -126,21 +128,20 @@ export function JobsProvider({ children }) {
       cancelHandlersRef.current.delete(id);
     }
 
-    // 2. Backend cancel (stop server process)
+    // 2. Backend cancel (Tripo task endpoint, only when we have a taskId)
     try {
       const token = await auth.currentUser?.getIdToken();
-      if (token) {
-        fetch(`${API_BASE}/api/cancel-job`, {
+      if (token && job?.panelType === 'tripo' && job?.taskId) {
+        fetch(`${API_BASE}/api/tripo/task/${job.taskId}/cancel`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ jobId: id }),
         }).catch(() => {});
       }
     } catch (e) {}
 
     // 3. UI cleanup
     removeJob(id);
-  }, [removeJob]);
+  }, [jobs, removeJob]);
 
   const clearSeenCompletedJobs = useCallback((panelType) => {
     setJobs((prev) => normalizeJobs(prev.map((job) => (

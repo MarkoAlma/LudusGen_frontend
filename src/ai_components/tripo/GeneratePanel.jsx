@@ -397,7 +397,7 @@ export const STYLE_PREFIX = [
 
 
 /* ─── Enhancer prompts (module-scope — no component deps) ────────────── */
-const TRIPO_ENHANCE_PROMPT = `You are a Tripo3D prompt engineer. Improve the user's prompt for 3D mesh generation.
+export const TRIPO_ENHANCE_PROMPT = `You are a Tripo3D prompt engineer. Improve the user's prompt for 3D mesh generation.
 
 OUTPUT: Raw JSON ONLY — no markdown, no prose: {"prompt": "...", "negative_prompt": "..."}
 
@@ -437,7 +437,7 @@ NEGATIVE PROMPT — type-specific mesh artifacts only, MAX 250 characters:
 - prop_weapon → open faces, missing backface, hollow shell, incomplete geometry, broken blade, missing handle, floating pieces
 - environment → floating objects, incomplete structures, missing ground plane`;
 
-const TRIPO_SUPER_ENHANCE_PROMPT = `You are an elite Tripo3D prompt engineer. Fully expand the user's prompt with rich construction-level detail for 3D mesh generation.
+export const TRIPO_SUPER_ENHANCE_PROMPT = `You are an elite Tripo3D prompt engineer. Fully expand the user's prompt with rich construction-level detail for 3D mesh generation.
 
 OUTPUT: Raw JSON ONLY — no markdown, no prose: {"prompt": "...", "negative_prompt": "..."}
 
@@ -485,7 +485,7 @@ NEGATIVE PROMPT — comprehensive, type-specific, MAX 250 characters:
 - prop_weapon → open faces, missing backface, hollow shell, broken geometry, missing components, floating pieces, incomplete blade, warped handle, melted edges
 - environment → floating objects, incomplete structures, missing ground plane, disconnected elements, collapsing geometry`;
 
-const TRIPO_SIMPLIFY_PROMPT = `You are a 3D model prompt engineer.
+export const TRIPO_SIMPLIFY_PROMPT = `You are a 3D model prompt engineer.
 The user gives you a long or complex prompt. Simplify it to a clear, concise English description under 200 characters, keeping the essential object and style.
 Respond ONLY with plain text, no JSON, no explanation.`;
 

@@ -416,6 +416,7 @@ const ThreeViewer = memo(forwardRef(({
 
   useEffect(() => {
     if (!modelUrl || !S.current?.scene) return;
+    if (onSegmentProcessing) onSegmentProcessing(false);
     // Blob URL-nél nincs kiterjesztés — azok mindig GLB (fetchGlbAsBlob hozza létre)
     if (!modelUrl.startsWith('blob:')) {
       const ext = modelUrl.split('?')[0].split('.').pop().toLowerCase();
