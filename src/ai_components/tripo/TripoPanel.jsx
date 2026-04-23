@@ -206,6 +206,14 @@ const CSS = `
   }
 `;
 
+function logFrontendDebug(label, payload) {
+  try {
+    console.log(label, JSON.parse(JSON.stringify(payload)));
+  } catch {
+    console.log(label, payload);
+  }
+}
+
 function CoinIcon({ size = 15 }) {
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: "linear-gradient(135deg,#f5c518,#e09900)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -289,19 +297,44 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [meshQ, setMeshQ] = useState("standard");
   const [inParts, setInParts] = useState(false);
   const [privacy, setPrivacy] = useState("public");
-  const [texOn, setTexOn] = useState(true);
-  const [tex4K, setTex4K] = useState(true);
-  const [pbrOn, setPbrOn] = useState(false);
+  const [texOn, setTexOn] = useState(() => {
+    const saved = sessionStorage.getItem("tripo_generate_texture");
+    return saved == null ? false : saved === "true";
+  });
+  const [tex4K, setTex4K] = useState(() => {
+    const saved = sessionStorage.getItem("tripo_generate_texture_4k");
+    return saved == null ? true : saved === "true";
+  });
+  const [pbrOn, setPbrOn] = useState(() => {
+    const savedTexture = sessionStorage.getItem("tripo_generate_texture");
+    const saved = sessionStorage.getItem("tripo_generate_pbr");
+    if (savedTexture === "false") return false;
+    return saved === "true";
+  });
   const [genStatus, setGenStatus] = useState("idle");
   const [isRunning, setIsRunning] = useState(false);
   const [pendingCountdown, setPendingCountdown] = useState(null);
   const pendingTaskRef = useRef(null);
+  const submitLockedRef = useRef(false);
+  const [submitLocked, setSubmitLocked] = useState(false);
   const [multiImages, setMultiImages] = useState([]);
   const [batchImages, setBatchImages] = useState([]);
   const [imgFile, setImgFile] = useState(null);
   const [imgPrev, setImgPrev] = useState(null);
   const [imgToken, setImgToken] = useState(null);
   const [imgUploading, setImgUploading] = useState(false);
+
+  useEffect(() => {
+    sessionStorage.setItem("tripo_generate_texture", String(texOn));
+  }, [texOn]);
+
+  useEffect(() => {
+    sessionStorage.setItem("tripo_generate_texture_4k", String(tex4K));
+  }, [tex4K]);
+
+  useEffect(() => {
+    sessionStorage.setItem("tripo_generate_pbr", String(pbrOn && texOn));
+  }, [pbrOn, texOn]);
 
   // topology
   const [quadMesh, setQuadMesh] = useState(true);
@@ -641,6 +674,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const PARALLEL_LIMIT = 10;
 
   const canGen = useMemo(() => {
+    if (submitLocked) return false;
     const running = [...activeTasksRef.current.values()]
       .filter(t => t.status === "running" || t.status === "pending").length;
     if (running >= PARALLEL_LIMIT) return false;
@@ -671,7 +705,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, [mode, genTab, prompt, batchImages, segId, fillId, retopoId, isFillPartsCompatible,
     texId, texInputTab, texPrompt, multiImages, editId, brushMode, brushPrompt,
-    refineId, stylizeId, riggedId, selAnim, activeTaskId, activeH, refineBlockedBySelectedSource, focusedInstanceId, _taskTick]);
+    refineId, stylizeId, riggedId, selAnim, activeTaskId, activeH, refineBlockedBySelectedSource, focusedInstanceId, _taskTick, submitLocked]);
 
 
 
@@ -1171,26 +1205,30 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       toast.error(msg);
       return;
     }
+    if (submitLockedRef.current) return;
+    submitLockedRef.current = true;
+    setSubmitLocked(true);
 
-    if (histAbort.current) histAbort.current.cancelled = true;
-    histAbort.current = null;
-    pendingUrlTaskId.current = null;
-    setLoadingId(null);
-
-    // Frontend credit check — don't send request if insufficient
-    const estimatedCost = genCost;
-    if (userCredits < estimatedCost && estimatedCost > 0) {
-      toast.error(`Insufficient credits: ${estimatedCost} needed, ${userCredits} available`);
-      setErrorMsg(`Insufficient credits. You need ${estimatedCost} credits but have ${userCredits}.`);
-      return;
-    }
-
-    setGenStatus("pending"); setErrorMsg("");
-    const srcId = activeTaskId;
-    const animSlugs = [...selAnim].map(id => getAnimById(id)?.slug).filter(Boolean);
-    const animSlug = animSlugs.length === 1 ? animSlugs[0] : null;
     try {
-      let body;
+      if (histAbort.current) histAbort.current.cancelled = true;
+      histAbort.current = null;
+      pendingUrlTaskId.current = null;
+      setLoadingId(null);
+
+      // Frontend credit check — don't send request if insufficient
+      const estimatedCost = genCost;
+      if (userCredits < estimatedCost && estimatedCost > 0) {
+        toast.error(`Insufficient credits: ${estimatedCost} needed, ${userCredits} available`);
+        setErrorMsg(`Insufficient credits. You need ${estimatedCost} credits but have ${userCredits}.`);
+        return;
+      }
+
+      setGenStatus("pending"); setErrorMsg("");
+      const srcId = activeTaskId;
+      const animSlugs = [...selAnim].map(id => getAnimById(id)?.slug).filter(Boolean);
+      const animSlug = animSlugs.length === 1 ? animSlugs[0] : null;
+      try {
+        let body;
 
       /* ── texture paint: upload mask from canvas before building body ── */
       let maskToken = null;
@@ -1391,6 +1429,17 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         default: return;
       }
 
+      logFrontendDebug("[TripoPanel][submit-debug] built body:", {
+        mode,
+        genTab,
+        activeTaskId: srcId ?? null,
+        texOn,
+        pbrOn,
+        tex4K,
+        refineSourceTaskId: mode === "refine" ? refineSourceTaskId : null,
+        body,
+      });
+
       // Generate instanceId and label
       const instanceId = crypto.randomUUID();
       const effectiveOpType = mode === "segment" ? segSub : mode;
@@ -1473,6 +1522,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         }
         const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify(body) });
         const td = await tr.json();
+        logFrontendDebug("[TripoPanel][submit-debug] backend response:", {
+          httpStatus: tr.status,
+          ok: tr.ok,
+          response: td,
+        });
 
         if (!td.success) {
           const msg = td.message ?? "Task failed";
@@ -1528,6 +1582,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         }
         forceUpdate();
       } catch (e) {
+        console.error("[TripoPanel][submit-debug] request failed:", e);
         const current = activeTasksRef.current.get(instanceId);
         if (current) {
           activeTasksRef.current.set(instanceId, { ...current, status: "failed", errorMsg: e.message ?? "Network error" });
@@ -1539,10 +1594,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         else if (e.type === "credits") toast.error("Nincs elég Tripo kredit. Tölts fel a fiókodba!");
         else if (e.type === "nsfw") toast.error("Tartalom blokkolva: NSFW vagy irányelvek megsértése.");
       }
-    } catch (e) {
-      // Body-building errors (mask upload, switch default already returns early)
-      console.warn("[handleGen] Unexpected error during body construction:", e.message);
-      setErrorMsg(e.message ?? "Generation setup failed");
+      } catch (e) {
+        // Body-building errors (mask upload, switch default already returns early)
+        console.warn("[handleGen] Unexpected error during body construction:", e.message);
+        setErrorMsg(e.message ?? "Generation setup failed");
+      }
+    } finally {
+      submitLockedRef.current = false;
+      setSubmitLocked(false);
     }
   }, [canGen, mode, refineBlockedBySelectedSource, refineDisableReason, refineSourceTaskId, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError]);
 
@@ -1752,12 +1811,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     await loadHistoryIntoViewer(item, { showLoading: true });
   }, [applyHistorySelection, loadHistoryIntoViewer]);
 
-  const loadHistoryIntoViewerAuto = useCallback(async (item, { showLoading = true } = {}) => {
-    if (!item) return;
-    await loadHistoryIntoViewer(item, { showLoading });
-  }, [loadHistoryIntoViewer]);
-
-
   // Called by Shared3DHistory once when the first Firestore snapshot arrives.
   // Restores the previously selected item from URL param or saved sessionStorage id.
   const onHistoryLoad = useCallback((items) => {
@@ -1770,8 +1823,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         : null;
     if (!item) { setLoadingId(null); return; }
     pendingUrlTaskId.current = null;
-    loadHistoryIntoViewerAuto(item, { showLoading: true });
-  }, [loadHistoryIntoViewerAuto]);
+    void selHist(item);
+  }, [selHist]);
 
   useEffect(() => {
     const pendingTaskId = pendingUrlTaskId.current;
@@ -1784,8 +1837,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
     pendingUrlTaskId.current = null;
     setLoadingId(null);
-    loadHistoryIntoViewerAuto(pendingItem, { showLoading: true });
-  }, [history, optimisticItems, loadHistoryIntoViewerAuto]);
+    void selHist(pendingItem);
+  }, [history, optimisticItems, selHist]);
 
   const reuse = useCallback((item) => {
     const styleObj = STYLE_PREFIX.find(s => s.id === item?.styleId);
@@ -1887,7 +1940,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       const histItem = history.find(h => h.taskId === job.taskId);
       if (histItem) {
         sessionStorage.removeItem(key);
-        loadHistoryIntoViewerAuto(histItem, { showLoading: true });
+        void selHist(histItem);
       } else if (job.status === 'done') {
         // Still waiting for history to sync the finished job
         pendingUrlTaskId.current = job.taskId;
@@ -1897,7 +1950,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       // Job doesn't have taskId yet or was removed?
       sessionStorage.removeItem(key);
     }
-  }, [user?.uid, jobs, history, loadHistoryIntoViewerAuto]);
+  }, [user?.uid, jobs, history, selHist]);
 
   // Synchronize active model with tripoTaskId URL parameter
   const urlTaskIdParam = searchParams.get("tripoTaskId");
@@ -1915,13 +1968,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (urlTaskIdParam === activeTaskIdRef.current) return;
     const histItem = historyRef.current.find(h => h.taskId === urlTaskIdParam);
     if (histItem) {
-      loadHistoryIntoViewerAuto(histItem, { showLoading: true });
+      void selHist(histItem);
     } else {
       pendingUrlTaskId.current = urlTaskIdParam;
       setLoadingId("__url_pending__");
     }
     // Only re-run when the URL param itself changes (external navigation)
-  }, [urlTaskIdParam, loadHistoryIntoViewerAuto]);
+  }, [urlTaskIdParam, selHist]);
 
   return (
     <StudioLayout
