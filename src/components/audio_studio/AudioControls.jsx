@@ -32,6 +32,45 @@ const TTS_VOICES = [
 const MINIMAX_SAMPLE_RATES = [16000, 24000, 32000, 44100];
 const MINIMAX_BITRATES = [32000, 64000, 128000, 256000];
 const MINIMAX_FILE_FORMATS = ["mp3", "wav", "pcm"];
+const DEAPI_FILE_FORMATS = [
+  { id: "mp3", label: "MP3" },
+  { id: "wav", label: "WAV" },
+  { id: "flac", label: "FLAC" },
+];
+const DEAPI_TTS_MODES = [
+  { id: "custom_voice", label: "Preset", desc: "Kesz hang" },
+  { id: "voice_clone", label: "Clone", desc: "Referencia" },
+  { id: "voice_design", label: "Design", desc: "Leiras" },
+];
+const DEAPI_TTS_LANGUAGES = [
+  { id: "en", label: "EN" },
+  { id: "en-us", label: "EN-US" },
+  { id: "en-gb", label: "EN-GB" },
+  { id: "hu", label: "HU" },
+  { id: "de", label: "DE" },
+  { id: "es", label: "ES" },
+  { id: "fr", label: "FR" },
+  { id: "it", label: "IT" },
+  { id: "ja", label: "JA" },
+  { id: "zh", label: "ZH" },
+];
+const DEAPI_TTS_SAMPLE_RATES = [
+  { id: "16000", label: "16 kHz" },
+  { id: "22050", label: "22.05 kHz" },
+  { id: "24000", label: "24 kHz" },
+  { id: "44100", label: "44.1 kHz" },
+  { id: "48000", label: "48 kHz" },
+];
+const DEAPI_TTS_VOICES = [
+  { id: "af_sky", label: "AF Sky", desc: "Kokoro" },
+  { id: "af_heart", label: "AF Heart", desc: "Kokoro" },
+  { id: "am_adam", label: "AM Adam", desc: "Kokoro" },
+  { id: "female", label: "Female", desc: "Chatterbox" },
+  { id: "male", label: "Male", desc: "Chatterbox" },
+  { id: "Vivian", label: "Vivian", desc: "Qwen3" },
+  { id: "Serena", label: "Serena", desc: "Qwen3" },
+  { id: "Dylan", label: "Dylan", desc: "Qwen3" },
+];
 const MINIMAX_OUTPUT_FORMATS = [
   { id: "url", label: "URL", desc: "24 órás link" },
   { id: "hex", label: "HEX", desc: "Beágyazott adat" },
@@ -100,39 +139,67 @@ const formatDurationLabel = (value) => {
   return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
 };
 
-function SectionShell({ color, eyebrow, title, subtitle, icon: Icon, children }) {
+function SectionShell({ color, eyebrow, title, subtitle, icon: Icon, children, compact = false }) {
+  const shellClassName = compact
+    ? "relative rounded-[1.25rem] border border-white/6 bg-white/[0.025] p-3.5 shadow-[0_14px_28px_rgba(0,0,0,0.18)]"
+    : "relative rounded-[1.75rem] border border-white/6 bg-white/[0.025] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.22)]";
+  const headerClassName = compact ? "mb-3 flex items-start justify-between gap-3" : "mb-5 flex items-start justify-between gap-4";
+  const eyebrowClassName = compact
+    ? "text-[8px] font-black uppercase tracking-[0.16em] text-zinc-600 italic"
+    : "text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic";
+  const titleClassName = compact
+    ? "mt-1 text-[11px] font-black uppercase tracking-[0.08em] text-white"
+    : "mt-2 text-[13px] font-black uppercase tracking-[0.16em] text-white";
+  const subtitleClassName = compact
+    ? "mt-1 break-words text-[9px] font-semibold uppercase tracking-[0.04em] leading-snug text-zinc-500"
+    : "mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500";
+  const iconClassName = compact
+    ? "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-white/8"
+    : "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/8";
+
   return (
-    <section className="relative rounded-[1.75rem] border border-white/6 bg-white/[0.025] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.22)]">
+    <section className={shellClassName}>
       <div
         className="pointer-events-none absolute inset-x-6 top-0 h-px"
         style={{ background: `linear-gradient(90deg, transparent, ${color}55, transparent)` }}
       />
-      <div className="mb-5 flex items-start justify-between gap-4">
+      <div className={headerClassName}>
         <div className="min-w-0">
-          <p className="text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic">{eyebrow}</p>
-          <h3 className="mt-2 text-[13px] font-black uppercase tracking-[0.16em] text-white">{title}</h3>
+          <p className={eyebrowClassName}>{eyebrow}</p>
+          <h3 className={titleClassName}>{title}</h3>
           {subtitle ? (
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{subtitle}</p>
+            <p className={subtitleClassName}>{subtitle}</p>
           ) : null}
         </div>
         {Icon ? (
           <div
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/8"
+            className={iconClassName}
             style={{ backgroundColor: `${color}14`, color }}
           >
             <Icon className="h-4 w-4" />
           </div>
         ) : null}
       </div>
-      <div className="space-y-5">{children}</div>
+      <div className={compact ? "space-y-3" : "space-y-5"}>{children}</div>
     </section>
   );
 }
 
-function TextAreaField({ label, value, onChange, placeholder, hint, rows = 4, disabled = false }) {
+function TextAreaField({ label, value, onChange, placeholder, hint, rows = 4, disabled = false, compact = false }) {
+  const wrapperClassName = compact ? "min-w-0 space-y-2" : "min-w-0 space-y-3";
+  const labelClassName = compact
+    ? "block break-words px-1 text-[8px] font-black uppercase tracking-[0.14em] text-zinc-600 italic leading-snug"
+    : "block break-words px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic leading-relaxed";
+  const textareaSizeClassName = compact
+    ? "rounded-[1rem] p-3 text-[12px] leading-snug"
+    : "rounded-[1.25rem] p-4 text-[13px] leading-relaxed";
+  const hintClassName = compact
+    ? "break-words px-1 text-[9px] font-semibold uppercase tracking-[0.04em] leading-snug text-zinc-500"
+    : "break-words px-1 text-[10px] font-bold uppercase tracking-[0.14em] leading-relaxed text-zinc-600";
+
   return (
-    <div className="min-w-0 space-y-3">
-      <label className="block break-words px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic leading-relaxed">
+    <div className={wrapperClassName}>
+      <label className={labelClassName}>
         {label}
       </label>
       <textarea
@@ -141,31 +208,56 @@ function TextAreaField({ label, value, onChange, placeholder, hint, rows = 4, di
         placeholder={placeholder}
         rows={rows}
         disabled={disabled}
-        className={`w-full rounded-[1.25rem] border p-4 text-[13px] leading-relaxed transition-all resize-none focus:outline-none ${
+        className={`w-full border transition-all resize-none focus:outline-none ${textareaSizeClassName} ${
           disabled
             ? 'cursor-not-allowed border-white/5 bg-white/[0.015] text-zinc-600 placeholder:text-zinc-800'
             : 'border-white/6 bg-white/[0.02] text-zinc-200 placeholder:text-zinc-800 focus:border-white/12'
         }`}
       />
       {hint ? (
-        <p className="break-words px-1 text-[10px] font-bold uppercase tracking-[0.14em] leading-relaxed text-zinc-600">{hint}</p>
+        <p className={hintClassName}>{hint}</p>
       ) : null}
     </div>
   );
 }
 
-function TextInputField({ label, value, onChange, onCommit, placeholder, hint, type = "text", inputMode, min, max, step }) {
+function TextInputField({
+  label,
+  value,
+  onChange,
+  onCommit,
+  placeholder,
+  hint,
+  type = "text",
+  inputMode,
+  min,
+  max,
+  step,
+  compact = false,
+  wrapperClassName = "",
+  showLimit = true,
+}) {
   const hasMin = min !== undefined && min !== null && min !== "";
   const hasMax = max !== undefined && max !== null && max !== "";
-  const limitNote = hasMin && hasMax
+  const limitNote = showLimit && hasMin && hasMax
     ? Number(min) === Number(max)
       ? `Limit: fixen ${min}`
       : `Limit: ${min}-${max}`
     : null;
+  const baseWrapperClassName = compact ? "min-w-0 space-y-1.5" : "min-w-0 space-y-3";
+  const labelClassName = compact
+    ? "block truncate px-1 text-[8px] font-black uppercase tracking-[0.12em] text-zinc-600 italic leading-snug"
+    : "block break-words px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic leading-relaxed";
+  const inputClassName = compact
+    ? "min-w-0 w-full rounded-[0.9rem] border border-white/6 bg-white/[0.02] px-3 py-2 text-[11px] font-bold text-zinc-200 placeholder:text-zinc-700 transition-all focus:outline-none focus:border-white/12"
+    : "min-w-0 w-full rounded-[1.1rem] border border-white/6 bg-white/[0.02] px-4 py-3 text-[12px] font-bold text-zinc-200 placeholder:text-zinc-700 transition-all focus:outline-none focus:border-white/12";
+  const helperClassName = compact
+    ? "break-words px-1 text-[9px] font-semibold uppercase tracking-[0.04em] leading-snug text-zinc-500"
+    : "break-words px-1 text-[10px] font-bold uppercase tracking-[0.12em] leading-relaxed text-zinc-600";
 
   return (
-    <div className="min-w-0 space-y-3">
-      <label className="block break-words px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic leading-relaxed">
+    <div className={`${baseWrapperClassName} ${wrapperClassName}`}>
+      <label className={labelClassName}>
         {label}
       </label>
       <input
@@ -185,13 +277,13 @@ function TextInputField({ label, value, onChange, onCommit, placeholder, hint, t
         min={min}
         max={max}
         step={step}
-        className="min-w-0 w-full rounded-[1.1rem] border border-white/6 bg-white/[0.02] px-4 py-3 text-[12px] font-bold text-zinc-200 placeholder:text-zinc-700 transition-all focus:outline-none focus:border-white/12"
+        className={inputClassName}
       />
       {limitNote ? (
-        <p className="break-words px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500 leading-relaxed">{limitNote}</p>
+        <p className={compact ? "break-words px-1 text-[9px] font-semibold uppercase tracking-[0.04em] leading-snug text-zinc-500" : "break-words px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500 leading-relaxed"}>{limitNote}</p>
       ) : null}
       {hint ? (
-        <p className="break-words px-1 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-600 leading-relaxed">{hint}</p>
+        <p className={helperClassName}>{hint}</p>
       ) : null}
     </div>
   );
@@ -242,27 +334,46 @@ function ToggleCard({ color, label, description, active, onClick, icon: Icon, di
   );
 }
 
-function OptionCard({ color, label, description, active, onClick, disabled = false }) {
-  return (
-    <button
-      type="button"
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      className={`min-w-0 rounded-[1.2rem] border px-3 py-3 text-center transition-all duration-300 ${
+function OptionCard({ color, label, description, active, onClick, disabled = false, compact = false }) {
+  const buttonClassName = compact
+    ? `min-w-0 rounded-[0.95rem] border px-2 py-2 text-center transition-all duration-300 ${
+        disabled
+          ? 'cursor-not-allowed border-white/5 bg-white/[0.015] opacity-40'
+          : active
+            ? 'shadow-[0_10px_22px_rgba(0,0,0,0.16)]'
+            : 'border-white/6 bg-white/[0.018] hover:border-white/12 hover:bg-white/[0.03]'
+      }`
+    : `min-w-0 rounded-[1.2rem] border px-3 py-3 text-center transition-all duration-300 ${
         disabled
           ? 'cursor-not-allowed border-white/5 bg-white/[0.015] opacity-40'
           : active
             ? 'shadow-[0_12px_30px_rgba(0,0,0,0.18)]'
             : 'border-white/6 bg-white/[0.018] hover:border-white/12 hover:bg-white/[0.03]'
-      }`}
+      }`;
+  const contentClassName = compact
+    ? "flex min-h-[2.7rem] flex-col items-center justify-center gap-0.5"
+    : "flex min-h-[4.75rem] flex-col items-center justify-center gap-1";
+  const labelClassName = compact
+    ? `break-words text-[9px] font-black uppercase tracking-[0.06em] leading-tight ${active ? 'text-white' : 'text-zinc-200'}`
+    : `break-words text-[11px] font-black uppercase tracking-[0.16em] leading-tight ${active ? 'text-white' : 'text-zinc-200'}`;
+  const descriptionClassName = compact
+    ? "break-words text-[8px] font-semibold uppercase tracking-[0.02em] leading-tight text-zinc-500"
+    : "break-words text-[8px] font-bold uppercase tracking-[0.08em] leading-[1.45] text-zinc-500";
+
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className={buttonClassName}
       style={active ? { borderColor: `${color}55`, backgroundColor: `${color}12` } : undefined}
     >
-      <div className="flex min-h-[4.75rem] flex-col items-center justify-center gap-1">
-        <div className={`break-words text-[11px] font-black uppercase tracking-[0.16em] leading-tight ${active ? 'text-white' : 'text-zinc-200'}`}>
+      <div className={contentClassName}>
+        <div className={labelClassName}>
           {label}
         </div>
         {description ? (
-          <div className="break-words text-[8px] font-bold uppercase tracking-[0.08em] leading-[1.45] text-zinc-500">{description}</div>
+          <div className={descriptionClassName}>{description}</div>
         ) : null}
       </div>
     </button>
@@ -281,6 +392,27 @@ export default function AudioControls({
   setSelectedVoice,
   speed,
   setSpeed,
+  deapiTtsVariant,
+  setDeapiTtsVariant,
+  deapiTtsMode,
+  setDeapiTtsMode,
+  deapiTtsVoice,
+  setDeapiTtsVoice,
+  deapiTtsLang,
+  setDeapiTtsLang,
+  deapiTtsSpeed,
+  setDeapiTtsSpeed,
+  deapiTtsFormat,
+  setDeapiTtsFormat,
+  deapiTtsSampleRate,
+  setDeapiTtsSampleRate,
+  deapiTtsRefText,
+  setDeapiTtsRefText,
+  deapiTtsInstruct,
+  setDeapiTtsInstruct,
+  deapiTtsReferenceAudio,
+  onDeapiTtsReferenceAudioSelect,
+  onDeapiTtsReferenceAudioClear,
 
   rivaLang,
   setRivaLang,
@@ -311,10 +443,7 @@ export default function AudioControls({
   setMusicFileFormat,
 
   deapiModels,
-  deapiModelsLoading,
-  deapiModelsError,
   deapiModelSlug,
-  setDeapiModelSlug,
   deapiCaption,
   setDeapiCaption,
   deapiEnhancingPrompt,
@@ -345,20 +474,34 @@ export default function AudioControls({
   setDeapiKeyscale,
   deapiTimesignature,
   setDeapiTimesignature,
-  deapiWebhookUrl,
-  setDeapiWebhookUrl,
   deapiReferenceAudio,
   onDeapiReferenceAudioSelect,
   onDeapiReferenceAudioClear,
 }) {
   const dropdownRef = useRef(null);
   const referenceAudioInputRef = useRef(null);
+  const ttsReferenceAudioInputRef = useRef(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const color = selectedModel.color || "#10b981";
 
   const isTTS = selectedModel.audioType === "tts";
   const isNvidiaRiva = selectedModel.provider === "nvidia-riva";
+  const isDeapiTTS = selectedModel.audioType === "tts" && selectedModel.provider === "deapi";
   const isDeapiMusic = selectedModel.audioType === "music" && selectedModel.provider === "deapi";
+  const deapiTtsVariants = Array.isArray(selectedModel.deapiTtsVariants) ? selectedModel.deapiTtsVariants : [];
+  const selectedDeapiTtsVariant = deapiTtsVariants.find((variant) => variant.id === deapiTtsVariant) || deapiTtsVariants[0] || null;
+  const effectiveDeapiTtsMode = selectedDeapiTtsVariant?.mode || deapiTtsMode;
+  const effectiveDeapiTtsLimits = selectedDeapiTtsVariant?.limits || selectedModel.deapiTtsLimits || {};
+  const deapiTtsLanguageOptions = selectedDeapiTtsVariant?.languages || selectedModel.deapiTtsLanguages || DEAPI_TTS_LANGUAGES;
+  const deapiTtsVoiceOptions = selectedDeapiTtsVariant?.voices || selectedModel.deapiTtsVoices || DEAPI_TTS_VOICES;
+  const deapiTtsAvailableModeIds = Array.isArray(selectedModel.deapiTtsModes) && selectedModel.deapiTtsModes.length > 0
+    ? selectedModel.deapiTtsModes
+    : ["custom_voice"];
+  const deapiTtsModeOptions = DEAPI_TTS_MODES.filter((option) => deapiTtsAvailableModeIds.includes(option.id));
+  const showDeapiTtsModeSelector = deapiTtsVariants.length > 1 || deapiTtsModeOptions.length > 1;
+  const showDeapiTtsVoiceSelector = effectiveDeapiTtsMode === "custom_voice" && deapiTtsVoiceOptions.length > 1;
+  const deapiTtsRefDurationMin = Number(effectiveDeapiTtsLimits.minRefAudioDuration ?? 5);
+  const deapiTtsRefDurationMax = Number(effectiveDeapiTtsLimits.maxRefAudioDuration ?? 15);
   const selectedDeapiModel = deapiModels.find((model) => model.slug === deapiModelSlug) || null;
   const deapiLimits = selectedDeapiModel?.limits || {};
   const deapiCaptionMin = Number.isFinite(Number(deapiLimits.min_caption)) ? Number(deapiLimits.min_caption) : 3;
@@ -393,14 +536,20 @@ export default function AudioControls({
   const canGenerateMiniMax = musicInstrumental
     ? !!musicPrompt.trim()
     : !!musicLyrics.trim() || (musicLyricsOptimizer && !!musicPrompt.trim());
-  const hasValidDeapiWebhook = !deapiWebhookUrl.trim() || /^https:\/\//i.test(deapiWebhookUrl.trim());
   const canGenerateDeapi = !!deapiCaption.trim()
     && !!deapiModelSlug.trim()
     && hasValidDeapiCaptionLength
-    && hasValidDeapiWebhook
     && (deapiLyricsMode === "instrumental" || deapiLyricsMode === "auto-lyrics" || !!deapiLyrics.trim());
   const canGenerateMusic = isDeapiMusic ? canGenerateDeapi : canGenerateMiniMax;
-  const canGenerate = isTTS ? !!text.trim() : canGenerateMusic;
+  const canGenerateDeapiTts = !!text.trim()
+    && (
+      effectiveDeapiTtsMode === "custom_voice"
+        ? !!String(deapiTtsVoice || "").trim()
+        : effectiveDeapiTtsMode === "voice_clone"
+          ? !!deapiTtsReferenceAudio
+        : !!String(deapiTtsInstruct || "").trim()
+    );
+  const canGenerate = isTTS ? (isDeapiTTS ? canGenerateDeapiTts : !!text.trim()) : canGenerateMusic;
 
   useEffect(() => {
     if (!dropdownOpen) return undefined;
@@ -415,34 +564,132 @@ export default function AudioControls({
     return () => document.removeEventListener('mousedown', handler);
   }, [dropdownOpen]);
 
-  const Select = ({ label, options, value, onChange, icon: Icon }) => (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 px-1">
-        {Icon ? <Icon className="h-3 w-3 text-zinc-600" /> : null}
-        <label className="text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic">{label}</label>
-      </div>
-      <div className="group relative">
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="w-full appearance-none rounded-[1.1rem] border border-white/6 bg-white/[0.02] py-3 pl-4 pr-10 text-[11px] font-bold text-zinc-300 transition-all cursor-pointer focus:outline-none focus:border-white/12 group-hover:border-white/12"
-        >
-          {options.map((option) => (
-            <option
-              key={typeof option === 'string' ? option : option.code || option.id}
-              value={typeof option === 'string' ? option : option.code || option.id}
-              className="bg-[#0a0a14]"
-            >
-              {typeof option === 'string' ? option : option.label}
-            </option>
-          ))}
-        </select>
-        <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 transition-colors group-hover:text-zinc-400">
-          <ChevronDown className="h-3.5 w-3.5" />
+  const Select = ({ label, options, value, onChange, icon: Icon, compact = false }) => {
+    const selectRef = useRef(null);
+    const [open, setOpen] = useState(false);
+
+    const getOptionValue = (option) => String(
+      typeof option === 'string'
+        ? option
+        : option.code ?? option.id ?? option.value ?? option.slug ?? ''
+    );
+    const getOptionLabel = (option) => String(
+      typeof option === 'string'
+        ? option
+        : option.label ?? option.name ?? option.code ?? option.id ?? option.value ?? ''
+    );
+    const getOptionDescription = (option) => (
+      typeof option === 'string'
+        ? ''
+        : option.desc || option.description || option.provider || ''
+    );
+    const selectedOption = options.find((option) => getOptionValue(option) === String(value));
+    const selectedLabel = selectedOption ? getOptionLabel(selectedOption) : String(value || '');
+
+    useEffect(() => {
+      if (!open) return undefined;
+
+      const handlePointerDown = (event) => {
+        if (selectRef.current && !selectRef.current.contains(event.target)) {
+          setOpen(false);
+        }
+      };
+      const handleKeyDown = (event) => {
+        if (event.key === 'Escape') setOpen(false);
+      };
+
+      document.addEventListener('mousedown', handlePointerDown);
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.removeEventListener('mousedown', handlePointerDown);
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }, [open]);
+
+    return (
+      <div ref={selectRef} className={compact ? "space-y-1.5" : "space-y-3"}>
+        <div className="flex items-center gap-2 px-1">
+          {Icon ? <Icon className="h-3 w-3 text-zinc-600" /> : null}
+          <label className={compact ? "truncate text-[8px] font-black uppercase tracking-[0.12em] text-zinc-600 italic" : "text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic"}>{label}</label>
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setOpen((current) => !current)}
+            className={`flex w-full min-w-0 items-center gap-2 border border-white/8 bg-white/[0.04] text-left transition-all duration-300 hover:border-white/15 hover:bg-white/[0.06] focus:outline-none focus:border-white/15 ${
+              compact
+                ? 'min-h-10 rounded-xl py-2 pl-2 pr-3'
+                : 'min-h-12 rounded-[1.1rem] py-2.5 pl-2.5 pr-4'
+            }`}
+          >
+            {Icon ? (
+              <span
+                className={`flex shrink-0 items-center justify-center rounded-lg ${compact ? 'h-6 w-6' : 'h-7 w-7'}`}
+                style={{ backgroundColor: `${color}18`, color }}
+              >
+                <Icon className={compact ? "h-3 w-3" : "h-3.5 w-3.5"} />
+              </span>
+            ) : null}
+            <span className={`min-w-0 flex-1 truncate font-black text-white ${compact ? 'text-[10px]' : 'text-[11px]'}`}>
+              {selectedLabel}
+            </span>
+            <ChevronDown
+              className={`shrink-0 text-zinc-500 transition-transform duration-200 ${open ? 'rotate-180' : ''} ${compact ? 'h-3 w-3' : 'h-3.5 w-3.5'}`}
+            />
+          </button>
+
+          <AnimatePresence>
+            {open ? (
+              <motion.div
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.15 }}
+                className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border border-white/10 bg-[#0d0d14]/98 py-1 shadow-2xl backdrop-blur-xl"
+              >
+                {options.map((option) => {
+                  const optionValue = getOptionValue(option);
+                  const optionLabel = getOptionLabel(option);
+                  const optionDescription = getOptionDescription(option);
+                  const isActive = optionValue === String(value);
+
+                  return (
+                    <button
+                      key={optionValue || optionLabel}
+                      type="button"
+                      onClick={() => {
+                        onChange(optionValue);
+                        setOpen(false);
+                      }}
+                      className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all ${
+                        isActive ? 'bg-white/[0.05]' : 'hover:bg-white/[0.025]'
+                      }`}
+                    >
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: isActive ? color : 'rgba(255,255,255,0.16)' }}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[11px] font-bold text-white">{optionLabel}</span>
+                        {optionDescription ? (
+                          <span className="block truncate text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-600">
+                            {optionDescription}
+                          </span>
+                        ) : null}
+                      </span>
+                      {isActive ? (
+                        <span className="shrink-0 text-[8px] font-black uppercase" style={{ color }}>Aktív</span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="flex h-full flex-col overflow-hidden border-r border-white/5 bg-[#0a0618]/30 backdrop-blur-[60px] shadow-[20px_0_40px_rgba(0,0,0,0.3)]">
@@ -543,7 +790,181 @@ export default function AudioControls({
                 subtitle="A beszédszintézis rész megőrizve"
                 icon={Settings2}
               >
-                {isNvidiaRiva ? (
+                {isDeapiTTS ? (
+                  <>
+                    {showDeapiTtsModeSelector ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        {(deapiTtsVariants.length > 0 ? deapiTtsVariants : deapiTtsModeOptions).map((option) => (
+                          <OptionCard
+                            key={option.id}
+                            color={color}
+                            label={option.label}
+                            description={option.description || option.desc}
+                            active={deapiTtsVariants.length > 0 ? deapiTtsVariant === option.id : deapiTtsMode === option.id}
+                            onClick={() => {
+                              if (deapiTtsVariants.length > 0) {
+                                setDeapiTtsVariant(option.id);
+                              } else {
+                                setDeapiTtsMode(option.id);
+                              }
+                            }}
+                            compact
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select
+                        label="Nyelv"
+                        options={deapiTtsLanguageOptions}
+                        value={deapiTtsLang}
+                        onChange={setDeapiTtsLang}
+                        icon={Globe}
+                        compact
+                      />
+                      <Select
+                        label="Formatum"
+                        options={DEAPI_FILE_FORMATS}
+                        value={deapiTtsFormat}
+                        onChange={setDeapiTtsFormat}
+                        icon={Settings2}
+                        compact
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select
+                        label="Mintavetel"
+                        options={DEAPI_TTS_SAMPLE_RATES}
+                        value={String(deapiTtsSampleRate)}
+                        onChange={(value) => setDeapiTtsSampleRate(Number(value))}
+                        icon={Activity}
+                        compact
+                      />
+                      <TextInputField
+                        label="Sebesseg"
+                        type="text"
+                        inputMode="decimal"
+                        value={deapiTtsSpeed}
+                        onChange={setDeapiTtsSpeed}
+                        min={effectiveDeapiTtsLimits.minSpeed ?? 0.25}
+                        max={effectiveDeapiTtsLimits.maxSpeed ?? 4}
+                        step={0.1}
+                        hint={`${effectiveDeapiTtsLimits.minSpeed ?? 0.25}-${effectiveDeapiTtsLimits.maxSpeed ?? 4}x`}
+                        compact
+                        showLimit={false}
+                      />
+                    </div>
+
+                    {showDeapiTtsVoiceSelector ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          {deapiTtsVoiceOptions.map((voice) => (
+                            <button
+                              key={voice.id}
+                              type="button"
+                              onClick={() => setDeapiTtsVoice(voice.id)}
+                              className={`rounded-xl border px-2 py-2 text-left transition-all duration-300 ${
+                                deapiTtsVoice === voice.id
+                                  ? ''
+                                  : 'border-white/5 bg-white/[0.01] text-zinc-700 hover:border-white/10 hover:text-zinc-500'
+                              }`}
+                              style={
+                                deapiTtsVoice === voice.id
+                                  ? { backgroundColor: `${color}15`, borderColor: `${color}40`, color }
+                                  : undefined
+                              }
+                            >
+                              <div className={`truncate text-[10px] font-black uppercase tracking-[0.04em] ${deapiTtsVoice === voice.id ? 'text-white' : ''}`}>
+                                {voice.label}
+                              </div>
+                              <div className="mt-0.5 truncate text-[7px] font-bold uppercase tracking-widest opacity-40">{voice.desc || voice.id}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {effectiveDeapiTtsMode === "voice_clone" ? (
+                      <div className="space-y-3">
+                        <input
+                          ref={ttsReferenceAudioInputRef}
+                          type="file"
+                          accept=".mp3,.wav,.flac,.ogg,.m4a,audio/mpeg,audio/wav,audio/x-wav,audio/flac,audio/ogg,audio/mp4,audio/x-m4a"
+                          className="hidden"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] || null;
+                            onDeapiTtsReferenceAudioSelect?.(file);
+                            event.target.value = '';
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => ttsReferenceAudioInputRef.current?.click()}
+                          className="flex min-w-0 items-center justify-between gap-3 rounded-[1rem] border border-white/6 bg-white/[0.018] px-3 py-2.5 text-left transition-all duration-300 hover:border-white/12 hover:bg-white/[0.03]"
+                        >
+                          <div className="min-w-0">
+                            <p className="break-words text-[9px] font-black uppercase tracking-[0.08em] text-white">
+                              {deapiTtsReferenceAudio ? 'Referencia csere' : 'Referencia audio'}
+                            </p>
+                            <p className="mt-1 break-words text-[8px] font-semibold uppercase tracking-[0.03em] leading-snug text-zinc-500">
+                              MP3, WAV, FLAC, OGG, M4A | max 10 MB | {deapiTtsRefDurationMin}-{deapiTtsRefDurationMax}s
+                            </p>
+                          </div>
+                          <div
+                            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-white/8"
+                            style={{ backgroundColor: `${color}14`, color }}
+                          >
+                            <Upload className="h-4 w-4" />
+                          </div>
+                        </button>
+
+                        {deapiTtsReferenceAudio ? (
+                          <div className="rounded-[1rem] border border-white/6 bg-black/20 p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-[11px] font-black text-white">{deapiTtsReferenceAudio.name}</p>
+                                <p className="mt-1 break-words text-[8px] font-semibold uppercase tracking-[0.03em] leading-snug text-zinc-500">
+                                  {[formatFileSize(deapiTtsReferenceAudio.size), formatDurationLabel(deapiTtsReferenceAudio.duration)].filter(Boolean).join(' | ')}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={onDeapiTtsReferenceAudioClear}
+                                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-white/6 bg-white/[0.03] text-zinc-400 transition-all hover:border-white/12 hover:text-white"
+                                aria-label="Referencia audio torlese"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <TextAreaField
+                          label="Referencia szoveg"
+                          value={deapiTtsRefText}
+                          onChange={setDeapiTtsRefText}
+                          placeholder="A referencia audio szovege, ha ismert"
+                          rows={3}
+                          compact
+                        />
+                      </div>
+                    ) : null}
+
+                    {effectiveDeapiTtsMode === "voice_design" ? (
+                      <TextAreaField
+                        label="Hang leirasa"
+                        value={deapiTtsInstruct}
+                        onChange={setDeapiTtsInstruct}
+                        placeholder="Pl. A warm female voice with a British accent"
+                        rows={4}
+                        hint="Ebbol keszit uj hangkaraktert."
+                        compact
+                      />
+                    ) : null}
+                  </>
+                ) : isNvidiaRiva ? (
                   <>
                     <Select
                       label="Szintézis nyelve"
@@ -695,57 +1116,44 @@ export default function AudioControls({
             <>
               <SectionShell
                 color={color}
-                eyebrow="deAPI modell"
-                title="Model slug és leírás"
-                subtitle="A hivatalos model endpoint alapján"
+                eyebrow="Prompt"
+                title="Zenei prompt"
+                subtitle="Írd le, milyen zene készüljön"
                 icon={Music}
+                compact
               >
-                <Select
-                  label="Model slug"
-                  options={
-                    deapiModels.length > 0
-                      ? deapiModels.map((model) => ({
-                          id: model.slug,
-                          label: model.name ? `${model.name} — ${model.slug}` : model.slug,
-                        }))
-                      : [{ id: deapiModelSlug, label: deapiModelSlug || 'AceStep_1_5_Base' }]
-                  }
-                  value={deapiModelSlug}
-                  onChange={setDeapiModelSlug}
-                  icon={Settings2}
-                />
-
                 <TextAreaField
-                  label="Caption"
+                  label="Zenei prompt"
                   value={deapiCaption}
                   onChange={setDeapiCaption}
                   placeholder="Pl. upbeat electronic dance music with energetic synths and bright festival drops..."
-                  rows={5}
+                  rows={4}
                   hint={`Limit: ${deapiCaptionMin}-${deapiCaptionMax} • Jelenleg: ${deapiCaptionLength}${deapiCaptionLength > deapiCaptionMax ? " • Túl hosszú" : deapiCaptionLength < deapiCaptionMin ? " • Túl rövid" : ""}`}
+                  compact
                 />
 
-                <div className="rounded-[1.25rem] border border-white/6 bg-black/20 p-4">
+                <div className="rounded-[1rem] border border-white/6 bg-black/20 p-2.5">
                   <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={onDeapiResetDefaults}
-                        disabled={deapiResetDisabled}
-                        className="inline-flex w-full min-w-0 items-center justify-center gap-1.5 rounded-[1rem] border px-2 py-3 text-[9px] font-black uppercase tracking-[0.1em] transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-40"
-                        style={{
-                          borderColor: "rgba(255,255,255,0.08)",
-                          backgroundColor: deapiResetDisabled ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
-                          color: deapiResetDisabled ? "#71717a" : "#d4d4d8",
-                        }}
-                      >
-                        <RotateCcw className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span className="whitespace-nowrap">Defaults</span>
-                      </button>
+                    <button
+                      type="button"
+                      onClick={onDeapiResetDefaults}
+                      disabled={deapiResetDisabled}
+                      className="inline-flex w-full min-w-0 items-center justify-center gap-1.5 rounded-[0.85rem] border px-2 py-2 text-[9px] font-black uppercase tracking-[0.06em] transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-40"
+                      style={{
+                        borderColor: "rgba(255,255,255,0.08)",
+                        backgroundColor: deapiResetDisabled ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
+                        color: deapiResetDisabled ? "#71717a" : "#d4d4d8",
+                      }}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span className="whitespace-nowrap">Defaults</span>
+                    </button>
                     
                     <button
                       type="button"
                       onClick={onDeapiEnhancePrompt}
                       disabled={deapiEnhanceDisabled}
-                      className="inline-flex w-full min-w-0 items-center justify-center gap-1.5 rounded-[1rem] border px-2 py-3 text-[9px] font-black uppercase tracking-[0.1em] transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex w-full min-w-0 items-center justify-center gap-1.5 rounded-[0.85rem] border px-2 py-2 text-[9px] font-black uppercase tracking-[0.06em] transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-40"
                       style={{
                         borderColor: `${color}35`,
                         backgroundColor: deapiEnhanceDisabled ? "rgba(255,255,255,0.02)" : `${color}14`,
@@ -759,57 +1167,48 @@ export default function AudioControls({
                   </div>
 
                   {deapiEnhancerError ? (
-                    <div className="mt-3 flex items-start gap-2 rounded-[1rem] border border-rose-500/20 bg-rose-500/10 px-3 py-3 text-rose-200">
+                    <div className="mt-2 flex items-start gap-2 rounded-[0.9rem] border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-rose-200">
                       <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                      <p className="break-words text-[10px] font-bold uppercase tracking-[0.1em] leading-relaxed">
+                      <p className="break-words text-[9px] font-semibold uppercase tracking-[0.04em] leading-snug">
                         {deapiEnhancerError}
                       </p>
                     </div>
                   ) : null}
-                </div>
-
-                <div className="rounded-[1.25rem] border border-white/6 bg-black/20 p-4">
-                  <p className="text-[9px] font-black uppercase tracking-[0.34em] text-zinc-500 italic">Model státusz</p>
-                  <p className="mt-2 break-words text-[10px] font-bold uppercase tracking-[0.12em] leading-relaxed text-zinc-600">
-                    {deapiModelsLoading
-                      ? 'deAPI modellek betöltése...'
-                      : deapiModelsError
-                        ? deapiModelsError
-                        : deapiModels.length > 0
-                          ? `${deapiModels.length} elérhető txt2music modell · guidance ${deapiGuidanceMin}-${deapiGuidanceMax} · bpm ${deapiBpmMin}-${deapiBpmMax}`
-                          : 'Nincs betöltött modelllista, fallback slug használva.'}
-                  </p>
                 </div>
               </SectionShell>
 
               <SectionShell
                 color={color}
                 eyebrow="Dalszöveg és vokál"
-                title="Lyrics vezérlés"
-                subtitle="Az API külön lyrics mezőt kér"
+                title="Dalszöveg mód"
+                subtitle="Válassz énekes vagy instrumentális irányt"
                 icon={Sparkles}
+                compact
               >
                 <div className="grid grid-cols-3 gap-2">
                   <OptionCard
                     color={color}
+                    label="Instrumentális"
+                    description="Nincs vokál"
+                    active={deapiLyricsMode === "instrumental"}
+                    onClick={() => setDeapiLyricsMode("instrumental")}
+                    compact
+                  />
+                  <OptionCard
+                    color={color}
                     label="Auto-Lyrics"
-                    description="AI írja a szöveget"
+                    description="AI szöveg"
                     active={deapiLyricsMode === "auto-lyrics"}
                     onClick={() => setDeapiLyricsMode("auto-lyrics")}
+                    compact
                   />
                   <OptionCard
                     color={color}
                     label="Lyrics"
-                    description="Te írod a szöveget"
+                    description="Saját"
                     active={deapiLyricsMode === "lyrics"}
                     onClick={() => setDeapiLyricsMode("lyrics")}
-                  />
-                  <OptionCard
-                    color={color}
-                    label="Instrumental"
-                    description="Nincs vokál"
-                    active={deapiLyricsMode === "instrumental"}
-                    onClick={() => setDeapiLyricsMode("instrumental")}
+                    compact
                   />
                 </div>
 
@@ -820,41 +1219,23 @@ export default function AudioControls({
                       value={deapiLyrics}
                       onChange={setDeapiLyrics}
                       placeholder="Teljes dalszöveg szekciókkal, pl. [Verse], [Chorus]"
-                      rows={7}
+                      rows={5}
                       hint="Csak lyrics módban kerül beküldésre."
+                      compact
                     />
                   </div>
-                ) : deapiLyricsMode === "auto-lyrics" ? (
-                  <div className="rounded-[1.25rem] border border-white/6 bg-black/20 p-4">
-                    <p className="text-[9px] font-black uppercase tracking-[0.34em] text-zinc-500 italic">Auto-lyrics mód</p>
-                    <p className="mt-2 break-words text-[10px] font-bold uppercase tracking-[0.12em] leading-relaxed text-zinc-600">
-                      Generáláskor az AI előbb megírja a dalszöveget a caption alapján, és azt küldi tovább a modellnek.
-                    </p>
-                  </div>
-                ) : deapiLyricsMode === "instrumental" ? (
-                  <div className="rounded-[1.25rem] border border-white/6 bg-black/20 p-4">
-                    <p className="text-[9px] font-black uppercase tracking-[0.34em] text-zinc-500 italic">Instrumental mód</p>
-                    <p className="mt-2 break-words text-[10px] font-bold uppercase tracking-[0.12em] leading-relaxed text-zinc-600">
-                      Ebben a módban a backend automatikusan a <span className="text-zinc-300">[Instrumental]</span> lyrics értéket küldi a modellnek.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="rounded-[1.25rem] border border-white/6 bg-black/20 p-4">
-                    <p className="break-words text-[10px] font-bold uppercase tracking-[0.12em] leading-relaxed text-zinc-600">
-                      Válassz módot, vagy használd az Enhance gombot.
-                    </p>
-                  </div>
-                )}
+                ) : null}
               </SectionShell>
 
               <SectionShell
                 color={color}
                 eyebrow="Generálási paraméterek"
-                title="Idő, lépések, guidance"
-                subtitle="A deAPI txt2music összes szöveges paramétere"
+                title="Finomhangolás"
+                subtitle="Idő, tempó és generálási erősség"
                 icon={Activity}
+                compact
               >
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-2">
                   <TextInputField
                     label="Duration"
                     type="text"
@@ -866,6 +1247,8 @@ export default function AudioControls({
                     max={deapiDurationMax}
                     step={1}
                     hint="10–600 másodperc"
+                    compact
+                    showLimit={false}
                   />
                   <TextInputField
                     label="Inference steps"
@@ -878,6 +1261,8 @@ export default function AudioControls({
                     max={deapiStepsMax}
                     step={1}
                     hint="Turbo modelhez jellemzően 8"
+                    compact
+                    showLimit={false}
                   />
                   <TextInputField
                     label="Guidance scale"
@@ -890,6 +1275,8 @@ export default function AudioControls({
                     max={deapiGuidanceMax}
                     step={0.1}
                     hint="0–20"
+                    compact
+                    showLimit={false}
                   />
                   <TextInputField
                     label="Seed"
@@ -899,13 +1286,15 @@ export default function AudioControls({
                     onChange={setDeapiSeed}
                     step={1}
                     hint="-1 = random"
+                    compact
                   />
-                  <TextInputField
-                    label="Format"
+                  <Select
+                    label="Formátum"
+                    options={DEAPI_FILE_FORMATS}
                     value={deapiFormat}
                     onChange={setDeapiFormat}
-                    placeholder="flac"
-                    hint="Az API stringként várja. A docs példája: flac."
+                    icon={Settings2}
+                    compact
                   />
                   <TextInputField
                     label="BPM"
@@ -917,82 +1306,46 @@ export default function AudioControls({
                     min={deapiBpmMin}
                     max={deapiBpmMax}
                     step={1}
-                    hint="Opcionális, 30–300"
+                    compact
+                    showLimit={false}
                   />
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-2">
                   <TextInputField
                     label="Key scale"
                     value={deapiKeyscale}
                     onChange={setDeapiKeyscale}
                     placeholder="C major"
                     hint='Pl. "C major", "F# minor"'
-                  />
-                  <TextInputField
-                    label="Webhook URL"
-                    value={deapiWebhookUrl}
-                    onChange={setDeapiWebhookUrl}
-                    placeholder="https://example.com/webhooks/deapi"
-                    hint="Opcionális, csak HTTPS lehet."
+                    compact
                   />
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3 px-1">
-                    <div className="text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic">Time signature</div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.14em]" style={{ color }}>
+                <div className="rounded-[1rem] border border-white/6 bg-black/20 p-2.5">
+                  <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
+                    <div className="min-w-0 truncate text-[8px] font-black uppercase tracking-[0.12em] text-zinc-600 italic">Time signature</div>
+                    <div className="flex-shrink-0 text-[9px] font-black uppercase tracking-[0.08em]" style={{ color }}>
                       {deapiSelectedTimeSignature.label}
                     </div>
                   </div>
-                  <div className="rounded-[1.25rem] border border-white/6 bg-black/20 p-4">
-                    <div className="relative h-1.5 overflow-hidden rounded-full bg-white/5">
-                      <div
-                        className="absolute h-full transition-all duration-300"
-                        style={{
-                          width: `${(deapiTimeSignatureIndex / (DEAPI_TIME_SIGNATURES.length - 1)) * 100}%`,
-                          backgroundColor: color,
-                        }}
-                      />
-                      <input
-                        type="range"
-                        min="0"
-                        max={String(DEAPI_TIME_SIGNATURES.length - 1)}
-                        step="1"
-                        value={deapiTimeSignatureIndex}
-                        onChange={(event) => {
-                          const nextIndex = Number(event.target.value);
-                          setDeapiTimesignature(DEAPI_TIME_SIGNATURES[nextIndex]?.id ?? "");
-                        }}
-                        className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-                      />
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-5 gap-2">
-                      {DEAPI_TIME_SIGNATURES.map((signature) => (
-                        <button
-                          key={signature.id || "auto"}
-                          type="button"
-                          onClick={() => setDeapiTimesignature(signature.id)}
-                          className={`rounded-[0.9rem] border px-2 py-2 text-center transition-all duration-300 ${
-                            deapiTimesignature === signature.id
-                              ? ""
-                              : "border-white/6 bg-white/[0.018] text-zinc-500 hover:border-white/12 hover:bg-white/[0.03]"
-                          }`}
-                          style={deapiTimesignature === signature.id ? { borderColor: `${color}55`, backgroundColor: `${color}12`, color: "#fff" } : undefined}
-                        >
-                          <div className="text-[9px] font-black uppercase tracking-[0.14em]">{signature.label}</div>
-                        </button>
-                      ))}
-                    </div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {DEAPI_TIME_SIGNATURES.map((signature) => (
+                      <button
+                        key={signature.id || "auto"}
+                        type="button"
+                        onClick={() => setDeapiTimesignature(signature.id)}
+                        className={`rounded-[0.75rem] border px-1 py-1.5 text-center transition-all duration-300 ${
+                          deapiTimesignature === signature.id
+                            ? ""
+                            : "border-white/6 bg-white/[0.018] text-zinc-500 hover:border-white/12 hover:bg-white/[0.03]"
+                        }`}
+                        style={deapiTimesignature === signature.id ? { borderColor: `${color}55`, backgroundColor: `${color}12`, color: "#fff" } : undefined}
+                      >
+                        <div className="text-[8px] font-black uppercase tracking-[0.06em]">{signature.label}</div>
+                      </button>
+                    ))}
                   </div>
-                </div>
-
-                <div className="rounded-[1.25rem] border border-white/6 bg-black/20 p-4">
-                  <p className="text-[9px] font-black uppercase tracking-[0.34em] text-zinc-500 italic">deAPI szabályok</p>
-                  <p className="mt-2 break-words text-[10px] font-bold uppercase tracking-[0.12em] leading-relaxed text-zinc-600">
-                    A reference audio már támogatott. A webhook mező opcionális, de ha megadod, HTTPS URL kell legyen.
-                  </p>
                 </div>
               </SectionShell>
 
@@ -1000,8 +1353,9 @@ export default function AudioControls({
                 color={color}
                 eyebrow="Referencia audio"
                 title="Style transfer input"
-                subtitle="Opcionais audio mintaval"
+                subtitle="Opcionális audio mintával"
                 icon={Upload}
+                compact
               >
                 <input
                   ref={referenceAudioInputRef}
@@ -1018,18 +1372,18 @@ export default function AudioControls({
                 <button
                   type="button"
                   onClick={() => referenceAudioInputRef.current?.click()}
-                  className="flex min-w-0 items-center justify-between gap-3 rounded-[1.35rem] border border-white/6 bg-white/[0.018] px-4 py-4 text-left transition-all duration-300 hover:border-white/12 hover:bg-white/[0.03]"
+                  className="flex min-w-0 items-center justify-between gap-3 rounded-[1rem] border border-white/6 bg-white/[0.018] px-3 py-2.5 text-left transition-all duration-300 hover:border-white/12 hover:bg-white/[0.03]"
                 >
                   <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white">
-                      {deapiReferenceAudio ? 'Referencia audio csere' : 'Referencia audio feltoltes'}
+                    <p className="break-words text-[9px] font-black uppercase tracking-[0.08em] text-white">
+                      {deapiReferenceAudio ? 'Referencia audio csere' : 'Referencia audio feltöltés'}
                     </p>
-                    <p className="mt-2 break-words text-[9px] font-bold uppercase tracking-[0.12em] leading-relaxed text-zinc-500">
+                    <p className="mt-1 break-words text-[8px] font-semibold uppercase tracking-[0.03em] leading-snug text-zinc-500">
                       MP3, WAV, FLAC, OGG, M4A | max 10 MB | {deapiReferenceDurationMin}-{deapiReferenceDurationMax}s
                     </p>
                   </div>
                   <div
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/8"
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-white/8"
                     style={{ backgroundColor: `${color}14`, color }}
                   >
                     <Upload className="h-4 w-4" />
@@ -1037,11 +1391,11 @@ export default function AudioControls({
                 </button>
 
                 {deapiReferenceAudio ? (
-                  <div className="rounded-[1.35rem] border border-white/6 bg-black/20 p-4">
+                  <div className="rounded-[1rem] border border-white/6 bg-black/20 p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-[11px] font-black text-white">{deapiReferenceAudio.name}</p>
-                        <p className="mt-2 break-words text-[9px] font-bold uppercase tracking-[0.12em] leading-relaxed text-zinc-500">
+                        <p className="mt-1 break-words text-[8px] font-semibold uppercase tracking-[0.03em] leading-snug text-zinc-500">
                           {[formatFileSize(deapiReferenceAudio.size), formatDurationLabel(deapiReferenceAudio.duration)].filter(Boolean).join(' | ')}
                         </p>
                       </div>
@@ -1049,7 +1403,7 @@ export default function AudioControls({
                         type="button"
                         onClick={onDeapiReferenceAudioClear}
                         className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-white/6 bg-white/[0.03] text-zinc-400 transition-all hover:border-white/12 hover:text-white"
-                        aria-label="Referencia audio torlese"
+                        aria-label="Referencia audio törlése"
                       >
                         <X className="h-4 w-4" />
                       </button>

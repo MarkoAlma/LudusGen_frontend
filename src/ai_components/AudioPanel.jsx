@@ -7,8 +7,6 @@ import {
   PanelLeftClose, PanelLeftOpen, Layout
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { db } from "../firebase/firebaseApp";
-import { collection, addDoc, query, orderBy, limit, getDocs, serverTimestamp } from "firebase/firestore";
 
 import BackgroundFilters from '../components/chat/BackgroundFilters';
 import AudioEngineBg from '../assets/backgrounds/motif_audio_bg.png';
@@ -180,6 +178,16 @@ const DEAPI_REFERENCE_AUDIO_MIME_TYPES = new Set([
   "video/mp4",
 ]);
 const DEAPI_REFERENCE_AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".flac", ".ogg", ".m4a"]);
+const DEAPI_TTS_DEFAULTS = {
+  mode: "custom_voice",
+  voice: "af_sky",
+  lang: "en-us",
+  speed: 1,
+  format: "mp3",
+  sampleRate: 24000,
+  refText: "",
+  instruct: "",
+};
 const DEAPI_MUSIC_ENHANCER_PROMPT = `
 You are a music prompt enhancer for deAPI txt2music models.
 Your job is to transform a short user music idea into a structured control object for music generation.
@@ -221,20 +229,37 @@ Output rules:
 - Make the lyrics performance-ready and stylistically coherent with the genre, mood, and production feel.
 - Do not reference copyrighted songs or reuse famous lyrics.
 `.trim();
+const DEAPI_MUSIC_MODEL_OPTIONS = [
+  { slug: "AceStep_1_5_XL_Turbo_INT8", name: "Ace Step 1.5 XL Turbo INT8" },
+  { slug: "AceStep_1_5_Base", name: "Ace Step 1.5 Base" },
+];
+const normalizeDeapiModelSlug = (slug) => String(slug || "").trim().toLowerCase();
+const findSupportedDeapiModelOption = (slug) => {
+  const normalizedSlug = normalizeDeapiModelSlug(slug);
+  return DEAPI_MUSIC_MODEL_OPTIONS.find((model) => normalizeDeapiModelSlug(model.slug) === normalizedSlug) || null;
+};
+
+const getDeapiModelGenerationDefaults = (modelSlug) => {
+  const normalizedSlug = String(modelSlug || "").toLowerCase();
+  const isBaseModel = normalizedSlug === "acestep_1_5_base" || normalizedSlug.includes("1_5_base");
+
+  return isBaseModel
+    ? { inferenceSteps: "60", guidanceScale: "9" }
+    : { inferenceSteps: "8", guidanceScale: "1" };
+};
+
 const DEAPI_MUSIC_DEFAULTS = {
   modelSlug: "AceStep_1_5_Base",
-  lyricsMode: "",
+  lyricsMode: "instrumental",
   lyrics: "",
   duration: "60",
-  inferenceSteps: "60",
-  guidanceScale: "9",
+  ...getDeapiModelGenerationDefaults("AceStep_1_5_Base"),
   seed: -1,
-  format: "flac",
+  format: "mp3",
   bpm: "",
   keyscale: "",
   timesignature: "",
   vocalLanguage: "unknown",
-  webhookUrl: "",
 };
 
 const getFileExtension = (filename = "") => {
@@ -353,6 +378,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
 
   const isTTS = selectedModel.audioType === "tts";
   const isNvidiaRiva = selectedModel.provider === "nvidia-riva";
+  const isDeapiTTS = selectedModel.audioType === "tts" && selectedModel.provider === "deapi";
   const isDeapiMusic = selectedModel.audioType === "music" && selectedModel.provider === "deapi";
 
   const [activeTab, setActiveTab] = useState("generate");
@@ -394,6 +420,62 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
   const [selectedVoice, setSelectedVoice] = useState("nova");
   const [speed, setSpeed] = useState(1.0);
   const [audioFormat, setAudioFormat] = useState("mp3");
+
+  // deAPI TTS
+  const [deapiTtsVariant, setDeapiTtsVariant] = useState("");
+  const [deapiTtsMode, setDeapiTtsMode] = useState(DEAPI_TTS_DEFAULTS.mode);
+  const [deapiTtsVoice, setDeapiTtsVoice] = useState(DEAPI_TTS_DEFAULTS.voice);
+  const [deapiTtsLang, setDeapiTtsLang] = useState(DEAPI_TTS_DEFAULTS.lang);
+  const [deapiTtsSpeed, setDeapiTtsSpeed] = useState(DEAPI_TTS_DEFAULTS.speed);
+  const [deapiTtsFormat, setDeapiTtsFormat] = useState(DEAPI_TTS_DEFAULTS.format);
+  const [deapiTtsSampleRate, setDeapiTtsSampleRate] = useState(DEAPI_TTS_DEFAULTS.sampleRate);
+  const [deapiTtsRefText, setDeapiTtsRefText] = useState(DEAPI_TTS_DEFAULTS.refText);
+  const [deapiTtsInstruct, setDeapiTtsInstruct] = useState(DEAPI_TTS_DEFAULTS.instruct);
+  const [deapiTtsReferenceAudio, setDeapiTtsReferenceAudio] = useState(null);
+  const deapiTtsVariants = Array.isArray(selectedModel.deapiTtsVariants) ? selectedModel.deapiTtsVariants : [];
+  const selectedDeapiTtsVariant = deapiTtsVariants.find((variant) => variant.id === deapiTtsVariant) || deapiTtsVariants[0] || null;
+  const effectiveDeapiTtsMode = selectedDeapiTtsVariant?.mode || deapiTtsMode;
+  const effectiveDeapiTtsModelSlug = selectedDeapiTtsVariant?.slug || selectedModel.deapiTtsModelSlug || selectedModel.apiModel;
+  const effectiveDeapiTtsDefaults = selectedDeapiTtsVariant?.defaults || selectedModel.deapiTtsDefaults || DEAPI_TTS_DEFAULTS;
+  const effectiveDeapiTtsLimits = selectedDeapiTtsVariant?.limits || selectedModel.deapiTtsLimits || {};
+
+  useEffect(() => {
+    if (!isDeapiTTS) return;
+    const variants = Array.isArray(selectedModel.deapiTtsVariants) ? selectedModel.deapiTtsVariants : [];
+    const defaultVariant = variants.find((variant) => variant.id === selectedModel.deapiTtsDefaultVariant) || variants[0] || null;
+    const defaults = defaultVariant?.defaults || selectedModel.deapiTtsDefaults || DEAPI_TTS_DEFAULTS;
+    const nextMode = defaultVariant?.mode || selectedModel.deapiTtsDefaultMode || DEAPI_TTS_DEFAULTS.mode;
+
+    setDeapiTtsVariant(defaultVariant?.id || "");
+    setDeapiTtsMode(nextMode);
+    setDeapiTtsVoice(defaults.voice || "");
+    setDeapiTtsLang(defaults.lang || DEAPI_TTS_DEFAULTS.lang);
+    setDeapiTtsSpeed(defaults.speed ?? DEAPI_TTS_DEFAULTS.speed);
+    setDeapiTtsFormat(defaults.format || DEAPI_TTS_DEFAULTS.format);
+    setDeapiTtsSampleRate(defaults.sampleRate || DEAPI_TTS_DEFAULTS.sampleRate);
+    setDeapiTtsInstruct(defaults.instruct || "");
+
+    if (nextMode !== "voice_clone") {
+      setDeapiTtsReferenceAudio(null);
+      setDeapiTtsRefText("");
+    }
+  }, [isDeapiTTS, selectedModel.id, selectedModel.deapiTtsModelSlug, selectedModel.apiModel, selectedModel.deapiTtsDefaultMode, selectedModel.deapiTtsDefaultVariant]);
+
+  useEffect(() => {
+    if (!isDeapiTTS || !selectedDeapiTtsVariant) return;
+    const defaults = selectedDeapiTtsVariant.defaults || DEAPI_TTS_DEFAULTS;
+    setDeapiTtsMode(selectedDeapiTtsVariant.mode || DEAPI_TTS_DEFAULTS.mode);
+    setDeapiTtsVoice(defaults.voice || "");
+    setDeapiTtsLang(defaults.lang || DEAPI_TTS_DEFAULTS.lang);
+    setDeapiTtsSpeed(defaults.speed ?? DEAPI_TTS_DEFAULTS.speed);
+    setDeapiTtsFormat(defaults.format || DEAPI_TTS_DEFAULTS.format);
+    setDeapiTtsSampleRate(defaults.sampleRate || DEAPI_TTS_DEFAULTS.sampleRate);
+    setDeapiTtsInstruct(defaults.instruct || "");
+    if (selectedDeapiTtsVariant.mode !== "voice_clone") {
+      setDeapiTtsReferenceAudio(null);
+      setDeapiTtsRefText("");
+    }
+  }, [isDeapiTTS, selectedDeapiTtsVariant?.id]);
 
   // NVIDIA Riva
   const [rivaLang, setRivaLang] = useState("EN-US");
@@ -449,7 +531,6 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
   const [deapiKeyscale, setDeapiKeyscale] = useState(DEAPI_MUSIC_DEFAULTS.keyscale);
   const [deapiTimesignature, setDeapiTimesignature] = useState(DEAPI_MUSIC_DEFAULTS.timesignature);
   const [deapiVocalLanguage, setDeapiVocalLanguage] = useState(DEAPI_MUSIC_DEFAULTS.vocalLanguage);
-  const [deapiWebhookUrl, setDeapiWebhookUrl] = useState(DEAPI_MUSIC_DEFAULTS.webhookUrl);
   const [deapiReferenceAudio, setDeapiReferenceAudio] = useState(null);
   const [deapiEnhancingPrompt, setDeapiEnhancingPrompt] = useState(false);
   const [deapiEnhancerError, setDeapiEnhancerError] = useState("");
@@ -461,6 +542,26 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
   const deapiCaptionMax = Number(selectedDeapiModel?.limits?.max_caption ?? 300);
   const deapiCaptionLength = deapiCaption.trim().length;
   const hasValidDeapiCaptionLength = deapiCaptionLength >= deapiCaptionMin && deapiCaptionLength <= deapiCaptionMax;
+
+  const handleDeapiModelSlugChange = (nextModelSlug) => {
+    const supportedModel = findSupportedDeapiModelOption(nextModelSlug);
+    const safeModelSlug = supportedModel?.slug || DEAPI_MUSIC_DEFAULTS.modelSlug;
+    const nextDefaults = getDeapiModelGenerationDefaults(safeModelSlug);
+    setDeapiModelSlug(safeModelSlug);
+    setDeapiInferenceSteps(nextDefaults.inferenceSteps);
+    setDeapiGuidanceScale(nextDefaults.guidanceScale);
+  };
+
+  useEffect(() => {
+    if (!isDeapiMusic) return;
+    if (!selectedModel.deapiModelSlug) return;
+    handleDeapiModelSlugChange(selectedModel.deapiModelSlug);
+  }, [isDeapiMusic, selectedModel.id, selectedModel.deapiModelSlug]);
+
+  useEffect(() => {
+    if (!isDeapiMusic || deapiLyricsMode) return;
+    setDeapiLyricsMode(DEAPI_MUSIC_DEFAULTS.lyricsMode);
+  }, [isDeapiMusic, deapiLyricsMode]);
 
   useEffect(() => {
     if (musicStream && musicOutputFormat !== "hex") {
@@ -508,17 +609,28 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         const payload = await res.json();
         if (cancelled) return;
 
-        const nextModels = Array.isArray(payload.models) ? payload.models : [];
+        const apiModels = Array.isArray(payload.models) ? payload.models : [];
+        const nextModels = DEAPI_MUSIC_MODEL_OPTIONS.map((modelOption) => {
+          const apiModel = apiModels.find((model) =>
+            normalizeDeapiModelSlug(model.slug) === normalizeDeapiModelSlug(modelOption.slug)
+          );
+
+          return {
+            name: apiModel?.name || modelOption.name,
+            slug: modelOption.slug,
+            defaults: apiModel?.defaults || {},
+            limits: apiModel?.limits || {},
+          };
+        });
         setDeapiModels(nextModels);
 
         if (nextModels.length > 0) {
-          const hasSelectedModel = nextModels.some((model) => model.slug === deapiModelSlug);
-          if (!hasSelectedModel) {
-            const preferredModel = nextModels[0];
-            setDeapiModelSlug(preferredModel.slug);
-            if (!deapiInferenceSteps && preferredModel.defaults?.inference_steps) {
-              setDeapiInferenceSteps(Number(preferredModel.defaults.inference_steps));
-            }
+          const preferredModel = findSupportedDeapiModelOption(selectedModel.deapiModelSlug || deapiModelSlug) || DEAPI_MUSIC_MODEL_OPTIONS[0];
+          const hasSelectedModel = nextModels.some((model) =>
+            normalizeDeapiModelSlug(model.slug) === normalizeDeapiModelSlug(preferredModel.slug)
+          );
+          if (hasSelectedModel) {
+            handleDeapiModelSlugChange(preferredModel.slug);
           }
         }
       } catch (err) {
@@ -538,7 +650,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       cancelled = true;
       controller.abort();
     };
-  }, [getIdToken, isDeapiMusic]);
+  }, [getIdToken, isDeapiMusic, selectedModel.deapiModelSlug]);
 
   useEffect(() => {
     if (!isDeapiMusic || !selectedDeapiModel?.limits) return;
@@ -696,7 +808,6 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
     setDeapiKeyscale(DEAPI_MUSIC_DEFAULTS.keyscale);
     setDeapiTimesignature(DEAPI_MUSIC_DEFAULTS.timesignature);
     setDeapiVocalLanguage(DEAPI_MUSIC_DEFAULTS.vocalLanguage);
-    setDeapiWebhookUrl(DEAPI_MUSIC_DEFAULTS.webhookUrl);
     setDeapiEnhancerError("");
   };
 
@@ -847,8 +958,56 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
     }
   };
 
+  const clearDeapiTtsReferenceAudio = () => {
+    setDeapiTtsReferenceAudio(null);
+  };
+
+  const handleDeapiTtsReferenceAudioSelect = async (file) => {
+    if (!file) {
+      clearDeapiTtsReferenceAudio();
+      return;
+    }
+
+    const fileExtension = getFileExtension(file.name);
+    const hasSupportedMime = DEAPI_REFERENCE_AUDIO_MIME_TYPES.has(file.type);
+    const hasSupportedExtension = DEAPI_REFERENCE_AUDIO_EXTENSIONS.has(fileExtension);
+
+    if (!hasSupportedMime && !hasSupportedExtension) {
+      toast.error("Csak MP3, WAV, FLAC, OGG vagy M4A referencia audio toltheto fel.");
+      return;
+    }
+
+    if (file.size > DEAPI_REFERENCE_AUDIO_MAX_BYTES) {
+      toast.error("A referencia audio merete legfeljebb 10 MB lehet.");
+      return;
+    }
+
+    try {
+      const duration = await readAudioDuration(file);
+      const minDuration = Number(effectiveDeapiTtsLimits.minRefAudioDuration ?? 5);
+      const maxDuration = Number(effectiveDeapiTtsLimits.maxRefAudioDuration ?? 15);
+      if (Number.isFinite(duration) && (duration < minDuration || duration > maxDuration)) {
+        toast.error(`Voice clone modban a referencia audio hossza ${minDuration}-${maxDuration} masodperc lehet.`);
+        return;
+      }
+
+      setDeapiTtsReferenceAudio({
+        file,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        duration,
+      });
+    } catch (err) {
+      toast.error(err.message || "A referencia audio nem olvashato be.");
+    }
+  };
+
   // Common
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationStatus, setGenerationStatus] = useState("");
+  const [generationElapsed, setGenerationElapsed] = useState(0);
   const [audioUrl, setAudioUrl] = useState(null);
   const [audioInfo, setAudioInfo] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -868,6 +1027,9 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         generationController.current = null;
       }
       setIsGenerating(false);
+      setGenerationProgress(0);
+      setGenerationStatus("");
+      setGenerationElapsed(0);
       setCurrentJobId(null);
     }
   }, [jobs, currentJobId, isGenerating]);
@@ -877,22 +1039,67 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
   const [offsets, setOffsets] = useState({ left: 320, right: 0 });
 
   const audioRef = useRef(null);
+  const audioObjectUrlRef = useRef(null);
   const generationController = useRef(null);
   const color = selectedModel.color || "#10b981";
 
-  useEffect(() => { loadHistory(); }, [userId, selectedModel.id]);
+  const clearAudioObjectUrl = () => {
+    if (audioObjectUrlRef.current) {
+      URL.revokeObjectURL(audioObjectUrlRef.current);
+      audioObjectUrlRef.current = null;
+    }
+  };
+
+  const setExternalAudioUrl = (nextAudioUrl) => {
+    clearAudioObjectUrl();
+    setAudioUrl(nextAudioUrl);
+  };
+
+  const fetchArchivedAudioBlobUrl = async (audioId) => {
+    if (!audioId) throw new Error("Hiányzó audio azonosító");
+    const token = getIdToken ? await getIdToken() : null;
+    const res = await fetch(`${API_BASE}/api/audio/history/${audioId}/file`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`;
+      try {
+        const payload = await res.json();
+        message = payload.message || message;
+      } catch {}
+      throw new Error(message);
+    }
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    clearAudioObjectUrl();
+    audioObjectUrlRef.current = objectUrl;
+    return objectUrl;
+  };
+
+  useEffect(() => () => clearAudioObjectUrl(), []);
+
+  useEffect(() => { loadHistory(); }, [userId]);
   useEffect(() => {
     if (audioRef.current) audioRef.current.onended = () => setIsPlaying(false);
   }, [audioUrl]);
 
   const loadHistory = async () => {
-    if (!userId) return;
+    if (!userId) {
+      setHistory([]);
+      return;
+    }
     try {
-      const ref = collection(db, "audio_generations", userId, selectedModel.id);
-      const q = query(ref, orderBy("createdAt", "desc"), limit(20));
-      const snap = await getDocs(q);
-      setHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    } catch { }
+      const token = getIdToken ? await getIdToken() : null;
+      const res = await fetch(`${API_BASE}/api/audio/history`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json();
+      setHistory(Array.isArray(payload.items) ? payload.items : []);
+    } catch (err) {
+      console.warn("Audio archívum betöltési hiba:", err.message);
+      setHistory([]);
+    }
   };
 
   const togglePlay = () => {
@@ -901,33 +1108,113 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
     else { audioRef.current.play(); setIsPlaying(true); }
   };
 
-  const deapiHasHttpsWebhook = !deapiWebhookUrl.trim() || /^https:\/\//i.test(deapiWebhookUrl.trim());
   const canGenerateMiniMax = musicInstrumental
     ? !!musicPrompt.trim()
     : !!musicLyrics.trim() || (musicLyricsOptimizer && !!musicPrompt.trim());
   const canGenerateDeapi = !!deapiCaption.trim()
     && !!deapiModelSlug.trim()
     && hasValidDeapiCaptionLength
-    && deapiHasHttpsWebhook
     && (deapiLyricsMode === "instrumental" || deapiLyricsMode === "auto-lyrics" || !!deapiLyrics.trim());
+  const canGenerateDeapiTts = !!text.trim()
+    && (
+      effectiveDeapiTtsMode === "custom_voice"
+        ? !!deapiTtsVoice.trim()
+        : effectiveDeapiTtsMode === "voice_clone"
+          ? !!deapiTtsReferenceAudio?.file
+          : !!deapiTtsInstruct.trim()
+    );
   const currentMusicContent = isDeapiMusic
     ? (deapiCaption || (deapiLyricsMode === "lyrics" ? effectiveDeapiLyrics : ""))
     : (musicPrompt || musicLyrics);
 
+  const readAudioEventStream = async (res, jobId) => {
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("Nem olvashato a generatasi stream.");
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    const handleLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) return null;
+
+      const raw = trimmed.slice(5).trim();
+      if (!raw || raw === "[DONE]") return null;
+
+      let event;
+      try {
+        event = JSON.parse(raw);
+      } catch {
+        return null;
+      }
+
+      if (event.type === "status") {
+        const progress = Math.max(0, Math.min(99, Math.round(Number(event.progress ?? 0))));
+        const elapsed = Math.max(0, Math.round(Number(event.elapsed ?? 0)));
+        setGenerationProgress(progress);
+        setGenerationStatus(event.status ?? "");
+        setGenerationElapsed(elapsed);
+        updateJob(jobId, { progress, updatedAt: Date.now() });
+        return null;
+      }
+
+      if (event.type === "done") {
+        const elapsed = Math.max(0, Math.round(Number(event.elapsed ?? generationElapsed ?? 0)));
+        setGenerationProgress(100);
+        setGenerationStatus("DONE");
+        setGenerationElapsed(elapsed);
+        updateJob(jobId, { progress: 100, updatedAt: Date.now() });
+        return { success: true, ...event };
+      }
+
+      if (event.type === "error") {
+        throw new Error(event.message || "Generatasi hiba");
+      }
+
+      return null;
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const finalEvent = handleLine(line);
+        if (finalEvent) return finalEvent;
+      }
+    }
+
+    if (buffer) {
+      const finalEvent = handleLine(buffer);
+      if (finalEvent) return finalEvent;
+    }
+
+    throw new Error("A generatasi stream eredmeny nelkul zarult.");
+  };
+
   const handleGenerate = async () => {
     const canGenerateMusic = isDeapiMusic ? canGenerateDeapi : canGenerateMiniMax;
+    const canGenerateSpeech = isDeapiTTS ? canGenerateDeapiTts : !!text.trim();
     const content = isTTS ? text : currentMusicContent;
-    if ((isTTS ? !text.trim() : !canGenerateMusic) || isGenerating) return;
+    if ((isTTS ? !canGenerateSpeech : !canGenerateMusic) || isGenerating) return;
 
     setIsGenerating(true);
     setError(null);
-    setAudioUrl(null);
+    setExternalAudioUrl(null);
     setAudioInfo(null);
     setIsPlaying(false);
+    setGenerationProgress(0);
+    setGenerationStatus("");
+    setGenerationElapsed(0);
     closeMobileStudioPanel();
     const jobId = startJob(isTTS ? 'audio' : 'music', (content || 'Hanggenerálás').slice(0, 48), 'audio');
     setCurrentJobId(jobId);
     generationController.current = new AbortController();
+    updateJob(jobId, { progress: 0, updatedAt: Date.now() });
 
     try {
       const token = getIdToken ? await getIdToken() : null;
@@ -935,6 +1222,9 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       let resolvedDeapiLyrics = effectiveDeapiLyrics;
 
       if (!isTTS && isDeapiMusic && deapiLyricsMode === "auto-lyrics") {
+        setGenerationStatus("LYRICS");
+        setGenerationProgress(3);
+        updateJob(jobId, { progress: 3, updatedAt: Date.now() });
         resolvedDeapiLyrics = await generateDeapiAutoLyrics();
         setDeapiLyrics(resolvedDeapiLyrics);
       }
@@ -942,7 +1232,32 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       let body;
       let headers = { ...(token ? { Authorization: `Bearer ${token}` } : {}) };
       if (isTTS) {
-        if (isNvidiaRiva) {
+        if (isDeapiTTS) {
+          const formData = new FormData();
+          const deapiTtsPayload = {
+            apiId: selectedModel.apiId,
+            provider: selectedModel.provider,
+            model: effectiveDeapiTtsModelSlug,
+            text,
+            mode: effectiveDeapiTtsMode,
+            voice: effectiveDeapiTtsMode === "custom_voice" ? deapiTtsVoice.trim() : "",
+            lang: deapiTtsLang,
+            speed: deapiTtsSpeed,
+            format: deapiTtsFormat,
+            sample_rate: deapiTtsSampleRate,
+            ref_text: effectiveDeapiTtsMode === "voice_clone" ? deapiTtsRefText.trim() : "",
+            instruct: effectiveDeapiTtsMode === "voice_design" ? deapiTtsInstruct.trim() : "",
+            jobId,
+          };
+          Object.entries(deapiTtsPayload).forEach(([key, value]) => {
+            if (value === undefined || value === null || value === "") return;
+            formData.append(key, String(value));
+          });
+          if (effectiveDeapiTtsMode === "voice_clone" && deapiTtsReferenceAudio?.file) {
+            formData.append("ref_audio", deapiTtsReferenceAudio.file, deapiTtsReferenceAudio.file.name);
+          }
+          body = formData;
+        } else if (isNvidiaRiva) {
           const lc = rivaLang.toLowerCase().replace(/^(\w+)-(\w+)$/, (_, a, b) => `${a}-${b.toUpperCase()}`);
           body = {
             model: selectedModel.apiModel,
@@ -955,7 +1270,9 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         } else {
           body = { model: selectedModel.apiModel, provider: selectedModel.provider, text, voice: selectedVoice, speed, format: audioFormat, jobId };
         }
-        headers["Content-Type"] = "application/json";
+        if (!isDeapiTTS) {
+          headers["Content-Type"] = "application/json";
+        }
       } else {
         if (isDeapiMusic) {
           const formData = new FormData();
@@ -965,6 +1282,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
             model: deapiModelSlug,
             caption: deapiCaption,
             lyrics: resolvedDeapiLyrics,
+            lyrics_mode: deapiLyricsMode,
             duration: deapiDuration,
             inference_steps: deapiInferenceSteps,
             guidance_scale: deapiGuidanceScale,
@@ -974,7 +1292,6 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
             keyscale: deapiKeyscale.trim() || null,
             timesignature: deapiTimesignature ? Number(deapiTimesignature) : null,
             vocal_language: "unknown",
-            webhook_url: deapiWebhookUrl.trim() || null,
             jobId,
           };
           Object.entries(deapiPayload).forEach(([key, value]) => {
@@ -1011,7 +1328,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       const res = await fetch(endpoint, {
         method: "POST",
         headers,
-        body: isDeapiMusic ? body : JSON.stringify(body),
+        body: (isDeapiMusic || isDeapiTTS) ? body : JSON.stringify(body),
         signal: generationController.current?.signal,
       });
       if (!res.ok) {
@@ -1019,19 +1336,27 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
         throw new Error(errMsg);
       }
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      const data = (isDeapiMusic || isDeapiTTS) && contentType.includes("text/event-stream")
+        ? await readAudioEventStream(res, jobId)
+        : await res.json();
       if (generationController.current?.signal.aborted) return;
       if (!data.success) throw new Error(data.message);
 
-      setAudioUrl(data.audioUrl);
+      const playbackAudioUrl = data.audioId
+        ? await fetchArchivedAudioBlobUrl(data.audioId)
+        : data.audioUrl;
+      if (!playbackAudioUrl) throw new Error("Nem érkezett vissza lejátszható audio.");
+      setAudioUrl(playbackAudioUrl);
       setAudioInfo(
         isTTS
           ? {
-              fileFormat: isNvidiaRiva ? "wav" : audioFormat,
-              sampleRate: isNvidiaRiva ? 22050 : null,
+              fileFormat: data.fileFormat || (isDeapiTTS ? deapiTtsFormat : isNvidiaRiva ? "wav" : audioFormat),
+              sampleRate: data.sampleRate || (isDeapiTTS ? deapiTtsSampleRate : isNvidiaRiva ? 22050 : null),
               bitrate: null,
-              outputFormat: "data",
+              outputFormat: data.outputFormat || (isDeapiTTS ? "url" : "data"),
               stream: false,
+              audioId: data.audioId || null,
             }
           : {
               fileFormat: data.fileFormat || (isDeapiMusic ? deapiFormat : musicFileFormat),
@@ -1039,61 +1364,13 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
               bitrate: data.bitrate || (isDeapiMusic ? null : musicBitrate),
               outputFormat: data.outputFormat || (isDeapiMusic ? "url" : (musicStream ? "hex" : musicOutputFormat)),
               stream: Boolean(data.stream ?? (isDeapiMusic ? false : musicStream)),
+              audioId: data.audioId || null,
             }
       );
       markJobDoneAndSeen(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now() });
 
       if (userId) {
-        try {
-          await addDoc(collection(db, "audio_generations", userId, selectedModel.id), {
-            audioUrl: data.audioUrl,
-            type: isTTS ? "tts" : "music",
-            [isTTS ? "text" : "prompt"]: content,
-            ...(isTTS
-              ? isNvidiaRiva
-                ? { voice: buildRivaVoiceName(), lang: rivaLang, voiceName: rivaVoiceName, emotion: rivaEmotion }
-                : { voice: selectedVoice, speed }
-              : isDeapiMusic
-                ? {
-                    caption: deapiCaption,
-                    lyrics: resolvedDeapiLyrics,
-                    lyricsMode: deapiLyricsMode,
-                    instrumental: deapiLyricsMode === "instrumental",
-                    autoLyrics: deapiLyricsMode === "auto-lyrics",
-                    deapiModel: deapiModelSlug,
-                    duration: deapiDuration,
-                    inferenceSteps: deapiInferenceSteps,
-                    guidanceScale: deapiGuidanceScale,
-                    seed: deapiSeed,
-                    fileFormat: data.fileFormat || deapiFormat,
-                    bpm: deapiBpm === "" ? null : Number(deapiBpm),
-                    keyscale: deapiKeyscale.trim() || null,
-                    timesignature: deapiTimesignature ? Number(deapiTimesignature) : null,
-                    vocalLanguage: "unknown",
-                    webhookUrl: deapiWebhookUrl.trim() || null,
-                    hasReferenceAudio: Boolean(deapiReferenceAudio?.file),
-                    referenceAudioName: deapiReferenceAudio?.name || null,
-                    referenceAudioSize: deapiReferenceAudio?.size || null,
-                    referenceAudioDuration: deapiReferenceAudio?.duration ?? null,
-                    requestId: data.requestId || null,
-                  }
-                : {
-                    lyrics: musicLyrics,
-                    lyricsOptimizer: musicInstrumental ? false : musicLyricsOptimizer,
-                    instrumental: musicInstrumental,
-                    stream: musicStream,
-                    outputFormat: data.outputFormat || (musicStream ? "hex" : musicOutputFormat),
-                    sampleRate: data.sampleRate || musicSampleRate,
-                    bitrate: data.bitrate || musicBitrate,
-                    fileFormat: data.fileFormat || musicFileFormat,
-                  }),
-            modelId: selectedModel.id,
-            createdAt: serverTimestamp(),
-          });
-          await loadHistory();
-        } catch (saveErr) {
-          console.warn("Előzmény mentési hiba:", saveErr.message);
-        }
+        await loadHistory();
       }
     } catch (err) {
       setError(err.message || "Generálási hiba");
@@ -1177,7 +1454,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
               <AudioControls
                 selectedModel={selectedModel}
                 onModelChange={(model) => {
-                  setAudioUrl(null);
+                  setExternalAudioUrl(null);
                   setAudioInfo(null);
                   setIsPlaying(false);
                   onModelChange?.(model);
@@ -1187,6 +1464,18 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
                 text={text} setText={setText}
                 selectedVoice={selectedVoice} setSelectedVoice={setSelectedVoice}
                 speed={speed} setSpeed={setSpeed}
+                deapiTtsVariant={deapiTtsVariant} setDeapiTtsVariant={setDeapiTtsVariant}
+                deapiTtsMode={deapiTtsMode} setDeapiTtsMode={setDeapiTtsMode}
+                deapiTtsVoice={deapiTtsVoice} setDeapiTtsVoice={setDeapiTtsVoice}
+                deapiTtsLang={deapiTtsLang} setDeapiTtsLang={setDeapiTtsLang}
+                deapiTtsSpeed={deapiTtsSpeed} setDeapiTtsSpeed={setDeapiTtsSpeed}
+                deapiTtsFormat={deapiTtsFormat} setDeapiTtsFormat={setDeapiTtsFormat}
+                deapiTtsSampleRate={deapiTtsSampleRate} setDeapiTtsSampleRate={setDeapiTtsSampleRate}
+                deapiTtsRefText={deapiTtsRefText} setDeapiTtsRefText={setDeapiTtsRefText}
+                deapiTtsInstruct={deapiTtsInstruct} setDeapiTtsInstruct={setDeapiTtsInstruct}
+                deapiTtsReferenceAudio={deapiTtsReferenceAudio}
+                onDeapiTtsReferenceAudioSelect={handleDeapiTtsReferenceAudioSelect}
+                onDeapiTtsReferenceAudioClear={clearDeapiTtsReferenceAudio}
                 rivaLang={rivaLang} setRivaLang={setRivaLang}
                 rivaVoices={rivaVoices}
                 rivaVoiceName={rivaVoiceName} setRivaVoiceName={setRivaVoiceName}
@@ -1204,7 +1493,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
                 deapiModels={deapiModels}
                 deapiModelsLoading={deapiModelsLoading}
                 deapiModelsError={deapiModelsError}
-                deapiModelSlug={deapiModelSlug} setDeapiModelSlug={setDeapiModelSlug}
+                deapiModelSlug={deapiModelSlug}
                 deapiCaption={deapiCaption} setDeapiCaption={setDeapiCaption}
                 deapiEnhancingPrompt={deapiEnhancingPrompt}
                 deapiEnhancerError={deapiEnhancerError}
@@ -1224,7 +1513,6 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
                 onCommitDeapiBpm={commitDeapiBpm}
                 deapiKeyscale={deapiKeyscale} setDeapiKeyscale={setDeapiKeyscale}
                 deapiTimesignature={deapiTimesignature} setDeapiTimesignature={setDeapiTimesignature}
-                deapiWebhookUrl={deapiWebhookUrl} setDeapiWebhookUrl={setDeapiWebhookUrl}
                 deapiReferenceAudio={deapiReferenceAudio}
                 onDeapiReferenceAudioSelect={handleDeapiReferenceAudioSelect}
                 onDeapiReferenceAudioClear={clearDeapiReferenceAudio}
@@ -1236,7 +1524,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
     >
       <div className="h-full w-full relative overflow-hidden flex flex-col">
         <BackgroundFilters />
-        
+
         {/* Existing Background Logic - Preserved as requested */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
           <div className="absolute inset-0 liquid-wave opacity-60 scale-110 animate-[ken-burns_60s_infinite_alternate_ease-in-out]">
@@ -1255,9 +1543,12 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
           <div className="absolute inset-0 bg-gradient-to-b from-[#03000a]/80 via-transparent to-[#03000a]" />
         </div>
 
-        <AudioWorkspace 
+        <AudioWorkspace
           view={view}
           isGenerating={isGenerating}
+          generationProgress={generationProgress}
+          generationStatus={generationStatus}
+          generationElapsed={generationElapsed}
           audioUrl={audioUrl}
           audioInfo={audioInfo}
           error={error}
@@ -1265,18 +1556,40 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
           togglePlay={togglePlay}
           color={color}
           history={history}
-          onHistorySelect={(item) => {
-            setAudioUrl(item.audioUrl);
-            setAudioInfo({
-              fileFormat: item.fileFormat || item.format || (item.type === 'tts' && item.voiceName ? 'wav' : 'mp3'),
-              sampleRate: item.sampleRate || null,
-              bitrate: item.bitrate || null,
-              outputFormat: item.outputFormat || null,
-              stream: Boolean(item.stream),
-            });
-            setView('forge');
-            setIsPlaying(false);
+          onHistorySelect={async (item, options = {}) => {
+            try {
+              setError(null);
+              audioRef.current?.pause?.();
+              setIsPlaying(false);
+              const nextAudioUrl = item.audioId && item.storage === 'b2'
+                ? await fetchArchivedAudioBlobUrl(item.audioId)
+                : item.audioUrl;
+
+              if (!nextAudioUrl) throw new Error("Az archív audio nem tölthető be.");
+              if (item.audioId && item.storage === 'b2') {
+                setAudioUrl(nextAudioUrl);
+              } else {
+                setExternalAudioUrl(nextAudioUrl);
+              }
+              const nextAudioInfo = {
+                fileFormat: item.fileFormat || item.format || (item.type === 'tts' && item.voiceName ? 'wav' : 'mp3'),
+                sampleRate: item.sampleRate || null,
+                bitrate: item.bitrate || null,
+                outputFormat: item.outputFormat || null,
+                stream: Boolean(item.stream),
+                audioId: item.audioId || null,
+              };
+              setAudioInfo(nextAudioInfo);
+              if (!options.keepHistory) setView('forge');
+              return { audioUrl: nextAudioUrl, audioInfo: nextAudioInfo };
+            } catch (err) {
+              console.warn("Archiv audio betoltesi hiba:", err.message);
+              setError(err.message || "Az archív audio nem tölthető be.");
+              if (!options.keepHistory) setView('forge');
+              throw err;
+            }
           }}
+          getIdToken={getIdToken}
         />
         {audioUrl && <audio ref={audioRef} src={audioUrl} />}
       </div>

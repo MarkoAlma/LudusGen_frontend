@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Play, Pause, Download, Mic, Music, Layout, 
   Sparkles, History, Activity, Share2, Trash2, X, AlertCircle
 } from 'lucide-react';
+import { API_BASE } from '../../api/client';
 
 const MiniWaveform = ({ color, isPlaying }) => (
   <div className="flex items-center justify-center gap-[2px] sm:gap-1 md:gap-1.5 h-20 sm:h-24 md:h-32 px-4 sm:px-8 md:px-16 relative overflow-hidden">
@@ -35,6 +36,11 @@ const MIME_TO_EXTENSION = {
   "audio/wav": "wav",
   "audio/x-wav": "wav",
   "audio/wave": "wav",
+  "audio/flac": "flac",
+  "audio/x-flac": "flac",
+  "audio/ogg": "ogg",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
   "audio/pcm": "pcm",
 };
 
@@ -68,9 +74,59 @@ const guessExtensionFromUrl = (audioUrl) => {
   return "mp3";
 };
 
+const triggerBlobDownload = (blob, filename) => {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+};
+
+const formatHistoryDate = (item) => {
+  const millis = item?.createdAtMs
+    || (item?.createdAt?.seconds ? item.createdAt.seconds * 1000 : null);
+  if (!millis) return "";
+  return new Date(millis).toLocaleDateString();
+};
+
+const isMusicHistoryItem = (item) => item?.type === "music";
+
+const getHistoryKind = (item) => isMusicHistoryItem(item)
+  ? { id: "music", label: "Zene", accent: "#a855f7", Icon: Music }
+  : { id: "voice", label: "Hang", accent: "#06b6d4", Icon: Mic };
+
+const getHistoryTitle = (item) => {
+  const title = item?.title || item?.caption || item?.prompt || item?.text || item?.lyrics;
+  return String(title || "Névtelen audio").trim();
+};
+
+const getHistoryMeta = (item) => {
+  const model = item?.deapiModel || item?.model || item?.modelId || item?.legacyModelId;
+  return [
+    item?.provider,
+    model,
+    item?.fileFormat || item?.format,
+  ].filter(Boolean).map((part) => String(part));
+};
+
+const buildHistoryAudioInfo = (item) => ({
+  fileFormat: item?.fileFormat || item?.format || (isMusicHistoryItem(item) ? "mp3" : "wav"),
+  sampleRate: item?.sampleRate || null,
+  bitrate: item?.bitrate || null,
+  outputFormat: item?.outputFormat || null,
+  stream: Boolean(item?.stream),
+  audioId: item?.audioId || null,
+});
+
 export default function AudioWorkspace({ 
   view, 
   isGenerating, 
+  generationProgress = 0,
+  generationStatus = "",
+  generationElapsed = 0,
   audioUrl, 
   audioInfo,
   error,
@@ -78,17 +134,141 @@ export default function AudioWorkspace({
   togglePlay, 
   color, 
   history,
-  onHistorySelect
+  onHistorySelect,
+  getIdToken,
 }) {
-  const handleDownload = () => {
-    if (!audioUrl) return;
-    const extension = audioInfo?.fileFormat || guessExtensionFromUrl(audioUrl);
-    const link = document.createElement('a');
-    link.href = audioUrl;
-    link.download = `neural_audio_${Date.now()}.${extension}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
+  const [historyFilter, setHistoryFilter] = useState("all");
+  const [activeHistoryItem, setActiveHistoryItem] = useState(null);
+  const [activeHistoryAudioUrl, setActiveHistoryAudioUrl] = useState("");
+  const [activeHistoryAudioInfo, setActiveHistoryAudioInfo] = useState(null);
+  const [isHistoryAudioLoading, setIsHistoryAudioLoading] = useState(false);
+  const [historyModalError, setHistoryModalError] = useState("");
+  const [isHistoryModalPlaying, setIsHistoryModalPlaying] = useState(false);
+  const historyAudioRef = useRef(null);
+
+  const downloadAudio = async ({ sourceUrl, info, filenamePrefix = "neural_audio" }) => {
+    if (!sourceUrl) return;
+    const safeSourceUrl = String(sourceUrl);
+    const extension = String(info?.fileFormat || guessExtensionFromUrl(safeSourceUrl) || "mp3")
+      .replace(/^\./, "")
+      .toLowerCase();
+    const filename = `${filenamePrefix}_${Date.now()}.${extension}`;
+
+    setIsDownloading(true);
+    setDownloadError("");
+
+    try {
+      if (safeSourceUrl.startsWith("data:") || safeSourceUrl.startsWith("blob:")) {
+        const response = await fetch(safeSourceUrl);
+        const blob = await response.blob();
+        triggerBlobDownload(blob, filename);
+        return;
+      }
+
+      const token = getIdToken ? await getIdToken() : "";
+      const response = await fetch(`${API_BASE}/api/audio/download`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ audioUrl: safeSourceUrl, filename }),
+      });
+
+      if (!response.ok) {
+        let message = `HTTP ${response.status}`;
+        try {
+          const payload = await response.json();
+          message = payload.message || message;
+        } catch {}
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      triggerBlobDownload(blob, filename);
+    } catch (err) {
+      console.error("Audio download failed:", err);
+      setDownloadError(err.message || "A letöltés nem sikerült.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleDownload = () => downloadAudio({
+    sourceUrl: audioUrl,
+    info: audioInfo,
+    filenamePrefix: "neural_audio",
+  });
+
+  const closeHistoryModal = () => {
+    if (historyAudioRef.current) {
+      historyAudioRef.current.pause();
+      historyAudioRef.current.currentTime = 0;
+    }
+    setActiveHistoryItem(null);
+    setActiveHistoryAudioUrl("");
+    setActiveHistoryAudioInfo(null);
+    setIsHistoryAudioLoading(false);
+    setHistoryModalError("");
+    setDownloadError("");
+    setIsHistoryModalPlaying(false);
+  };
+
+  const openHistoryModal = async (item) => {
+    if (historyAudioRef.current) {
+      historyAudioRef.current.pause();
+      historyAudioRef.current.currentTime = 0;
+    }
+    setActiveHistoryItem(item);
+    setActiveHistoryAudioUrl("");
+    setActiveHistoryAudioInfo(buildHistoryAudioInfo(item));
+    setIsHistoryAudioLoading(true);
+    setHistoryModalError("");
+    setDownloadError("");
+    setIsHistoryModalPlaying(false);
+
+    try {
+      const result = await onHistorySelect?.(item, { keepHistory: true });
+      const nextAudioUrl = result?.audioUrl || item?.audioUrl || "";
+      const nextAudioInfo = result?.audioInfo || buildHistoryAudioInfo(item);
+      if (!nextAudioUrl) throw new Error("Az archív audio nem tölthető be.");
+      setActiveHistoryAudioUrl(nextAudioUrl);
+      setActiveHistoryAudioInfo(nextAudioInfo);
+    } catch (err) {
+      console.warn("Archiv modal betoltesi hiba:", err.message);
+      setHistoryModalError(err.message || "Az archív audio nem tölthető be.");
+    } finally {
+      setIsHistoryAudioLoading(false);
+    }
+  };
+
+  const handleHistoryDownload = () => {
+    const kind = getHistoryKind(activeHistoryItem);
+    downloadAudio({
+      sourceUrl: activeHistoryAudioUrl,
+      info: activeHistoryAudioInfo,
+      filenamePrefix: kind.id === "music" ? "ludusgen_zene" : "ludusgen_hang",
+    });
+  };
+
+  const toggleHistoryPlayback = async () => {
+    const audio = historyAudioRef.current;
+    if (!audio || !activeHistoryAudioUrl || isHistoryAudioLoading) return;
+
+    if (isHistoryModalPlaying) {
+      audio.pause();
+      return;
+    }
+
+    try {
+      await audio.play();
+      setIsHistoryModalPlaying(true);
+    } catch (err) {
+      console.warn("Archiv modal lejatszasi hiba:", err.message);
+      setHistoryModalError("A lejátszás nem indítható el.");
+    }
   };
 
   const playbackDetails = [
@@ -96,6 +276,33 @@ export default function AudioWorkspace({
     formatSampleRate(audioInfo?.sampleRate),
     formatBitrate(audioInfo?.bitrate),
   ].filter(Boolean).join(" • ");
+  const safeGenerationProgress = Math.max(6, Math.min(100, Math.round(Number(generationProgress) || 0)));
+  const generationStatusLabel = generationStatus || "PROCESSING";
+  const safeHistory = Array.isArray(history) ? history : [];
+  const historyCounts = safeHistory.reduce((counts, item) => {
+    if (isMusicHistoryItem(item)) counts.music += 1;
+    else counts.voice += 1;
+    counts.all += 1;
+    return counts;
+  }, { all: 0, voice: 0, music: 0 });
+  const historyFilters = [
+    { id: "all", label: "Mind", count: historyCounts.all, Icon: Layout },
+    { id: "voice", label: "Hang", count: historyCounts.voice, Icon: Mic },
+    { id: "music", label: "Zene", count: historyCounts.music, Icon: Music },
+  ];
+  const filteredHistory = safeHistory.filter((item) => {
+    if (historyFilter === "all") return true;
+    return historyFilter === "music" ? isMusicHistoryItem(item) : !isMusicHistoryItem(item);
+  });
+  const activeHistoryKind = activeHistoryItem ? getHistoryKind(activeHistoryItem) : getHistoryKind(null);
+  const ActiveHistoryIcon = activeHistoryKind.Icon;
+  const activeHistoryTitle = activeHistoryItem ? getHistoryTitle(activeHistoryItem) : "";
+  const activeHistoryMeta = activeHistoryItem ? getHistoryMeta(activeHistoryItem) : [];
+  const activeHistoryDetails = [
+    activeHistoryAudioInfo?.fileFormat ? activeHistoryAudioInfo.fileFormat.toUpperCase() : null,
+    formatSampleRate(activeHistoryAudioInfo?.sampleRate),
+    formatBitrate(activeHistoryAudioInfo?.bitrate),
+  ].filter(Boolean).join(" | ");
 
   return (
     <div className="h-full w-full relative z-10 flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
@@ -106,44 +313,92 @@ export default function AudioWorkspace({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-5xl h-full flex flex-col gap-6"
+            className="w-full max-w-6xl h-full flex flex-col gap-5"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex shrink-0 items-center justify-center">
                   <History className="w-5 h-5 text-white/40" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-sm font-black text-white italic uppercase tracking-[0.2em]">Archívum</h2>
-                  <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mt-0.5">Neurális generálások előzményei</p>
+                  <p className="mt-0.5 text-[10px] font-bold text-white/25 uppercase tracking-widest">Hangok és zenék</p>
                 </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {historyFilters.map((filter) => {
+                  const FilterIcon = filter.Icon;
+                  const isActive = historyFilter === filter.id;
+                  return (
+                    <button
+                      key={filter.id}
+                      type="button"
+                      onClick={() => setHistoryFilter(filter.id)}
+                      className={`flex h-10 items-center gap-2 rounded-2xl border px-3 text-[10px] font-black uppercase tracking-[0.16em] transition-all ${
+                        isActive
+                          ? "border-white/20 bg-white/10 text-white shadow-lg shadow-black/20"
+                          : "border-white/5 bg-white/[0.025] text-white/35 hover:border-white/12 hover:bg-white/[0.05] hover:text-white/70"
+                      }`}
+                    >
+                      <FilterIcon className="h-3.5 w-3.5 shrink-0" />
+                      <span>{filter.label}</span>
+                      <span className="rounded-full bg-black/25 px-1.5 py-0.5 text-[9px] text-white/45">{filter.count}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto scrollbar-hide">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {history.map((item, idx) => (
+              <div className="grid grid-cols-1 gap-3 pb-6 xl:grid-cols-2">
+                {filteredHistory.map((item, idx) => (
                   <button 
                     key={item.id || idx}
-                    onClick={() => onHistorySelect(item)}
-                    className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-white/10 transition-all text-left flex items-start gap-4 group"
+                    type="button"
+                    onClick={() => openHistoryModal(item)}
+                    className="group relative min-h-[132px] overflow-hidden rounded-[1.35rem] border border-white/5 bg-[#090711]/70 p-4 text-left shadow-2xl shadow-black/10 transition-all hover:-translate-y-0.5 hover:border-white/10 hover:bg-white/[0.04] flex items-start gap-4"
                   >
-                    <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-zinc-500 group-hover:text-white transition-colors">
+                    <div className={`w-12 h-12 rounded-2xl border flex shrink-0 items-center justify-center transition-transform group-hover:scale-105 ${
+                      item.type === 'music'
+                        ? 'border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-300'
+                        : 'border-cyan-400/20 bg-cyan-500/10 text-cyan-300'
+                    }`}>
                       {item.type === 'music' ? <Music className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[11px] font-bold text-white truncate mb-1">
-                        {item.text || item.prompt || "Névtelen töredék"}
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full border px-2 py-1 text-[8px] font-black uppercase tracking-[0.18em] ${
+                          item.type === 'music'
+                            ? 'border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-300'
+                            : 'border-cyan-400/20 bg-cyan-500/10 text-cyan-300'
+                        }`}>
+                          {item.type === 'music' ? 'Zene' : 'Hang'}
+                        </span>
+                        <span className="text-[8px] font-black uppercase tracking-[0.18em] text-white/25">{formatHistoryDate(item) || "archívum"}</span>
                       </div>
-                      <div className="flex items-center gap-3 text-[9px] font-black text-zinc-600 uppercase tracking-widest italic">
-                        <span>{item.type || 'audio'}</span>
-                        <span className="w-1 h-1 rounded-full bg-white/10" />
-                        <span>{new Date(item.createdAt?.seconds * 1000).toLocaleDateString()}</span>
+                      <div className="line-clamp-2 text-[13px] font-black leading-snug text-white">
+                        {getHistoryTitle(item)}
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-[8px] font-black uppercase tracking-[0.16em] text-white/25">
+                        {getHistoryMeta(item).slice(0, 3).map((part) => (
+                          <span key={part} className="max-w-[12rem] truncate rounded-lg bg-white/[0.03] px-2 py-1">
+                            {part}
+                          </span>
+                        ))}
                       </div>
                     </div>
                   </button>
                 ))}
               </div>
+              {filteredHistory.length === 0 ? (
+                <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 bg-white/[0.015] text-center">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-white/25">
+                    <History className="h-6 w-6" />
+                  </div>
+                  <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/45">Nincs találat</div>
+                  <div className="mt-2 text-[9px] font-bold uppercase tracking-widest text-white/20">Az archívum ebben a szűrőben üres</div>
+                </div>
+              ) : null}
             </div>
           </motion.div>
         ) : error ? (
@@ -173,14 +428,30 @@ export default function AudioWorkspace({
             className="w-full flex flex-col items-center justify-center"
           >
             {isGenerating ? (
-              <div className="flex flex-col items-center gap-8">
+              <div className="flex flex-col items-center gap-8 text-center">
                 <MiniWaveform color={color} isPlaying={true} />
-                <div className="flex flex-col items-center gap-2">
+                <div className="flex flex-col items-center gap-4">
                   <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/10">
                     <Activity className="w-3.5 h-3.5 text-primary animate-pulse" />
-                    <span className="text-[10px] font-black text-white italic uppercase tracking-[0.2em]">Neurális feldolgozás</span>
+                    <span className="text-[10px] font-black text-white italic uppercase tracking-[0.2em]">Audio generálás</span>
                   </div>
-                  <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">Hangfrekvenciák szintézise...</p>
+                  <div className="w-64 max-w-[72vw] flex flex-col items-center gap-2">
+                    <div className="flex items-center justify-center rounded-md border border-white/5 bg-white/[0.025] px-3 py-1.5 text-[8px] font-black uppercase tracking-widest text-zinc-400">
+                      {generationStatusLabel}
+                    </div>
+                    <div className="h-[2px] w-full overflow-hidden rounded-full bg-white/5">
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: color }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${safeGenerationProgress}%` }}
+                        transition={{ duration: 0.4, ease: 'easeOut' }}
+                      />
+                    </div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
+                      {safeGenerationProgress}%{generationElapsed > 0 ? ` | ${generationElapsed}s` : ''}
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : audioUrl ? (
@@ -219,14 +490,25 @@ export default function AudioWorkspace({
                       <div className="flex gap-2">
                         <button 
                           onClick={handleDownload}
-                          className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                          disabled={isDownloading}
+                          className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all disabled:cursor-wait disabled:opacity-50"
+                          title={isDownloading ? "Letöltés..." : "Letöltés"}
                         >
-                          <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                          {isDownloading ? (
+                            <Activity className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
+                          ) : (
+                            <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                          )}
                         </button>
                         <button className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all">
                           <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                       </div>
+                      {downloadError ? (
+                        <p className="max-w-[8rem] break-words text-center text-[8px] font-bold uppercase tracking-[0.12em] text-rose-300">
+                          {downloadError}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -257,6 +539,135 @@ export default function AudioWorkspace({
             )}
           </motion.div>
         )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {activeHistoryItem ? (
+          <motion.div
+            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/75 p-4 backdrop-blur-2xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeHistoryModal}
+          >
+            <motion.div
+              className="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#080610]/95 shadow-2xl shadow-black/60"
+              initial={{ opacity: 0, scale: 0.96, y: 18 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 18 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-white/5 px-5 py-4 sm:px-6">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border"
+                    style={{
+                      color: activeHistoryKind.accent,
+                      borderColor: `${activeHistoryKind.accent}35`,
+                      backgroundColor: `${activeHistoryKind.accent}12`,
+                    }}
+                  >
+                    <ActiveHistoryIcon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div
+                      className="mb-1 text-[9px] font-black uppercase tracking-[0.22em]"
+                      style={{ color: activeHistoryKind.accent }}
+                    >
+                      {activeHistoryKind.label}
+                    </div>
+                    <h3 className="line-clamp-2 text-base font-black leading-tight text-white sm:text-lg">
+                      {activeHistoryTitle}
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeHistoryModal}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/5 bg-white/[0.03] text-white/40 transition-all hover:border-white/15 hover:bg-white/10 hover:text-white"
+                  title="Bezárás"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="px-5 py-5 sm:px-6">
+                <div className="mb-5 overflow-hidden rounded-[1.5rem] border border-white/5 bg-white/[0.025]">
+                  <MiniWaveform color={activeHistoryKind.accent} isPlaying={isHistoryModalPlaying} />
+                </div>
+
+                <div className="mb-4 flex flex-wrap items-center gap-2 text-[8px] font-black uppercase tracking-[0.16em] text-white/30">
+                  {[...activeHistoryMeta, activeHistoryDetails, formatHistoryDate(activeHistoryItem)]
+                    .filter(Boolean)
+                    .slice(0, 5)
+                    .map((part) => (
+                      <span key={part} className="max-w-[12rem] truncate rounded-lg border border-white/5 bg-white/[0.025] px-2 py-1">
+                        {part}
+                      </span>
+                    ))}
+                </div>
+
+                {isHistoryAudioLoading ? (
+                  <div className="flex h-20 items-center justify-center rounded-2xl border border-white/5 bg-white/[0.02] text-white/45">
+                    <Activity className="h-5 w-5 animate-pulse" />
+                  </div>
+                ) : historyModalError ? (
+                  <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-rose-200">
+                    {historyModalError}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center">
+                    <button
+                      type="button"
+                      onClick={toggleHistoryPlayback}
+                      className="flex h-16 w-16 items-center justify-center rounded-[1.35rem] shadow-2xl transition-all hover:scale-105 active:scale-95"
+                      style={{
+                        backgroundColor: activeHistoryKind.accent,
+                        boxShadow: `0 18px 45px ${activeHistoryKind.accent}24`,
+                      }}
+                      title={isHistoryModalPlaying ? "Szünet" : "Lejátszás"}
+                    >
+                      {isHistoryModalPlaying ? (
+                        <Pause className="h-6 w-6 fill-current text-white" />
+                      ) : (
+                        <Play className="ml-0.5 h-6 w-6 fill-current text-white" />
+                      )}
+                    </button>
+                    <audio
+                      ref={historyAudioRef}
+                      className="hidden"
+                      src={activeHistoryAudioUrl}
+                      preload="metadata"
+                      onPlay={() => setIsHistoryModalPlaying(true)}
+                      onPause={() => setIsHistoryModalPlaying(false)}
+                      onEnded={() => setIsHistoryModalPlaying(false)}
+                    />
+                  </div>
+                )}
+
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-[9px] font-black uppercase tracking-[0.18em] text-white/25">
+                    {activeHistoryDetails || "AI audio"}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleHistoryDownload}
+                    disabled={!activeHistoryAudioUrl || isHistoryAudioLoading || isDownloading}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-4 text-[10px] font-black uppercase tracking-[0.18em] text-white/70 transition-all hover:border-white/20 hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-45"
+                  >
+                    {isDownloading ? <Activity className="h-4 w-4 animate-pulse" /> : <Download className="h-4 w-4" />}
+                    Letöltés
+                  </button>
+                </div>
+                {downloadError ? (
+                  <div className="mt-3 text-right text-[9px] font-bold uppercase tracking-[0.12em] text-rose-300">
+                    {downloadError}
+                  </div>
+                ) : null}
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
       </AnimatePresence>
     </div>
   );
