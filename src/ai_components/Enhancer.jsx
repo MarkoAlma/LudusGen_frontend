@@ -112,6 +112,7 @@ function Enhancer({
   // Undo stack — stores previous prompt values before AI replaces them
   const undoStack = useRef([]);
 
+
   const isBusy = enhancing || superEnhancing || dechanting || describingImages;
 
   useEffect(() => {
