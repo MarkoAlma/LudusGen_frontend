@@ -12,6 +12,8 @@ const omitUndefined = (obj) => Object.fromEntries(
   Object.entries(obj).filter(([, value]) => value !== undefined)
 );
 
+const getCanonicalModelVersion = (value) => value ?? null;
+
 /**
  * @param {{
  *   userId: string,
@@ -45,8 +47,10 @@ export function useTripoHistory({
     const cap2 = s => s ? s.trim().split(/\s+/).slice(0, 2).join(" ") : s;
     const effectivePrompt = extra.prompt ?? prompt;
     const effectiveMode = extra.mode ?? mode;
-    const effectiveModelVer = extra.modelVer ?? modelVer;
+    const effectiveModelVer = getCanonicalModelVersion(extra.model_version ?? extra.modelVer ?? modelVer);
     const cleanExtra = omitUndefined(extra);
+    delete cleanExtra.modelVer;
+    delete cleanExtra.modelVersion;
     const topLevelType = cleanExtra.type ?? null;
     const marksTexturedOutput =
       cleanExtra.texture === true ||
@@ -70,10 +74,14 @@ export function useTripoHistory({
       ...(marksPbrOutput && { pbr: true }),
       styleId: activeStyle || null,
       negPrompt: (extra.negPrompt ?? negPrompt) || null,
-      params: omitUndefined({ model_version: effectiveModelVer, mode: effectiveMode, ...cleanExtra }),
+      params: omitUndefined({
+        ...cleanExtra,
+        model_version: effectiveModelVer,
+        mode: effectiveMode,
+      }),
       ts: Date.now(),
     };
-    console.log("[useTripoHistory][saveHist]", {
+    if (import.meta.env.DEV && import.meta.env.VITE_TRIPO_DEBUG === "true") console.log("[useTripoHistory][saveHist]", {
       taskId,
       mode: effectiveMode,
       type: item.params?.type ?? null,
