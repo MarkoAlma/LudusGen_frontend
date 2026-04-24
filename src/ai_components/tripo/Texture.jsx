@@ -5,7 +5,7 @@ import Enhancer from "../Enhancer";
 import {
   Image, Cpu, Pencil, HelpCircle, Check, Loader2,
   PersonStanding, Upload, X, RotateCcw,
-  Paintbrush, Wand2, Info,
+  Paintbrush, Wand2, Info, AlertTriangle,
 } from "lucide-react";
 import { Tooltip } from "../meshy/ui/Primitives";
 
@@ -430,7 +430,7 @@ export function TexInputBox({
               </div>
               <p style={{ color: T.textPrimary, fontSize: 13, fontWeight: 700, margin: "0 0 4px" }}>Upload reference image</p>
               <p style={{ color: T.textDim, fontSize: 10, fontWeight: 600, margin: "2px 0 0" }}>AVIF supported too</p>
-              <p style={{ color: T.textDim, fontSize: 10, fontWeight: 600, margin: 0 }}>JPG · PNG · WEBP &nbsp;≤ 20 MB</p>
+              <p style={{ color: T.textDim, fontSize: 10, fontWeight: 600, margin: 0 }}>JPG · PNG · WEBP &nbsp;≤ 10 MB</p>
             </div>
           )}
         </div>
@@ -500,7 +500,7 @@ export function TexInputBox({
         <div style={{ padding: "10px 10px 8px" }}>
           <Enhancer
             value={texPrompt}
-            onChange={val => setTexPrompt(val.slice(0, 1000))}
+            onChange={val => setTexPrompt(val.slice(0, 1024))}
             onSubmit={() => {}}
             color="#8b5cf6"
             getIdToken={getIdToken}
@@ -736,6 +736,7 @@ export function MagicBrushPanel({
   brushSize, setBrushSize,
   brushOpacity = 1, setBrushOpacity,
   brushHardness = 80, setBrushHardness,
+  uvOverlapWarning = false,
   canvasRef,
   onUndo,
 }) {
@@ -828,8 +829,8 @@ export function MagicBrushPanel({
               <textarea
                 className="tp-ta"
                 value={brushPrompt}
-                onChange={e => setBrushPrompt(e.target.value.slice(0, 1000))}
-                placeholder="Describe the new texture for the painted region…"
+                onChange={e => setBrushPrompt(e.target.value.slice(0, 1024))}
+                placeholder="Describe the texture to generate for the selected model..."
                 rows={6}
                 style={{
                   minHeight: 130,
@@ -841,7 +842,7 @@ export function MagicBrushPanel({
                 }}
               />
               <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 12px 8px" }}>
-                <span style={{ color: T.textDim, fontSize: 10, fontFamily: "monospace", fontWeight: 700 }}>{brushPrompt.length}/1000</span>
+                <span style={{ color: T.textDim, fontSize: 10, fontFamily: "monospace", fontWeight: 700 }}>{brushPrompt.length}/1024</span>
               </div>
             </div>
           </div>
@@ -852,7 +853,7 @@ export function MagicBrushPanel({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <SectionLabel>Creativity Strength</SectionLabel>
-                <Tooltip text="Higher values give the AI more freedom to reimagine the painted area. Lower values stay closer to the original.">
+                <Tooltip text="Higher values give the AI more freedom to reimagine the texture pass. Lower values stay closer to the original.">
                   <Info style={{ width: 12, height: 12, color: T.textDim, flexShrink: 0, cursor: "help" }} />
                 </Tooltip>
               </div>
@@ -862,9 +863,9 @@ export function MagicBrushPanel({
               <StyledSlider min={0} max={1} step={0.01} value={creativity} onChange={e => setCreativity(Number(e.target.value))} />
             </div>
             <p style={{ color: T.textDim, fontSize: 10, fontWeight: 600, margin: "6px 0 0", lineHeight: 1.6 }}>
-              {creativity < 0.4 && "Conservative — stays close to original texture"}
-              {creativity >= 0.4 && creativity < 0.7 && "Balanced — moderate creative freedom"}
-              {creativity >= 0.7 && "High — freely reimagines the painted area"}
+              {creativity < 0.4 && "Conservative - stays close to original texture"}
+              {creativity >= 0.4 && creativity < 0.7 && "Balanced - moderate creative freedom"}
+              {creativity >= 0.7 && "High - freely reimagines the texture pass"}
             </p>
           </div>
         </div>
@@ -905,6 +906,61 @@ export function MagicBrushPanel({
               </div>
             </div>
           </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <SectionLabel>Prompt</SectionLabel>
+            <div style={{
+              borderRadius: 12,
+              border: `1px solid ${T.glassBorder}`,
+              background: "rgba(255,255,255,0.025)",
+              overflow: "hidden",
+              backdropFilter: "blur(12px)",
+            }}>
+              <textarea
+                className="tp-ta"
+                value={brushPrompt}
+                onChange={e => setBrushPrompt(e.target.value.slice(0, 1024))}
+                placeholder="Describe the texture to generate for this model..."
+                rows={4}
+                style={{
+                  minHeight: 92,
+                  padding: "12px 12px 4px",
+                  background: "transparent",
+                  border: "none",
+                  resize: "none",
+                  width: "100%",
+                }}
+              />
+              <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 12px 8px" }}>
+                <span style={{ color: T.textDim, fontSize: 10, fontFamily: "monospace", fontWeight: 700 }}>{brushPrompt.length}/1024</span>
+              </div>
+            </div>
+          </div>
+
+          {uvOverlapWarning && (
+            <div style={{
+              borderRadius: 12,
+              border: "1px solid rgba(245,158,11,0.22)",
+              background: "rgba(245,158,11,0.07)",
+              padding: "10px 12px",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              marginBottom: 14,
+            }}>
+              <div style={{ width: 28, height: 28, borderRadius: 9, background: "rgba(245,158,11,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <AlertTriangle style={{ width: 14, height: 14, color: "#fbbf24" }} />
+              </div>
+              <div>
+                <p style={{ color: "#fde68a", fontSize: 11, fontWeight: 800, margin: "0 0 4px" }}>
+                  Possible UV overlap
+                </p>
+                <p style={{ color: "#d6d0bf", fontSize: 10, fontWeight: 700, margin: 0, lineHeight: 1.6 }}>
+                  If the model uses mirrored or overlapping UVs, local paint preview strokes can appear on other parts too. Generation can still run from the prompt.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Color section */}
           <div>
@@ -966,7 +1022,6 @@ export function MagicBrushPanel({
                   height: Math.max(4, Math.min(32, brushSize * 0.27)),
                   borderRadius: "50%",
                   background: brushColor,
-                  boxShadow: `0 0 6px ${brushColor}88`,
                 }} />
               </div>
               <div style={{ flex: 1 }}>
@@ -974,7 +1029,7 @@ export function MagicBrushPanel({
                   <span style={{ ...T.labelStyle, fontSize: 10 }}>Size</span>
                   <ValueBadge>{brushSize}px</ValueBadge>
                 </div>
-                <StyledSlider min={0.5} max={120} step={0.5} value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} />
+                <StyledSlider min={0.1} max={120} step={0.1} value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} />
               </div>
             </div>
 
@@ -1034,6 +1089,7 @@ export default function Texture({
   brushSize, setBrushSize,
   brushOpacity, setBrushOpacity,
   brushHardness, setBrushHardness,
+  uvOverlapWarning = false,
   canvasRef,
   onUndo,
   getIdToken,
@@ -1206,6 +1262,7 @@ export default function Texture({
             brushSize={brushSize} setBrushSize={setBrushSize}
             brushOpacity={brushOpacity} setBrushOpacity={setBrushOpacity}
             brushHardness={brushHardness} setBrushHardness={setBrushHardness}
+            uvOverlapWarning={uvOverlapWarning}
             canvasRef={canvasRef}
             onUndo={onUndo}
           />

@@ -66,7 +66,7 @@ export function useTripoHistory({
       name: resolvedName,
       status: "succeeded",
       model_url: rawUrl,
-      source: "tripo",
+      source: extra.source ?? "tripo",
       mode: effectiveMode,
       taskId,
       ...(topLevelType && { type: topLevelType }),

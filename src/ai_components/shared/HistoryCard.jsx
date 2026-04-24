@@ -85,6 +85,8 @@ function useContainerWidth(ref) {
 }
 
 const EXPIRED_URLS = new Set();
+const THUMBNAIL_CACHE_VERSION = "history-thumb-v2";
+const getThumbnailCacheKey = (item) => item?.model_url ? `${item.model_url}#${THUMBNAIL_CACHE_VERSION}` : null;
 
 /* ─── Type config ────────────────────────────────────────────────────────── */
 const getTypeConfig = (item) => {
@@ -151,17 +153,18 @@ const HistoryCard = React.memo(function HistoryCard({
 
   useEffect(() => {
     if (!item?.model_url) return;
+    const thumbnailCacheKey = getThumbnailCacheKey(item);
     if (item?.status === "failed" || EXPIRED_URLS.has(item.model_url)) {
       setThumbError(true);
       if (EXPIRED_URLS.has(item.model_url)) setErrorCode(410);
       return;
     }
-    if (isThumbnailUnsupported(item.model_url)) {
+    if (isThumbnailUnsupported(thumbnailCacheKey)) {
       setThumbError(true);
       setThumbLoading(false);
       return;
     }
-    const cached = checkThumbnailCache(item.model_url);
+    const cached = checkThumbnailCache(thumbnailCacheKey);
     if (cached) {
       setThumbnail(cached);
       setThumbError(false);
@@ -178,7 +181,7 @@ const HistoryCard = React.memo(function HistoryCard({
         if (cancelled || !data) return;
         // Show shimmer only if not already resolved (prevents flicker for cache hits)
         if (!cancelled) { loadingTimer = setTimeout(() => { if (!cancelled) setThumbLoading(true); }, 150); }
-        const thumb = await getCachedThumbnail(data.buffer, { width: 280, height: 280 }, item.model_url);
+        const thumb = await getCachedThumbnail(data.buffer, { width: 280, height: 280 }, thumbnailCacheKey);
         if (data.blobUrl) URL.revokeObjectURL(data.blobUrl);
         clearTimeout(loadingTimer);
         if (!cancelled) { if (thumb) setThumbnail(thumb); else setThumbError(true); }

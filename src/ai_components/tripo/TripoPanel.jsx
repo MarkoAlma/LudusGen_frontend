@@ -28,6 +28,9 @@ import { checkThumbnailCache, getCachedThumbnail } from "../trellis/Glbthumbnail
 import { useTripoHistory } from "./useTripoHistory";
 import { useTripoRig } from "./useTripoRig";
 import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX } from "./GeneratePanel";
+import { DEFAULT_MODEL_VERSION, DEFAULT_TEXTURE_MODEL_VERSION } from "./constants";
+import { streamTaskStatus, uploadViaTripoSts } from "./tripoTransfers";
+import { resolveTripoModelUrl, resolveTripoUrlNode } from "./utils/modelUrl";
 import Segment from "./Segment";
 import Retopo from "./Retopo";
 import Texture from "./Texture";
@@ -88,7 +91,18 @@ const MODE_COST = {
   fill_parts: 50,
   paint: 10,
   animate: 10,
+  generate_image: 5,
+  generate_multiview_image: 10,
+  edit_multiview_image: 10,
 };
+
+function inferImageTypeFromUrl(url) {
+  const cleanUrl = String(url || "").split("?")[0].toLowerCase();
+  if (cleanUrl.endsWith(".jpg") || cleanUrl.endsWith(".jpeg")) return "jpeg";
+  if (cleanUrl.endsWith(".webp")) return "webp";
+  if (cleanUrl.endsWith(".png")) return "png";
+  return "png";
+}
 
 function isRefineModelVersionSupported(version) {
   if (!version) return true;
@@ -233,6 +247,11 @@ function logFrontendDebug(label, payload) {
   }
 }
 
+function formatApiError(data, fallback = "API error") {
+  const base = data?.message || fallback;
+  return data?.tripoTraceId ? `${base} (Tripo trace: ${data.tripoTraceId})` : base;
+}
+
 function CoinIcon({ size = 15 }) {
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: "linear-gradient(135deg,#f5c518,#e09900)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -308,7 +327,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   // generate
   const [genTab, setGenTab] = useState("image");
-  const [modelVer, setModelVer] = useState(MODEL_VERSIONS[0].id);
+  const [modelVer, setModelVer] = useState(DEFAULT_MODEL_VERSION);
   const [prompt, setPrompt] = useState("");
   const [negPrompt, setNegPrompt] = useState("");
   const [aiSuggestedNeg, setAiSuggestedNeg] = useState("");
@@ -336,6 +355,19 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const pendingTaskRef = useRef(null);
   const submitLockedRef = useRef(false);
   const [submitLocked, setSubmitLocked] = useState(false);
+  const [imageSourceMode, setImageSourceMode] = useState("upload");
+  const [multiviewSourceMode, setMultiviewSourceMode] = useState("upload");
+  const [generationModel, setGenerationModel] = useState("");
+  const [generationTemplateId, setGenerationTemplateId] = useState("");
+  const [generationOrientation, setGenerationOrientation] = useState("");
+  const [generationCompress, setGenerationCompress] = useState("");
+  const [generationRenderImage, setGenerationRenderImage] = useState(true);
+  const [generationTextureAlignment, setGenerationTextureAlignment] = useState("");
+  const [imageReference, setImageReference] = useState(null);
+  const [multiviewReference, setMultiviewReference] = useState(null);
+  const [multiviewMode, setMultiviewMode] = useState("");
+  const [multiviewOrthographic, setMultiviewOrthographic] = useState(false);
+  const [multiviewOriginalTaskId, setMultiviewOriginalTaskId] = useState("");
   const [multiImages, setMultiImages] = useState([]);
   const [batchImages, setBatchImages] = useState([]);
   const [imgFile, setImgFile] = useState(null);
@@ -496,7 +528,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   }, [history, optimisticItems]);
   const resolveHistoryDisplayName = useCallback((item) => {
     if (!item) return "Model";
-    const originalTaskKey = item?.params?.originalModelTaskId || item?.params?.original_model_task_id || item?.params?.draftModelTaskId || item?.params?.draft_model_task_id;
+    const originalTaskKey = item?.params?.originalModelTaskId || item?.params?.originalTaskId || item?.params?.original_model_task_id || item?.params?.original_task_id || item?.params?.draftModelTaskId || item?.params?.draft_model_task_id;
     const originalItem = findHistoryItemByTaskKey(originalTaskKey);
     const base = originalItem?.name || originalItem?.prompt || item?.name || item?.prompt || item?.mode || "Model";
     if (item?.params?.animated) {
@@ -508,9 +540,19 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     return base;
   }, [findHistoryItemByTaskKey]);
 
-  const activeH = useMemo(() => findHistoryItemById(selHistId), [findHistoryItemById, selHistId]);
+  const activeH = useMemo(() => {
+    const listedItem = findHistoryItemById(selHistId);
+    if (listedItem) return listedItem;
+    if (manualSelectedItem && manualSelectedItem.id === selHistId) return manualSelectedItem;
+    return null;
+  }, [findHistoryItemById, selHistId, manualSelectedItem]);
 
-  const viewerH = useMemo(() => findHistoryItemById(viewerHistId), [findHistoryItemById, viewerHistId]);
+  const viewerH = useMemo(() => {
+    const listedItem = findHistoryItemById(viewerHistId);
+    if (listedItem) return listedItem;
+    if (manualSelectedItem && manualSelectedItem.id === viewerHistId) return manualSelectedItem;
+    return null;
+  }, [findHistoryItemById, viewerHistId, manualSelectedItem]);
   const activeDisplayName = useMemo(() => resolveHistoryDisplayName(activeH), [activeH, resolveHistoryDisplayName]);
   const selectedPreviewItem = useMemo(() => {
     const baseItem = manualSelectedItem || activeH;
@@ -660,8 +702,32 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       || activeH
       || null;
   }, [findHistoryItemByTaskKey, textureEditTaskId, activeH]);
-  const textureEditHasTexture = itemHasTexture(textureEditItem);
+  const textureEditSourceResolution = useMemo(() => {
+    return resolveOperationSource({
+      operation: "texture",
+      selectedTaskId: textureEditTaskId,
+      selectedItem: textureEditItem,
+      fallbackItem: activeH,
+      findHistoryItemByTaskKey,
+    });
+  }, [textureEditTaskId, textureEditItem, activeH, findHistoryItemByTaskKey]);
+  const textureEditSourceTaskId = textureEditSourceResolution.taskId;
+  const textureEditSourceItem = useMemo(() => {
+    return findHistoryItemByTaskKey(textureEditSourceTaskId)
+      || textureEditItem
+      || activeH
+      || null;
+  }, [findHistoryItemByTaskKey, textureEditSourceTaskId, textureEditItem, activeH]);
   const textureEditDisplayName = useMemo(() => resolveHistoryDisplayName(textureEditItem), [textureEditItem, resolveHistoryDisplayName]);
+  const textureEditSourceDisplayName = useMemo(() => resolveHistoryDisplayName(textureEditSourceItem), [textureEditSourceItem, resolveHistoryDisplayName]);
+  const [, setViewerTextureReady] = useState(false);
+  const [viewerUvOverlap, setViewerUvOverlap] = useState(false);
+  const paintUvOverlapWarning = mode === "texture" && texSub === "paint" && viewerUvOverlap;
+
+  useEffect(() => {
+    setViewerTextureReady(false);
+    setViewerUvOverlap(false);
+  }, [modelUrl]);
 
   useEffect(() => {
     if (mode !== "refine") return;
@@ -688,28 +754,23 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [segmentHighlight, setSegmentHighlight] = useState(false);
 
   // texture mode options
-  const [texInputTab, setTexInputTab] = useState("image");
+  const [texInputTab, setTexInputTab] = useState("text");
   const [texPrompt, setTexPrompt] = useState("");
   const [texNeg, setTexNeg] = useState("");
   const [texPbr, setTexPbr] = useState(false);
   const [texAlignment, setTexAlignment] = useState("original_image");
 
-  useEffect(() => {
-    if (mode === "texture" && texSub === "paint" && !textureEditHasTexture) {
-      setTexSub("generate");
-    }
-  }, [mode, texSub, textureEditHasTexture]);
-
   // texture_edit — Magic Brush (viewport inpainting)
   const [brushMode, setBrushMode] = useState("Gen Mode");
   const [brushPrompt, setBrushPrompt] = useState("");
   const [creativity, setCreativity] = useState(0.6);
-  const [brushColor, setBrushColor] = useState("#ffffff");
+  const [brushColor, setBrushColor] = useState("#8b5cf6");
   const [brushSize, setBrushSize] = useState(10);
   const [brushOpacity, setBrushOpacity] = useState(1);
   const [brushHardness, setBrushHardness] = useState(80);
   const canvasRef = useRef(null);
   const isDrawingRef = useRef(false);
+  const wasPaintModeRef = useRef(false);
 
   // panels / modals
   const [dlOpen, setDlOpen] = useState(false);
@@ -785,16 +846,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   // NOTE: sidebar canvas event bindings removed — painting happens directly on the
   // 3D viewport via ThreeViewer's raycaster and _paintCanvas.
 
-  /* ── Helper: get mask blob from ThreeViewer's internal paint canvas ── */
-  const getMaskBlob = useCallback(() => {
-    const canvas = sceneRef.current?._paintCanvas;
-    if (!canvas) return null;
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => resolve(blob), "image/png");
-    });
-  }, [sceneRef]);
-
   const PARALLEL_LIMIT = 10;
+
+  const hasImageReference = !!(imageReference?.tripoFile || imageReference?.token);
+  const hasMultiviewReference = !!(multiviewReference?.tripoFile || multiviewReference?.token);
+
+  const isUploadedImageReady = useCallback((item) => {
+    return Boolean(item?.tripoFile || item?.token);
+  }, []);
 
   const canGen = useMemo(() => {
     if (submitLocked) return false;
@@ -804,8 +863,23 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
     switch (mode) {
       case "generate":
-        return genTab === "text" ? !!prompt.trim()
-          : (batchImages?.length > 0 && batchImages.every(i => i.token));
+        if (genTab === "text") return !!prompt.trim();
+        if (genTab === "image") {
+          if (imageSourceMode === "generate_image") {
+            return !!prompt.trim();
+          }
+          return batchImages?.length > 0 && batchImages.every((item) => isUploadedImageReady(item));
+        }
+        if (genTab === "multi") {
+          if (multiviewSourceMode === "generate_multiview_image") {
+            return !!prompt.trim() || hasMultiviewReference;
+          }
+          if (multiviewSourceMode === "edit_multiview_image") {
+            return !!multiviewOriginalTaskId.trim() || multiImages.some((item) => isUploadedImageReady(item)) || hasMultiviewReference;
+          }
+          return multiImages.length > 0 && multiImages.every((item) => isUploadedImageReady(item));
+        }
+        return false;
       case "segment":
         if (!isSegmentModelVersionSupported) return false;
         if (segSub === "fill_parts") {
@@ -817,9 +891,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         return !!retopoActionTaskId;
       case "texture":
         if (texSub === "paint") {
-          return textureEditHasTexture &&
-            !!(editId.trim() || activeTaskId) &&
-            (brushMode === "Paint Mode" || !!brushPrompt.trim());
+          return !!(textureEditSourceTaskId || editId.trim() || activeTaskId) && !!brushPrompt.trim();
         }
         {
           const hasTextureTarget = !!(texId.trim() || activeTaskId);
@@ -828,7 +900,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               ? !!texPrompt.trim()
               : texInputTab === "image"
                 ? !!imgToken
-                : multiImages.length > 0;
+                : multiImages.some((item) => isUploadedImageReady(item));
 
           if (texPbr && textureSourceHasTexture && !hasTextureGuidance) {
             return hasTextureTarget;
@@ -849,7 +921,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, [mode, genTab, prompt, batchImages, segId, fillId, retopoId, isFillPartsCompatible,
     texId, texSub, texInputTab, texPrompt, imgToken, multiImages, editId, brushMode, brushPrompt,
-    refineId, refineSourceTaskId, stylizeId, riggedId, selAnim, activeTaskId, activeH, texPbr, textureSourceHasTexture, textureEditHasTexture, refineBlockedBySelectedSource, focusedInstanceId, _taskTick, submitLocked, isSegmentModelVersionSupported, isRetopoModelVersionSupported, segmentActionTaskId, retopoActionTaskId]);
+    refineId, refineSourceTaskId, stylizeId, riggedId, selAnim, activeTaskId, activeH, texPbr,
+    textureSourceHasTexture, textureEditSourceTaskId, refineBlockedBySelectedSource, focusedInstanceId,
+    _taskTick, submitLocked, isSegmentModelVersionSupported, isRetopoModelVersionSupported,
+    segmentActionTaskId, retopoActionTaskId, imageSourceMode, multiviewSourceMode, imageReference,
+    multiviewReference, multiviewOriginalTaskId, isUploadedImageReady, hasMultiviewReference]);
 
 
 
@@ -899,27 +975,49 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const form = new FormData(); form.append("file", normalizedFile);
     const res = await fetch(BASE_URL + "/api/tripo/upload", { method: "POST", headers: { Authorization: "Bearer " + t }, body: form });
     const d = await res.json();
-    if (!d.success) throw new Error(d.message);
+    if (!d.success) throw new Error(formatApiError(d, "Upload failed"));
     return d.imageToken;
   }, [getIdToken, normalizeTripoUploadFile]);
 
   const getTripoImageType = useCallback((file) => {
     const mime = String(file?.type || "").toLowerCase();
-    if (mime === "image/jpeg" || mime === "image/jpg") return "jpg";
+    if (mime === "image/jpeg" || mime === "image/jpg") return "jpeg";
     if (mime === "image/png") return "png";
     if (mime === "image/webp") return "webp";
     if (mime === "image/avif") return "png";
 
     const name = String(file?.name || "").toLowerCase();
-    if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "jpg";
+    if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "jpeg";
     if (name.endsWith(".png")) return "png";
     if (name.endsWith(".webp")) return "webp";
     if (name.endsWith(".avif")) return "png";
     return "png";
   }, []);
 
-  const handleMultiImg = uploadImageFile;
-  const handleBatchImg = uploadImageFile;
+
+  const toTripoImageRef = useCallback((item) => {
+    if (!item) return null;
+    if (item.tripoFile) return item.tripoFile;
+    if (item.token) {
+      return {
+        type: getTripoImageType(item.file),
+        file_token: item.token,
+      };
+    }
+    return null;
+  }, [getTripoImageType]);
+
+  const uploadImageStsFile = useCallback(async (file) => {
+    const normalizedFile = await normalizeTripoUploadFile(file);
+    return uploadViaTripoSts({
+      getIdToken,
+      kind: "image",
+      file: normalizedFile,
+    });
+  }, [getIdToken, normalizeTripoUploadFile]);
+
+  const handleMultiImg = uploadImageStsFile;
+  const handleBatchImg = uploadImageStsFile;
 
   const handleImg = useCallback(async (file) => {
     if (!file) {
@@ -948,28 +1046,162 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const handleAssetUpload = useCallback(async (file) => {
     if (!file) return;
     setAssetUploading(true);
+    const instanceId = Math.random().toString(36).substring(2, 9);
     try {
-      const t = getIdToken ? await getIdToken() : "";
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch(BASE_URL + "/api/tripo/assets/upload", {
+      const uploadedFile = await uploadViaTripoSts({
+        getIdToken,
+        kind: "model",
+        file,
+      });
+      const headers = await authH();
+      const res = await fetch(BASE_URL + "/api/tripo/assets/import", {
         method: "POST",
-        headers: { Authorization: "Bearer " + t },
-        body: form,
+        headers,
+        body: JSON.stringify({
+          file: uploadedFile,
+          filename: file.name,
+        }),
       });
       const d = await res.json();
-      if (!d.success) throw new Error(d.message);
-      toast.success(`Asset uploaded: ${d.filename}`);
-      setHistory([]);
+      if (!d.success) throw new Error(formatApiError(d, "Asset upload failed"));
+      toast.success(`Asset uploaded: ${file.name}`);
+      
+      const label = `Upload ${file.name}`;
+      const taskObj = {
+        instanceId,
+        taskId: d.taskId,
+        mode: "upload",
+        status: "running",
+        progress: 0,
+        label,
+        startedAt: Date.now()
+      };
+      
+      activeTasksRef.current.set(instanceId, taskObj);
+      persistActiveTask(taskObj);
+      
+      addJob({
+        id: instanceId,
+        panelType: "tripo",
+        title: label,
+        status: "running",
+        progress: 0,
+        taskId: d.taskId,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+      
+      forceUpdate();
+      setRefreshTrigger((value) => value + 1);
     } catch (e) {
       toast.error(`Upload failed: ${e.message}`);
       setErrorMsg("Asset upload failed: " + e.message);
     } finally {
       setAssetUploading(false);
     }
-  }, [getIdToken]);
+  }, [authH, getIdToken, addJob, forceUpdate, persistActiveTask]);
+
+  const extractRealtimeTaskError = useCallback((d) => {
+    return (
+      d.errorMessage ||
+      d.rawOutput?.error_msg ||
+      d.rawOutput?.error_message ||
+      d.rawOutput?.error ||
+      d.rawOutput?.message ||
+      d.rawOutput?.reason ||
+      (d.errorCode != null ? `Task ${d.status} (Tripo code ${d.errorCode})` : null) ||
+      `Task ${d.status}`
+    );
+  }, []);
+
+  const waitForTaskRealtime = useCallback(async (taskId, pt, onSuccess, { skipJumpCheck = false, onProgress = null } = {}) => {
+    let prevProgress = 0;
+    let stuckSince = null;
+    const controller = new AbortController();
+
+    const processStatus = async (d) => {
+      if (!d?.success) throw new Error(formatApiError(d, "Poll error"));
+
+      const prog = d.progress ?? 0;
+      if (!skipJumpCheck && d.status !== "success" && prog - prevProgress > PROGRESS_JUMP_LIMIT) {
+        throw Object.assign(new Error(`Auto-stopped: suspicious progress jump (${prevProgress}% → ${prog}%)`), { type: "auto_stop", autoStop: true });
+      }
+      if (d.status !== "success") {
+        if (prog > 0 && prog === prevProgress) {
+          if (!stuckSince) stuckSince = Date.now();
+          else if (Date.now() - stuckSince > STUCK_THRESHOLD_MS) {
+            throw Object.assign(new Error("Auto-stopped: stuck at " + prog + "% for 5min"), { type: "auto_stop", autoStop: true });
+          }
+        } else {
+          stuckSince = null;
+        }
+      }
+
+      if (d.status !== "success" && d.status !== "failed" && d.status !== "cancelled") {
+        const dp = Math.min(prog, 99);
+        setProgress(dp);
+        updatePersistedProgress(dp);
+        prevProgress = prog;
+        if (dp >= 95) setStatusMsg("Finalizing…");
+        if (onProgress) onProgress(dp);
+        return false;
+      }
+
+      if (d.status === "success") {
+        const hasImagePreview = Boolean(d.previewImageUrl) || (Array.isArray(d.previewImageUrls) && d.previewImageUrls.length > 0);
+        if (!d.modelUrl && d.rigCheckResult === null && !hasImagePreview) {
+          throw Object.assign(new Error("Content blocked by Tripo. Credits were not charged."), { type: "nsfw" });
+        }
+        await onSuccess(d);
+        return true;
+      }
+
+      throw Object.assign(new Error(extractRealtimeTaskError(d)), { tripoStatus: d.status, rawOutput: d });
+    };
+
+    try {
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (fn, value) => {
+          if (settled) return;
+          settled = true;
+          controller.abort();
+          fn(value);
+        };
+
+        streamTaskStatus({
+          taskId,
+          getIdToken,
+          signal: controller.signal,
+          onStatus: (eventType, payload) => {
+            if (pt.cancelled || settled || eventType !== "status") return;
+            Promise.resolve(processStatus(payload))
+              .then((done) => {
+                if (done) finish(resolve);
+              })
+              .catch((err) => finish(reject, err));
+          },
+        }).then(() => {
+          if (!settled && !pt.cancelled) {
+            finish(reject, new Error("Task stream ended unexpectedly"));
+          }
+        }).catch((err) => {
+          if (err?.name === "AbortError") return;
+          finish(reject, err);
+        });
+      });
+      return true;
+    } catch (err) {
+      if (err?.name === "AbortError") return true;
+      console.warn(`[waitForTaskRealtime] falling back to polling for ${taskId}:`, err?.message ?? err);
+      return false;
+    }
+  }, [extractRealtimeTaskError, getIdToken]);
 
   const pollTask = useCallback(async (taskId, pt, headers, onSuccess, { skipJumpCheck = false, onProgress = null } = {}) => {
+    const streamed = await waitForTaskRealtime(taskId, pt, onSuccess, { skipJumpCheck, onProgress });
+    if (streamed) return;
+
     let n = 0, prevProgress = 0, stuckSince = null;
     while (n < POLL_MAX) {
       if (pt.cancelled) return;
@@ -978,7 +1210,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       n++;
       const res = await fetch(BASE_URL + "/api/tripo/task/" + taskId, { headers });
       const d = await res.json();
-      if (!d.success) throw new Error(d.message ?? "Poll error");
+      if (!d.success) throw new Error(formatApiError(d, "Poll error"));
       const prog = d.progress ?? 0;
       if (!skipJumpCheck && d.status !== "success" && prog - prevProgress > PROGRESS_JUMP_LIMIT) {
         throw Object.assign(new Error(`Auto-stopped: suspicious progress jump (${prevProgress}% → ${prog}%)`), { type: "auto_stop", autoStop: true });
@@ -1078,7 +1310,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         const res = await fetch(BASE_URL + "/api/tripo/task/" + persisted.taskId, { headers });
         if (pt.cancelled) return;
         const d = await res.json();
-        if (!d.success) throw new Error(d.message ?? "Task check failed");
+        if (!d.success) throw new Error(formatApiError(d, "Task check failed"));
 
         // Inline success handler for resume — handles all opTypes
         const onSuccess = async (sd) => {
@@ -1296,9 +1528,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (mode === "segment") return MODE_COST[segSub] ?? MODE_COST.segment;
     if (mode !== "generate") return MODE_COST[mode] ?? 10;
     const type = genTab === "text" ? "text_to_model" : genTab === "multi" ? "multiview_to_model" : "image_to_model";
-    // P1-20260311 fails for text_to_model — auto-switched to v3.1, so use v3.1 pricing
-    const effectiveVer = (genTab === "text" && modelVer === "P1-20260311") ? "v3.1-20260211" : modelVer;
-    if (effectiveVer === "v1.4-20240625") return type === "text_to_model" ? 20 : 30;
+    const effectiveVer = modelVer;
+    let preprocessCost = 0;
+    if (genTab === "image" && imageSourceMode === "generate_image") preprocessCost += MODE_COST.generate_image;
+    if (genTab === "multi" && multiviewSourceMode === "generate_multiview_image") preprocessCost += MODE_COST.generate_multiview_image;
+    if (genTab === "multi" && multiviewSourceMode === "edit_multiview_image") preprocessCost += MODE_COST.edit_multiview_image;
+    if (effectiveVer === "v1.4-20240625") return (type === "text_to_model" ? 20 : 30) + preprocessCost;
     const isP1 = effectiveVer === "P1-20260311";
     const isText = type === "text_to_model";
     const isModern = effectiveVer === "P1-20260311" || effectiveVer.startsWith("v3.");
@@ -1310,8 +1545,85 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const slpCost = smartLowPoly ? 10 : 0;
     const partsCost = inParts ? 20 : 0;
     const quadCost = quadMesh ? 5 : 0;
-    return base + texAddon + ultraAddon + slpCost + partsCost + quadCost;
-  }, [mode, texSub, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh, smartLowPoly, modelVer]);
+    return base + texAddon + ultraAddon + slpCost + partsCost + quadCost + preprocessCost;
+  }, [mode, texSub, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh, smartLowPoly, modelVer, imageSourceMode, multiviewSourceMode]);
+
+  const createTripoTaskRequest = useCallback(async (body, headersOverride = null) => {
+    const headers = headersOverride ?? await authH();
+    const tr = await fetch(BASE_URL + "/api/tripo/task", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    const td = await tr.json();
+    logFrontendDebug("[TripoPanel][submit-debug] backend response:", {
+      httpStatus: tr.status,
+      ok: tr.ok,
+      response: td,
+    });
+
+    if (!td.success) {
+      const msg = formatApiError(td, "Task failed");
+      const lower = msg.toLowerCase();
+      if (lower.includes("insufficient") || lower.includes("credit") || lower.includes("balance")) {
+        throw Object.assign(new Error("Nincs elég Tripo kredit. Tölts fel a fiókodba!"), { type: "credits" });
+      }
+      if (lower.includes("nsfw") || lower.includes("content policy") || lower.includes("moderat")) {
+        throw Object.assign(new Error("Tartalom blokkolva: NSFW vagy irányelvek megsértése."), { type: "nsfw" });
+      }
+      throw new Error(msg);
+    }
+
+    return {
+      headers,
+      taskId: td.taskId ?? (Array.isArray(td.taskIds) ? td.taskIds[0] : null),
+      response: td,
+    };
+  }, [authH]);
+
+  const getTaskPreviewRefs = useCallback((taskData) => {
+    const urls = Array.isArray(taskData?.previewImageUrls) && taskData.previewImageUrls.length > 0
+      ? taskData.previewImageUrls
+      : taskData?.previewImageUrl
+        ? [taskData.previewImageUrl]
+        : [];
+
+    return urls.filter(Boolean).map((url) => ({
+      type: inferImageTypeFromUrl(url),
+      url,
+    }));
+  }, []);
+
+  const runPreprocessTask = useCallback(async (body, statusLabel) => {
+    const pt = { cancelled: false };
+    setIsRunning(true);
+    setProgress(0);
+    setStatusMsg(statusLabel);
+
+    try {
+      const { taskId, headers } = await createTripoTaskRequest(body);
+      if (!taskId) throw new Error("Preprocess task creation did not return a taskId");
+      let taskResult = null;
+      await pollTask(taskId, pt, headers, async (d) => {
+        taskResult = d;
+      }, { skipJumpCheck: true });
+      if (!taskResult) throw new Error("Preprocess task finished without result payload");
+      try {
+        const token = await getIdToken();
+        await fetch(`${BASE_URL}/api/tripo/task/${taskId}/ack`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch {
+        // Non-critical for preview-only preprocess tasks.
+      }
+      return { taskId, taskResult };
+    } finally {
+      setIsRunning(false);
+      setProgress(0);
+      setStatusMsg("");
+    }
+  }, [createTripoTaskRequest, getIdToken, pollTask]);
 
   const loadHistoryIntoViewer = useCallback(async (item, { showLoading = false } = {}) => {
     if (!item) return;
@@ -1483,42 +1795,16 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       const animSlug = animSlugs.length === 1 ? animSlugs[0] : null;
       try {
         let body;
+        let snapshotExtras = {};
 
-      /* ── texture paint: upload mask from canvas before building body ── */
-      let maskToken = null;
-      if (mode === "texture" && texSub === "paint") {
-        try {
-          const maskBlob = await getMaskBlob();
-          if (maskBlob && maskBlob.size > 0) {
-            const t = getIdToken ? await getIdToken() : "";
-            const maskForm = new FormData();
-            maskForm.append("file", maskBlob, "mask.png");
-            const maskRes = await fetch(BASE_URL + "/api/tripo/upload", {
-              method: "POST",
-              headers: { Authorization: "Bearer " + t },
-              body: maskForm,
-            });
-            const maskData = await maskRes.json();
-            if (maskData.success) {
-              maskToken = maskData.imageToken;
-            }
-          }
-        } catch (e) {
-          console.warn("[TripoPanel] Mask upload failed, continuing without mask:", e.message);
-        }
-      }
-
-      // P1-20260311 consistently fails for text_to_model ("Failed to call LLM API").
-      // Safety net: force v3.1 at submission time if text_to_model with P1.
-      const effectiveModel = (genTab === "text" && modelVer === "P1-20260311")
-        ? "v3.1-20260211" : modelVer;
+      const effectiveModel = modelVer;
       const _isModern = effectiveModel === "P1-20260311" || effectiveModel.startsWith("v3.");
       // Build style prefix for text_to_model
       const styleObj = STYLE_PREFIX.find(s => s.id === activeStyle);
       const stylePrefix = (genTab === "text" && styleObj) ? styleObj.prefix : "";
-      switch (mode) {
-        case "generate":
-          if (genTab === "text") {
+        switch (mode) {
+          case "generate":
+            if (genTab === "text") {
             const isUltra = meshQ === "ultra" && _isModern;
             body = {
               type: "text_to_model", prompt: stylePrefix + prompt.trim(), model_version: effectiveModel,
@@ -1535,20 +1821,77 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               ...(modelSeed != null && { model_seed: modelSeed }),
               ...(imageSeed != null && { image_seed: imageSeed }),
               ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
+              ...(generationCompress && { compress: generationCompress }),
+              ...(generationOrientation && { orientation: generationOrientation }),
+              ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
+              ...(generationRenderImage && { render_image: true }),
               ...(autoSize && { auto_size: true }),
               ...(!exportUv && { export_uv: false }),
             };
-          } else if (genTab === "multi") {
-            const isUltra = meshQ === "ultra" && _isModern;
-            const isP1 = effectiveModel === "P1-20260311";
-            body = {
-              type: "multiview_to_model",
-              files: multiImages.map(i => ({ type: getTripoImageType(i.file), file_token: i.token })),
-              model_version: effectiveModel,
-              ...(negPrompt.trim() && !isP1 && { negative_prompt: negPrompt.trim() }),
-              ...(tPose && { t_pose: true }),
-              texture: !!texOn,
-              pbr: !!pbrOn,
+            } else if (genTab === "multi") {
+              const isUltra = meshQ === "ultra" && _isModern;
+              const isP1 = effectiveModel === "P1-20260311";
+              let originalTaskId = null;
+              let files = [];
+
+              if (multiviewSourceMode === "generate_multiview_image") {
+                const preprocessBody = {
+                  type: "generate_multiview_image",
+                  ...(prompt.trim() && { prompt: prompt.trim() }),
+                  ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
+                  ...(generationModel && { model: generationModel }),
+                  ...(generationTemplateId && { template_id: generationTemplateId }),
+                  ...(generationOrientation && { orientation: generationOrientation }),
+                  ...(generationCompress && { compress: generationCompress }),
+                  ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
+                  ...(generationRenderImage && { render_image: true }),
+                  ...(multiviewMode && { mode: multiviewMode }),
+                  ...(multiviewOrthographic && { orthographic_projection: true }),
+                  ...(hasMultiviewReference && { reference_image: toTripoImageRef(multiviewReference) }),
+                };
+                const preprocess = await runPreprocessTask(preprocessBody, "Generating multiview source…");
+                originalTaskId = preprocess.taskId;
+                snapshotExtras = {
+                  ...snapshotExtras,
+                  preprocessTaskId: preprocess.taskId,
+                  preprocessTaskType: preprocessBody.type,
+                };
+              } else if (multiviewSourceMode === "edit_multiview_image") {
+                const editFiles = (multiImages ?? []).map(toTripoImageRef).filter(Boolean);
+                const preprocessBody = {
+                  type: "edit_multiview_image",
+                  ...(prompt.trim() && { prompt: prompt.trim() }),
+                  ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
+                  ...(generationModel && { model: generationModel }),
+                  ...(generationTemplateId && { template_id: generationTemplateId }),
+                  ...(generationOrientation && { orientation: generationOrientation }),
+                  ...(generationCompress && { compress: generationCompress }),
+                  ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
+                  ...(generationRenderImage && { render_image: true }),
+                  ...(multiviewOrthographic && { orthographic_projection: true }),
+                  ...(multiviewOriginalTaskId.trim() && { original_task_id: multiviewOriginalTaskId.trim() }),
+                  ...(hasMultiviewReference && { reference_image: toTripoImageRef(multiviewReference) }),
+                  ...(editFiles.length > 0 && { files: editFiles }),
+                };
+                const preprocess = await runPreprocessTask(preprocessBody, "Editing multiview source…");
+                originalTaskId = preprocess.taskId;
+                snapshotExtras = {
+                  ...snapshotExtras,
+                  preprocessTaskId: preprocess.taskId,
+                  preprocessTaskType: preprocessBody.type,
+                };
+              } else {
+                files = multiImages.map(toTripoImageRef).filter(Boolean);
+              }
+
+              body = {
+                type: "multiview_to_model",
+                ...(originalTaskId ? { original_task_id: originalTaskId } : { files }),
+                model_version: effectiveModel,
+                ...(negPrompt.trim() && !isP1 && { negative_prompt: negPrompt.trim() }),
+                ...(tPose && { t_pose: true }),
+                texture: !!texOn,
+                pbr: !!pbrOn,
               ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
               ...(!isP1 && isUltra && { geometry_quality: "detailed" }),
               ...(polycount > 0 && { face_limit: polycount }),
@@ -1556,25 +1899,53 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               ...(!isP1 && quadMesh && { quad: true }),
               ...(!isP1 && smartLowPoly && { smart_low_poly: true }),
               ...(!isP1 && inParts && { generate_parts: true }),
-              ...(modelSeed != null && { model_seed: modelSeed }),
-              ...(imageSeed != null && { image_seed: imageSeed }),
-              ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
-              ...(autoSize && { auto_size: true }),
-              ...(!exportUv && { export_uv: false }),
-            };
-          } else {
-            // Unify Single and Batch images
-            const isUltra = meshQ === "ultra" && _isModern;
-            const isP1 = effectiveModel === "P1-20260311";
+                ...(modelSeed != null && { model_seed: modelSeed }),
+                ...(imageSeed != null && { image_seed: imageSeed }),
+                ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
+                ...(generationCompress && { compress: generationCompress }),
+                ...(generationOrientation && { orientation: generationOrientation }),
+                ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
+                ...(generationRenderImage && { render_image: true }),
+                ...(autoSize && { auto_size: true }),
+                ...(!exportUv && { export_uv: false }),
+              };
+            } else {
+              // Unify Single and Batch images
+              const isUltra = meshQ === "ultra" && _isModern;
+              const isP1 = effectiveModel === "P1-20260311";
+              let inputImages = [];
 
-            // Collect all image tokens from batchImages state
-            const tokens = (batchImages ?? []).filter(i => i.token).map(i => i.token);
-            if (tokens.length === 0) return;
+              if (imageSourceMode === "generate_image") {
+                const preprocessBody = {
+                  type: "generate_image",
+                  prompt: prompt.trim(),
+                  ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
+                  ...(generationModel && { model: generationModel }),
+                  ...(generationTemplateId && { template_id: generationTemplateId }),
+                  ...(generationOrientation && { orientation: generationOrientation }),
+                  ...(generationCompress && { compress: generationCompress }),
+                  ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
+                  ...(generationRenderImage && { render_image: true }),
+                  ...(hasImageReference && { reference_image: toTripoImageRef(imageReference) }),
+                };
+                const preprocess = await runPreprocessTask(preprocessBody, "Generating source image…");
+                inputImages = getTaskPreviewRefs(preprocess.taskResult);
+                if (inputImages.length === 0) throw new Error("generate_image task returned no preview image");
+                snapshotExtras = {
+                  ...snapshotExtras,
+                  preprocessTaskId: preprocess.taskId,
+                  preprocessTaskType: preprocessBody.type,
+                };
+              } else {
+                inputImages = (batchImages ?? []).map(toTripoImageRef).filter(Boolean);
+              }
 
-            body = {
-              type: "image_to_model",
-              model_version: effectiveModel,
-              ...(negPrompt.trim() && !isP1 && { negative_prompt: negPrompt.trim() }),
+              if (inputImages.length === 0) return;
+
+              body = {
+                type: "image_to_model",
+                model_version: effectiveModel,
+                ...(negPrompt.trim() && !isP1 && { negative_prompt: negPrompt.trim() }),
               ...(tPose && { t_pose: true }),
               texture: !!texOn,
               pbr: !!pbrOn,
@@ -1585,21 +1956,25 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               ...(!isP1 && quadMesh && { quad: true }),
               ...(!isP1 && smartLowPoly && { smart_low_poly: true }),
               ...(!isP1 && inParts && { generate_parts: true }),
-              ...(modelSeed != null && { model_seed: modelSeed }),
-              ...(imageSeed != null && { image_seed: imageSeed }),
-              ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
-              ...(autoSize && { auto_size: true }),
-              ...(!exportUv && { export_uv: false }),
-            };
+                ...(modelSeed != null && { model_seed: modelSeed }),
+                ...(imageSeed != null && { image_seed: imageSeed }),
+                ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
+                ...(generationCompress && { compress: generationCompress }),
+                ...(generationOrientation && { orientation: generationOrientation }),
+                ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
+                ...(generationRenderImage && { render_image: true }),
+                ...(autoSize && { auto_size: true }),
+                ...(!exportUv && { export_uv: false }),
+              };
 
-            // Requirement: 1 -> images: [], >1 -> batch_images: []
-            if (tokens.length === 1) {
-              body.images = tokens;
-            } else {
-              body.batch_images = tokens;
+              // Requirement: 1 -> images: [], >1 -> batch_images: []
+              if (inputImages.length === 1) {
+                body.images = inputImages;
+              } else {
+                body.batch_images = inputImages;
+              }
             }
-          }
-          break;
+            break;
         case "segment": {
           if (segSub === "fill_parts") {
             body = { type: "mesh_completion", original_model_task_id: (fillId.trim() || srcId) };
@@ -1640,17 +2015,36 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 ? !!imgToken
                 : multiImages.length > 0;
           if (texSub === "paint") {
-            if (!textureEditHasTexture) {
-              throw new Error("Paint csak már textúrázott modellen használható.");
+            const paintSourceTaskId = textureEditSourceTaskId || editId.trim() || srcId;
+            const paintSourceName = resolveHistoryDisplayName(textureEditSourceItem || textureEditItem || activeH);
+            const paintPrompt = brushPrompt.trim();
+            if (!paintSourceTaskId) {
+              throw new Error("Valassz modellt a Magic Brush futtatasa elott.");
             }
+            if (!paintPrompt) {
+              throw new Error("Adj meg promptot a Magic Brush texture passhez.");
+            }
+            let paintedTextureToken = null;
+            if (brushMode === "Paint Mode") {
+              const paintedTextureBlob = await sceneRef.current?.getPaintedTextureBlob?.();
+              if (paintedTextureBlob) {
+                const paintedTextureFile = new File([paintedTextureBlob], "painted-texture.png", { type: "image/png" });
+                paintedTextureToken = await uploadImageFile(paintedTextureFile);
+              }
+            }
+            const texturePrompt = {
+              text: paintPrompt,
+              ...(paintedTextureToken && { image: { type: "png", file_token: paintedTextureToken } }),
+            };
             body = {
               type: "texture_model",
-              original_model_task_id: (editId.trim() || srcId),
-              _sourceName: textureSourceName,
+              original_model_task_id: paintSourceTaskId,
+              _sourceName: paintSourceName,
+              model_version: DEFAULT_TEXTURE_MODEL_VERSION,
               texture_quality: tex4K ? "detailed" : "standard",
-              ...(brushPrompt.trim() && { prompt: brushPrompt.trim() }),
+              texture_prompt: texturePrompt,
+              ...(paintedTextureToken && { texture_alignment: "original_image" }),
               ...(texPbr && { pbr: true }),
-              ...(maskToken && { file: { type: "png", file_token: maskToken } }),
             };
           } else {
             if (texPbr && textureSourceHasTexture && !hasTextureGuidance) {
@@ -1658,17 +2052,21 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 type: "texture_model",
                 original_model_task_id: textureSourceTaskId,
                 _sourceName: textureSourceName,
+                model_version: DEFAULT_TEXTURE_MODEL_VERSION,
                 pbr: true,
               };
             } else {
+              const texturePrompt = {
+                ...(texInputTab === "text" && texPrompt.trim() && { text: texPrompt.trim() }),
+                ...((texInputTab === "image" && imgToken) && { image: { type: getTripoImageType(imgFile), file_token: imgToken } }),
+                ...((texInputTab === "multi" && multiImages.length > 0) && { images: multiImages.map(toTripoImageRef).filter(Boolean) }),
+              };
               body = {
                 type: "texture_model", original_model_task_id: textureSourceTaskId,
                 _sourceName: textureSourceName,
+                model_version: DEFAULT_TEXTURE_MODEL_VERSION,
                 texture_quality: tex4K ? "detailed" : "standard",
-                ...(texPrompt.trim() && { prompt: texPrompt.trim() }),
-                ...(texNeg.trim() && { negative_prompt: texNeg.trim() }),
-                ...((texInputTab === "image" && imgToken) && { file: { type: getTripoImageType(imgFile), file_token: imgToken } }),
-                ...((texInputTab === "multi" && multiImages.length > 0) && { files: multiImages.map(i => ({ type: getTripoImageType(i.file), file_token: i.token })) }),
+                ...(Object.keys(texturePrompt).length > 0 && { texture_prompt: texturePrompt }),
                 ...(texAlignment && { texture_alignment: texAlignment }),
                 ...(texPbr && { pbr: true }),
               };
@@ -1741,7 +2139,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         errorMsg: null,
         result: null,
         startedAt: Date.now(),
-        snapshot: body,
+        snapshot: { ...body, ...snapshotExtras },
         originalTaskId: activeTaskId || null,
         // animate_retarget metadata for onParallelTaskSuccess
         animSlugs: mode === "animate" ? animSlugs : undefined,
@@ -1811,7 +2209,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         });
 
         if (!td.success) {
-          const msg = td.message ?? "Task failed";
+          const msg = formatApiError(td, "Task failed");
           const lower = msg.toLowerCase();
           if (lower.includes("insufficient") || lower.includes("credit") || lower.includes("balance")) throw Object.assign(new Error("Nincs elég Tripo kredit. Tölts fel a fiókodba!"), { type: "credits" });
           if (lower.includes("nsfw") || lower.includes("content policy") || lower.includes("moderat")) throw Object.assign(new Error("Tartalom blokkolva: NSFW vagy irányelvek megsértése."), { type: "nsfw" });
@@ -1886,7 +2284,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       submitLockedRef.current = false;
       setSubmitLocked(false);
     }
-  }, [canGen, mode, texSub, refineBlockedBySelectedSource, effectiveRefineDisableReason, refineSourceTaskId, refineSelectedTaskId, refineResolvedFromUpstream, refineDraftDisplayName, refineSourceDisplayName, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError, textureSourceHasTexture, textureEditHasTexture, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH]);
+  }, [canGen, mode, texSub, refineBlockedBySelectedSource, effectiveRefineDisableReason, refineSourceTaskId, refineSelectedTaskId, refineResolvedFromUpstream, refineDraftDisplayName, refineSourceDisplayName, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError, textureSourceHasTexture, textureEditSourceTaskId, textureEditSourceItem, textureEditItem, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH, imageSourceMode, multiviewSourceMode, generationModel, generationTemplateId, generationOrientation, generationCompress, generationRenderImage, generationTextureAlignment, imageReference, multiviewReference, multiviewMode, multiviewOrthographic, multiviewOriginalTaskId, toTripoImageRef, runPreprocessTask, getTaskPreviewRefs, uploadImageFile, hasImageReference, hasMultiviewReference]);
 
   const { rigCompatRef, getCompatibility, handleAutoRig } = useTripoRig({
     activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl,
@@ -1948,15 +2346,16 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   // ── Parallel task poller callbacks ──────────────────────────────────────
   const onParallelTaskSuccess = useCallback(async (inst, d, blobUrl) => {
     const thisOptimisticId = inst.taskId ? `tripo_${inst.taskId}` : null;
+    const resolvedModelUrl = resolveTripoModelUrl(d);
 
     if (thisOptimisticId) {
       setViewerHistId(thisOptimisticId);
     }
 
-    if (blobUrl || d.modelUrl) {
+    if (blobUrl || resolvedModelUrl) {
       setLoadingId(null);
       revokeBlobUrl(prevUrl.current);
-      const nextViewerUrl = blobUrl || d.modelUrl;
+      const nextViewerUrl = blobUrl || resolvedModelUrl;
       setModelUrl(nextViewerUrl);
       prevUrl.current = nextViewerUrl;
       setGenStatus("succeeded");
@@ -1966,28 +2365,34 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
     if (blobUrl) {
       // Prime thumbnail cache so HistoryCard renders instantly (no blank placeholder)
-      if (d.modelUrl) {
+      if (resolvedModelUrl) {
         try {
           const buf = await fetch(blobUrl).then(r => r.arrayBuffer());
-          await getCachedThumbnail(buf, { width: 280, height: 280 }, d.modelUrl);
+          await getCachedThumbnail(buf, { width: 280, height: 280 }, resolvedModelUrl);
         } catch { /* non-critical — HistoryCard will regenerate on miss */ }
       }
     }
-    markJobDone(inst.instanceId, { title: inst.label, progress: 100, taskId: inst.taskId, modelUrl: d.modelUrl ?? null });
+    markJobDone(inst.instanceId, { title: inst.label, progress: 100, taskId: inst.taskId, modelUrl: resolvedModelUrl ?? null });
 
     // Persist the durable Firestore URL so TripoPanel can load it on next mount.
     // Blob URLs are revoked on unmount and must not be stored here.
-    if (d.modelUrl) {
-      _pendingModel = { url: d.modelUrl, taskId: inst.taskId };
+    if (resolvedModelUrl) {
+      _pendingModel = { url: resolvedModelUrl, taskId: inst.taskId };
     }
 
     refreshCredits?.();
 
+    if (!resolvedModelUrl && !blobUrl) {
+      console.warn("[onParallelTaskSuccess] success payload had no model URL:", d);
+      toast.error("A modell elkészült, de nem kaptunk betölthető modell URL-t.");
+      return;
+    }
+
     // Optimistic entry so Shared3DHistory shows card immediately (before Firestore round-trip)
-    if (d.modelUrl && inst.taskId) {
+    if (resolvedModelUrl && inst.taskId) {
       const stableDocId = `tripo_${inst.taskId}`;
       const isTextureOutput = inst.mode === "texture" || inst.snapshot?.type === "texture_model" || inst.snapshot?.texture === true;
-      const originalModelTaskId = inst.snapshot?.original_model_task_id ?? undefined;
+      const originalModelTaskId = inst.snapshot?.original_model_task_id ?? inst.snapshot?.original_task_id ?? undefined;
       const draftModelTaskId = inst.snapshot?.draft_model_task_id ?? undefined;
       const sourceName = inst.snapshot?._sourceName || "";
       const modeLabel = inst.mode === "segment" ? "Segmentation" : inst.mode === "retopo" ? "Retopo" : "";
@@ -1995,7 +2400,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         id: stableDocId,
         taskId: inst.taskId,
         status: "succeeded",
-        model_url: d.modelUrl,
+        model_url: resolvedModelUrl,
         source: "tripo",
         mode: inst.mode,
         ...(inst.snapshot?.type && { type: inst.snapshot.type }),
@@ -2010,9 +2415,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           ...(inst.snapshot?.model_version && { model_version: inst.snapshot.model_version }),
           ...(originalModelTaskId && { originalModelTaskId }),
           ...(draftModelTaskId && { draftModelTaskId }),
+          ...(inst.snapshot?.preprocessTaskId && { preprocessTaskId: inst.snapshot.preprocessTaskId }),
+          ...(inst.snapshot?.preprocessTaskType && { preprocessTaskType: inst.snapshot.preprocessTaskType }),
           ...(inst.snapshot?.generate_parts === true && { generate_parts: true, inParts: true }),
           ...(isTextureOutput && { texture: true }),
           ...(inst.snapshot?.pbr === true && { pbr: true }),
+          ...(d.consumedCredit != null && { consumedCredit: d.consumedCredit }),
         },
         createdAt: { toDate: () => new Date() },
       };
@@ -2027,8 +2435,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       const isAnimate = inst.mode === "animate";
       if (isAnimate) {
         // animate_retarget — save each animated_model URL as a separate history entry
-        const animatedModels = Array.isArray(d.rawOutput?.animated_models) ? d.rawOutput.animated_models : null;
-        const urlsToSave = animatedModels ?? (d.modelUrl ? [d.modelUrl] : []);
+        const animatedModels = Array.isArray(d.rawOutput?.animated_models)
+          ? d.rawOutput.animated_models.map(resolveTripoUrlNode).filter(Boolean)
+          : null;
+        const urlsToSave = animatedModels ?? (resolvedModelUrl ? [resolvedModelUrl] : []);
         const animSlugs = inst.animSlugs ?? [];
         const srcItem = history.find(h => h.taskId === inst.riggedId) || history.find(h => h.taskId === inst.originalTaskId);
         const baseName = (srcItem?.name || srcItem?.prompt || "model").trim().split(/\s+/).slice(0, 2).join(" ");
@@ -2048,6 +2458,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             animations: animSlugs.length > 1 ? animSlugs : undefined,
             animationIndex: animSlugs.length > 1 ? i : undefined,
             originalModelTaskId: inst.riggedId || inst.originalTaskId || null,
+            consumedCredit: d.consumedCredit ?? undefined,
           });
           if (ni) {
             focusGeneratedHistoryItem(ni);
@@ -2060,15 +2471,19 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       } else {
         const _sourceName = inst.snapshot?._sourceName || "";
         const _modeLabel = inst.mode === "segment" ? "Segmentation" : inst.mode === "retopo" ? "Retopo" : "";
-        const ni = await saveHist(inst.taskId, d.modelUrl, {
+        const ni = await saveHist(inst.taskId, resolvedModelUrl, {
           prompt: inst.snapshot?.prompt || _sourceName || inst.label,
           name: _sourceName ? (_modeLabel ? `${_modeLabel}/${_sourceName}` : _sourceName) : undefined,
           label: inst.label,
           mode: inst.mode,
+          source: inst.mode === "upload" ? "upload" : undefined,
           type: inst.snapshot?.type ?? undefined,
           modelVer: inst.snapshot?.model_version ?? undefined,
-          originalModelTaskId: inst.snapshot?.original_model_task_id ?? undefined,
+          originalModelTaskId: inst.snapshot?.original_model_task_id ?? inst.snapshot?.original_task_id ?? undefined,
           draftModelTaskId: inst.snapshot?.draft_model_task_id ?? undefined,
+          preprocessTaskId: inst.snapshot?.preprocessTaskId ?? undefined,
+          preprocessTaskType: inst.snapshot?.preprocessTaskType ?? undefined,
+          consumedCredit: d.consumedCredit ?? undefined,
           ...(inst.snapshot?.generate_parts === true && { generate_parts: true, inParts: true }),
           ...((inst.mode === "texture" || inst.snapshot?.type === "texture_model" || inst.snapshot?.texture === true) && { texture: true }),
           ...(inst.snapshot?.pbr === true && { pbr: true }),
@@ -2227,6 +2642,20 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     setRightOpen(v => !v);
   }, [rightOpen, isMobile, setLeftSecondaryOpen]);
 
+  useEffect(() => {
+    const enteringPaintMode =
+      mode === "texture" &&
+      texSub === "paint" &&
+      !wasPaintModeRef.current;
+
+    if (enteringPaintMode && sceneRef.current) {
+      sceneRef.current.autoSpin = false;
+      setAutoSpin(false);
+    }
+
+    wasPaintModeRef.current = mode === "texture" && texSub === "paint";
+  }, [mode, texSub, setAutoSpin]);
+
   const activeTasksRunningCount = useMemo(() =>
     [...activeTasksRef.current.values()].filter(t => t.status === "running" || t.status === "pending").length,
     [_taskTick]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -2347,7 +2776,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               {mode === "texture" && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 10 }}>
                   {TEXTURE_SUBS.map(s => {
-                    const isDisabled = s.id === "paint" && !textureEditHasTexture;
+                    const isDisabled = false;
                     return (
                       <button
                         key={s.id}
@@ -2388,8 +2817,24 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   imageSeed={imageSeed} setImageSeed={setImageSeed}
                   autoSize={autoSize} setAutoSize={setAutoSize}
                   exportUv={exportUv} setExportUv={setExportUv}
+                  imageSourceMode={imageSourceMode} setImageSourceMode={setImageSourceMode}
+                  multiviewSourceMode={multiviewSourceMode} setMultiviewSourceMode={setMultiviewSourceMode}
+                  generationModel={generationModel} setGenerationModel={setGenerationModel}
+                  generationTemplateId={generationTemplateId} setGenerationTemplateId={setGenerationTemplateId}
+                  generationOrientation={generationOrientation} setGenerationOrientation={setGenerationOrientation}
+                  generationCompress={generationCompress} setGenerationCompress={setGenerationCompress}
+                  generationRenderImage={generationRenderImage} setGenerationRenderImage={setGenerationRenderImage}
+                  generationTextureAlignment={generationTextureAlignment} setGenerationTextureAlignment={setGenerationTextureAlignment}
+                  imageReference={imageReference} setImageReference={setImageReference}
+                  multiviewReference={multiviewReference} setMultiviewReference={setMultiviewReference}
+                  multiviewMode={multiviewMode} setMultiviewMode={setMultiviewMode}
+                  multiviewOrthographic={multiviewOrthographic} setMultiviewOrthographic={setMultiviewOrthographic}
+                  multiviewOriginalTaskId={multiviewOriginalTaskId} setMultiviewOriginalTaskId={setMultiviewOriginalTaskId}
                   multiImages={multiImages} setMultiImages={setMultiImages}
+                  canGen={canGen}
                   getIdToken={getIdToken}
+                  handleMultiImg={handleMultiImg}
+                  handleBatchImg={handleBatchImg}
                   color={color} isRunning={isRunning} handleGen={handleGen}
                   setErrorMsg={setErrorMsg} activeStyles={activeStyle}
                   onStyleToggle={handleStyleToggle}
@@ -2413,8 +2858,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               <div style={mode !== "texture" ? { display: "none" } : undefined}>
                 <Texture
                   mode={texSub === "paint" ? "texture_edit" : "texture"}
-                  activeTaskId={texSub === "paint" ? (textureEditTaskId || activeTaskId) : (textureSelectedTaskId || activeTaskId)}
-                  activeModelName={texSub === "paint" ? textureEditDisplayName : textureTargetDisplayName}
+                  activeTaskId={texSub === "paint" ? (textureEditSourceTaskId || textureEditTaskId || activeTaskId) : (textureSelectedTaskId || activeTaskId)}
+                  activeModelName={texSub === "paint" ? (textureEditSourceDisplayName || textureEditDisplayName) : textureTargetDisplayName}
                   textureTargetTaskId={textureSelectedTaskId || activeTaskId}
                   textureTargetName={textureTargetDisplayName}
                   pbrTargetTaskId={textureSourceTaskId || textureSelectedTaskId || activeTaskId}
@@ -2436,6 +2881,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   brushSize={brushSize} setBrushSize={setBrushSize}
                   brushOpacity={brushOpacity} setBrushOpacity={setBrushOpacity}
                   brushHardness={brushHardness} setBrushHardness={setBrushHardness}
+                  uvOverlapWarning={paintUvOverlapWarning}
                   canvasRef={canvasRef}
                   color={color}
                   onUndo={() => sceneRef.current?.undoPaint()}
@@ -2801,7 +3247,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         activeClipIdx={activeClipIdx}
         onSwitchClip={handleSwitchClip}
         // 3D Paint
-        paintMode={mode === "texture" && texSub === "paint" && textureEditHasTexture && brushMode === "Paint Mode"}
+        paintMode={mode === "texture" && texSub === "paint" && brushMode === "Paint Mode"}
+        onTextureAvailabilityChange={setViewerTextureReady}
+        onUvOverlapChange={setViewerUvOverlap}
         paintColor={brushColor}
         paintSize={brushSize}
         paintOpacity={brushOpacity}

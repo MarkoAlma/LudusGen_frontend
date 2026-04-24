@@ -512,7 +512,6 @@ const GeneratePanel = memo(({
   smartLowPoly, setSmartLowPoly,
   polycount, setPolycount,
   modelVer, setModelVer,
-  isRunning,
   canGen,
   handleGen,
   negPrompt, setNegPrompt,
@@ -526,6 +525,19 @@ const GeneratePanel = memo(({
   imageSeed, setImageSeed,
   autoSize, setAutoSize,
   exportUv, setExportUv,
+  imageSourceMode, setImageSourceMode,
+  multiviewSourceMode, setMultiviewSourceMode,
+  generationModel, setGenerationModel,
+  generationTemplateId, setGenerationTemplateId,
+  generationOrientation, setGenerationOrientation,
+  generationCompress, setGenerationCompress,
+  generationRenderImage, setGenerationRenderImage,
+  generationTextureAlignment, setGenerationTextureAlignment,
+  imageReference, setImageReference,
+  multiviewReference, setMultiviewReference,
+  multiviewMode, setMultiviewMode,
+  multiviewOrthographic, setMultiviewOrthographic,
+  multiviewOriginalTaskId, setMultiviewOriginalTaskId,
   activeStyles = [],
   onStyleToggle = () => { },
 }) => {
@@ -536,6 +548,15 @@ const GeneratePanel = memo(({
     { label: "Back", icon: <User style={{ width: 14, height: 14, opacity: 0.5 }} /> },
   ];
   const batchInputRef = useRef(null);
+  const isUploadedItemReady = (item) => Boolean(item?.token || item?.tripoFile);
+  const normalizeUploadedItem = (file, preview, payload) => ({
+    file,
+    preview,
+    token: typeof payload === "string"
+      ? payload
+      : payload?.token || payload?.object?.key || "sts",
+    ...(typeof payload === "object" && payload ? { tripoFile: payload } : {}),
+  });
 
   /* ─── Capabilities for current model ──────────────────────────────────
    * Priority: backendCaps (fetched from API) > static MODEL_CAPS fallback.
@@ -543,7 +564,6 @@ const GeneratePanel = memo(({
    * without any hardcoded model-specific logic here.
    * ────────────────────────────────────────────────────────────────────── */
   const caps = UNIVERSAL_CAPS;
-  const cfg = React.useMemo(() => getFaceLimitConfig(smartLowPoly, quadMesh), [smartLowPoly, quadMesh]);
 
   /* ─── Auto-reset incompatible settings when model changes ─────────── */
   useEffect(() => {
@@ -575,8 +595,8 @@ const GeneratePanel = memo(({
           if (next.length < 10) next.push(tempItem);
           return next;
         });
-        handleBatchImg && handleBatchImg(f).then(token => {
-          setBatchImages(prev => prev.map(i => i.file === f ? { ...i, token } : i));
+        handleBatchImg && handleBatchImg(f).then(payload => {
+          setBatchImages(prev => prev.map(i => i.file === f ? normalizeUploadedItem(f, ev.target.result, payload) : i));
         }).catch(() => { });
       };
       r.readAsDataURL(f);
@@ -585,7 +605,94 @@ const GeneratePanel = memo(({
 
   /* ─── Derived ─────────────────────────────────────────────────────── */
   const partsDisabled = texOn || pbrOn || quadMesh;
-  const isModernModel = modelVer === "P1-20260311" || modelVer.startsWith("v3.");
+  const sourceModeBtnStyle = (active) => ({
+    flex: 1,
+    padding: "8px 10px",
+    borderRadius: 10,
+    border: active ? "1px solid rgba(139,92,246,0.38)" : "1px solid rgba(255,255,255,0.06)",
+    background: active ? "rgba(139,92,246,0.14)" : "rgba(255,255,255,0.03)",
+    color: active ? "#c4b5fd" : "#94a3b8",
+    fontSize: 10,
+    fontWeight: 800,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    cursor: "pointer",
+  });
+  const fieldStyle = {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(255,255,255,0.03)",
+    color: "#e2e8f0",
+    fontSize: 12,
+    boxSizing: "border-box",
+  };
+  const labelStyle = {
+    color: "#94a3b8",
+    fontSize: 10,
+    fontWeight: 800,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    display: "block",
+    marginBottom: 6,
+  };
+  const subtleHintStyle = { color: "#64748b", fontSize: 10, lineHeight: 1.5, margin: 0 };
+  const renderReferenceUploader = (value, setter, uploadHandler, emptyLabel) => {
+    const openPicker = () => {
+      const inp = document.createElement("input");
+      inp.type = "file";
+      inp.accept = "image/jpeg,image/png,image/webp,image/avif";
+      inp.onchange = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setter({ file, preview: ev.target.result, token: null });
+          uploadHandler?.(file).then((payload) => {
+            setter(normalizeUploadedItem(file, ev.target.result, payload));
+          }).catch(() => { });
+        };
+        reader.readAsDataURL(file);
+      };
+      inp.click();
+    };
+
+    return (
+      <div
+        onClick={openPicker}
+        style={{
+          border: "1px dashed rgba(255,255,255,0.1)",
+          background: "rgba(255,255,255,0.02)",
+          borderRadius: 12,
+          minHeight: 124,
+          cursor: "pointer",
+          overflow: "hidden",
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {value?.preview ? (
+          <>
+            <img src={value.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            {!isUploadedItemReady(value) && (
+              <div style={{ position: "absolute", inset: 0, background: "rgba(3,0,10,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Loader2 style={{ width: 18, height: 18, color: "#8b5cf6" }} className="anim-spin" />
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: 16 }}>
+            <Upload style={{ width: 18, height: 18, color: "#8b5cf6", margin: "0 auto 8px" }} />
+            <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 700 }}>{emptyLabel}</div>
+            <p style={{ ...subtleHintStyle, marginTop: 6 }}>Optional reference via STS upload</p>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   /* ─── Render ──────────────────────────────────────────────────────── */
   return (
@@ -601,9 +708,6 @@ const GeneratePanel = memo(({
               className={"tp-inp-tab" + (genTab === t.id ? " active" : "") + (disabled ? " model-na" : "")}
               onClick={() => {
                 setGenTab(t.id);
-                if (t.id === "text" && modelVer === "P1-20260311") {
-                  setModelVer("v3.1-20260211");
-                }
               }}
               title={disabled ? `Not available with ${modelVer}` : t.tip}
               style={{
@@ -626,6 +730,164 @@ const GeneratePanel = memo(({
 
       {/* ── AI Model ── */}
       <ModelDropdown modelVer={modelVer} setModelVer={setModelVer} />
+
+      {genTab === "image" && (
+        <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" onClick={() => setImageSourceMode("upload")} style={sourceModeBtnStyle(imageSourceMode === "upload")}>Upload Source</button>
+            <button type="button" onClick={() => setImageSourceMode("generate_image")} style={sourceModeBtnStyle(imageSourceMode === "generate_image")}>Generate Image</button>
+          </div>
+
+          {imageSourceMode === "generate_image" && (
+            <div style={{ padding: 12, borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 10 }}>
+              <div>
+                <label style={labelStyle}>Image Prompt</label>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  rows={4}
+                  placeholder="Describe the source image you want Tripo to generate before converting it to 3D…"
+                  style={{ ...fieldStyle, resize: "vertical", minHeight: 96 }}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Reference Image</label>
+                {renderReferenceUploader(imageReference, setImageReference, handleBatchImg, "Add reference image")}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+                <div>
+                  <label style={labelStyle}>Image Model</label>
+                  <input value={generationModel} onChange={(e) => setGenerationModel(e.target.value)} placeholder="Optional model id" style={fieldStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Template</label>
+                  <input value={generationTemplateId} onChange={(e) => setGenerationTemplateId(e.target.value)} placeholder="Optional template id" style={fieldStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Orientation</label>
+                  <select value={generationOrientation} onChange={(e) => setGenerationOrientation(e.target.value)} style={fieldStyle}>
+                    <option value="">Default</option>
+                    <option value="portrait">Portrait</option>
+                    <option value="landscape">Landscape</option>
+                    <option value="square">Square</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Compress</label>
+                  <select value={generationCompress} onChange={(e) => setGenerationCompress(e.target.value)} style={fieldStyle}>
+                    <option value="">Off</option>
+                    <option value="geometry">Geometry</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Texture Alignment</label>
+                <input value={generationTextureAlignment} onChange={(e) => setGenerationTextureAlignment(e.target.value)} placeholder="Optional texture alignment hint" style={fieldStyle} />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <div>
+                  <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 700 }}>Render Image</div>
+                  <p style={subtleHintStyle}>Keep a preview render in the Tripo task output.</p>
+                </div>
+                <div className={"tp-switch" + (generationRenderImage ? " on" : "")} onClick={() => setGenerationRenderImage((v) => !v)} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {genTab === "multi" && (
+        <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" onClick={() => setMultiviewSourceMode("upload")} style={sourceModeBtnStyle(multiviewSourceMode === "upload")}>Upload Views</button>
+            <button type="button" onClick={() => setMultiviewSourceMode("generate_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "generate_multiview_image")}>Generate Views</button>
+            <button type="button" onClick={() => setMultiviewSourceMode("edit_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "edit_multiview_image")}>Edit Views</button>
+          </div>
+
+          {multiviewSourceMode !== "upload" && (
+            <div style={{ padding: 12, borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 10 }}>
+              <div>
+                <label style={labelStyle}>{multiviewSourceMode === "edit_multiview_image" ? "Edit Prompt" : "Multiview Prompt"}</label>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  rows={4}
+                  placeholder={multiviewSourceMode === "edit_multiview_image"
+                    ? "Describe how the generated multiview set should be edited…"
+                    : "Describe the subject for Tripo multiview image generation…"}
+                  style={{ ...fieldStyle, resize: "vertical", minHeight: 96 }}
+                />
+              </div>
+              {multiviewSourceMode === "edit_multiview_image" && (
+                <div>
+                  <label style={labelStyle}>Original Task Id</label>
+                  <input value={multiviewOriginalTaskId} onChange={(e) => setMultiviewOriginalTaskId(e.target.value)} placeholder="Optional original multiview task id" style={fieldStyle} />
+                </div>
+              )}
+              <div>
+                <label style={labelStyle}>Reference Image</label>
+                {renderReferenceUploader(multiviewReference, setMultiviewReference, handleMultiImg, "Add multiview reference")}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+                <div>
+                  <label style={labelStyle}>Image Model</label>
+                  <input value={generationModel} onChange={(e) => setGenerationModel(e.target.value)} placeholder="Optional model id" style={fieldStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Template</label>
+                  <input value={generationTemplateId} onChange={(e) => setGenerationTemplateId(e.target.value)} placeholder="Optional template id" style={fieldStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Orientation</label>
+                  <select value={generationOrientation} onChange={(e) => setGenerationOrientation(e.target.value)} style={fieldStyle}>
+                    <option value="">Default</option>
+                    <option value="portrait">Portrait</option>
+                    <option value="landscape">Landscape</option>
+                    <option value="square">Square</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Compress</label>
+                  <select value={generationCompress} onChange={(e) => setGenerationCompress(e.target.value)} style={fieldStyle}>
+                    <option value="">Off</option>
+                    <option value="geometry">Geometry</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Mode</label>
+                  <select value={multiviewMode} onChange={(e) => setMultiviewMode(e.target.value)} style={fieldStyle}>
+                    <option value="">Default</option>
+                    <option value="concept">Concept</option>
+                    <option value="orthographic">Orthographic</option>
+                    <option value="character">Character</option>
+                    <option value="product">Product</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Texture Alignment</label>
+                  <input value={generationTextureAlignment} onChange={(e) => setGenerationTextureAlignment(e.target.value)} placeholder="Optional texture alignment hint" style={fieldStyle} />
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div>
+                    <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 700 }}>Render Image</div>
+                    <p style={subtleHintStyle}>Keep preview renders in the task output.</p>
+                  </div>
+                  <div className={"tp-switch" + (generationRenderImage ? " on" : "")} onClick={() => setGenerationRenderImage((v) => !v)} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div>
+                    <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 700 }}>Orthographic</div>
+                    <p style={subtleHintStyle}>Enable orthographic projection for cleaner guide views.</p>
+                  </div>
+                  <div className={"tp-switch" + (multiviewOrthographic ? " on" : "")} onClick={() => setMultiviewOrthographic((v) => !v)} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
 
       {/* ── Text tab ── */}
@@ -709,10 +971,10 @@ const GeneratePanel = memo(({
             className="tp-ta"
             placeholder={caps.negPrompt ? "Negative prompt (optional)…" : "Not supported by this model"}
             value={negPrompt}
-            onChange={e => caps.negPrompt && setNegPrompt(e.target.value.slice(0, 250))}
+            onChange={e => caps.negPrompt && setNegPrompt(e.target.value.slice(0, 255))}
             rows={2}
             disabled={!caps.negPrompt}
-            maxLength={250}
+            maxLength={255}
             style={{
               border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9,
               background: "rgba(255,255,255,0.03)", fontSize: 11, resize: "none", width: "100%",
@@ -722,16 +984,16 @@ const GeneratePanel = memo(({
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 3 }}>
             <span style={{
               fontSize: 10,
-              color: negPrompt.length > 225 ? (negPrompt.length >= 250 ? "#ef4444" : "#f59e0b") : "#6b6b8a",
+              color: negPrompt.length > 230 ? (negPrompt.length >= 255 ? "#ef4444" : "#f59e0b") : "#6b6b8a",
             }}>
-              {negPrompt.length}/250
+              {negPrompt.length}/255
             </span>
           </div>
         </div>
       </Na>
 
       {/* ── Multi-view tab ── */}
-      {genTab === "multi" && (
+      {genTab === "multi" && multiviewSourceMode !== "generate_multiview_image" && (
         <div style={{ marginBottom: 14 }}>
           {multiImages?.some(i => i) && (
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
@@ -747,7 +1009,7 @@ const GeneratePanel = memo(({
             <div className="mv-grid">
               {MV_SLOTS.map((slot, i) => {
                 const prev = multiImages?.[i]?.preview;
-                const isUploading = multiImages?.[i] && !multiImages[i].token;
+                const isUploading = multiImages?.[i] && !isUploadedItemReady(multiImages[i]);
                 return (
                   <div key={slot.label} className={"mv-cell checker" + (prev ? " has-img" : "")}
                     onClick={() => {
@@ -761,10 +1023,10 @@ const GeneratePanel = memo(({
                             const next = [...(multiImages ?? [])];
                             next[i] = { file: f, preview: ev.target.result, token: null };
                             setMultiImages(next);
-                            handleMultiImg && handleMultiImg(f).then(token => {
+                            handleMultiImg && handleMultiImg(f).then(payload => {
                               setMultiImages(prev => {
                                 const updated = [...prev];
-                                if (updated[i]) updated[i] = { ...updated[i], token };
+                                if (updated[i]) updated[i] = normalizeUploadedItem(f, ev.target.result, payload);
                                 return updated;
                               });
                             }).catch(() => { });
@@ -804,7 +1066,7 @@ const GeneratePanel = memo(({
       )}
 
       {/* ── Image tab (Unified Single/Batch) ── */}
-      {genTab === "image" && (
+      {genTab === "image" && imageSourceMode === "upload" && (
         <div style={{ marginBottom: 14 }}>
           <div
             className="tp-drop checker"
@@ -840,12 +1102,12 @@ const GeneratePanel = memo(({
                       style={{ position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.7)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", backdropFilter: "blur(4px)" }}>
                       <X style={{ width: 10, height: 10 }} />
                     </button>
-                    {!img.token && (
+                    {!isUploadedItemReady(img) && (
                       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <Loader2 style={{ width: 16, height: 16, color: "#6c63ff" }} className="anim-spin" />
                       </div>
                     )}
-                    {img.token && (
+                    {isUploadedItemReady(img) && (
                       <div style={{ position: "absolute", bottom: 4, right: 4, width: 14, height: 14, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #10b981" }}>
                         <Check style={{ width: 8, height: 8, color: "#fff" }} />
                       </div>

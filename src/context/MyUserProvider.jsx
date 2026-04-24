@@ -1,8 +1,7 @@
 import { useState, createContext, useEffect } from "react";
-import { auth, db } from "../firebase/firebaseApp";
+import { auth } from "../firebase/firebaseApp";
 import {
   onAuthStateChanged,
-  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithCustomToken,
   signOut,
@@ -140,10 +139,6 @@ useEffect(() => {
     try {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) return;
-      // If we already have credits from the last loadUserFromFirestore call, reuse them
-      if (user.credits !== undefined && user.credits !== null) {
-        return; // credits already fresh from auth state listener
-      }
       const token = await firebaseUser.getIdToken();
       const response = await axios.get(
         `${API_BASE}/api/get-user/${user.uid}`,
@@ -320,7 +315,7 @@ useEffect(() => {
       console.error("Google sign-in error:", error);
       setMsg({ incorrectSignIn: error.message });
 
-      try { await signOut(auth); } catch {}
+      try { await signOut(auth); } catch { /* ignore sign-out cleanup failure */ }
 
       return { requires2FA: false };
     }

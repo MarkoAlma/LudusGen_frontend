@@ -5,11 +5,20 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 function normalizeMaterialTextureColorSpaces(THREE, material) {
   if (!THREE || !material) return;
 
+  const hasImageData = (texture) => {
+    const image = texture?.image;
+    if (!image) return false;
+    if (typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) return image.width > 0 && image.height > 0;
+    if (typeof HTMLCanvasElement !== 'undefined' && image instanceof HTMLCanvasElement) return image.width > 0 && image.height > 0;
+    if (typeof HTMLVideoElement !== 'undefined' && image instanceof HTMLVideoElement) return image.readyState >= 2;
+    return Boolean(image.width || image.videoWidth || image.data);
+  };
+
   ['map', 'emissiveMap'].forEach((slot) => {
     const texture = material[slot];
     if (texture?.isTexture) {
       texture.colorSpace = THREE.SRGBColorSpace;
-      texture.needsUpdate = true;
+      if (hasImageData(texture)) texture.needsUpdate = true;
     }
   });
 
@@ -17,8 +26,70 @@ function normalizeMaterialTextureColorSpaces(THREE, material) {
     const texture = material[slot];
     if (texture?.isTexture) {
       texture.colorSpace = THREE.NoColorSpace;
-      texture.needsUpdate = true;
+      if (hasImageData(texture)) texture.needsUpdate = true;
     }
+  });
+}
+
+function hasTextureImageData(texture) {
+  const image = texture?.image;
+  if (!image) return false;
+  if (typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) return image.width > 0 && image.height > 0;
+  if (typeof HTMLCanvasElement !== 'undefined' && image instanceof HTMLCanvasElement) return image.width > 0 && image.height > 0;
+  if (typeof HTMLVideoElement !== 'undefined' && image instanceof HTMLVideoElement) return image.readyState >= 2;
+  return Boolean(image.width || image.videoWidth || image.data);
+}
+
+function collectModelTextures(model) {
+  const textures = [];
+  const slots = ['map', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'alphaMap', 'bumpMap', 'displacementMap'];
+  model?.traverse?.((node) => {
+    if (!node.isMesh) return;
+    const mats = Array.isArray(node.material) ? node.material : [node.material];
+    mats.forEach((mat) => {
+      if (!mat) return;
+      slots.forEach((slot) => {
+        const texture = mat[slot];
+        if (texture?.isTexture && !textures.includes(texture)) textures.push(texture);
+      });
+    });
+  });
+  return textures;
+}
+
+async function waitForThumbnailTextures(model, timeoutMs = 900) {
+  const textures = collectModelTextures(model);
+  if (!textures.length || textures.every(hasTextureImageData)) return;
+
+  await Promise.race([
+    new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+    new Promise((resolve) => {
+      let settled = false;
+      const finishIfReady = () => {
+        if (!settled && textures.every((texture) => hasTextureImageData(texture) || !texture.image)) {
+          settled = true;
+          resolve();
+        }
+      };
+
+      textures.forEach((texture) => {
+        const image = texture.image;
+        if (!image || hasTextureImageData(texture)) return;
+        if (typeof image.addEventListener === 'function') {
+          image.addEventListener('load', finishIfReady, { once: true });
+          image.addEventListener('error', finishIfReady, { once: true });
+        }
+        if (typeof image.decode === 'function') {
+          image.decode().then(finishIfReady).catch(finishIfReady);
+        }
+      });
+
+      finishIfReady();
+    }),
+  ]);
+
+  textures.forEach((texture) => {
+    if (hasTextureImageData(texture)) texture.needsUpdate = true;
   });
 }
 
@@ -285,6 +356,8 @@ export function generateGlbThumbnail(source, options = {}) {
       keyLight.target.updateMatrixWorld();
 
       // ── Render ───────────────────────────────────────────────────────
+      await waitForThumbnailTextures(model);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       renderer.render(scene, camera);
       const dataUrl = canvas.toDataURL('image/webp', 0.85);
       cleanup();

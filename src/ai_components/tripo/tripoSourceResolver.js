@@ -51,6 +51,10 @@ export function hasTextureMarker(item) {
   ].filter(Boolean).join(" ").toLowerCase();
 
   return (
+    item?.mode === "upload" ||
+    item?.source === "upload" ||
+    item?.type === "import_model" ||
+    item?.params?.type === "import_model" ||
     item?.mode === "texture" ||
     item?.texture === true ||
     item?.texture === "true" ||

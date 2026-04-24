@@ -527,7 +527,7 @@ export default function Shared3DHistory({
         {/* Upload drop zone */}
         {activeTab === 'upload' && (
           <>
-            <input ref={assetFileRef} type="file" accept=".glb,.fbx,.obj" style={{ display: "none" }}
+            <input ref={assetFileRef} type="file" accept=".glb,.fbx,.obj,.stl" style={{ display: "none" }}
               onChange={e => { if (e.target.files?.[0]) handleAssetUpload(e.target.files[0]); e.target.value = ""; }}
             />
             <button onClick={() => assetFileRef.current?.click()} disabled={assetUploading} style={{
@@ -546,7 +546,7 @@ export default function Shared3DHistory({
             >
               {assetUploading
                 ? <><Loader2 style={{ width: 11, height: 11 }} className="anim-spin" /> Uploading…</>
-                : <><Upload style={{ width: 11, height: 11 }} /> Drop or select .glb / .fbx / .obj</>
+                : <><Upload style={{ width: 11, height: 11 }} /> Drop or select .glb / .fbx / .obj / .stl</>
               }
             </button>
           </>

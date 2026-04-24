@@ -121,7 +121,7 @@ export const ENDPOINTS = {
 };
 
 /**
- * Upload a file (GLB/FBX/OBJ) to Tripo assets.
+ * Upload a file (GLB/FBX/OBJ/STL) to Tripo assets.
  * @param {File} file
  * @param {(() => Promise<string>) | string} getIdTokenOrToken
  * @returns {Promise<{ success: boolean, filename?: string, message?: string }>}

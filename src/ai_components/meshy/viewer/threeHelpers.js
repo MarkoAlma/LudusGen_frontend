@@ -4,6 +4,15 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
 export const hexToInt = (h) => (h ? parseInt(h.replace("#", ""), 16) : null);
 
+function textureHasImageData(texture) {
+  const image = texture?.image;
+  if (!image) return false;
+  if (typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) return image.width > 0 && image.height > 0;
+  if (typeof HTMLCanvasElement !== 'undefined' && image instanceof HTMLCanvasElement) return image.width > 0 && image.height > 0;
+  if (typeof HTMLVideoElement !== 'undefined' && image instanceof HTMLVideoElement) return image.readyState >= 2;
+  return Boolean(image.width || image.videoWidth || image.data);
+}
+
 export function syncCamera(camera, c) {
   const pz = c.panZ ?? 0;
   camera.position.set(
@@ -88,7 +97,7 @@ function normalizeMaterialTextureColorSpaces(THREE, material) {
     const texture = material[slot];
     if (texture?.isTexture) {
       texture.colorSpace = THREE.SRGBColorSpace;
-      texture.needsUpdate = true;
+      if (textureHasImageData(texture)) texture.needsUpdate = true;
     }
   });
 
@@ -96,7 +105,7 @@ function normalizeMaterialTextureColorSpaces(THREE, material) {
     const texture = material[slot];
     if (texture?.isTexture) {
       texture.colorSpace = THREE.NoColorSpace;
-      texture.needsUpdate = true;
+      if (textureHasImageData(texture)) texture.needsUpdate = true;
     }
   });
 }
@@ -227,8 +236,13 @@ export function applyViewMode(s, mode) {
     } else if (mode === 'uv') {
       if (!s._uvMats.has(node.uuid)) {
         const buildLitUV = (m) => {
-          const map = (m?.map) ?? null;
-          if (map) { map.colorSpace = THREE.SRGBColorSpace; map.needsUpdate = true; }
+          const map = m?.map ?? null;
+          if (map) {
+            map.colorSpace = THREE.SRGBColorSpace;
+            if (textureHasImageData(map)) map.needsUpdate = true;
+          }
+          const alphaMap = m?.alphaMap ?? null;
+          if (alphaMap && textureHasImageData(alphaMap)) alphaMap.needsUpdate = true;
           return new THREE.MeshStandardMaterial({
             map,
             color: map ? 0xffffff : (m?.color ?? new THREE.Color(0xe0dbd5)),
@@ -236,6 +250,11 @@ export function applyViewMode(s, mode) {
             metalness: 0.0,
             envMapIntensity: 0.5,
             side: THREE.DoubleSide,
+            transparent: m?.transparent ?? false,
+            opacity: m?.opacity ?? 1,
+            alphaTest: m?.alphaTest ?? 0,
+            alphaMap,
+            depthWrite: m?.depthWrite ?? true
           });
         };
         s._uvMats.set(node.uuid, Array.isArray(orig) ? orig.map(m => buildLitUV(m)) : buildLitUV(orig));
@@ -456,7 +475,7 @@ export function disposeModel(scene, model, origMaterials, wireCache, clayMats, u
   scene.remove(model);
 }
 
-export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOverlay = false, wireOpacity = 0.22, wireHexColor = 0xffffff, showRig = false, onRigDetected = null, segmentHighlight = false, segmentEdgeColor = 0x00ff88) {
+export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOverlay = false, wireOpacity = 0.22, wireHexColor = 0xffffff, showRig = false, onRigDetected = null, segmentHighlight = false, segmentEdgeColor = 0x00ff88, onModelLoaded = null) {
   const { THREE, scene, placeholder } = s;
   if (!THREE) return;
   if (placeholder) placeholder.visible = false;
@@ -614,6 +633,7 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     const _segEC = segmentEdgeColor ?? s._segmentEdgeColor ?? 0x00ff88;
     if (_segHL) applySegmentHighlight(s, true, _segEC, { async: true, batchSize: 2, edgeBatchSize: 1, frameBudget: 5 });
     s.autoSpin = autoSpin;
+    onModelLoaded?.(model);
     s.markDirty?.();
   };
 
@@ -944,4 +964,65 @@ export function modelHasTextures(model) {
     mats.forEach((m) => { if (m?.map) texturedCount++; });
   });
   return meshCount > 0 && texturedCount > 0;
+}
+
+export function modelHasUvOverlapSuspicion(model) {
+  if (!model) return false;
+
+  model.updateMatrixWorld?.(true);
+
+  const bounds = new THREE.Box3().setFromObject(model);
+  const modelDiagonal = bounds.isEmpty() ? 1 : bounds.getSize(new THREE.Vector3()).length();
+  const minDistanceSq = Math.pow(Math.max(0.08, modelDiagonal * 0.045), 2);
+  const samePointSq = Math.pow(Math.max(0.01, modelDiagonal * 0.0025), 2);
+  const uvBuckets = new Map();
+  let checkedVertices = 0;
+
+  model.traverse((node) => {
+    if (!node.isMesh || !node.geometry) return;
+    const pos = node.geometry.attributes?.position;
+    const uv = node.geometry.attributes?.uv;
+    if (!pos || !uv) return;
+
+    const sampleStep = Math.max(1, Math.floor(pos.count / 6000));
+    const limit = Math.min(pos.count, uv.count ?? pos.count);
+    for (let i = 0; i < limit; i += sampleStep) {
+      const u = uv.getX(i);
+      const v = uv.getY(i);
+      if (!Number.isFinite(u) || !Number.isFinite(v)) continue;
+
+      const inPrimaryRange = u >= 0 && u <= 1 && v >= 0 && v <= 1;
+      if (inPrimaryRange && (u <= 0.002 || u >= 0.998 || v <= 0.002 || v >= 0.998)) {
+        continue;
+      }
+
+      const key = `${Math.round(u * 4096)}:${Math.round(v * 4096)}`;
+      const worldPos = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(node.matrixWorld);
+      const prev = uvBuckets.get(key);
+      checkedVertices++;
+
+      if (!prev) {
+        uvBuckets.set(key, { positions: [worldPos], suspicious: false });
+        continue;
+      }
+
+      if (prev.positions.some((point) => point.distanceToSquared(worldPos) <= samePointSq)) {
+        continue;
+      }
+
+      if (prev.positions.some((point) => point.distanceToSquared(worldPos) >= minDistanceSq)) {
+        prev.suspicious = true;
+      }
+
+      if (prev.positions.length < 6) {
+        prev.positions.push(worldPos);
+      }
+    }
+  });
+
+  if (checkedVertices < 800 || uvBuckets.size < 200) return false;
+
+  const suspiciousBuckets = [...uvBuckets.values()].filter((bucket) => bucket.suspicious).length;
+  const suspiciousRatio = suspiciousBuckets / uvBuckets.size;
+  return suspiciousBuckets >= 96 && suspiciousRatio > 0.025;
 }
