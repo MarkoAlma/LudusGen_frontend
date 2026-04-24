@@ -1,7 +1,7 @@
 // shared/HistoryCard.jsx  — DAW / Game Asset Browser aesthetic
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Download, RotateCcw, Trash2, Box, Sparkles, AlertCircle, PersonStanding, Wand2, Scissors, Boxes } from "lucide-react";
-import { getCachedThumbnail, checkThumbnailCache } from "../trellis/Glbthumbnail";
+import { getCachedThumbnail, checkThumbnailCache, isThumbnailUnsupported } from "../trellis/Glbthumbnail";
 import { fetchModelData } from "../trellis/utils";
 
 /* ─── CSS injection ──────────────────────────────────────────────────────── */
@@ -134,7 +134,7 @@ function ShimmerThumb({ height }) {
 
 /* ─── HistoryCard ────────────────────────────────────────────────────────── */
 const HistoryCard = React.memo(function HistoryCard({
-  item, isActive, onSelect, onReuse, onDownload, onDelete,
+  item, isActive, onSelect, onReuse, onDownload, onDelete, onExpired,
   color = "#64748b", getIdToken,
 }) {
   const containerRef = React.useRef(null);
@@ -154,6 +154,11 @@ const HistoryCard = React.memo(function HistoryCard({
     if (item?.status === "failed" || EXPIRED_URLS.has(item.model_url)) {
       setThumbError(true);
       if (EXPIRED_URLS.has(item.model_url)) setErrorCode(410);
+      return;
+    }
+    if (isThumbnailUnsupported(item.model_url)) {
+      setThumbError(true);
+      setThumbLoading(false);
       return;
     }
     const cached = checkThumbnailCache(item.model_url);
@@ -181,13 +186,16 @@ const HistoryCard = React.memo(function HistoryCard({
         clearTimeout(loadingTimer);
         if (!cancelled) {
           const st = err.status || null; setErrorCode(st); setThumbError(true);
-          if (st === 410) EXPIRED_URLS.add(item.model_url);
+          if (st === 410) {
+            EXPIRED_URLS.add(item.model_url);
+            onExpired?.(item);
+          }
           else console.error("[HistoryCard]", err?.message);
         }
       } finally { if (!cancelled) setThumbLoading(false); }
     })();
     return () => { cancelled = true; clearTimeout(loadingTimer); };
-  }, [item?.model_url, getIdToken]);
+  }, [item?.id, item?.model_url, item?.taskId, item?.status, getIdToken, onExpired]);
 
   const handleSelect = useCallback(() => onSelect?.(item), [onSelect, item]);
   const handleReuse = useCallback((e) => { e.stopPropagation(); onReuse?.(item); }, [onReuse, item]);

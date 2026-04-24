@@ -26,6 +26,32 @@ let _activeCount = 0;
 const _MAX = 3;
 const _queue = [];
 const _TIMEOUT_MS = 20000;
+const _UNSUPPORTED_THUMBNAIL = Symbol('unsupported-thumbnail');
+
+function readAscii(bytes, length = bytes.length) {
+  return String.fromCharCode(...bytes.slice(0, length));
+}
+
+function sniffModelFormat(buffer) {
+  const bytes = new Uint8Array(buffer, 0, Math.min(32, buffer.byteLength));
+  const header = readAscii(bytes);
+  const firstText = header.trimStart();
+
+  if (header.startsWith('glTF')) return 'glb';
+  if (header.startsWith('Kaydara')) return 'fbx';
+  if (header.startsWith('PK')) return 'zip';
+  if (firstText.startsWith('{')) return 'gltf-json';
+  if (firstText.startsWith('<')) return 'html';
+  return 'unknown';
+}
+
+function createUnsupportedThumbnailError(format) {
+  const err = new Error(`Unsupported model data for thumbnail generation: ${format}`);
+  err.code = 'UNSUPPORTED_THUMBNAIL_FORMAT';
+  err.thumbnailUnsupported = true;
+  err.format = format;
+  return err;
+}
 
 function _dequeue() {
   if (_activeCount >= _MAX || _queue.length === 0) return;
@@ -107,6 +133,11 @@ export function generateGlbThumbnail(source, options = {}) {
         throw new Error('Empty or corrupt model data');
       }
 
+      const format = sniffModelFormat(buffer);
+      if (format === 'zip' || format === 'html' || format === 'unknown') {
+        throw createUnsupportedThumbnailError(format);
+      }
+
       // ── Renderer setup ───────────────────────────────────────────────
       const canvas = document.createElement('canvas');
       canvas.width = width;
@@ -152,13 +183,9 @@ export function generateGlbThumbnail(source, options = {}) {
       bounce.position.set(0, -5, 2);
       scene.add(bounce);
 
-      // ── Sniff format & parse ─────────────────────────────────────────
-      const header = new Uint8Array(buffer, 0, Math.min(20, buffer.byteLength));
-      const headerStr = String.fromCharCode(...header);
-      const isFBX = headerStr.startsWith('Kaydara');
-
+      // ── Parse model ─────────────────────────────────────────────────
       let model;
-      if (isFBX) {
+      if (format === 'fbx') {
         // Suppress FBXLoader's console.warn about unsupported material maps
         const _origWarn = console.warn;
         console.warn = () => { };
@@ -263,7 +290,9 @@ export function generateGlbThumbnail(source, options = {}) {
       cleanup();
       resolve(dataUrl);
     } catch (err) {
-      console.error('[Thumbnail] generation failed:', err);
+      if (!err?.thumbnailUnsupported) {
+        console.error('[Thumbnail] generation failed:', err);
+      }
       cleanup();
       reject(err);
     }
@@ -275,7 +304,12 @@ const _cache = new Map();
 
 export function checkThumbnailCache(key) {
   if (!key) return null;
-  return _cache.has(key) ? _cache.get(key) : null;
+  const cached = _cache.get(key);
+  return cached === _UNSUPPORTED_THUMBNAIL ? null : cached || null;
+}
+
+export function isThumbnailUnsupported(key) {
+  return !!key && _cache.get(key) === _UNSUPPORTED_THUMBNAIL;
 }
 
 /**
@@ -287,13 +321,23 @@ export function checkThumbnailCache(key) {
 export async function getCachedThumbnail(source, options = {}, cacheKey) {
   if (!source) return null;
   const key = cacheKey || (typeof source === 'string' ? source : null);
-  if (key && _cache.has(key)) return _cache.get(key);
+  if (key && _cache.has(key)) {
+    const cached = _cache.get(key);
+    return cached === _UNSUPPORTED_THUMBNAIL ? null : cached;
+  }
   try {
     const thumb = await generateGlbThumbnail(source, options);
     if (key) _cache.set(key, thumb);
     return thumb;
   } catch (err) {
-    console.error('[Thumbnail] cache miss error:', err);
+    if (err?.thumbnailUnsupported) {
+      if (key && !_cache.has(key)) {
+        console.warn('[Thumbnail] unsupported model skipped:', err.format || err.message);
+        _cache.set(key, _UNSUPPORTED_THUMBNAIL);
+      }
+    } else {
+      console.error('[Thumbnail] cache miss error:', err);
+    }
     return null;
   }
 }

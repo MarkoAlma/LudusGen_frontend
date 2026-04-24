@@ -223,6 +223,8 @@ export function SelectedModelBadge({
   badgeColor = "rgba(139,92,246,0.22)",
   badgeBg = "rgba(139,92,246,0.12)",
   hint = "",
+  actionLabel = "",
+  onAction = null,
 }) {
   if (!activeTaskId && !name && !hint) return null;
   return (
@@ -287,6 +289,29 @@ export function SelectedModelBadge({
         }}>
           {hint}
         </p>
+      )}
+      {!!actionLabel && typeof onAction === "function" && (
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          onClick={onAction}
+          style={{
+            marginTop: 9,
+            width: "100%",
+            height: 30,
+            borderRadius: 9,
+            border: "1px solid rgba(0,229,255,0.24)",
+            background: "rgba(0,229,255,0.10)",
+            color: "#a5f3fc",
+            fontSize: 9,
+            fontWeight: 900,
+            textTransform: "uppercase",
+            letterSpacing: "0.12em",
+            cursor: "pointer",
+          }}
+        >
+          {actionLabel}
+        </motion.button>
       )}
     </div>
   );
@@ -993,6 +1018,7 @@ export default function Texture({
   pbrTargetTaskId = "",
   pbrTargetName = "",
   pbrTargetResolved = false,
+  onUseOriginalModel = null,
   texInputTab, setTexInputTab,
   texPrompt, setTexPrompt,
   imgPrev, imgToken, imgUploading, handleImg, fileRef,
@@ -1040,10 +1066,12 @@ export default function Texture({
             hint={
               pbrAvailable
                 ? (pbrTargetResolved
-                  ? "A PBR az upstream texturazott modellen fog futni, nem a nyers downstream exporton."
+                  ? "A PBR az original/upstream modellen fog futni, nem a nyers downstream exporton."
                   : "Ez mar egy texturazott modell, ugyhogy a PBR kozvetlenul kapcsolhato.")
                 : "Kapcsold be a PBR-t a texture passhez; draft modellen is egyutt generalodik a material map keszlet."
             }
+            actionLabel={pbrTargetResolved ? "Use original model" : ""}
+            onAction={pbrTargetResolved ? onUseOriginalModel : null}
           />
           <TexInputBox
             tab={texInputTab} setTab={setTexInputTab}

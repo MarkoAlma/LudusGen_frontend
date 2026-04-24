@@ -217,6 +217,20 @@ export default function Shared3DHistory({
     } catch (e) { toast.error("Törlés sikertelen: " + e.message); }
   };
 
+  const handleExpiredLocally = useCallback(async (item) => {
+    if (!item?.id) return;
+    setHistory(prev => prev.filter(i => i.id !== item.id));
+    try {
+      const t = getIdToken ? await getIdToken() : "";
+      await fetch(BASE_URL + "/api/tripo/history/" + item.id, {
+        method: "DELETE",
+        headers: { Authorization: "Bearer " + t },
+      });
+    } catch (e) {
+      console.warn("[Shared3DHistory] expired cleanup failed:", e?.message ?? e);
+    }
+  }, [getIdToken]);
+
   const handleClearAll = useCallback(async () => {
     const label = activeTab === 'tripo' ? 'Tripo3D' : activeTab === 'trellis' ? 'Trellis' : 'Feltöltések';
     if (!window.confirm(`Biztosan törlöd az összes ${label} elemet?`)) return;
@@ -575,7 +589,7 @@ export default function Shared3DHistory({
                     const isFill = item.mode === 'fill_parts';
                     const cardColor = isAnim ? TYPE_COLORS.animation.rail : isRig ? TYPE_COLORS.rigged.rail : isSeg ? TYPE_COLORS.segment.rail : isFill ? "#c084fc" : accent;
                     return (
-                <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={cardColor} getIdToken={getIdToken} />
+                <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color={cardColor} getIdToken={getIdToken} />
                     );
                   })}
                 </div>
@@ -586,7 +600,7 @@ export default function Shared3DHistory({
                       <SectionHeader label="Generated Models" icon={Sparkles} typeColor={TYPE_COLORS.model} count={tripoSections.generated.length} />
                       <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
                         {tripoSections.generated.map(item => (
-                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={accent} getIdToken={getIdToken} />
+                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color={accent} getIdToken={getIdToken} />
                         ))}
                       </div>
                     </>
@@ -596,7 +610,7 @@ export default function Shared3DHistory({
                       <SectionHeader label="Rigged Characters" icon={PersonStanding} typeColor={TYPE_COLORS.rigged} count={tripoSections.rigged.length} />
                       <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
                         {tripoSections.rigged.map(item => (
-                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={TYPE_COLORS.rigged.rail} getIdToken={getIdToken} />
+                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color={TYPE_COLORS.rigged.rail} getIdToken={getIdToken} />
                         ))}
                       </div>
                     </>
@@ -606,7 +620,7 @@ export default function Shared3DHistory({
                       <SectionHeader label="Animations" icon={Wand2} typeColor={TYPE_COLORS.animation} count={tripoSections.animations.length} />
                       <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
                         {tripoSections.animations.map(item => (
-                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={TYPE_COLORS.animation.rail} getIdToken={getIdToken} />
+                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color={TYPE_COLORS.animation.rail} getIdToken={getIdToken} />
                         ))}
                       </div>
                     </>
@@ -616,7 +630,7 @@ export default function Shared3DHistory({
                       <SectionHeader label="Segmented" icon={Scissors} typeColor={TYPE_COLORS.segment} count={tripoSections.segments.length} />
                       <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
                         {tripoSections.segments.map(item => (
-                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={TYPE_COLORS.segment.rail} getIdToken={getIdToken} />
+                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color={TYPE_COLORS.segment.rail} getIdToken={getIdToken} />
                         ))}
                       </div>
                     </>
@@ -626,7 +640,7 @@ export default function Shared3DHistory({
                       <SectionHeader label="Completed Parts" icon={Boxes} typeColor={{ rail: "#c084fc" }} count={tripoSections.fillParts.length} />
                       <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
                         {tripoSections.fillParts.map(item => (
-                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color="#c084fc" getIdToken={getIdToken} />
+                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color="#c084fc" getIdToken={getIdToken} />
                         ))}
                       </div>
                     </>
@@ -643,7 +657,7 @@ export default function Shared3DHistory({
             <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {filtHist.map(item => (
-                <HistoryCard key={item.id} item={item} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} color={accent} getIdToken={getIdToken} />
+                <HistoryCard key={item.id} item={item} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color={accent} getIdToken={getIdToken} />
                 ))}
               </div>
             </motion.div>

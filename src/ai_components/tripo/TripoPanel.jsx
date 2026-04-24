@@ -27,12 +27,19 @@ import { useActiveTasksPoller } from "./useActiveTasksPoller";
 import { checkThumbnailCache, getCachedThumbnail } from "../trellis/Glbthumbnail";
 import { useTripoHistory } from "./useTripoHistory";
 import { useTripoRig } from "./useTripoRig";
-import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX, TRIPO_ENHANCE_PROMPT, TRIPO_SUPER_ENHANCE_PROMPT, TRIPO_SIMPLIFY_PROMPT } from "./GeneratePanel";
-import Enhancer from "../Enhancer";
+import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX } from "./GeneratePanel";
 import Segment from "./Segment";
 import Retopo from "./Retopo";
 import Texture from "./Texture";
 import Animate from "./Animate";
+import {
+  REFINE_DIRECT_SOURCE_TYPES,
+  UPSTREAM_SOURCE_TYPES,
+  getHistoryModelVersion,
+  getHistoryTaskType,
+  itemHasTexture as resolveItemHasTexture,
+  resolveOperationSource,
+} from "./tripoSourceResolver";
 import { motion, AnimatePresence, animate } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import { MyUserContext } from "../../context/MyUserProvider";
@@ -82,6 +89,17 @@ const MODE_COST = {
   paint: 10,
   animate: 10,
 };
+
+function isRefineModelVersionSupported(version) {
+  if (!version) return true;
+  return String(version).toLowerCase().startsWith("v1.4");
+}
+
+function isPostProcessModelVersionSupported(version) {
+  if (!version) return true;
+  const value = String(version);
+  return value === "P1-20260311" || value.startsWith("v3.");
+}
 
 /* ─── CSS ────────────────────────────────────────────────────────────── */
 const CSS = `
@@ -207,6 +225,7 @@ const CSS = `
 `;
 
 function logFrontendDebug(label, payload) {
+  if (!import.meta.env.DEV || import.meta.env.VITE_TRIPO_DEBUG !== "true") return;
   try {
     console.log(label, JSON.parse(JSON.stringify(payload)));
   } catch {
@@ -365,8 +384,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [editId, setEditId] = useState("");
   const [refineId, setRefineId] = useState("");
   const [refineManualOverride, setRefineManualOverride] = useState(false);
-  const [refinePrompt, setRefinePrompt] = useState("");
-  const [refineNegPrompt, setRefineNegPrompt] = useState("");
   const [stylizeId, setStylizeId] = useState("");
   const [stylizeStyle, setStylizeStyle] = useState("lego");
   const [animId, setAnimId] = useState("");
@@ -479,7 +496,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   }, [history, optimisticItems]);
   const resolveHistoryDisplayName = useCallback((item) => {
     if (!item) return "Model";
-    const originalTaskKey = item?.params?.originalModelTaskId || item?.params?.original_model_task_id;
+    const originalTaskKey = item?.params?.originalModelTaskId || item?.params?.original_model_task_id || item?.params?.draftModelTaskId || item?.params?.draft_model_task_id;
     const originalItem = findHistoryItemByTaskKey(originalTaskKey);
     const base = originalItem?.name || originalItem?.prompt || item?.name || item?.prompt || item?.mode || "Model";
     if (item?.params?.animated) {
@@ -493,11 +510,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   const activeH = useMemo(() => findHistoryItemById(selHistId), [findHistoryItemById, selHistId]);
 
-  useEffect(() => {
-    if (mode === "refine" && !refinePrompt && activeH?.prompt) {
-      setRefinePrompt(activeH.prompt);
-    }
-  }, [mode, activeH, refinePrompt]);
   const viewerH = useMemo(() => findHistoryItemById(viewerHistId), [findHistoryItemById, viewerHistId]);
   const activeDisplayName = useMemo(() => resolveHistoryDisplayName(activeH), [activeH, resolveHistoryDisplayName]);
   const selectedPreviewItem = useMemo(() => {
@@ -544,71 +556,75 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const isSegOutput = activeH?.mode === "segment";
   const isGeneratedInParts = activeH?.params?.generate_parts === true || activeH?.params?.inParts === true;
   const isFillPartsCompatible = isSegOutput || isGeneratedInParts;
-  const refineSourceTaskId = (((refineManualOverride || !activeTaskId) ? refineId.trim() : activeTaskId) || "").trim();
+  const segmentActionTaskId = (((segSub === "fill_parts" ? fillId : segId).trim() || activeTaskId) || "").trim();
+  const segmentActionItem = findHistoryItemByTaskKey(segmentActionTaskId) || activeH || null;
+  const segmentActionModelVersion = getHistoryModelVersion(segmentActionItem);
+  const isSegmentModelVersionSupported = isPostProcessModelVersionSupported(segmentActionModelVersion);
+  const retopoActionTaskId = ((retopoId.trim() || activeTaskId) || "").trim();
+  const retopoActionItem = findHistoryItemByTaskKey(retopoActionTaskId) || activeH || null;
+  const retopoActionModelVersion = getHistoryModelVersion(retopoActionItem);
+  const isRetopoModelVersionSupported = isPostProcessModelVersionSupported(retopoActionModelVersion);
+  const refineSelectedTaskId = (((refineManualOverride || !activeTaskId) ? refineId.trim() : activeTaskId) || "").trim();
   const refineSourceItem = useMemo(() => {
-    if (!refineSourceTaskId) return null;
-    return history.find(h => h.taskId === refineSourceTaskId || h.id === refineSourceTaskId)
-      || optimisticItems.find(h => h.taskId === refineSourceTaskId || h.id === refineSourceTaskId)
-      || (activeH?.taskId === refineSourceTaskId || activeH?.id === refineSourceTaskId ? activeH : null);
-  }, [refineSourceTaskId, history, optimisticItems, activeH]);
+    if (!refineSelectedTaskId) return null;
+    return history.find(h => h.taskId === refineSelectedTaskId || h.id === refineSelectedTaskId)
+      || optimisticItems.find(h => h.taskId === refineSelectedTaskId || h.id === refineSelectedTaskId)
+      || (activeH?.taskId === refineSelectedTaskId || activeH?.id === refineSelectedTaskId ? activeH : null);
+  }, [refineSelectedTaskId, history, optimisticItems, activeH]);
 
-  const itemHasTextureMarker = useCallback((item) => {
-    if (!item) return false;
-    const searchable = [
-      item?.mode,
-      item?.name,
-      item?.prompt,
-      item?.label,
-      item?.type,
-      item?.params?.mode,
-      item?.params?.type,
-      item?.params?.label,
-    ].filter(Boolean).join(" ").toLowerCase();
-    return (
-      item?.mode === "texture" ||
-      item?.texture === true ||
-      item?.texture === "true" ||
-      item?.pbr === true ||
-      item?.pbr === "true" ||
-      item?.type === "texture_model" ||
-      item?.params?.mode === "texture" ||
-      item?.params?.type === "texture_model" ||
-      item?.params?.texture === true ||
-      item?.params?.texture === "true" ||
-      item?.params?.pbr === true ||
-      item?.params?.pbr === "true" ||
-      /\btexture\b/.test(searchable)
-    );
-  }, []);
   const itemHasTexture = useCallback((item) => {
-    const visit = (candidate, seen = new Set(), depth = 0) => {
-      if (!candidate || depth > 4) return false;
-      if (itemHasTextureMarker(candidate)) return true;
-      const key =
-        candidate?.taskId ||
-        candidate?.id ||
-        candidate?.params?.originalModelTaskId ||
-        candidate?.params?.original_model_task_id ||
-        null;
-      if (key) {
-        if (seen.has(key)) return false;
-        seen.add(key);
-      }
-      const upstreamId = candidate?.params?.originalModelTaskId || candidate?.params?.original_model_task_id;
-      if (!upstreamId) return false;
-      return visit(findHistoryItemByTaskKey(upstreamId), seen, depth + 1);
-    };
-    return visit(item);
-  }, [itemHasTextureMarker, findHistoryItemByTaskKey]);
+    return resolveItemHasTexture(item, findHistoryItemByTaskKey);
+  }, [findHistoryItemByTaskKey]);
 
   const sourceForRefine = refineSourceItem || activeH;
   const hasTexture = itemHasTexture(sourceForRefine);
-  const activeSourceType = sourceForRefine?.params?.type || null;
-  const isRefineSourceTypeSupported = !activeSourceType || ["text_to_model", "image_to_model", "multiview_to_model"].includes(activeSourceType);
-  const refineBlockedBySelectedSource = mode === "refine" && (hasTexture || !isRefineSourceTypeSupported);
-  const refineDisableReason = hasTexture
+  const activeSourceType = getHistoryTaskType(sourceForRefine);
+  const refineSourceResolution = useMemo(() => {
+    return resolveOperationSource({
+      operation: "refine",
+      selectedTaskId: refineSelectedTaskId,
+      selectedItem: sourceForRefine,
+      fallbackItem: activeH,
+      findHistoryItemByTaskKey,
+    });
+  }, [sourceForRefine, refineSelectedTaskId, findHistoryItemByTaskKey]);
+  const refineSourceTaskId = refineSourceResolution.taskId;
+  const refineResolvedFromUpstream = !!(refineSelectedTaskId && refineSourceTaskId && refineSelectedTaskId !== refineSourceTaskId);
+  const refineDraftSourceItem = useMemo(() => {
+    return findHistoryItemByTaskKey(refineSourceTaskId) || null;
+  }, [findHistoryItemByTaskKey, refineSourceTaskId]);
+  const refineSourceDisplayName = useMemo(
+    () => resolveHistoryDisplayName(sourceForRefine),
+    [sourceForRefine, resolveHistoryDisplayName]
+  );
+  const refineDraftDisplayName = useMemo(
+    () => resolveHistoryDisplayName(refineDraftSourceItem || sourceForRefine),
+    [refineDraftSourceItem, sourceForRefine, resolveHistoryDisplayName]
+  );
+  const refineSourceModelVersion = getHistoryModelVersion(refineDraftSourceItem || sourceForRefine);
+  const isRefineSourceVersionSupported = isRefineModelVersionSupported(refineSourceModelVersion);
+  const isRefineSourceTypeSupported =
+    !activeSourceType ||
+    REFINE_DIRECT_SOURCE_TYPES.has(activeSourceType) ||
+    UPSTREAM_SOURCE_TYPES.has(activeSourceType) ||
+    refineResolvedFromUpstream;
+  const isAlreadyRefinedSource = activeSourceType === "refine_model";
+  const refineBlockedBySelectedSource = mode === "refine" && (!refineSourceTaskId || !isRefineSourceTypeSupported || !isRefineSourceVersionSupported || isAlreadyRefinedSource);
+  const refineDisableReason = !refineSourceTaskId
     ? "Refine csak draft (texture OFF) modellen használható."
     : (!isRefineSourceTypeSupported ? `Refine ehhez a forrástípushoz nem támogatott: ${activeSourceType}` : "");
+
+  const effectiveRefineDisableReason = refineDisableReason ||
+    (isAlreadyRefinedSource ? "A már refine-olt modelleket nem lehet újra refine-olni." : "") ||
+    (!isRefineSourceVersionSupported ? `Refine csak Tripo v1.4 draft modellel működik. Ez a modell: ${refineSourceModelVersion}` : "");
+  const operationDisabledReason =
+    mode === "segment" && segmentActionTaskId && !isSegmentModelVersionSupported
+      ? `Segment csak P1 vagy v3 AI modellel generált 3D modellnél használható. Ez a modell: ${segmentActionModelVersion}`
+      : mode === "retopo" && retopoActionTaskId && !isRetopoModelVersionSupported
+        ? `Retopo csak P1 vagy v3 AI modellel generált 3D modellnél használható. Ez a modell: ${retopoActionModelVersion}`
+        : mode === "refine" && refineBlockedBySelectedSource
+          ? effectiveRefineDisableReason
+          : "";
 
   const textureSelectedTaskId = ((texId.trim() || activeTaskId) || "").trim();
   const textureSelectedItem = useMemo(() => {
@@ -618,25 +634,16 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       || (activeH?.taskId === textureSelectedTaskId || activeH?.id === textureSelectedTaskId ? activeH : null);
   }, [textureSelectedTaskId, history, optimisticItems, activeH]);
   const textureTargetItem = textureSelectedItem || activeH;
-  const textureSourceTaskId = useMemo(() => {
-    const selected = textureTargetItem;
-    const selectedType = selected?.params?.type;
-    const selectedMode = selected?.mode || selected?.params?.mode;
-    const upstreamId = selected?.params?.originalModelTaskId || selected?.params?.original_model_task_id;
-    const selectedHasOwnTexture = itemHasTextureMarker(selected);
-    if (selectedHasOwnTexture) {
-      return textureSelectedTaskId;
-    }
-    if (
-      upstreamId &&
-      (selectedMode === "retopo" ||
-        selectedType === "convert_model" ||
-        selectedType === "smart_low_poly")
-    ) {
-      return upstreamId;
-    }
-    return textureSelectedTaskId;
-  }, [textureTargetItem, textureSelectedTaskId, itemHasTextureMarker]);
+  const textureSourceResolution = useMemo(() => {
+    return resolveOperationSource({
+      operation: "texture",
+      selectedTaskId: textureSelectedTaskId,
+      selectedItem: textureTargetItem,
+      fallbackItem: activeH,
+      findHistoryItemByTaskKey,
+    });
+  }, [textureTargetItem, textureSelectedTaskId, activeH, findHistoryItemByTaskKey]);
+  const textureSourceTaskId = textureSourceResolution.taskId;
   const textureSourceItem = useMemo(() => {
     return findHistoryItemByTaskKey(textureSourceTaskId)
       || textureTargetItem
@@ -658,11 +665,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   useEffect(() => {
     if (mode !== "refine") return;
-    console.log("[TripoPanel][refine-debug]", {
+    logFrontendDebug("[TripoPanel][refine-debug]", {
       refineId,
       refineManualOverride,
       activeTaskId,
+      refineSelectedTaskId,
       refineSourceTaskId,
+      refineResolvedFromUpstream,
       sourceTaskId: sourceForRefine?.taskId || sourceForRefine?.id || null,
       sourceMode: sourceForRefine?.mode || sourceForRefine?.params?.mode || null,
       sourceType: sourceForRefine?.params?.type || null,
@@ -671,9 +680,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       hasTexture,
       isRefineSourceTypeSupported,
       refineBlockedBySelectedSource,
-      refineDisableReason,
+      refineDisableReason: effectiveRefineDisableReason,
     });
-  }, [mode, refineId, refineManualOverride, activeTaskId, refineSourceTaskId, sourceForRefine, hasTexture, isRefineSourceTypeSupported, refineBlockedBySelectedSource, refineDisableReason]);
+  }, [mode, refineId, refineManualOverride, activeTaskId, refineSelectedTaskId, refineSourceTaskId, refineResolvedFromUpstream, sourceForRefine, hasTexture, isRefineSourceTypeSupported, refineBlockedBySelectedSource, effectiveRefineDisableReason]);
 
   // Segment highlight state controlled manually via top-right toggle
   const [segmentHighlight, setSegmentHighlight] = useState(false);
@@ -798,11 +807,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         return genTab === "text" ? !!prompt.trim()
           : (batchImages?.length > 0 && batchImages.every(i => i.token));
       case "segment":
+        if (!isSegmentModelVersionSupported) return false;
         if (segSub === "fill_parts") {
-          return isFillPartsCompatible && !!(fillId.trim() || activeTaskId);
+          return isFillPartsCompatible && !!segmentActionTaskId;
         }
-        return !!(segId.trim() || activeTaskId);
-      case "retopo": return !!(retopoId.trim() || activeTaskId);
+        return !!segmentActionTaskId;
+      case "retopo":
+        if (!isRetopoModelVersionSupported) return false;
+        return !!retopoActionTaskId;
       case "texture":
         if (texSub === "paint") {
           return textureEditHasTexture &&
@@ -829,7 +841,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           (brushMode === "Paint Mode" || !!brushPrompt.trim());
       case "refine": {
         if (refineBlockedBySelectedSource) return false;
-        return !!(refineId.trim() || activeTaskId);
+        return !!refineSourceTaskId;
       }
       case "stylize": return !!(stylizeId.trim() || activeTaskId);
       case "animate": return !!riggedId && selAnim.size > 0;
@@ -837,7 +849,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, [mode, genTab, prompt, batchImages, segId, fillId, retopoId, isFillPartsCompatible,
     texId, texSub, texInputTab, texPrompt, imgToken, multiImages, editId, brushMode, brushPrompt,
-    refineId, stylizeId, riggedId, selAnim, activeTaskId, activeH, texPbr, textureSourceHasTexture, textureEditHasTexture, refineBlockedBySelectedSource, focusedInstanceId, _taskTick, submitLocked]);
+    refineId, refineSourceTaskId, stylizeId, riggedId, selAnim, activeTaskId, activeH, texPbr, textureSourceHasTexture, textureEditHasTexture, refineBlockedBySelectedSource, focusedInstanceId, _taskTick, submitLocked, isSegmentModelVersionSupported, isRetopoModelVersionSupported, segmentActionTaskId, retopoActionTaskId]);
 
 
 
@@ -1373,7 +1385,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setTexId(item.taskId); setAnimId(item.taskId); setEditId(item.taskId);
       setRefineId(item.taskId); setRefineManualOverride(false); setStylizeId(item.taskId);
     }
-    console.log("[TripoPanel][history-select]", {
+    logFrontendDebug("[TripoPanel][history-select]", {
       taskId: item?.taskId || null,
       mode: item?.mode || item?.params?.mode || null,
       type: item?.params?.type || null,
@@ -1415,6 +1427,17 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, [setSearchParams]);
 
+  const handleUseOriginalModel = useCallback(async (taskId) => {
+    const originalItem = findHistoryItemByTaskKey(taskId);
+    if (!originalItem) {
+      toast.error("Az original modell nincs a historyban.");
+      return;
+    }
+    applyHistorySelection(originalItem);
+    await loadHistoryIntoViewer(originalItem, { showLoading: true });
+    toast.success("Original model betoltve.");
+  }, [applyHistorySelection, findHistoryItemByTaskKey, loadHistoryIntoViewer]);
+
   const focusGeneratedHistoryItem = useCallback((item) => {
     if (!item) return;
     applyHistorySelection(item);
@@ -1424,7 +1447,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const handleGen = useCallback(async () => {
     if (!canGen) return;
     if (mode === "refine" && refineBlockedBySelectedSource) {
-      const msg = refineDisableReason || "Refine cannot run on this selected model.";
+      const msg = effectiveRefineDisableReason || "Refine cannot run on this selected model.";
       console.warn("[TripoPanel][refine-blocked-at-submit]", {
         msg,
         refineId,
@@ -1618,7 +1641,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 : multiImages.length > 0;
           if (texSub === "paint") {
             if (!textureEditHasTexture) {
-              throw new Error("Paint csak mar texturazott modellen hasznalhato.");
+              throw new Error("Paint csak már textúrázott modellen használható.");
             }
             body = {
               type: "texture_model",
@@ -1657,8 +1680,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           body = { 
             type: "refine_model", 
             draft_model_task_id: refineSourceTaskId,
-            ...(refinePrompt.trim() && { prompt: refinePrompt.trim() }),
-            ...(refineNegPrompt.trim() && { negative_prompt: refineNegPrompt.trim() }),
+            _sourceName: refineDraftDisplayName || refineSourceDisplayName,
           }; 
           break;
         case "stylize": body = { type: "stylize_model", original_model_task_id: (stylizeId.trim() || srcId), style: stylizeStyle }; break;
@@ -1693,7 +1715,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         estimatedCost,
         body,
       });
-      console.log(`[TripoPanel][handleGen] Submitting task: type=${body.type} model=${body.model_version} texture=${body.texture} pbr=${body.pbr} cost=${estimatedCost}`);
+      logFrontendDebug("[TripoPanel][handleGen] submitting task:", {
+        type: body.type,
+        model: body.model_version,
+        texture: body.texture,
+        pbr: body.pbr,
+        cost: estimatedCost,
+      });
 
       // Generate instanceId and label
       const instanceId = crypto.randomUUID();
@@ -1767,12 +1795,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       try {
         const headers = await authH();
         if (mode === "refine") {
-          console.log("[TripoPanel][refine-debug] submitting refine body:", {
+          logFrontendDebug("[TripoPanel][refine-debug] submitting refine body:", {
             type: body?.type,
             draft_model_task_id: body?.draft_model_task_id ?? null,
-            original_model_task_id: body?.original_model_task_id ?? null,
-            prompt: body?.prompt ?? null,
-            negative_prompt: body?.negative_prompt ?? null,
+            selected_task_id: refineSelectedTaskId || null,
+            resolved_from_upstream: refineResolvedFromUpstream,
           });
         }
         const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify(body) });
@@ -1859,7 +1886,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       submitLockedRef.current = false;
       setSubmitLocked(false);
     }
-  }, [canGen, mode, texSub, refineBlockedBySelectedSource, refineDisableReason, refineSourceTaskId, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError, textureSourceHasTexture, textureEditHasTexture, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH]);
+  }, [canGen, mode, texSub, refineBlockedBySelectedSource, effectiveRefineDisableReason, refineSourceTaskId, refineSelectedTaskId, refineResolvedFromUpstream, refineDraftDisplayName, refineSourceDisplayName, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getMaskBlob, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError, textureSourceHasTexture, textureEditHasTexture, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH]);
 
   const { rigCompatRef, getCompatibility, handleAutoRig } = useTripoRig({
     activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl,
@@ -1961,6 +1988,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       const stableDocId = `tripo_${inst.taskId}`;
       const isTextureOutput = inst.mode === "texture" || inst.snapshot?.type === "texture_model" || inst.snapshot?.texture === true;
       const originalModelTaskId = inst.snapshot?.original_model_task_id ?? undefined;
+      const draftModelTaskId = inst.snapshot?.draft_model_task_id ?? undefined;
       const sourceName = inst.snapshot?._sourceName || "";
       const modeLabel = inst.mode === "segment" ? "Segmentation" : inst.mode === "retopo" ? "Retopo" : "";
       const optimisticItem = {
@@ -1981,6 +2009,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           ...(inst.snapshot?.type && { type: inst.snapshot.type }),
           ...(inst.snapshot?.model_version && { model_version: inst.snapshot.model_version }),
           ...(originalModelTaskId && { originalModelTaskId }),
+          ...(draftModelTaskId && { draftModelTaskId }),
           ...(inst.snapshot?.generate_parts === true && { generate_parts: true, inParts: true }),
           ...(isTextureOutput && { texture: true }),
           ...(inst.snapshot?.pbr === true && { pbr: true }),
@@ -2039,6 +2068,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           type: inst.snapshot?.type ?? undefined,
           modelVer: inst.snapshot?.model_version ?? undefined,
           originalModelTaskId: inst.snapshot?.original_model_task_id ?? undefined,
+          draftModelTaskId: inst.snapshot?.draft_model_task_id ?? undefined,
           ...(inst.snapshot?.generate_parts === true && { generate_parts: true, inParts: true }),
           ...((inst.mode === "texture" || inst.snapshot?.type === "texture_model" || inst.snapshot?.texture === true) && { texture: true }),
           ...(inst.snapshot?.pbr === true && { pbr: true }),
@@ -2270,19 +2300,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           <div className="w-[72px] h-full flex flex-col bg-[#030308] border-r border-white/5">
             {NAV.map(n => {
               const Icon = n.icon;
-              const isN = modelVer !== "P1-20260311" && !modelVer.startsWith("v3.");
-              const actsAsN = isN && (n.id === "segment" || n.id === "retopo");
               return (
-                <Tooltip key={n.id} text={n.label + (actsAsN ? " (Not supported by Model V1/V2)" : "")} side="right">
+                <Tooltip key={n.id} text={n.label} side="right">
                   <button
                     onClick={() => {
-                      if (!actsAsN) {
-                        setMode(n.id);
-                        setLeftSecondaryOpen(true);
-                        if (isMobile) setRightOpen(false);
-                      }
+                      setMode(n.id);
+                      setLeftSecondaryOpen(true);
+                      if (isMobile) setRightOpen(false);
                     }}
-                    className={"tp-nav-btn" + (mode === n.id ? " active" : "") + (actsAsN ? " model-na" : "")}
+                    className={"tp-nav-btn" + (mode === n.id ? " active" : "")}
                   >
                     <div className="ico"><Icon style={{ width: 18, height: 18, color: mode === n.id ? "var(--accent-bright)" : "var(--text-muted)" }} /></div>
                     <span className="lbl">{n.label}</span>
@@ -2394,6 +2420,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   pbrTargetTaskId={textureSourceTaskId || textureSelectedTaskId || activeTaskId}
                   pbrTargetName={textureSourceDisplayName}
                   pbrTargetResolved={pbrSourceResolvedFromUpstream}
+                  onUseOriginalModel={() => handleUseOriginalModel(textureSourceTaskId)}
                   getIdToken={getIdToken}
                   texInputTab={texInputTab} setTexInputTab={setTexInputTab}
                   texPrompt={texPrompt} setTexPrompt={setTexPrompt}
@@ -2449,44 +2476,46 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                         <span className="text-red-400 font-black uppercase tracking-wider text-[10px]">Incompatibility Detected</span>
                       </div>
                       <p className="text-red-300/70 text-[10px] leading-relaxed">
-                        {refineDisableReason || "Refine only works on compatible draft sources."}
+                        {effectiveRefineDisableReason || "Refine only works on compatible draft sources."}
                       </p>
                     </div>
                   ) : (
                     <>
                       <div className="space-y-3">
-                        <div>
-                          <label className="text-zinc-500 font-black uppercase tracking-widest text-[9px] block mb-2 px-1">Refinement Prompt</label>
-                          <Enhancer
-                            value={refinePrompt}
-                            onChange={val => { setRefinePrompt(val); setErrorMsg?.(""); }}
-                            onNegativeChange={setRefineNegPrompt}
-                            onSubmit={() => canGen && handleGen()}
-                            color="#8b5cf6"
-                            getIdToken={getIdToken}
-                            enhancing_prompt={TRIPO_ENHANCE_PROMPT}
-                            super_enhancing_prompt={TRIPO_SUPER_ENHANCE_PROMPT}
-                            dechanting_prompt={TRIPO_SIMPLIFY_PROMPT}
-                            onBusyChange={() => { }}
-                          />
+                        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Activity className="w-3.5 h-3.5 text-cyan-300" />
+                            <span className="text-cyan-200 font-black uppercase tracking-wider text-[10px]">Schema Match</span>
+                          </div>
+                          <p className="text-zinc-500 text-[10px] leading-relaxed m-0">
+                            Refine sends only <span className="font-mono text-zinc-300">type: refine_model</span> and <span className="font-mono text-zinc-300">draft_model_task_id</span>. Prompt and negative prompt are not part of the Tripo refine schema.
+                          </p>
                         </div>
 
-                        <div>
-                          <label className="text-zinc-500 font-black uppercase tracking-widest text-[9px] block mb-2 px-1">Negative Prompt</label>
-                          <textarea
-                            className="tp-ta"
-                            placeholder="Specify details to remove during refinement..."
-                            value={refineNegPrompt}
-                            onChange={e => setRefineNegPrompt(e.target.value.slice(0, 250))}
-                            rows={2}
-                            maxLength={250}
-                            style={{
-                              border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12,
-                              background: "rgba(255,255,255,0.03)", fontSize: 11, resize: "none", width: "100%",
-                              boxSizing: "border-box", padding: "10px 12px",
-                              color: "#e8e0ff"
-                            }}
-                          />
+                        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10">
+                          <div className="flex items-center justify-between gap-3 mb-2">
+                            <span className="text-zinc-500 font-black uppercase tracking-widest text-[9px]">Resolved Draft Source</span>
+                            {refineResolvedFromUpstream && (
+                              <span className="text-[8px] font-black uppercase tracking-widest text-cyan-200 bg-cyan-400/10 border border-cyan-400/20 rounded-full px-2 py-1">Upstream</span>
+                            )}
+                          </div>
+                          <p className="text-white/85 text-[11px] font-bold truncate m-0">{refineDraftDisplayName || refineSourceDisplayName || "Selected model"}</p>
+                          <p className="text-[#5b5b78] text-[9px] font-mono truncate mt-1 mb-0">{refineSourceTaskId || "No draft task selected"}</p>
+                          {refineResolvedFromUpstream && (
+                            <p className="text-zinc-500 text-[10px] leading-relaxed mt-2 mb-0">
+                              The selected textured/post-process result is being refined through its original draft task.
+                            </p>
+                          )}
+                          {refineResolvedFromUpstream && (
+                            <motion.button
+                              type="button"
+                              whileTap={{ scale: 0.97 }}
+                              onClick={() => handleUseOriginalModel(refineSourceTaskId)}
+                              className="mt-3 w-full h-8 rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 text-[9px] font-black uppercase tracking-widest"
+                            >
+                              Use original model
+                            </motion.button>
+                          )}
                         </div>
                       </div>
                     </>
@@ -2657,7 +2686,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                         title={
                           activeTasksRunningCount >= PARALLEL_LIMIT
                             ? `Maximum párhuzamos taskok elérve (${PARALLEL_LIMIT}/${PARALLEL_LIMIT})`
-                            : (mode === "refine" && refineBlockedBySelectedSource ? refineDisableReason : undefined)
+                            : (operationDisabledReason || undefined)
                         }
                       >
                         {genLabel}
