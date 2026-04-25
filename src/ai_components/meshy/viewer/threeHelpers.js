@@ -759,7 +759,7 @@ export function applySegmentHighlight(s, show, edgeColor = 0x00ff88, options = {
   const applyMaterialToMesh = (mesh, index = 0) => {
     // Tripo models often group many segments into a single mesh with multiple material slots
     // or multiple geometry groups. We must ensure each part gets its own color.
-    
+
     // If the mesh has multiple geometry groups but only one material, 
     // expand it to a material array so each group can have a unique color.
     if (!Array.isArray(mesh.material) && mesh.geometry?.groups?.length > 1) {

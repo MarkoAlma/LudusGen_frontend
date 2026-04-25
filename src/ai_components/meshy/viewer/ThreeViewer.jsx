@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
 import {
   syncCamera, buildPlaceholder,
   createSunLight,
@@ -16,11 +17,25 @@ import {
   modelHasTextures, modelHasUvOverlapSuspicion,
 } from './threeHelpers';
 
+const PAINT_SURFACE_MAX_SIZE = 1024;
+const PAINT_TEXTURE_UPLOAD_INTERVAL_MS = 32;
+const MAX_PAINT_DECALS = 700;
+
 function getImageSize(image) {
   return {
     width: image?.naturalWidth || image?.videoWidth || image?.width || 0,
     height: image?.naturalHeight || image?.videoHeight || image?.height || 0,
   };
+}
+
+function getTransparentPaintColor(color) {
+  const match = /^#?([0-9a-f]{6})$/i.exec(String(color || ""));
+  if (!match) return "rgba(255,255,255,0)";
+  const hex = match[1];
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},0)`;
 }
 
 function paintCanvasHasPixels(canvas) {
@@ -79,7 +94,7 @@ function getPaintSurfaceKey(meshUuid, materialIndex = 0) {
   return `${meshUuid}:${materialIndex}`;
 }
 
-function getPaintCanvasSize(material, maxSize = 2048) {
+function getPaintCanvasSize(material, maxSize = PAINT_SURFACE_MAX_SIZE) {
   const source = getTextureSourceFromMaterial(material);
   const sourceWidth = source?.width || 1024;
   const sourceHeight = source?.height || 1024;
@@ -102,6 +117,121 @@ function createPaintOverlayMaterial(THREE, texture = null, opacity = 1) {
     polygonOffsetUnits: -1,
     side: THREE.DoubleSide,
   });
+}
+
+function requestPaintTextureUpdate(state, surface, { immediate = false } = {}) {
+  if (!state || !surface?.texture) return;
+
+  surface.pendingPaintUpload = true;
+
+  const upload = () => {
+    surface.uploadTimer = null;
+    if (!state._paintSurfaces?.has(surface.key)) return;
+    surface.texture.needsUpdate = true;
+    surface.lastTextureUploadAt = performance.now();
+    surface.pendingPaintUpload = false;
+    state.markDirty?.();
+  };
+
+  if (immediate) {
+    if (surface.uploadTimer) {
+      clearTimeout(surface.uploadTimer);
+      surface.uploadTimer = null;
+    }
+    upload();
+    return;
+  }
+
+  const elapsed = performance.now() - (surface.lastTextureUploadAt || 0);
+  if (elapsed >= PAINT_TEXTURE_UPLOAD_INTERVAL_MS) {
+    upload();
+    return;
+  }
+
+  if (!surface.uploadTimer) {
+    surface.uploadTimer = setTimeout(upload, PAINT_TEXTURE_UPLOAD_INTERVAL_MS - elapsed);
+  }
+}
+
+function flushPendingPaintTextureUploads(state) {
+  state?._paintSurfaces?.forEach((surface) => {
+    if (surface.pendingPaintUpload || surface.uploadTimer) {
+      requestPaintTextureUpdate(state, surface, { immediate: true });
+    }
+  });
+}
+
+function getWorldBrushSize(state, hit, brushSizePx) {
+  const camera = state?.camera;
+  const renderer = state?.renderer;
+  const canvasHeight = renderer?.domElement?.clientHeight || 720;
+  const distance = camera?.position?.distanceTo?.(hit.point) || 1;
+  const fov = THREE.MathUtils.degToRad(camera?.fov || 45);
+  const visibleHeight = 2 * Math.tan(fov / 2) * distance;
+  const worldPerPixel = visibleHeight / Math.max(1, canvasHeight);
+  return Math.max(0.01, brushSizePx * worldPerPixel);
+}
+
+function getHitWorldNormal(hit) {
+  const normal = hit.face?.normal?.clone?.() || new THREE.Vector3(0, 0, 1);
+  const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+  return normal.applyMatrix3(normalMatrix).normalize();
+}
+
+function createPaintDecal(state, hit, color, brushSizePx, opacity = 1) {
+  if (!state || !hit?.object || !hit.point) return null;
+
+  const normal = getHitWorldNormal(hit);
+  const position = hit.point.clone().addScaledVector(normal, 0.002);
+  const helper = new THREE.Object3D();
+  helper.position.copy(position);
+  helper.lookAt(position.clone().add(normal));
+
+  const worldSize = getWorldBrushSize(state, hit, brushSizePx);
+  const geometry = new DecalGeometry(
+    hit.object,
+    position,
+    helper.rotation,
+    new THREE.Vector3(worldSize, worldSize, Math.max(worldSize * 0.45, 0.01)),
+  );
+  if (!geometry.attributes.position?.count) {
+    geometry.dispose();
+    return null;
+  }
+
+  const material = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: Math.max(0.01, Math.min(1, opacity)),
+    depthTest: true,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
+    side: THREE.DoubleSide,
+  });
+  const decal = new THREE.Mesh(geometry, material);
+  decal.renderOrder = 30;
+  decal.userData._isPaintDecal = true;
+  state.scene.add(decal);
+
+  if (!state._paintDecals) state._paintDecals = [];
+  state._paintDecals.push(decal);
+  if (state._paintDecals.length > MAX_PAINT_DECALS) {
+    const old = state._paintDecals.shift();
+    old?.parent?.remove(old);
+    old?.geometry?.dispose?.();
+    old?.material?.dispose?.();
+  }
+
+  state.markDirty?.();
+  return decal;
+}
+
+function disposePaintDecal(decal) {
+  decal?.parent?.remove(decal);
+  decal?.geometry?.dispose?.();
+  decal?.material?.dispose?.();
 }
 
 function getEmptyPaintMaterial(state) {
@@ -147,6 +277,9 @@ function getOrCreatePaintSurface(state, mesh, materialIndex = 0) {
     texture,
     material,
     touchedAt: 0,
+    lastTextureUploadAt: 0,
+    pendingPaintUpload: false,
+    uploadTimer: null,
   };
   state._paintSurfaces.set(key, surface);
   applyPaintSurfaceToOverlay(state, mesh.uuid, materialIndex, material);
@@ -165,14 +298,19 @@ function getLatestPaintSurface(state) {
 function disposePaintResources(state) {
   if (!state) return;
   state._paintOverlayMeshes?.forEach((mesh) => mesh.parent?.remove(mesh));
+  state._paintDecals?.forEach(disposePaintDecal);
+  state._paintDecals = [];
   state._paintOverlayMeshes = null;
   state._paintOverlayByMesh = new Map();
   state._paintMeshes = null;
   state._paintActive = false;
+  state._paintStrokeCount = 0;
   state._currentPaintStroke = null;
+  state._currentPaintDecals = null;
   state._lastPaintTarget = null;
   state._lastPaintUV = null;
   state._paintSurfaces?.forEach((surface) => {
+    if (surface.uploadTimer) clearTimeout(surface.uploadTimer);
     surface.texture?.dispose?.();
     surface.material?.dispose?.();
   });
@@ -184,7 +322,230 @@ function disposePaintResources(state) {
   state.paintTexture = null;
 }
 
-async function createPaintedTextureBlob(state, maxSize = 2048) {
+function canvasToBlob(canvas, mimeType = 'image/png', quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('Canvas export failed'));
+    }, mimeType, quality);
+  });
+}
+
+function roundTextureEditDimension(value) {
+  return Math.max(512, Math.round(value / 16) * 16);
+}
+
+function getTextureEditExportSize(sourceWidth, sourceHeight, options = {}) {
+  const maxSize = options.maxSize || 1536;
+  const minLongEdge = options.minLongEdge || 1024;
+  const longEdge = Math.max(sourceWidth || 1024, sourceHeight || 1024);
+  const grow = longEdge < minLongEdge ? minLongEdge / longEdge : 1;
+  const shrink = longEdge * grow > maxSize ? maxSize / (longEdge * grow) : 1;
+  const scale = grow * shrink;
+  return {
+    width: roundTextureEditDimension((sourceWidth || 1024) * scale),
+    height: roundTextureEditDimension((sourceHeight || 1024) * scale),
+  };
+}
+
+function drawBaseTextureToCanvas(state, targetMaterial, width, height) {
+  const base = getTextureSourceFromMaterial(targetMaterial) || getLargestDiffuseMap(state);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  if (base?.image) {
+    try {
+      ctx.drawImage(base.image, 0, 0, width, height);
+      return { canvas, width, height, base };
+    } catch {
+      // Cross-origin fallback keeps the pipeline usable for textureless or tainted images.
+    }
+  }
+
+  ctx.fillStyle = getFallbackMaterialColor(state, targetMaterial);
+  ctx.fillRect(0, 0, width, height);
+  return { canvas, width, height, base: null };
+}
+
+function createPaintMaskCanvas(paintCanvas, width, height) {
+  const resized = document.createElement('canvas');
+  resized.width = width;
+  resized.height = height;
+  const resizedCtx = resized.getContext('2d', { willReadFrequently: true });
+  resizedCtx.imageSmoothingEnabled = true;
+  resizedCtx.imageSmoothingQuality = 'high';
+  resizedCtx.drawImage(paintCanvas, 0, 0, width, height);
+
+  const src = resizedCtx.getImageData(0, 0, width, height);
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = width;
+  outCanvas.height = height;
+  const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
+  const out = outCtx.createImageData(width, height);
+
+  for (let i = 0; i < src.data.length; i += 4) {
+    const alpha = src.data[i + 3];
+    out.data[i] = 255;
+    out.data[i + 1] = 255;
+    out.data[i + 2] = 255;
+    out.data[i + 3] = 255 - alpha;
+  }
+
+  outCtx.putImageData(out, 0, 0);
+  return outCanvas;
+}
+
+async function createTexturePaintEditPackageFromSurface(state, surface, options = {}) {
+  const paintCanvas = surface?.canvas;
+  if (!surface || !paintCanvasHasPixels(paintCanvas)) return null;
+
+  const targetMaterial = surface.baseMaterial || getTargetMaterial(state, surface);
+  const source = getTextureSourceFromMaterial(targetMaterial) || getLargestDiffuseMap(state);
+  const sourceWidth = source?.width || paintCanvas.width || 1024;
+  const sourceHeight = source?.height || paintCanvas.height || 1024;
+  const { width, height } = getTextureEditExportSize(sourceWidth, sourceHeight, options);
+  const base = drawBaseTextureToCanvas(state, targetMaterial, width, height);
+  if (!base?.canvas) return null;
+
+  const maskCanvas = createPaintMaskCanvas(paintCanvas, width, height);
+  const guideCanvas = document.createElement('canvas');
+  guideCanvas.width = width;
+  guideCanvas.height = height;
+  const guideCtx = guideCanvas.getContext('2d');
+  guideCtx.drawImage(base.canvas, 0, 0);
+  guideCtx.drawImage(paintCanvas, 0, 0, width, height);
+
+  const [baseBlob, maskBlob, guideBlob] = await Promise.all([
+    canvasToBlob(base.canvas, 'image/png'),
+    canvasToBlob(maskCanvas, 'image/png'),
+    canvasToBlob(guideCanvas, 'image/png'),
+  ]);
+
+  return {
+    baseBlob,
+    maskBlob,
+    guideBlob,
+    width,
+    height,
+    surfaceKey: surface.key,
+    meshUuid: surface.meshUuid,
+    materialIndex: surface.materialIndex,
+  };
+}
+
+async function createTexturePaintEditPackage(state, options = {}) {
+  const target = state?._lastPaintTarget;
+  const targetKey = target ? getPaintSurfaceKey(target.meshUuid, target.materialIndex) : null;
+  const surface = (targetKey && state?._paintSurfaces?.get(targetKey)) || getLatestPaintSurface(state);
+  return createTexturePaintEditPackageFromSurface(state, surface, options);
+}
+
+async function createTexturePaintEditPackages(state, options = {}) {
+  const surfaces = [...(state?._paintSurfaces?.values() || [])]
+    .filter((surface) => paintCanvasHasPixels(surface.canvas))
+    .sort((a, b) => a.touchedAt - b.touchedAt);
+  const packages = await Promise.all(
+    surfaces.map((surface) => createTexturePaintEditPackageFromSurface(state, surface, options))
+  );
+  return packages.filter(Boolean);
+}
+
+function loadImageFromSource(source) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Edited texture image could not be loaded'));
+    img.src = source;
+  });
+}
+
+function findMeshByUuid(state, uuid) {
+  let found = null;
+  state?.model?.traverse((node) => {
+    if (!found && node.isMesh && node.uuid === uuid) found = node;
+  });
+  return found;
+}
+
+function setMaterialAtIndex(matOrMats, index, updater) {
+  if (Array.isArray(matOrMats)) {
+    const mat = matOrMats[index] || matOrMats[0];
+    if (mat) updater(mat);
+    return matOrMats;
+  }
+  if (matOrMats) updater(matOrMats);
+  return matOrMats;
+}
+
+async function applyEditedTextureImage(state, source, target = null) {
+  if (!state) return false;
+  const surface = target?.surfaceKey
+    ? state._paintSurfaces?.get(target.surfaceKey)
+    : getLatestPaintSurface(state);
+  const meshUuid = target?.meshUuid || surface?.meshUuid;
+  const materialIndex = Math.max(0, target?.materialIndex ?? surface?.materialIndex ?? 0);
+  if (!meshUuid) return false;
+
+  const mesh = findMeshByUuid(state, meshUuid);
+  const targetMaterial = surface?.baseMaterial || getTargetMaterial(state, { meshUuid, materialIndex });
+  if (!mesh || !targetMaterial) return false;
+
+  const img = await loadImageFromSource(source);
+  const sourceMap = targetMaterial.map || null;
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth || img.width || 1024;
+  canvas.height = img.naturalHeight || img.height || 1024;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const texture = new state.THREE.CanvasTexture(canvas);
+  texture.colorSpace = state.THREE.SRGBColorSpace;
+  texture.flipY = sourceMap?.flipY ?? false;
+  texture.wrapS = sourceMap?.wrapS ?? state.THREE.ClampToEdgeWrapping;
+  texture.wrapT = sourceMap?.wrapT ?? state.THREE.ClampToEdgeWrapping;
+  texture.minFilter = sourceMap?.minFilter ?? state.THREE.LinearMipmapLinearFilter;
+  texture.magFilter = sourceMap?.magFilter ?? state.THREE.LinearFilter;
+  texture.generateMipmaps = sourceMap?.generateMipmaps ?? true;
+  if (sourceMap?.repeat) texture.repeat.copy(sourceMap.repeat);
+  if (sourceMap?.offset) texture.offset.copy(sourceMap.offset);
+  if (sourceMap?.center) texture.center.copy(sourceMap.center);
+  if (Number.isFinite(sourceMap?.rotation)) texture.rotation = sourceMap.rotation;
+  texture.needsUpdate = true;
+
+  const applyMap = (mat) => {
+    mat.map = texture;
+    mat.color?.set?.(0xffffff);
+    mat.needsUpdate = true;
+  };
+
+  setMaterialAtIndex(state.origMaterials?.get(meshUuid), materialIndex, applyMap);
+  if (state._currentViewMode === 'normal') {
+    setMaterialAtIndex(mesh.material, materialIndex, applyMap);
+  }
+
+  state._uvMats?.delete?.(meshUuid);
+  if (state._currentViewMode === 'uv') {
+    applyViewMode(state, 'uv');
+  } else if (state._currentViewMode === 'normal') {
+    applyViewMode(state, 'normal');
+  }
+
+  state.markDirty?.();
+  return true;
+}
+
+async function createPaintedTextureBlob(state, options = {}) {
+  const {
+    maxSize = 2048,
+    mimeType = 'image/png',
+    quality,
+  } = typeof options === 'number' ? { maxSize: options } : options;
   const target = state?._lastPaintTarget;
   const targetKey = target ? getPaintSurfaceKey(target.meshUuid, target.materialIndex) : null;
   const surface = (targetKey && state?._paintSurfaces?.get(targetKey)) || getLatestPaintSurface(state);
@@ -226,7 +587,7 @@ async function createPaintedTextureBlob(state, maxSize = 2048) {
     canvas.toBlob((blob) => {
       if (blob) resolve(blob);
       else reject(new Error('Painted texture export failed'));
-    }, 'image/png');
+    }, mimeType, quality);
   });
 }
 
@@ -385,7 +746,11 @@ const ThreeViewer = memo(forwardRef(({
         _paintMeshes: null,
         _paintSurfaces: new Map(),
         _paintOverlayByMesh: new Map(),
+        _paintDecals: [],
+        _paintStrokeCount: 0,
         _currentPaintStroke: null,
+        _currentPaintDecals: null,
+        _hasUvOverlap: false,
         // Smooth camera targets
         camTarget: { ...cam },
         lerpFactor: 0.08,
@@ -527,6 +892,7 @@ const ThreeViewer = memo(forwardRef(({
       });
       resizeObs.observe(el);
 
+      attachViewerApi();
       if (onReady) onReady(S.current);
     })().catch(console.error);
 
@@ -641,12 +1007,14 @@ const ThreeViewer = memo(forwardRef(({
         console.warn('ThreeViewer: nem modell URL, kihagyva:', modelUrl);
         onTextureAvailabilityChange?.(false);
         onUvOverlapChange?.(false);
+        if (S.current) S.current._hasUvOverlap = false;
         if (onNonGlbUrl) onNonGlbUrl(modelUrl, ext);
         return;
       }
     }
     onTextureAvailabilityChange?.(false);
     onUvOverlapChange?.(false);
+    if (S.current) S.current._hasUvOverlap = false;
     disposePaintResources(S.current);
     loadGLB(
       S.current,
@@ -661,8 +1029,10 @@ const ThreeViewer = memo(forwardRef(({
       segmentHighlight,
       segmentEdgeColor,
       (model) => {
+        const hasUvOverlap = modelHasUvOverlapSuspicion(model);
+        if (S.current) S.current._hasUvOverlap = hasUvOverlap;
         onTextureAvailabilityChange?.(modelHasTextures(model));
-        onUvOverlapChange?.(modelHasUvOverlapSuspicion(model));
+        onUvOverlapChange?.(hasUvOverlap);
       }
     );
     if (onAnimClipsDetected) {
@@ -744,6 +1114,7 @@ const ThreeViewer = memo(forwardRef(({
     // after raycast resolves the actual mesh/material target.
     if (dragMode === 'paint') {
       S.current._currentPaintStroke = new Map();
+      S.current._currentPaintDecals = [];
       _doPaint(e);
     }
   }, [onSpinStop]);
@@ -772,7 +1143,7 @@ const ThreeViewer = memo(forwardRef(({
       const solidStop = (hardness / 100) * 0.9;
       const grad = ctx.createRadialGradient(r, r, r * Math.max(0.01, solidStop), r, r, r);
       grad.addColorStop(0, color);
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, getTransparentPaintColor(color));
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(r, r, r * Math.max(0.01, solidStop), 0, Math.PI * 2);
@@ -811,20 +1182,24 @@ const ThreeViewer = memo(forwardRef(({
     if (meshes.length === 0) return;
     raycaster.firstHitOnly = true;
     const intersects = raycaster.intersectObjects(meshes, false);
-    if (intersects.length === 0 || !intersects[0].uv) return;
+    if (intersects.length === 0) return;
 
     const { paintColor: pc, paintSize: ps, paintOpacity: po = 0.35, paintHardness: ph = 60 } = paintRef.current;
     const hit = intersects[0];
     const materialIndex = Math.max(0, hit.face?.materialIndex ?? 0);
     S.current._lastPaintTarget = { meshUuid: hit.object.uuid, materialIndex };
+
+    // Removing DecalGeometry approach as it causes severe lag during pointermove
+    // and bypasses the UV canvas, resulting in empty mask exports.
+
+    if (!hit.uv) return;
     const surface = getOrCreatePaintSurface(S.current, hit.object, materialIndex);
     const cvs = surface?.canvas;
     if (!cvs) return;
     const ctx2d = cvs.getContext('2d');
     const curX = hit.uv.x * cvs.width;
     const curY = (1 - hit.uv.y) * cvs.height;
-    const brushScale = Math.max(cvs.width, cvs.height) / 512;
-    const radius = Math.max(0.5, ps * brushScale);
+    const radius = Math.max(0.5, ps / 2);
     const stamp = _getStamp(pc, radius, ph);
     const stampR = stamp.width / 2;
 
@@ -838,6 +1213,41 @@ const ThreeViewer = memo(forwardRef(({
 
     const prevAlpha = ctx2d.globalAlpha;
     ctx2d.globalAlpha = Math.max(0.01, Math.min(1, po));
+
+    const finishPaintStroke = () => {
+      ctx2d.globalAlpha = prevAlpha;
+      S.current._lastPaintUV = { x: curX, y: curY, sx: e.clientX, sy: e.clientY, targetKey: surface.key };
+      surface.touchedAt = Date.now();
+      S.current._paintStrokeCount = (S.current._paintStrokeCount || 0) + 1;
+      requestPaintTextureUpdate(S.current, surface);
+    };
+
+    const drawInterpolatedStamp = () => {
+      const last = S.current._lastPaintUV;
+      const screenOk = last && last.targetKey === surface.key && Math.hypot(e.clientX - last.sx, e.clientY - last.sy) < 80;
+
+      if (last && screenOk) {
+        const dx = curX - last.x;
+        const dy = curY - last.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < cvs.width * 0.25) {
+          const step = Math.max(1, radius * 0.4);
+          const steps = Math.ceil(dist / step);
+          for (let i = 0; i <= steps; i++) {
+            const t = steps === 0 ? 1 : i / steps;
+            ctx2d.drawImage(stamp, last.x + dx * t - stampR, last.y + dy * t - stampR);
+          }
+        } else {
+          ctx2d.drawImage(stamp, curX - stampR, curY - stampR);
+        }
+      } else {
+        ctx2d.drawImage(stamp, curX - stampR, curY - stampR);
+      }
+    };
+
+    // We always use the 3D-proximity triangle masking to prevent UV mirroring,
+    // even if the heuristic didn't confidently detect UV overlap, because
+    // missing an overlap causes catastrophic painting behavior (drawing everywhere).
 
     // ── 3D-PROXIMITY TRIANGLE MASKING ─────────────────────────────────────
     // Instead of painting the stamp at the raw UV hit point (which bleeds
@@ -888,11 +1298,28 @@ const ThreeViewer = memo(forwardRef(({
     const worldPerPx = _faceWorldSize / _faceUvSize;
     const worldBrushR = radius * worldPerPx * 1.15; // slight padding
 
-    // Collect nearby-triangle UV footprints
+    // Collect nearby-triangle UV footprints to prevent painting on mirrored/overlapping UVs
     const triCount = indexAttr ? indexAttr.count / 3 : posAttr.count / 3;
     const nearbyTriUvs = []; // [{ax,ay, bx,by, cx,cy}]
+
+    // Always include the exact hit face
+    if (hit.face && uvAttr) {
+      const uva = new THREE.Vector2().fromBufferAttribute(uvAttr, hit.face.a);
+      const uvb = new THREE.Vector2().fromBufferAttribute(uvAttr, hit.face.b);
+      const uvc = new THREE.Vector2().fromBufferAttribute(uvAttr, hit.face.c);
+      nearbyTriUvs.push({
+        ax: uva.x * cvs.width, ay: (1 - uva.y) * cvs.height,
+        bx: uvb.x * cvs.width, by: (1 - uvb.y) * cvs.height,
+        cx: uvc.x * cvs.width, cy: (1 - uvc.y) * cvs.height,
+      });
+    }
+
     const _v = new THREE.Vector3();
     const _va = new THREE.Vector3(), _vb = new THREE.Vector3(), _vc = new THREE.Vector3();
+    const hitNormal = hit.face ? hit.face.normal.clone() : new THREE.Vector3(0, 0, 1);
+    const _triNormal = new THREE.Vector3();
+    const _edge1 = new THREE.Vector3();
+    const _edge2 = new THREE.Vector3();
 
     for (let t = 0; t < triCount; t++) {
       const ia = indexAttr ? indexAttr.getX(t * 3) : t * 3;
@@ -916,15 +1343,29 @@ const ThreeViewer = memo(forwardRef(({
         _vb.applyMatrix4(mesh.matrixWorld);
         _vc.applyMatrix4(mesh.matrixWorld);
       }
+
+      // Compute face normal to prevent bleeding through thin geometry
+      _edge1.subVectors(_vb, _va);
+      _edge2.subVectors(_vc, _va);
+      _triNormal.crossVectors(_edge1, _edge2).normalize();
+
+      // If the triangle faces away from the hit surface (e.g. back of the arm), ignore it
+      if (_triNormal.dot(hitNormal) < 0.2) continue;
+
       // Triangle centre
       _v.set((_va.x + _vb.x + _vc.x) / 3, (_va.y + _vb.y + _vc.y) / 3, (_va.z + _vb.z + _vc.z) / 3);
       const distToHit = _v.distanceTo(hitPoint3D);
+
       // Also check individual vertices — for very large tris the centre
       // can be far but a vertex can be right under the brush.
       const minVertDist = Math.min(_va.distanceTo(hitPoint3D), _vb.distanceTo(hitPoint3D), _vc.distanceTo(hitPoint3D));
       if (distToHit > worldBrushR && minVertDist > worldBrushR) continue;
 
       if (!uvAttr) continue;
+
+      // Avoid adding the hit face twice
+      if (hit.face && hit.face.a === ia && hit.face.b === ib && hit.face.c === ic) continue;
+
       const uva = new THREE.Vector2().fromBufferAttribute(uvAttr, ia);
       const uvb = new THREE.Vector2().fromBufferAttribute(uvAttr, ib);
       const uvc = new THREE.Vector2().fromBufferAttribute(uvAttr, ic);
@@ -937,7 +1378,7 @@ const ThreeViewer = memo(forwardRef(({
 
     if (nearbyTriUvs.length === 0) {
       // Fallback: if no nearby tris found (e.g. no UV attr), paint naively
-      ctx2d.drawImage(stamp, curX - stampR, curY - stampR);
+      drawInterpolatedStamp();
     } else {
       // Build a clipping path from nearby triangle UV footprints, then
       // draw the stamp only inside that region.
@@ -952,34 +1393,11 @@ const ThreeViewer = memo(forwardRef(({
       ctx2d.clip();
 
       // Paint with interpolation from last point (smooth strokes)
-      const last = S.current._lastPaintUV;
-      const screenOk = last && last.targetKey === surface.key && Math.hypot(e.clientX - last.sx, e.clientY - last.sy) < 80;
-
-      if (last && screenOk) {
-        const dx = curX - last.x;
-        const dy = curY - last.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < cvs.width * 0.25) {
-          const step = Math.max(1, radius * 0.4);
-          const steps = Math.ceil(dist / step);
-          for (let i = 0; i <= steps; i++) {
-            const t = steps === 0 ? 1 : i / steps;
-            ctx2d.drawImage(stamp, last.x + dx * t - stampR, last.y + dy * t - stampR);
-          }
-        } else {
-          ctx2d.drawImage(stamp, curX - stampR, curY - stampR);
-        }
-      } else {
-        ctx2d.drawImage(stamp, curX - stampR, curY - stampR);
-      }
+      drawInterpolatedStamp();
       ctx2d.restore();
     }
 
-    ctx2d.globalAlpha = prevAlpha;
-    S.current._lastPaintUV = { x: curX, y: curY, sx: e.clientX, sy: e.clientY, targetKey: surface.key };
-    surface.touchedAt = Date.now();
-    surface.texture.needsUpdate = true;
-    S.current.markDirty();
+    finishPaintStroke();
   }, []);
 
   const _doPaint = useCallback((e) => {
@@ -1032,12 +1450,18 @@ const ThreeViewer = memo(forwardRef(({
 
   const onPointerUp = useCallback(() => {
     if (S.current) {
-      if (S.current._currentPaintStroke?.size) {
+      if (S.current._currentPaintDecals?.length) {
+        if (!S.current._paintHistory) S.current._paintHistory = [];
+        S.current._paintHistory.push({ type: 'decals', decals: [...S.current._currentPaintDecals] });
+        if (S.current._paintHistory.length > 20) S.current._paintHistory.shift();
+      } else if (S.current._currentPaintStroke?.size) {
         if (!S.current._paintHistory) S.current._paintHistory = [];
         S.current._paintHistory.push([...S.current._currentPaintStroke.values()]);
         if (S.current._paintHistory.length > 20) S.current._paintHistory.shift();
       }
+      flushPendingPaintTextureUploads(S.current);
       S.current._currentPaintStroke = null;
+      S.current._currentPaintDecals = null;
       S.current.drag.active = false;
       S.current._lastPaintUV = null;
     }
@@ -1054,57 +1478,123 @@ const ThreeViewer = memo(forwardRef(({
   // ── CACHED BRUSH CURSOR ─────────────────────────────────────────────
   const _cursorCacheRef = useRef({ val: 'crosshair', color: '', size: 0 });
 
-  const getBrushCursor = () => {
-    const { paintMode: pm, paintColor: pc, paintSize: ps } = paintRef.current;
+  const getBrushCursor = (cursorState = paintRef.current) => {
+    const { paintMode: pm, paintColor: pc, paintSize: ps } = cursorState;
     if (!pm) return 'crosshair';
     const cc = _cursorCacheRef.current;
     if (cc.color === pc && cc.size === ps) return cc.val;
-    const diam = Math.max(12, Math.min(128, Math.round(ps * 2)));
+    const diam = Math.max(4, Math.min(160, Math.round(ps)));
     const r = diam / 2;
-    const circleR = Math.max(1, r - 0.5);
+    const circleR = Math.max(1, r - 1);
     // Solid filled circle — single flat colour, no shadow, no glow
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${diam}' height='${diam}' viewBox='0 0 ${diam} ${diam}'><circle cx='${r}' cy='${r}' r='${circleR}' fill='${pc}' fill-opacity='0.55' stroke='${pc}' stroke-width='1'/></svg>`;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${diam}' height='${diam}' viewBox='0 0 ${diam} ${diam}'><circle cx='${r}' cy='${r}' r='${circleR}' fill='none' stroke='${pc}' stroke-width='1.5'/></svg>`;
     cc.val = `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${r} ${r}, crosshair`;
     cc.color = pc; cc.size = ps;
     return cc.val;
   };
 
   const getCursor = () => {
-    const { paintMode: pm } = paintRef.current;
-    if (pm && (!S.current?.drag?.active || S.current?.drag?.mode === 'paint')) return getBrushCursor();
+    const currentPaint = { paintMode, paintColor, paintSize };
+    if (paintMode && (!S.current?.drag?.active || S.current?.drag?.mode === 'paint')) return getBrushCursor(currentPaint);
     if (!S.current?.drag?.active) return 'grab';
-    if (S.current.drag.mode === 'paint') return getBrushCursor();
+    if (S.current.drag.mode === 'paint') return getBrushCursor(currentPaint);
     return S.current.drag.mode === 'model' ? 'ew-resize' : 'grabbing';
   };
 
-  useImperativeHandle(ref, () => ({
-    undoPaint: () => {
-      if (!S.current?._paintHistory?.length) return;
-      const stroke = S.current._paintHistory.pop();
-      stroke.forEach(({ key, imageData }) => {
-        const surface = S.current._paintSurfaces?.get(key);
-        const ctx = surface?.canvas?.getContext('2d');
-        if (!surface || !ctx) return;
-        ctx.putImageData(imageData, 0, 0);
-        surface.texture.needsUpdate = true;
+  const undoPaint = useCallback(() => {
+    if (!S.current?._paintHistory?.length) return;
+    const stroke = S.current._paintHistory.pop();
+    if (stroke?.type === 'decals') {
+      stroke.decals?.forEach((decal) => {
+        disposePaintDecal(decal);
+        const idx = S.current._paintDecals?.indexOf(decal) ?? -1;
+        if (idx >= 0) S.current._paintDecals.splice(idx, 1);
       });
+      S.current._paintStrokeCount = Math.max(0, (S.current._paintStrokeCount || 0) - (stroke.decals?.length || 0));
       S.current.markDirty();
-    },
-    clearPaint: () => {
-      if (!S.current?._paintSurfaces) return;
-      S.current._paintSurfaces.forEach((surface) => {
-        const ctx = surface.canvas.getContext('2d');
-        ctx.clearRect(0, 0, surface.canvas.width, surface.canvas.height);
-        surface.texture.needsUpdate = true;
-      });
-      S.current._paintHistory = [];
-      S.current._lastPaintTarget = null;
-      S.current.markDirty();
-      },
-    hasModelTextures: () => modelHasTextures(S.current?.model),
-    hasPaintStrokes: () => !!getLatestPaintSurface(S.current),
-    getPaintedTextureBlob: () => createPaintedTextureBlob(S.current),
-  }));
+      return;
+    }
+    stroke.forEach(({ key, imageData }) => {
+      const surface = S.current._paintSurfaces?.get(key);
+      const ctx = surface?.canvas?.getContext('2d');
+      if (!surface || !ctx) return;
+      ctx.putImageData(imageData, 0, 0);
+      requestPaintTextureUpdate(S.current, surface, { immediate: true });
+    });
+    if (!getLatestPaintSurface(S.current)) S.current._paintStrokeCount = 0;
+    S.current.markDirty();
+  }, []);
+
+  const clearPaint = useCallback(() => {
+    if (!S.current?._paintSurfaces) return;
+    const emptyPaintMat = getEmptyPaintMaterial(S.current);
+    S.current._paintDecals?.forEach(disposePaintDecal);
+    S.current._paintDecals = [];
+    S.current._paintSurfaces.forEach((surface) => {
+      if (surface.uploadTimer) clearTimeout(surface.uploadTimer);
+      const ctx = surface.canvas.getContext('2d');
+      ctx.clearRect(0, 0, surface.canvas.width, surface.canvas.height);
+      surface.touchedAt = 0;
+      surface.texture.needsUpdate = true;
+      surface.texture?.dispose?.();
+      surface.material?.dispose?.();
+      applyPaintSurfaceToOverlay(S.current, surface.meshUuid, surface.materialIndex, emptyPaintMat);
+    });
+    S.current._paintSurfaces = new Map();
+    S.current._paintHistory = [];
+    S.current._lastPaintTarget = null;
+    S.current._paintStrokeCount = 0;
+    S.current._currentPaintStroke = null;
+    S.current._currentPaintDecals = null;
+    S.current._lastPaintUV = null;
+    _paintQueueRef.current = null;
+    S.current.markDirty();
+  }, []);
+
+  const hasPaintStrokes = useCallback(() => {
+    if (_paintQueueRef.current) _flushPaint();
+    return (S.current?._paintStrokeCount || 0) > 0 || (S.current?._paintDecals?.length || 0) > 0 || !!getLatestPaintSurface(S.current);
+  }, [_flushPaint]);
+
+  const getPaintedTextureBlob = useCallback((options) => {
+    if (_paintQueueRef.current) _flushPaint();
+    return createPaintedTextureBlob(S.current, options);
+  }, [_flushPaint]);
+
+  const getTexturePaintEditPackage = useCallback((options) => {
+    if (_paintQueueRef.current) _flushPaint();
+    return createTexturePaintEditPackage(S.current, options);
+  }, [_flushPaint]);
+
+  const getTexturePaintEditPackages = useCallback((options) => {
+    if (_paintQueueRef.current) _flushPaint();
+    return createTexturePaintEditPackages(S.current, options);
+  }, [_flushPaint]);
+
+  const applyEditedTexture = useCallback((source, target) => {
+    return applyEditedTextureImage(S.current, source, target);
+  }, []);
+
+  const attachViewerApi = useCallback(() => {
+    if (!S.current) return null;
+    Object.assign(S.current, {
+      undoPaint,
+      clearPaint,
+      hasModelTextures: () => modelHasTextures(S.current?.model),
+      hasPaintStrokes,
+      getPaintedTextureBlob,
+      getTexturePaintEditPackage,
+      getTexturePaintEditPackages,
+      applyEditedTexture,
+    });
+    return S.current;
+  }, [applyEditedTexture, clearPaint, getPaintedTextureBlob, getTexturePaintEditPackage, getTexturePaintEditPackages, hasPaintStrokes, undoPaint]);
+
+  useEffect(() => {
+    attachViewerApi();
+  }, [attachViewerApi]);
+
+  useImperativeHandle(ref, () => attachViewerApi() || {}, [attachViewerApi]);
 
   return (
     <div
@@ -1122,4 +1612,3 @@ const ThreeViewer = memo(forwardRef(({
 }));
 
 export default ThreeViewer;
-

@@ -13,6 +13,14 @@ export const UPSTREAM_SOURCE_TYPES = new Set([
   "mesh_completion",
 ]);
 
+export const TEXTURE_DIRECT_SOURCE_TYPES = new Set([
+  "text_to_model",
+  "image_to_model",
+  "multiview_to_model",
+  "texture_model",
+  "import_model",
+]);
+
 export function getHistoryTaskType(item) {
   return item?.params?.type || item?.type || item?.params?.mode || item?.mode || null;
 }
@@ -116,7 +124,9 @@ export function resolveOperationSource({
       !!upstreamId &&
       (operation === "refine"
         ? UPSTREAM_SOURCE_TYPES.has(candidateType) || (!!candidateType && !REFINE_DIRECT_SOURCE_TYPES.has(candidateType)) || textured
-        : (candidateType === "convert_model" || candidateType === "smart_low_poly" || candidate?.mode === "retopo" || candidate?.params?.mode === "retopo") && !hasTextureMarker(candidate));
+        : (candidateType
+          ? !TEXTURE_DIRECT_SOURCE_TYPES.has(candidateType)
+          : candidate?.mode === "retopo" || candidate?.params?.mode === "retopo"));
 
     if (!shouldUseUpstream) {
       return { taskId: candidateTaskId || fallback, item: candidate, resolvedFromUpstream: false, selectedItem: selected };

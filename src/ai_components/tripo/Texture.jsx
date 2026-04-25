@@ -6,8 +6,10 @@ import {
   Image, Cpu, Pencil, HelpCircle, Check, Loader2,
   PersonStanding, Upload, X, RotateCcw,
   Paintbrush, Wand2, Info, AlertTriangle,
+  ChevronDown,
 } from "lucide-react";
 import { Tooltip } from "../meshy/ui/Primitives";
+import { TEXTURE_MODEL_VERSIONS } from "./constants";
 
 /* ─── color helpers ─────────────────────────────────────────────────────── */
 export function hslToHex(h, s, l) {
@@ -177,6 +179,110 @@ function GlassSwitch({ on, onChange, disabled = false }) {
 }
 
 /* ─── Tab definitions ───────────────────────────────────────────────────── */
+function TextureModelSelect({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const selected = TEXTURE_MODEL_VERSIONS.find(v => v.id === value) ?? TEXTURE_MODEL_VERSIONS[0];
+
+  return (
+    <div style={{ position: "relative", marginBottom: 14 }}>
+      <SectionLabel>Texture AI Model</SectionLabel>
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.97 }}
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: "100%",
+          minHeight: 44,
+          padding: "8px 10px",
+          borderRadius: 12,
+          border: `1px solid ${T.glassBorder}`,
+          background: "rgba(255,255,255,0.035)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.035)",
+        }}
+      >
+        <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+          <span style={{
+            width: 28,
+            height: 28,
+            borderRadius: 9,
+            background: "rgba(139,92,246,0.14)",
+            border: "1px solid rgba(139,92,246,0.22)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}>
+            <Cpu style={{ width: 14, height: 14, color: "#c4b5fd" }} />
+          </span>
+          <span style={{ color: T.textPrimary, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {selected.label}
+          </span>
+        </span>
+        <ChevronDown style={{ width: 14, height: 14, color: T.textDim, transition: "transform 0.18s", transform: open ? "rotate(180deg)" : "none", flexShrink: 0 }} />
+      </motion.button>
+
+      {open && (
+        <div style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: "calc(100% + 5px)",
+          zIndex: 80,
+          borderRadius: 12,
+          border: `1px solid ${T.glassBorderHover}`,
+          background: "#11111f",
+          overflow: "hidden",
+          boxShadow: "0 18px 44px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.035)",
+        }}>
+          {TEXTURE_MODEL_VERSIONS.map((option, index) => {
+            const active = option.id === value;
+            return (
+              <motion.button
+                type="button"
+                key={option.id}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  onChange?.(option.id);
+                  setOpen(false);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "none",
+                  borderBottom: index < TEXTURE_MODEL_VERSIONS.length - 1 ? `1px solid ${T.divider}` : "none",
+                  background: active ? "rgba(139,92,246,0.14)" : "transparent",
+                  color: active ? "#c4b5fd" : "#c8c8e0",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  fontFamily: "inherit",
+                  textAlign: "left",
+                }}
+              >
+                <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>{option.label}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: active ? "#8b7cff" : T.textDim, fontFamily: "monospace" }}>
+                    {option.id}
+                  </span>
+                </span>
+                {active && <Check style={{ width: 13, height: 13, color: "#c4b5fd", flexShrink: 0 }} />}
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TEX_INPUT_TABS = [
   { id: "image", icon: Image, label: "Reference", tip: "Generate texture from a single image" },
   { id: "multi", icon: Cpu, label: "Multi-view", tip: "Generate texture from 4 specific angles" },
@@ -318,14 +424,24 @@ export function SelectedModelBadge({
 }
 
 /* ─── TexInputBox ────────────────────────────────────────────────────────── */
+const isUploadedTextureItemReady = (item) => Boolean(item?.token || item?.tripoFile);
+
+function normalizeTextureUploadItem(file, preview, payload) {
+  if (typeof payload === "string") {
+    return { file, preview, token: payload, tripoFile: null, uploading: false, error: null };
+  }
+  return { file, preview, token: null, tripoFile: payload ?? null, uploading: false, error: null };
+}
+
 export function TexInputBox({
   tab, setTab,
   texPrompt, setTexPrompt,
   imgPrev, imgToken, imgUploading, handleImg, fileRef,
   multiImages, setMultiImages,
+  uploadTextureImage,
   getIdToken,
 }) {
-  const VIEW_SLOTS = ["Front", "Left", "Right", "Back"];
+  const VIEW_SLOTS = ["Front", "Left", "Back", "Right"];
 
   return (
     <div style={{
@@ -438,9 +554,35 @@ export function TexInputBox({
 
       {/* Multi-view tab */}
       {tab === "multi" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, padding: 8 }}>
+        <div style={{ padding: 8 }}>
+          {multiImages?.some(Boolean) && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setMultiImages([])}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#ef4444",
+                  fontSize: 9,
+                  fontWeight: 900,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                  cursor: "pointer",
+                  padding: "2px 4px",
+                }}
+              >
+                Clear views
+              </motion.button>
+            </div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
           {VIEW_SLOTS.map((slot, i) => {
-            const prev = multiImages?.[i]?.preview;
+            const item = multiImages?.[i];
+            const prev = item?.preview;
+            const isUploading = item?.uploading || (item && !isUploadedTextureItemReady(item) && !item.error);
+            const isReady = isUploadedTextureItemReady(item);
             return (
               <motion.div
                 key={slot}
@@ -453,9 +595,31 @@ export function TexInputBox({
                     if (f) {
                       const r = new FileReader();
                       r.onload = ev => {
+                        const preview = ev.target.result;
                         const next = [...(multiImages || [])];
-                        next[i] = { file: f, preview: ev.target.result };
+                        next[i] = { file: f, preview, token: null, tripoFile: null, uploading: true, error: null };
                         setMultiImages(next);
+                        Promise.resolve(uploadTextureImage?.(f))
+                          .then(payload => {
+                            setMultiImages(prevItems => {
+                              const updated = [...(prevItems || [])];
+                              if (updated[i]?.file === f) updated[i] = normalizeTextureUploadItem(f, preview, payload);
+                              return updated;
+                            });
+                          })
+                          .catch(err => {
+                            setMultiImages(prevItems => {
+                              const updated = [...(prevItems || [])];
+                              if (updated[i]?.file === f) {
+                                updated[i] = {
+                                  ...updated[i],
+                                  uploading: false,
+                                  error: err?.message || "Upload failed",
+                                };
+                              }
+                              return updated;
+                            });
+                          });
                       };
                       r.readAsDataURL(f);
                     }
@@ -479,7 +643,39 @@ export function TexInputBox({
                 }}
               >
                 {prev ? (
-                  <img src={prev} alt={slot} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 9 }} />
+                  <>
+                    <img src={prev} alt={slot} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 9 }} />
+                    {isUploading && (
+                      <div style={{ position: "absolute", inset: 0, background: "rgba(10,10,20,0.62)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Loader2 style={{ width: 18, height: 18, color: T.purple }} className="anim-spin" />
+                      </div>
+                    )}
+                    {isReady && !isUploading && (
+                      <div style={{ position: "absolute", bottom: 5, right: 5, width: 20, height: 20, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Check style={{ width: 11, height: 11, color: "#fff" }} />
+                      </div>
+                    )}
+                    {item?.error && (
+                      <div style={{ position: "absolute", inset: 0, background: "rgba(127,29,29,0.72)", display: "flex", alignItems: "center", justifyContent: "center", padding: 8, textAlign: "center" }}>
+                        <span style={{ color: "#fecaca", fontSize: 9, fontWeight: 900, lineHeight: 1.35 }}>{item.error}</span>
+                      </div>
+                    )}
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.9 }}
+                      onClick={e => {
+                        e.stopPropagation();
+                        setMultiImages(prevItems => {
+                          const updated = [...(prevItems || [])];
+                          updated[i] = null;
+                          return updated;
+                        });
+                      }}
+                      style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.72)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      <X style={{ width: 10, height: 10, color: "#fff" }} />
+                    </motion.button>
+                  </>
                 ) : (
                   <>
                     <PersonStanding style={{ width: 18, height: 18, color: T.textDim }} />
@@ -492,6 +688,10 @@ export function TexInputBox({
               </motion.div>
             );
           })}
+          </div>
+          <p style={{ color: T.textDim, fontSize: 10, fontWeight: 700, margin: "7px 0 0", lineHeight: 1.5 }}>
+            Upload exactly four views in Tripo order: front, left, back, right.
+          </p>
         </div>
       )}
 
@@ -735,17 +935,24 @@ export function MagicBrushPanel({
   brushColor, setBrushColor,
   brushSize, setBrushSize,
   brushOpacity = 1, setBrushOpacity,
-  brushHardness = 80, setBrushHardness,
   uvOverlapWarning = false,
   canvasRef,
-  onUndo,
+  onClearPaint,
+  paintModeDisabled = false,
+  paintModeDisabledMessage = "currently waiting for tripo patches",
 }) {
 
   const PRESETS = ["#000000", "#ffffff", "#ef4444", "#f97316", "#eab308", "#22c55e", "#00e5ff", "#8b5cf6"];
 
+  useEffect(() => {
+    if (paintModeDisabled && brushMode === "Paint Mode") {
+      setBrushMode("Gen Mode");
+    }
+  }, [brushMode, paintModeDisabled, setBrushMode]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      {/* Mode switcher + Undo */}
+      {/* Mode switcher + Reset */}
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         <div style={{
           display: "flex",
@@ -756,46 +963,67 @@ export function MagicBrushPanel({
           border: `1px solid ${T.glassBorder}`,
           gap: 3,
         }}>
-          {["Gen Mode", "Paint Mode"].map(m => (
-            <motion.button
-              key={m}
-              onClick={() => setBrushMode(m)}
-              whileTap={{ scale: 0.97 }}
-              style={{
-                flex: 1,
-                padding: "7px 4px",
-                borderRadius: 9,
-                border: "none",
-                cursor: "pointer",
-                fontSize: 11,
-                fontWeight: 800,
-                letterSpacing: "0.02em",
-                background: brushMode === m ? "rgba(139,92,246,0.2)" : "transparent",
-                color: brushMode === m ? "#c4b5fd" : T.textDim,
-                boxShadow: brushMode === m ? "0 0 12px rgba(139,92,246,0.2), inset 0 1px 0 rgba(255,255,255,0.06)" : "none",
-                transition: "all 0.18s",
-              }}
-            >
-              {m === "Gen Mode" ? (
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                  <Wand2 style={{ width: 12, height: 12 }} />
-                  Gen Mode
-                </span>
-              ) : (
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                  <Paintbrush style={{ width: 12, height: 12 }} />
-                  Paint Mode
-                </span>
-              )}
-            </motion.button>
-          ))}
+          {["Gen Mode", "Paint Mode"].map(m => {
+            const isPaintMode = m === "Paint Mode";
+            const isDisabled = isPaintMode && paintModeDisabled;
+            const isActive = brushMode === m && !isDisabled;
+
+            return (
+              <motion.button
+                key={m}
+                onClick={() => {
+                  if (!isDisabled) setBrushMode(m);
+                }}
+                disabled={isDisabled}
+                aria-disabled={isDisabled}
+                title={isDisabled ? paintModeDisabledMessage : m}
+                whileTap={isDisabled ? undefined : { scale: 0.97 }}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  minHeight: isDisabled ? 42 : undefined,
+                  padding: isDisabled ? "6px 4px" : "7px 4px",
+                  borderRadius: 9,
+                  border: isDisabled ? `1px solid ${T.glassBorder}` : "none",
+                  cursor: isDisabled ? "not-allowed" : "pointer",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: "0.02em",
+                  background: isActive ? "rgba(139,92,246,0.2)" : isDisabled ? "rgba(255,255,255,0.018)" : "transparent",
+                  color: isActive ? "#c4b5fd" : isDisabled ? "rgba(255,255,255,0.28)" : T.textDim,
+                  boxShadow: isActive ? "0 0 12px rgba(139,92,246,0.2), inset 0 1px 0 rgba(255,255,255,0.06)" : "none",
+                  opacity: isDisabled ? 0.72 : 1,
+                  transition: "all 0.18s",
+                }}
+              >
+                {m === "Gen Mode" ? (
+                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                    <Wand2 style={{ width: 12, height: 12 }} />
+                    Gen Mode
+                  </span>
+                ) : (
+                  <span style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, minWidth: 0 }}>
+                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                      <Paintbrush style={{ width: 12, height: 12, flexShrink: 0 }} />
+                      Paint Mode
+                    </span>
+                    {isDisabled && (
+                      <span style={{ color: "rgba(255,255,255,0.34)", fontSize: 7, fontWeight: 900, letterSpacing: "0.08em", lineHeight: 1.1, textTransform: "uppercase", whiteSpace: "normal" }}>
+                        {paintModeDisabledMessage}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </motion.button>
+            );
+          })}
         </div>
 
-        {brushMode === "Paint Mode" && onUndo && (
+        {!paintModeDisabled && brushMode === "Paint Mode" && onClearPaint && (
           <motion.button
-            onClick={onUndo}
+            onClick={onClearPaint}
             whileTap={{ scale: 0.95 }}
-            title="Undo last stroke"
+            title="Reset painted strokes"
             style={{
               width: 42,
               borderRadius: 12,
@@ -872,7 +1100,7 @@ export function MagicBrushPanel({
       )}
 
       {/* ── PAINT MODE ── */}
-      {brushMode === "Paint Mode" && (
+      {!paintModeDisabled && brushMode === "Paint Mode" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
           {/* Instruction banner */}
           <div style={{
@@ -904,6 +1132,29 @@ export function MagicBrushPanel({
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+
+          <div style={{
+            borderRadius: 12,
+            border: "1px solid rgba(245,158,11,0.22)",
+            background: "rgba(245,158,11,0.07)",
+            padding: "10px 12px",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+            marginBottom: 14,
+          }}>
+            <div style={{ width: 28, height: 28, borderRadius: 9, background: "rgba(245,158,11,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <AlertTriangle style={{ width: 14, height: 14, color: "#fbbf24" }} />
+            </div>
+            <div>
+              <p style={{ color: "#fde68a", fontSize: 11, fontWeight: 800, margin: "0 0 4px" }}>
+                Direct Tripo texture pass
+              </p>
+              <p style={{ color: "#d6d0bf", fontSize: 10, fontWeight: 700, margin: 0, lineHeight: 1.6 }}>
+                Paint marks stay local as a visual guide. The prompt is sent directly to Tripo on the selected model task scope.
+              </p>
             </div>
           </div>
 
@@ -1033,18 +1284,6 @@ export function MagicBrushPanel({
               </div>
             </div>
 
-            {/* Hardness row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <div style={{ width: 40, height: 40, flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ ...T.labelStyle, fontSize: 10 }}>Hardness</span>
-                  <ValueBadge>{brushHardness}%</ValueBadge>
-                </div>
-                <StyledSlider min={0} max={100} step={1} value={brushHardness} onChange={e => setBrushHardness(Number(e.target.value))} color={T.cyan} />
-              </div>
-            </div>
-
             {/* Opacity row */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ width: 40, height: 40, flexShrink: 0 }} />
@@ -1064,6 +1303,60 @@ export function MagicBrushPanel({
 }
 
 /* ─── main export ─────────────────────────────────────────────────────────── */
+function MagicBrushUnavailablePanel({
+  message = "waiting for tripo patch",
+}) {
+  return (
+    <div style={{
+      borderRadius: 16,
+      border: "1px solid rgba(255,255,255,0.08)",
+      background: "rgba(255,255,255,0.025)",
+      padding: "18px 16px",
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 12,
+      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+    }}>
+      <div style={{
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        background: "rgba(139,92,246,0.10)",
+        border: "1px solid rgba(139,92,246,0.18)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}>
+        <Paintbrush style={{ width: 16, height: 16, color: "rgba(196,181,253,0.65)" }} />
+      </div>
+      <div>
+        <p style={{
+          margin: "0 0 6px",
+          color: "rgba(255,255,255,0.72)",
+          fontSize: 12,
+          fontWeight: 900,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+        }}>
+          Paint Mode Disabled
+        </p>
+        <p style={{
+          margin: 0,
+          color: "rgba(255,255,255,0.34)",
+          fontSize: 10,
+          fontWeight: 900,
+          letterSpacing: "0.12em",
+          lineHeight: 1.5,
+          textTransform: "uppercase",
+        }}>
+          {message}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function Texture({
   mode,
   activeTaskId,
@@ -1078,6 +1371,8 @@ export default function Texture({
   texPrompt, setTexPrompt,
   imgPrev, imgToken, imgUploading, handleImg, fileRef,
   multiImages, setMultiImages,
+  uploadTextureImage,
+  textureModelVer, setTextureModelVer,
   tex4K, setTex4K,
   pbrOn, setPbrOn,
   pbrAvailable = true,
@@ -1088,10 +1383,11 @@ export default function Texture({
   brushColor, setBrushColor,
   brushSize, setBrushSize,
   brushOpacity, setBrushOpacity,
-  brushHardness, setBrushHardness,
   uvOverlapWarning = false,
   canvasRef,
-  onUndo,
+  onClearPaint,
+  paintModeDisabled = false,
+  paintModeDisabledMessage = "currently waiting for tripo patches",
   getIdToken,
 }) {
   return (
@@ -1135,8 +1431,28 @@ export default function Texture({
             imgPrev={imgPrev} imgToken={imgToken}
             imgUploading={imgUploading} handleImg={handleImg} fileRef={fileRef}
             multiImages={multiImages} setMultiImages={setMultiImages}
+            uploadTextureImage={uploadTextureImage}
             getIdToken={getIdToken}
           />
+          <div style={{
+            borderRadius: 12,
+            border: "1px solid rgba(0,229,255,0.18)",
+            background: "rgba(0,229,255,0.055)",
+            padding: "10px 12px",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+            marginBottom: 14,
+          }}>
+            <Info style={{ width: 14, height: 14, color: "#67e8f9", flexShrink: 0, marginTop: 1 }} />
+            <p style={{ color: "#b8ecf5", fontSize: 10, fontWeight: 700, margin: 0, lineHeight: 1.6 }}>
+              A Tripo textúrázás egy futásban egy vezérlést használ: szöveget, egy referencia képet vagy többnézetes referenciát. A feltöltött kép irányadó referencia, nem pixelesen pontos texture-másolat.
+            </p>
+          </div>
+
+          {setTextureModelVer && (
+            <TextureModelSelect value={textureModelVer} onChange={setTextureModelVer} />
+          )}
 
           {/* 4K Texture */}
           <motion.div
@@ -1166,7 +1482,7 @@ export default function Texture({
           </motion.div>
           {tex4K && (
             <p style={{ color: T.textDim, fontSize: 10, fontWeight: 600, margin: "-2px 0 10px 2px", lineHeight: 1.6 }}>
-              texture_quality: "HD" — higher resolution, slower generation.
+              texture_quality: "detailed" uses the V3.0 texture model for higher resolution output.
             </p>
           )}
 
@@ -1254,18 +1570,26 @@ export default function Texture({
             name={activeModelName}
             activeTaskId={activeTaskId}
           />
-          <MagicBrushPanel
-            brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt}
-            creativity={creativity} setCreativity={setCreativity}
-            brushMode={brushMode} setBrushMode={setBrushMode}
-            brushColor={brushColor} setBrushColor={setBrushColor}
-            brushSize={brushSize} setBrushSize={setBrushSize}
-            brushOpacity={brushOpacity} setBrushOpacity={setBrushOpacity}
-            brushHardness={brushHardness} setBrushHardness={setBrushHardness}
-            uvOverlapWarning={uvOverlapWarning}
-            canvasRef={canvasRef}
-            onUndo={onUndo}
-          />
+          {setTextureModelVer && (
+            <TextureModelSelect value={textureModelVer} onChange={setTextureModelVer} />
+          )}
+          {paintModeDisabled ? (
+            <MagicBrushUnavailablePanel message={paintModeDisabledMessage} />
+          ) : (
+            <MagicBrushPanel
+              brushPrompt={brushPrompt} setBrushPrompt={setBrushPrompt}
+              creativity={creativity} setCreativity={setCreativity}
+              brushMode={brushMode} setBrushMode={setBrushMode}
+              brushColor={brushColor} setBrushColor={setBrushColor}
+              brushSize={brushSize} setBrushSize={setBrushSize}
+              brushOpacity={brushOpacity} setBrushOpacity={setBrushOpacity}
+              uvOverlapWarning={uvOverlapWarning}
+              canvasRef={canvasRef}
+              onClearPaint={onClearPaint}
+              paintModeDisabled={paintModeDisabled}
+              paintModeDisabledMessage={paintModeDisabledMessage}
+            />
+          )}
         </>
       )}
     </>

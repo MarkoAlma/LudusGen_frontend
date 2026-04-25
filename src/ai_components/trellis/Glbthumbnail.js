@@ -94,10 +94,11 @@ async function waitForThumbnailTextures(model, timeoutMs = 900) {
 }
 
 let _activeCount = 0;
-const _MAX = 3;
+const _MAX = 1;
 const _queue = [];
-const _TIMEOUT_MS = 20000;
+const _TIMEOUT_MS = 45000;
 const _UNSUPPORTED_THUMBNAIL = Symbol('unsupported-thumbnail');
+const _pending = new Map();
 
 function readAscii(bytes, length = bytes.length) {
   return String.fromCharCode(...bytes.slice(0, length));
@@ -131,7 +132,13 @@ function _dequeue() {
   if (item) item.run();
 }
 
-function _enqueue(run) {
+function createThumbnailTimeoutError(timeoutMs) {
+  const err = new Error(`Thumbnail generation timeout after ${Math.round(timeoutMs / 1000)}s`);
+  err.code = 'THUMBNAIL_TIMEOUT';
+  return err;
+}
+
+function _enqueue(run, timeoutMs = _TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     let finished = false;
     const finish = (fn, val) => {
@@ -142,15 +149,17 @@ function _enqueue(run) {
       fn(val);
     };
 
-    const timer = setTimeout(() => {
-      finish(reject, new Error('Thumbnail generation timeout'));
-    }, _TIMEOUT_MS);
-
+    let timer = null;
     _queue.push({
-      run: () => run(
-        (val) => { clearTimeout(timer); finish(resolve, val); },
-        (err) => { clearTimeout(timer); finish(reject, err); }
-      ),
+      run: () => {
+        timer = setTimeout(() => {
+          finish(reject, createThumbnailTimeoutError(timeoutMs));
+        }, timeoutMs);
+        run(
+          (val) => { clearTimeout(timer); finish(resolve, val); },
+          (err) => { clearTimeout(timer); finish(reject, err); }
+        );
+      }
     });
     _dequeue();
   });
@@ -166,6 +175,7 @@ export function generateGlbThumbnail(source, options = {}) {
     width = 280,
     height = 280,
     bgColor = '#1a1528',
+    timeoutMs = _TIMEOUT_MS,
   } = options;
 
   return _enqueue(async (resolve, reject) => {
@@ -369,7 +379,7 @@ export function generateGlbThumbnail(source, options = {}) {
       cleanup();
       reject(err);
     }
-  });
+  }, timeoutMs);
 }
 
 // ── Cache ────────────────────────────────────────────────────────────────
@@ -398,21 +408,37 @@ export async function getCachedThumbnail(source, options = {}, cacheKey) {
     const cached = _cache.get(key);
     return cached === _UNSUPPORTED_THUMBNAIL ? null : cached;
   }
-  try {
-    const thumb = await generateGlbThumbnail(source, options);
-    if (key) _cache.set(key, thumb);
-    return thumb;
-  } catch (err) {
-    if (err?.thumbnailUnsupported) {
-      if (key && !_cache.has(key)) {
-        console.warn('[Thumbnail] unsupported model skipped:', err.format || err.message);
-        _cache.set(key, _UNSUPPORTED_THUMBNAIL);
-      }
-    } else {
-      console.error('[Thumbnail] cache miss error:', err);
-    }
-    return null;
+  if (key && _pending.has(key)) {
+    return _pending.get(key);
   }
+
+  const pending = (async () => {
+    try {
+      const thumb = await generateGlbThumbnail(source, options);
+      if (key) _cache.set(key, thumb);
+      return thumb;
+    } catch (err) {
+      if (err?.thumbnailUnsupported) {
+        if (key && !_cache.has(key)) {
+          console.warn('[Thumbnail] unsupported model skipped:', err.format || err.message);
+          _cache.set(key, _UNSUPPORTED_THUMBNAIL);
+        }
+      } else if (err?.code === 'THUMBNAIL_TIMEOUT') {
+        console.warn('[Thumbnail] generation timed out; will retry next time:', key || err.message);
+      } else {
+        console.error('[Thumbnail] cache miss error:', err);
+      }
+      return null;
+    } finally {
+      if (key) _pending.delete(key);
+    }
+  })();
+
+  if (key) _pending.set(key, pending);
+  return pending;
 }
 
-export function clearThumbnailCache() { _cache.clear(); }
+export function clearThumbnailCache() {
+  _cache.clear();
+  _pending.clear();
+}
