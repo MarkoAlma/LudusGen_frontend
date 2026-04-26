@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, memo } from "react";
 import {
   Image, Boxes, Grid3x3, Pencil, HelpCircle, Upload, Check, X, Plus,
-  Loader2, Globe, Lock, ChevronDown, ChevronUp, PersonStanding, Zap, Images, Lightbulb,
+  Loader2, ChevronDown, ChevronUp, PersonStanding, Zap, Images, Lightbulb,
   Camera, Box, Gamepad2, FlaskConical, Triangle, Palette, Sparkles, ToyBrick, Mountain, Dice5,
   Type, User, ChevronLeft, ChevronRight, Info,
 } from "lucide-react";
@@ -28,6 +28,26 @@ export const MODEL_VERSIONS = [
   { id: "Turbo-v1.0-20250506", label: "Turbo V1.0" },
   { id: "v2.0-20240919", label: "V2.0" },
   { id: "v1.4-20240625", label: "V1.4 (Fastest Model)" },
+];
+
+const ORIENTATION_OPTIONS = [
+  { value: "", label: "Default" },
+  { value: "portrait", label: "Portrait" },
+  { value: "landscape", label: "Landscape" },
+  { value: "square", label: "Square" },
+];
+
+const COMPRESS_OPTIONS = [
+  { value: "", label: "Off" },
+  { value: "geometry", label: "Geometry" },
+];
+
+const MULTIVIEW_MODE_OPTIONS = [
+  { value: "", label: "Default" },
+  { value: "concept", label: "Concept" },
+  { value: "orthographic", label: "Orthographic" },
+  { value: "character", label: "Character" },
+  { value: "product", label: "Product" },
 ];
 
 /* ─── Per-model capability map ───────────────────────────────────────────
@@ -145,6 +165,48 @@ function SeedSpinner({ value, onChange, disabled = false }) {
   );
 }
 
+function TripoSelect({ value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find(option => option.value === value) || options[0];
+
+  return (
+    <div
+      className="tp-custom-select"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+      }}
+      style={{ position: "relative" }}
+    >
+      <button
+        type="button"
+        className="tp-custom-select-trigger"
+        onClick={() => setOpen(v => !v)}
+      >
+        <span>{selected?.label || "Default"}</span>
+        <ChevronDown style={{ width: 15, height: 15, opacity: 0.78, transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.16s ease" }} />
+      </button>
+      {open && (
+        <div className="tp-custom-select-menu">
+          {options.map(option => (
+            <button
+              key={option.value || "default"}
+              type="button"
+              className={"tp-custom-select-option" + (option.value === value ? " selected" : "")}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Collapsible({ label, children, border = true, extra }) {
   const [open, setOpen] = useState(false);
   return (
@@ -239,7 +301,7 @@ function TopoControls({
           <HelpCircle style={{ width: 13, height: 13, color: "#475569" }} />
         </Tooltip>
       </div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+      <div className="tp-flat-segment-row" style={{ display: "flex", gap: 0, marginBottom: 10 }}>
         {/* Quad */}
         <Na unsupported={!capsQuad} tip="Quad topology not supported by this model">
           <button
@@ -609,35 +671,53 @@ const GeneratePanel = memo(({
   }
 
   /* ─── Derived ─────────────────────────────────────────────────────── */
-  const partsDisabled = texOn || pbrOn || quadMesh;
-  const sourceModeBtnStyle = (active) => ({
+  const activePbrOn = texOn && pbrOn;
+  const partsBlockers = [
+    texOn ? "Texture off" : null,
+    activePbrOn ? "PBR off" : null,
+    quadMesh ? "Triangle topology" : null,
+  ].filter(Boolean);
+  const partsDisabled = partsBlockers.length > 0;
+  const partsRequirement = partsBlockers.length > 2
+    ? `${partsBlockers.slice(0, -1).join(", ")}, and ${partsBlockers[partsBlockers.length - 1]}`
+    : partsBlockers.join(" and ");
+  const sourceModeRowStyle = {
+    display: "flex",
+    gap: 0,
+    borderRadius: 22,
+    overflow: "hidden",
+    background: "rgba(3,7,18,0.28)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.045)",
+  };
+  const sourceModeBtnStyle = (active, index = 0, count = 1) => ({
     flex: 1,
     minHeight: 48,
     padding: "11px 12px",
-    borderRadius: 18,
-    border: active ? "1px solid rgba(139,220,255,0.42)" : "1px solid rgba(255,255,255,0.075)",
+    border: 0,
+    borderLeft: index > 0 ? "1px solid rgba(139,220,255,0.12)" : 0,
+    borderRadius: index === 0 ? "22px 0 0 22px" : index === count - 1 ? "0 22px 22px 0" : 0,
     background: active
-      ? "linear-gradient(145deg, rgba(139,220,255,0.16), rgba(47,140,255,0.11), rgba(255,255,255,0.055))"
-      : "linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018))",
+      ? "linear-gradient(145deg, rgba(139,220,255,0.15), rgba(47,140,255,0.10), rgba(255,255,255,0.04))"
+      : "transparent",
     color: active ? "#f8fafc" : "#94a3b8",
     fontSize: 10,
     fontWeight: 900,
     letterSpacing: "0.12em",
     textTransform: "uppercase",
     cursor: "pointer",
-    boxShadow: active ? "0 14px 30px rgba(0,0,0,0.22), 0 0 24px rgba(47,140,255,0.14)" : "inset 0 1px 0 rgba(255,255,255,0.06)",
+    boxShadow: "none",
   });
   const fieldStyle = {
     width: "100%",
     padding: "12px 14px",
     borderRadius: 16,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025))",
+    border: "1px solid rgba(139,220,255,0.16)",
+    background: "linear-gradient(145deg, rgba(15,23,42,0.44), rgba(3,7,18,0.34))",
     color: "#e2e8f0",
     fontSize: 12,
     fontWeight: 700,
     boxSizing: "border-box",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.045)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
   };
   const labelStyle = {
     color: "rgba(225,226,212,0.70)",
@@ -673,9 +753,9 @@ const GeneratePanel = memo(({
       <div
         onClick={openPicker}
         style={{
-          border: "1px dashed rgba(255,255,255,0.1)",
-          background: "rgba(255,255,255,0.02)",
-          borderRadius: 12,
+          border: "1.5px dashed rgba(139,220,255,0.28)",
+          background: "linear-gradient(145deg, rgba(15,23,42,0.32), rgba(3,7,18,0.24))",
+          borderRadius: 20,
           minHeight: 124,
           cursor: "pointer",
           overflow: "hidden",
@@ -744,9 +824,9 @@ const GeneratePanel = memo(({
 
       {genTab === "image" && (
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div className="tp-source-mode-row" style={{ display: "flex", gap: 8 }}>
-            <button type="button" onClick={() => setImageSourceMode("upload")} style={sourceModeBtnStyle(imageSourceMode === "upload")}>Upload Source</button>
-            <button type="button" onClick={() => setImageSourceMode("generate_image")} style={sourceModeBtnStyle(imageSourceMode === "generate_image")}>Generate Image</button>
+          <div className="tp-source-mode-row" style={sourceModeRowStyle}>
+            <button type="button" className={"tp-source-mode-btn" + (imageSourceMode === "upload" ? " active" : "")} onClick={() => setImageSourceMode("upload")} style={sourceModeBtnStyle(imageSourceMode === "upload", 0, 2)}>Upload Source</button>
+            <button type="button" className={"tp-source-mode-btn" + (imageSourceMode === "generate_image" ? " active" : "")} onClick={() => setImageSourceMode("generate_image")} style={sourceModeBtnStyle(imageSourceMode === "generate_image", 1, 2)}>Generate Image</button>
           </div>
 
           {imageSourceMode === "generate_image" && (
@@ -776,19 +856,11 @@ const GeneratePanel = memo(({
                 </div>
                 <div>
                   <label style={labelStyle}>Orientation</label>
-                  <select value={generationOrientation} onChange={(e) => setGenerationOrientation(e.target.value)} style={fieldStyle}>
-                    <option value="">Default</option>
-                    <option value="portrait">Portrait</option>
-                    <option value="landscape">Landscape</option>
-                    <option value="square">Square</option>
-                  </select>
+                  <TripoSelect value={generationOrientation} onChange={setGenerationOrientation} options={ORIENTATION_OPTIONS} />
                 </div>
                 <div>
                   <label style={labelStyle}>Compress</label>
-                  <select value={generationCompress} onChange={(e) => setGenerationCompress(e.target.value)} style={fieldStyle}>
-                    <option value="">Off</option>
-                    <option value="geometry">Geometry</option>
-                  </select>
+                  <TripoSelect value={generationCompress} onChange={setGenerationCompress} options={COMPRESS_OPTIONS} />
                 </div>
               </div>
               <div>
@@ -809,10 +881,10 @@ const GeneratePanel = memo(({
 
       {genTab === "multi" && (
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div className="tp-source-mode-row" style={{ display: "flex", gap: 8 }}>
-            <button type="button" onClick={() => setMultiviewSourceMode("upload")} style={sourceModeBtnStyle(multiviewSourceMode === "upload")}>Upload Views</button>
-            <button type="button" onClick={() => setMultiviewSourceMode("generate_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "generate_multiview_image")}>Generate Views</button>
-            <button type="button" onClick={() => setMultiviewSourceMode("edit_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "edit_multiview_image")}>Edit Views</button>
+          <div className="tp-source-mode-row" style={sourceModeRowStyle}>
+            <button type="button" className={"tp-source-mode-btn" + (multiviewSourceMode === "upload" ? " active" : "")} onClick={() => setMultiviewSourceMode("upload")} style={sourceModeBtnStyle(multiviewSourceMode === "upload", 0, 3)}>Upload Views</button>
+            <button type="button" className={"tp-source-mode-btn" + (multiviewSourceMode === "generate_multiview_image" ? " active" : "")} onClick={() => setMultiviewSourceMode("generate_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "generate_multiview_image", 1, 3)}>Generate Views</button>
+            <button type="button" className={"tp-source-mode-btn" + (multiviewSourceMode === "edit_multiview_image" ? " active" : "")} onClick={() => setMultiviewSourceMode("edit_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "edit_multiview_image", 2, 3)}>Edit Views</button>
           </div>
 
           {multiviewSourceMode !== "upload" && (
@@ -850,29 +922,15 @@ const GeneratePanel = memo(({
                 </div>
                 <div>
                   <label style={labelStyle}>Orientation</label>
-                  <select value={generationOrientation} onChange={(e) => setGenerationOrientation(e.target.value)} style={fieldStyle}>
-                    <option value="">Default</option>
-                    <option value="portrait">Portrait</option>
-                    <option value="landscape">Landscape</option>
-                    <option value="square">Square</option>
-                  </select>
+                  <TripoSelect value={generationOrientation} onChange={setGenerationOrientation} options={ORIENTATION_OPTIONS} />
                 </div>
                 <div>
                   <label style={labelStyle}>Compress</label>
-                  <select value={generationCompress} onChange={(e) => setGenerationCompress(e.target.value)} style={fieldStyle}>
-                    <option value="">Off</option>
-                    <option value="geometry">Geometry</option>
-                  </select>
+                  <TripoSelect value={generationCompress} onChange={setGenerationCompress} options={COMPRESS_OPTIONS} />
                 </div>
                 <div>
                   <label style={labelStyle}>Mode</label>
-                  <select value={multiviewMode} onChange={(e) => setMultiviewMode(e.target.value)} style={fieldStyle}>
-                    <option value="">Default</option>
-                    <option value="concept">Concept</option>
-                    <option value="orthographic">Orthographic</option>
-                    <option value="character">Character</option>
-                    <option value="product">Product</option>
-                  </select>
+                  <TripoSelect value={multiviewMode} onChange={setMultiviewMode} options={MULTIVIEW_MODE_OPTIONS} />
                 </div>
                 <div>
                   <label style={labelStyle}>Texture Alignment</label>
@@ -1200,7 +1258,7 @@ const GeneratePanel = memo(({
           title="Ultra uses detailed geometry refinement. Standard is faster but with fewer polygons."
         />
       </div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 2 }}>
+      <div className="tp-flat-segment-row" style={{ display: "flex", gap: 0, marginBottom: 2 }}>
         {/* Ultra — model-na when not supported */}
         <Na unsupported={!caps.ultraMesh} tip={`Ultra quality not supported by ${modelVer} — requires P1-20260311 or v3.x`}>
           <button
@@ -1247,30 +1305,13 @@ const GeneratePanel = memo(({
       </Na>
       {partsDisabled && caps.inParts && (
         <p style={{ color: "#f87171", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
-          Generate in Parts requires Texture off, PBR off, and Triangle topology.
+          Generate in Parts requires {partsRequirement}.
         </p>
       )}
 
-      {/* ── Privacy ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Privacy</span>
-          <HelpCircle
-            style={{ width: 13, height: 13, color: "#475569", cursor: "help" }}
-            title="Private models are only visible to you. Public models appear in the community gallery."
-          />
-        </div>
-        <button onClick={() => setPrivacy(v => v === "public" ? "private" : "public")}
-          style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 7, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", cursor: "pointer", color: "#8a8aaa", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>
-          {privacy === "public" ? <Globe style={{ width: 12, height: 12 }} /> : <Lock style={{ width: 12, height: 12 }} />}
-          {privacy === "public" ? "Public" : "Private"}
-          <ChevronDown style={{ width: 10, height: 10 }} />
-        </button>
-      </div>
-
       {/* ── Texture ── */}
       <Na unsupported={!caps.texture} tip={`Texture not supported by ${modelVer}`}>
-        <Toggle label="Texture" value={texOn && caps.texture} onChange={v => { if (caps.texture) { setTexOn(v); if (!v) { setPbrOn(false); setTex4K(false); } } }} disabled={!caps.texture} />
+        <Toggle label="Texture" value={texOn && caps.texture} onChange={v => caps.texture && setTexOn(v)} disabled={!caps.texture} />
       </Na>
 
       <Collapsible label="Texture Settings">
@@ -1282,10 +1323,10 @@ const GeneratePanel = memo(({
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "9px 0",
-                cursor: (texOn || pbrOn) && caps.tex4K ? "pointer" : "not-allowed",
-                opacity: (texOn || pbrOn) && caps.tex4K ? 1 : 0.4,
+                cursor: texOn && caps.tex4K ? "pointer" : "not-allowed",
+                opacity: texOn && caps.tex4K ? 1 : 0.4,
               }}
-              onClick={() => (texOn || pbrOn) && caps.tex4K && setTex4K(v => !v)}
+              onClick={() => texOn && caps.tex4K && setTex4K(v => !v)}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>4K Texture</span>
@@ -1294,11 +1335,11 @@ const GeneratePanel = memo(({
                   title="Generates 4096x4096px textures. Significantly higher detail but takes more time."
                 />
               </div>
-              <div className={"tp-switch" + (tex4K && (texOn || pbrOn) && caps.tex4K ? " on" : "")}
+              <div className={"tp-switch" + (tex4K && texOn && caps.tex4K ? " on" : "")}
                 style={{ background: tex4K && texOn && caps.tex4K ? "#2f8cff" : "rgba(255,255,255,0.12)" }} />
             </div>
           </Na>
-          {tex4K && (texOn || pbrOn) && caps.tex4K && (
+          {tex4K && texOn && caps.tex4K && (
             <p style={{ color: "#64748b", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
               texture_quality: "HD" — higher resolution, slower generation.
             </p>
@@ -1311,7 +1352,7 @@ const GeneratePanel = memo(({
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "9px 0",
                 cursor: texOn && caps.pbr ? "pointer" : "not-allowed",
-                opacity: (texOn || pbrOn) && caps.pbr ? 1 : 0.4,
+                opacity: texOn && caps.pbr ? 1 : 0.4,
               }}
               onClick={() => texOn && caps.pbr && setPbrOn(v => !v)}
             >
@@ -1378,7 +1419,7 @@ const GeneratePanel = memo(({
           </Na>
 
           {/* texture_seed */}
-          {(texOn || pbrOn) && (
+          {texOn && (
             <Na unsupported={!caps.textureSeed} tip={`Texture Seed not supported by ${modelVer}`}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>

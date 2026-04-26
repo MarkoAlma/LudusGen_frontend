@@ -693,6 +693,260 @@ const CSS = `
     pointer-events: none !important;
     opacity: 0.25 !important;
   }
+
+  /* Restored Tripo premium flat pass */
+  .tp-panel-head {
+    border-radius:22px !important;
+    border:1px solid rgba(139,220,255,0.13) !important;
+    background:
+      linear-gradient(145deg,rgba(10,18,32,0.58),rgba(3,0,10,0.72) 62%,rgba(14,7,22,0.62)),
+      radial-gradient(circle at 92% 8%,color-mix(in srgb, var(--tp-mode-a) 16%, transparent),transparent 34%) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 18px 42px rgba(0,0,0,0.18) !important;
+    backdrop-filter:blur(22px) !important;
+  }
+  .tp-panel-head::before {
+    left:0 !important;
+    top:22px !important;
+    bottom:22px !important;
+    right:auto !important;
+    width:2px !important;
+    height:auto !important;
+    border-radius:99px !important;
+    background:linear-gradient(180deg,var(--tp-mode-a),var(--tp-mode-b)) !important;
+    opacity:0.82 !important;
+    filter:none !important;
+    box-shadow:0 0 18px color-mix(in srgb, var(--tp-mode-b) 30%, transparent) !important;
+  }
+  .tp-panel-head::after {
+    left:20px !important;
+    right:20px !important;
+    bottom:0 !important;
+    height:1px !important;
+    background:linear-gradient(90deg,transparent,color-mix(in srgb, var(--tp-mode-b) 34%, transparent),transparent) !important;
+    box-shadow:none !important;
+    opacity:0.72 !important;
+  }
+
+  .tp-workflow-page .tp-gen-tabs {
+    min-height:54px !important;
+    padding:0 !important;
+    gap:0 !important;
+    border:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+    overflow:hidden !important;
+    border-radius:22px !important;
+    margin-bottom:12px !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:hover,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:focus,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active {
+    min-height:54px !important;
+    border:0 !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+    outline:0 !important;
+    background:rgba(255,255,255,0.014) !important;
+    transform:none !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:first-child {
+    border-radius:22px 0 0 22px !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:last-child {
+    border-radius:0 22px 22px 0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab + .tp-inp-tab {
+    border-left:1px solid rgba(139,220,255,0.13) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active {
+    background:linear-gradient(145deg,rgba(138,43,226,0.20),rgba(47,140,255,0.16),rgba(0,229,255,0.08)) !important;
+    color:#f8fafc !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab span { display:none !important; }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab svg { width:21px !important; height:21px !important; }
+
+  .tp-workflow-page .tp-source-mode-row,
+  .tp-workflow-page .tp-flat-segment-row {
+    gap:0 !important;
+    border-radius:20px !important;
+    overflow:hidden !important;
+    background:rgba(5,8,18,0.18) !important;
+    box-shadow:none !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > button,
+  .tp-workflow-page .tp-source-mode-row > button:hover,
+  .tp-workflow-page .tp-source-mode-row > button:focus,
+  .tp-workflow-page .tp-flat-segment-row > button,
+  .tp-workflow-page .tp-flat-segment-row > button:hover,
+  .tp-workflow-page .tp-flat-segment-row > button:focus,
+  .tp-workflow-page .tp-flat-segment-row > .model-na,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:hover,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:focus {
+    min-height:48px !important;
+    border:0 !important;
+    outline:0 !important;
+    box-shadow:none !important;
+    border-radius:0 !important;
+    background:transparent !important;
+    transform:none !important;
+    margin:0 !important;
+  }
+  .tp-workflow-page .tp-flat-segment-row > .model-na {
+    flex:1 !important;
+    display:flex !important;
+  }
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button {
+    flex:1 !important;
+    width:100% !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > button:first-child,
+  .tp-workflow-page .tp-flat-segment-row > button:first-child,
+  .tp-workflow-page .tp-flat-segment-row > .model-na:first-child > button {
+    border-radius:20px 0 0 20px !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > button:last-child,
+  .tp-workflow-page .tp-flat-segment-row > button:last-child,
+  .tp-workflow-page .tp-flat-segment-row > .model-na:last-child > button {
+    border-radius:0 20px 20px 0 !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > button + button,
+  .tp-workflow-page .tp-flat-segment-row > button + button,
+  .tp-workflow-page .tp-flat-segment-row > .model-na + button,
+  .tp-workflow-page .tp-flat-segment-row > button + .model-na > button {
+    border-left:1px solid rgba(139,220,255,0.13) !important;
+  }
+  .tp-workflow-page .tp-source-mode-btn.active,
+  .tp-workflow-page .tp-flat-segment-row > .sel,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel {
+    background:linear-gradient(145deg,rgba(138,43,226,0.18),rgba(47,140,255,0.13),rgba(0,229,255,0.06)) !important;
+    color:#f8fafc !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > button,
+  .tp-workflow-page .tp-flat-segment-row > button,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button {
+    font-size:10px !important;
+    font-weight:950 !important;
+    letter-spacing:0.14em !important;
+    text-transform:uppercase !important;
+    color:rgba(203,213,225,0.72) !important;
+  }
+
+  .tp-custom-select { position:relative; z-index:20; }
+  .tp-custom-select-trigger {
+    width:100%;
+    min-height:46px !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:space-between !important;
+    padding:0 14px !important;
+    border:1px solid rgba(139,220,255,0.16) !important;
+    border-radius:18px !important;
+    background:linear-gradient(145deg,rgba(15,23,42,0.48),rgba(3,7,18,0.34)) !important;
+    color:#f8fafc !important;
+    font-size:12px !important;
+    font-weight:850 !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.055) !important;
+  }
+  .tp-custom-select-menu {
+    position:absolute;
+    top:calc(100% + 6px);
+    left:0;
+    right:0;
+    z-index:80;
+    padding:6px;
+    border:1px solid rgba(139,220,255,0.16);
+    border-radius:18px;
+    background:rgba(4,7,18,0.96);
+    box-shadow:0 22px 48px rgba(0,0,0,0.40),0 0 30px rgba(47,140,255,0.10);
+    backdrop-filter:blur(22px);
+  }
+  .tp-custom-select-option {
+    width:100%;
+    min-height:38px !important;
+    justify-content:flex-start !important;
+    padding:0 12px !important;
+    border:0 !important;
+    border-radius:12px !important;
+    background:transparent !important;
+    color:rgba(203,213,225,0.76) !important;
+    font-size:12px !important;
+    font-weight:800 !important;
+    box-shadow:none !important;
+  }
+  .tp-custom-select-option:hover,
+  .tp-custom-select-option.selected {
+    background:rgba(47,140,255,0.13) !important;
+    color:#ffffff !important;
+  }
+
+  .tp-action-dock {
+    border-top:1px solid rgba(139,220,255,0.10) !important;
+    background:linear-gradient(180deg,rgba(3,0,10,0.02),rgba(3,7,18,0.46)) !important;
+    box-shadow:none !important;
+  }
+  .tp-action-card {
+    border-radius:22px !important;
+    border:1px solid rgba(139,220,255,0.14) !important;
+    border-left:0 !important;
+    background:linear-gradient(145deg,rgba(15,23,42,0.42),rgba(3,7,18,0.28)) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.055) !important;
+  }
+  .tp-generation-dock {
+    padding:8px 14px 14px !important;
+    border-top:1px solid rgba(139,220,255,0.09) !important;
+    background:linear-gradient(180deg,rgba(3,7,18,0.02),rgba(0,229,255,0.05)) !important;
+    box-shadow:none !important;
+  }
+  .tp-generation-card {
+    border:0 !important;
+    border-radius:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+    overflow:visible !important;
+  }
+  .tp-generation-card > div:first-child {
+    display:none !important;
+  }
+  .tp-generation-card .tp-asset-name-input {
+    height:48px !important;
+    border-radius:20px !important;
+    border:1px solid rgba(139,220,255,0.16) !important;
+    background:rgba(5,8,18,0.22) !important;
+    box-shadow:none !important;
+    padding:0 18px !important;
+    color:#f8fafc !important;
+    font-size:12px !important;
+    font-weight:850 !important;
+    letter-spacing:0.04em !important;
+  }
+  .tp-generation-card .tp-gen-btn {
+    min-height:54px !important;
+    border-radius:22px !important;
+    border:0 !important;
+    box-shadow:none !important;
+    background:rgba(5,8,18,0.20) !important;
+  }
+  .tp-generation-card .tp-gen-btn.go {
+    background:linear-gradient(145deg,rgba(138,43,226,0.20),rgba(47,140,255,0.16),rgba(0,229,255,0.07)) !important;
+    color:#f8fafc !important;
+  }
+  .tp-generation-card .tp-gen-btn.no {
+    background:rgba(5,8,18,0.16) !important;
+    border:1px solid rgba(139,220,255,0.09) !important;
+    color:rgba(148,163,184,0.50) !important;
+  }
+  .tp-generation-card .tp-export-btn {
+    width:100% !important;
+    min-height:44px !important;
+    margin-top:8px !important;
+    border:0 !important;
+    border-radius:18px !important;
+    background:rgba(5,8,18,0.18) !important;
+    box-shadow:none !important;
+    color:rgba(203,213,225,0.52) !important;
+  }
 `;
 
 function logFrontendDebug(label, payload) {
@@ -2039,7 +2293,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const isModern = effectiveVer === "P1-20260311" || effectiveVer.startsWith("v3.");
     const isUltra = meshQ === "ultra" && isModern;
     const base = isP1 ? (isText ? 30 : 40) : (isText ? 10 : 20);
-    const hasTex = texOn || pbrOn;
+    const activePbrOn = texOn && pbrOn;
+    const hasTex = texOn || activePbrOn;
     const texAddon = !hasTex ? 0 : tex4K ? 20 : 10;
     const ultraAddon = isUltra ? 20 : 0;
     const slpCost = smartLowPoly ? 10 : 0;
@@ -2302,6 +2557,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         // Build style prefix for text_to_model
         const styleObj = STYLE_PREFIX.find(s => s.id === activeStyle);
         const stylePrefix = (genTab === "text" && styleObj) ? styleObj.prefix : "";
+        const effectivePbrOn = texOn && pbrOn;
         switch (mode) {
           case "generate":
             if (genTab === "text") {
@@ -2311,8 +2567,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
                 ...(tPose && { t_pose: true }),
                 texture: !!texOn,
-                pbr: !!pbrOn,
-                ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
+                pbr: !!effectivePbrOn,
+                ...(texOn && { texture_quality: tex4K ? "detailed" : "standard" }),
                 ...(isUltra && { geometry_quality: "detailed" }),
                 ...(polycount > 0 && { face_limit: polycount }),
                 ...(inParts && { generate_parts: true }),
@@ -2320,7 +2576,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 ...(smartLowPoly && { smart_low_poly: true }),
                 ...(modelSeed != null && { model_seed: modelSeed }),
                 ...(imageSeed != null && { image_seed: imageSeed }),
-                ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
+                ...(texOn && textureSeed != null && { texture_seed: textureSeed }),
                 ...(generationCompress && { compress: generationCompress }),
                 ...(generationOrientation && { orientation: generationOrientation }),
                 ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
@@ -2391,8 +2647,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 ...(negPrompt.trim() && !isP1 && { negative_prompt: negPrompt.trim() }),
                 ...(tPose && { t_pose: true }),
                 texture: !!texOn,
-                pbr: !!pbrOn,
-                ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
+                pbr: !!effectivePbrOn,
+                ...(texOn && { texture_quality: tex4K ? "detailed" : "standard" }),
                 ...(!isP1 && isUltra && { geometry_quality: "detailed" }),
                 ...(polycount > 0 && { face_limit: polycount }),
                 // P1-20260311 does NOT support quad, smart_low_poly, generate_parts, geometry_quality
@@ -2401,7 +2657,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 ...(!isP1 && inParts && { generate_parts: true }),
                 ...(modelSeed != null && { model_seed: modelSeed }),
                 ...(imageSeed != null && { image_seed: imageSeed }),
-                ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
+                ...(texOn && textureSeed != null && { texture_seed: textureSeed }),
                 ...(generationCompress && { compress: generationCompress }),
                 ...(generationOrientation && { orientation: generationOrientation }),
                 ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
@@ -2448,8 +2704,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 ...(negPrompt.trim() && !isP1 && { negative_prompt: negPrompt.trim() }),
                 ...(tPose && { t_pose: true }),
                 texture: !!texOn,
-                pbr: !!pbrOn,
-                ...((texOn || pbrOn) && { texture_quality: tex4K ? "detailed" : "standard" }),
+                pbr: !!effectivePbrOn,
+                ...(texOn && { texture_quality: tex4K ? "detailed" : "standard" }),
                 ...(!isP1 && isUltra && { geometry_quality: "detailed" }),
                 ...(makeBetter && { enable_image_autofix: true }),
                 ...(polycount > 0 && { face_limit: polycount }),
@@ -2458,7 +2714,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 ...(!isP1 && inParts && { generate_parts: true }),
                 ...(modelSeed != null && { model_seed: modelSeed }),
                 ...(imageSeed != null && { image_seed: imageSeed }),
-                ...((texOn || pbrOn) && textureSeed != null && { texture_seed: textureSeed }),
+                ...(texOn && textureSeed != null && { texture_seed: textureSeed }),
                 ...(generationCompress && { compress: generationCompress }),
                 ...(generationOrientation && { orientation: generationOrientation }),
                 ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
@@ -3560,8 +3816,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               )}
             </div>
             {/* Action bar */}
-            <div className="tp-action-dock" style={{ padding: "6px 10px 10px", flexShrink: 0 }}>
-              <div className="tp-action-card" style={{
+            <div className="tp-action-dock tp-generation-dock" style={{ padding: "6px 10px 10px", flexShrink: 0 }}>
+              <div className="tp-action-card tp-generation-card" style={{
                 position: "relative",
                 borderRadius: 12,
                 background: "linear-gradient(160deg,rgba(255,255,255,0.075),rgba(255,255,255,0.030))",
@@ -3579,7 +3835,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                     <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
                   </div>
                   <input
-                    className="tp-input"
+                    className="tp-input tp-asset-name-input"
                     placeholder={prompt ? prompt.trim().split(/\s+/).slice(0, 2).join(" ") || "Model neve…" : "Model neve…"}
                     value={modelName}
                     onChange={e => setModelName(e.target.value)}
@@ -3700,6 +3956,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                       </button>
                       {modelUrl && !isRunning && (
                         <button
+                          className="tp-export-btn"
                           onClick={() => { setDlItem(null); setDlOpen(true); }}
                           style={{
                             width: "100%", marginTop: 6, padding: "7px 0", borderRadius: 8,
