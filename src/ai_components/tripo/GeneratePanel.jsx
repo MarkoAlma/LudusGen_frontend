@@ -684,25 +684,31 @@ const GeneratePanel = memo(({
   const sourceModeRowStyle = {
     display: "flex",
     gap: 0,
-    borderRadius: 22,
+    width: "100%",
+    maxWidth: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
+    borderRadius: 20,
     overflow: "hidden",
     background: "rgba(3,7,18,0.28)",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.045)",
   };
-  const sourceModeBtnStyle = (active, index = 0, count = 1) => ({
+  const sourceModeBtnStyle = (_active, index = 0, count = 1) => ({
     flex: 1,
+    minWidth: 0,
     minHeight: 48,
-    padding: "11px 12px",
+    padding: "9px 6px",
     border: 0,
     borderLeft: index > 0 ? "1px solid rgba(139,220,255,0.12)" : 0,
-    borderRadius: index === 0 ? "22px 0 0 22px" : index === count - 1 ? "0 22px 22px 0" : 0,
-    background: active
-      ? "linear-gradient(145deg, rgba(139,220,255,0.15), rgba(47,140,255,0.10), rgba(255,255,255,0.04))"
-      : "transparent",
-    color: active ? "#f8fafc" : "#94a3b8",
-    fontSize: 10,
+    borderRadius: 0,
+    background: "transparent",
+    color: "#94a3b8",
+    fontSize: count >= 3 ? 9.5 : 10.25,
     fontWeight: 900,
-    letterSpacing: "0.12em",
+    letterSpacing: "0.02em",
+    lineHeight: 1.05,
+    whiteSpace: "nowrap",
+    textAlign: "center",
     textTransform: "uppercase",
     cursor: "pointer",
     boxShadow: "none",
@@ -789,31 +795,41 @@ const GeneratePanel = memo(({
   return (
     <>
       {/* ── Tab bar ── */}
-      <div className="tp-gen-tabs" style={{ display: "flex", gap: 3, padding: "3px", background: "rgba(255,255,255,0.06)", borderRadius: 11, marginBottom: 14 }}>
+      <div className="tp-gen-tabs" style={{ display: "flex", width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box", gap: 0, padding: 0, overflow: "hidden", background: "rgba(255,255,255,0.06)", borderRadius: 22, marginBottom: 14 }}>
         {GEN_TABS.map(t => {
           const tabCap = { image: true, text: true, multi: caps.multiview };
           const disabled = !tabCap[t.id];
           return (
             <button
               key={t.id}
-              className={"tp-inp-tab" + (genTab === t.id ? " active" : "") + (disabled ? " model-na" : "")}
+              type="button"
+              className={"tp-inp-tab-clean" + (genTab === t.id ? " active" : "") + (disabled ? " model-na" : "")}
+              data-tooltip={t.label}
+              aria-label={t.label}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
+                if (disabled) return;
                 setGenTab(t.id);
               }}
               title={disabled ? `Not available with ${modelVer}` : t.tip}
               style={{
                 flex: 1,
+                minWidth: 0,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 6,
-                color: genTab === t.id ? "#0a0a1a" : "#64748b",
+                gap: 0,
+                borderRadius: 0,
+                border: 0,
+                margin: 0,
+                color: genTab === t.id ? "#e2e8f0" : "#94a3b8",
                 cursor: disabled ? "not-allowed" : "pointer",
                 padding: "8px 0",
+                opacity: disabled ? 0.35 : 1,
               }}
             >
-              <t.icon size={15} />
-              <span style={{ fontSize: 12, fontWeight: 700 }}>{t.label}</span>
+              <t.icon size={15} className="tp-tab-icon" />
+              <span className="tp-tab-label" style={{ fontSize: 12, fontWeight: 700 }}>{t.label}</span>
             </button>
           );
         })}
@@ -825,12 +841,12 @@ const GeneratePanel = memo(({
       {genTab === "image" && (
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
           <div className="tp-source-mode-row" style={sourceModeRowStyle}>
-            <button type="button" className={"tp-source-mode-btn" + (imageSourceMode === "upload" ? " active" : "")} onClick={() => setImageSourceMode("upload")} style={sourceModeBtnStyle(imageSourceMode === "upload", 0, 2)}>Upload Source</button>
-            <button type="button" className={"tp-source-mode-btn" + (imageSourceMode === "generate_image" ? " active" : "")} onClick={() => setImageSourceMode("generate_image")} style={sourceModeBtnStyle(imageSourceMode === "generate_image", 1, 2)}>Generate Image</button>
+            <button type="button" className={"tp-source-mode-btn-clean" + (imageSourceMode === "upload" ? " active" : "")} data-active={imageSourceMode === "upload" ? "true" : "false"} aria-pressed={imageSourceMode === "upload"} onMouseDown={(e) => e.preventDefault()} onClick={() => setImageSourceMode("upload")} style={sourceModeBtnStyle(imageSourceMode === "upload", 0, 2)}>Upload Source</button>
+            <button type="button" className={"tp-source-mode-btn-clean" + (imageSourceMode === "generate_image" ? " active" : "")} data-active={imageSourceMode === "generate_image" ? "true" : "false"} aria-pressed={imageSourceMode === "generate_image"} onMouseDown={(e) => e.preventDefault()} onClick={() => setImageSourceMode("generate_image")} style={sourceModeBtnStyle(imageSourceMode === "generate_image", 1, 2)}>Generate Image</button>
           </div>
 
           {imageSourceMode === "generate_image" && (
-            <div className="tp-inline-option-card" style={{ padding: 12, borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div>
                 <label style={labelStyle}>Image Prompt</label>
                 <textarea
@@ -882,13 +898,13 @@ const GeneratePanel = memo(({
       {genTab === "multi" && (
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
           <div className="tp-source-mode-row" style={sourceModeRowStyle}>
-            <button type="button" className={"tp-source-mode-btn" + (multiviewSourceMode === "upload" ? " active" : "")} onClick={() => setMultiviewSourceMode("upload")} style={sourceModeBtnStyle(multiviewSourceMode === "upload", 0, 3)}>Upload Views</button>
-            <button type="button" className={"tp-source-mode-btn" + (multiviewSourceMode === "generate_multiview_image" ? " active" : "")} onClick={() => setMultiviewSourceMode("generate_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "generate_multiview_image", 1, 3)}>Generate Views</button>
-            <button type="button" className={"tp-source-mode-btn" + (multiviewSourceMode === "edit_multiview_image" ? " active" : "")} onClick={() => setMultiviewSourceMode("edit_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "edit_multiview_image", 2, 3)}>Edit Views</button>
+            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "upload" ? " active" : "")} data-active={multiviewSourceMode === "upload" ? "true" : "false"} aria-pressed={multiviewSourceMode === "upload"} onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("upload")} style={sourceModeBtnStyle(multiviewSourceMode === "upload", 0, 3)}>Upload Views</button>
+            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "generate_multiview_image" ? " active" : "")} data-active={multiviewSourceMode === "generate_multiview_image" ? "true" : "false"} aria-pressed={multiviewSourceMode === "generate_multiview_image"} onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("generate_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "generate_multiview_image", 1, 3)}>Generate Views</button>
+            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "edit_multiview_image" ? " active" : "")} data-active={multiviewSourceMode === "edit_multiview_image" ? "true" : "false"} aria-pressed={multiviewSourceMode === "edit_multiview_image"} onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("edit_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "edit_multiview_image", 2, 3)}>Edit Views</button>
           </div>
 
           {multiviewSourceMode !== "upload" && (
-            <div className="tp-inline-option-card" style={{ padding: 12, borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div>
                 <label style={labelStyle}>{multiviewSourceMode === "edit_multiview_image" ? "Edit Prompt" : "Multiview Prompt"}</label>
                 <textarea
@@ -967,28 +983,20 @@ const GeneratePanel = memo(({
             <label style={{ color: "#64748b", fontSize: 11, fontWeight: 600, display: "block", marginBottom: 6 }}>
               Style
             </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+            <div className="tp-style-grid">
               {STYLE_PREFIX.map(s => {
                 const active = activeStyles === s.id;
                 return (
                   <button
                     key={s.id}
+                    type="button"
+                    className={"tp-style-chip" + (active ? " active" : "")}
+                    data-active={active ? "true" : "false"}
+                    aria-pressed={active}
                     onClick={() => onStyleToggle(s.id)}
                     title={s.prefix}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 5,
-                      padding: "7px 13px", borderRadius: 11,
-                      fontSize: 12, fontWeight: 600,
-                      cursor: "pointer",
-                      border: active ? "1px solid rgba(47,140,255,0.38)" : "1px solid rgba(255,255,255,0.06)",
-                      background: active ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.035)",
-                      color: active ? "#f8fafc" : "#64748b",
-                      transition: "all 0.15s ease",
-                      fontFamily: "'SF Pro Text', system-ui, sans-serif",
-                    }}
                   >
-                    <span style={{ fontSize: 14 }}>{s.icon}</span>
-                    {s.label}
+                    <span className="tp-style-chip-label">{s.label}</span>
                   </button>
                 );
               })}
@@ -1262,28 +1270,25 @@ const GeneratePanel = memo(({
         {/* Ultra — model-na when not supported */}
         <Na unsupported={!caps.ultraMesh} tip={`Ultra quality not supported by ${modelVer} — requires P1-20260311 or v3.x`}>
           <button
-            className="tp-qual-btn"
+            type="button"
+            className={"tp-qual-btn" + (meshQ === "ultra" && caps.ultraMesh ? " sel" : "")}
             onClick={() => caps.ultraMesh && setMeshQ("ultra")}
+            disabled={!caps.ultraMesh}
             title={caps.ultraMesh ? "geometry_quality: detailed" : `Requires P1-20260311 or v3.x`}
             style={{
-              background: meshQ === "ultra" && caps.ultraMesh ? "rgba(255,255,255,0.075)" : "rgba(255,255,255,0.05)",
-              color: meshQ === "ultra" && caps.ultraMesh ? "#8bdcff" : "#64748b",
-              outline: meshQ === "ultra" && caps.ultraMesh ? "1.5px solid rgba(47,140,255,0.38)" : "1.5px solid rgba(255,255,255,0.07)",
               cursor: caps.ultraMesh ? "pointer" : "not-allowed",
+              opacity: caps.ultraMesh ? 1 : 0.5,
             }}>
             Ultra
           </button>
         </Na>
         {/* Standard — always available */}
         <button
-          className="tp-qual-btn"
+          type="button"
+          className={"tp-qual-btn" + (meshQ === "standard" || !caps.ultraMesh ? " sel" : "")}
           onClick={() => setMeshQ("standard")}
           title="geometry_quality: standard"
-          style={{
-            background: meshQ === "standard" || !caps.ultraMesh ? "rgba(255,255,255,0.075)" : "rgba(255,255,255,0.05)",
-            color: meshQ === "standard" || !caps.ultraMesh ? "#8bdcff" : "#64748b",
-            outline: meshQ === "standard" || !caps.ultraMesh ? "1.5px solid rgba(47,140,255,0.38)" : "1.5px solid rgba(255,255,255,0.07)",
-          }}>
+        >
           Standard
         </button>
       </div>

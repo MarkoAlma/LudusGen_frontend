@@ -240,7 +240,19 @@ const CSS = `
   .tp-mode-kicker::before { content:''; width:8px; height:8px; border-radius:999px; background:linear-gradient(135deg,var(--tp-mode-a),var(--tp-mode-b)); box-shadow:0 0 20px color-mix(in srgb, var(--tp-mode-a) 52%, transparent); }
   .tp-panel-title { position:relative; margin:0; min-height:24px; color:#fff; text-shadow:none; }
   .tp-panel-desc { position:relative; margin:9px 0 0; color:rgba(203,213,225,0.78); font-size:11px; font-weight:800; line-height:1.58; }
-  .tp-sub-tabs { position:relative; display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; padding:5px; border:1px solid rgba(255,255,255,0.09); border-radius:24px; background:rgba(3,0,10,0.32); box-shadow:inset 0 1px 0 rgba(255,255,255,0.06); }
+  .tp-sub-tabs {
+    position:relative;
+    display:flex;
+    flex-wrap:nowrap;
+    gap:0;
+    margin-top:14px;
+    padding:0;
+    border:1px solid rgba(139,220,255,0.13);
+    border-radius:20px;
+    overflow:hidden;
+    background:rgba(5,8,18,0.18);
+    box-shadow:none;
+  }
   .tp-panel-scroll { position:relative; z-index:2; padding:16px 14px 14px; scrollbar-width:thin; scrollbar-color:rgba(0,229,255,0.22) transparent; }
   .tp-panel-scroll::-webkit-scrollbar { width:4px; }
   .tp-panel-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.16); border-radius:999px; }
@@ -265,10 +277,35 @@ const CSS = `
   .tp-ta::placeholder { color:var(--text-muted); }
   .tp-ta:focus { border-color:var(--border-accent);outline:none;box-shadow:0 0 0 3px rgba(47,140,255,0.12),0 0 20px rgba(47,140,255,0.10); }
   .tp-drop:hover { border-color:rgba(47,140,255,0.28) !important;box-shadow:0 12px 32px rgba(0,0,0,0.18),0 0 22px rgba(47,140,255,0.12); }
-  .tp-sub-tab { padding:10px 12px;border-radius:18px;font-size:10px;font-weight:950;cursor:pointer;border:1px solid transparent;transition:background 0.16s, color 0.16s, border-color 0.16s, box-shadow 0.16s, transform 0.16s;font-family:inherit;letter-spacing:0.08em;text-transform:uppercase; }
-  .tp-sub-tab.on { background:linear-gradient(135deg,color-mix(in srgb, var(--tp-mode-a) 34%, rgba(255,255,255,0.08)),color-mix(in srgb, var(--tp-mode-b) 22%, rgba(255,255,255,0.06)));color:#fff;border-color:color-mix(in srgb, var(--tp-mode-b) 46%, rgba(255,255,255,0.12));box-shadow:0 12px 30px rgba(0,0,0,0.26),0 0 26px color-mix(in srgb, var(--tp-mode-a) 22%, transparent),inset 0 1px 0 rgba(255,255,255,0.20); }
-  .tp-sub-tab:not(.on) { background:rgba(255,255,255,0.045);color:rgba(203,213,225,0.60);border-color:rgba(255,255,255,0.08); }
-  .tp-sub-tab:not(.on):hover { color:rgba(255,255,255,0.92);background:rgba(0,229,255,0.070);border-color:rgba(0,229,255,0.18);transform:translateY(-1px); }
+  .tp-sub-tab {
+    flex:1 1 auto;
+    min-height:48px;
+    padding:10px 12px;
+    border:0;
+    border-radius:0;
+    background:transparent;
+    color:rgba(203,213,225,0.72);
+    font-size:10px;
+    font-weight:950;
+    cursor:pointer;
+    transition:background 0.16s, color 0.16s;
+    font-family:inherit;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:none;
+  }
+  .tp-sub-tab + .tp-sub-tab { border-left:1px solid rgba(139,220,255,0.13); }
+  .tp-sub-tab:first-child { border-radius:20px 0 0 20px; }
+  .tp-sub-tab:last-child { border-radius:0 20px 20px 0; }
+  .tp-sub-tab.on {
+    background:linear-gradient(145deg,rgba(138,43,226,0.18),rgba(47,140,255,0.13),rgba(0,229,255,0.06));
+    color:#f8fafc;
+  }
+  .tp-sub-tab:not(.on):hover { color:rgba(255,255,255,0.92); background:rgba(255,255,255,0.035); }
+  .tp-sub-tab:disabled { opacity:0.42; cursor:not-allowed; }
   .tp-workflow-page { --tp-mode-a:#2f8cff; --tp-mode-b:#8bdcff; display:flex; flex-direction:column; gap:12px; min-width:0; }
   .tp-workflow-page > div { margin-bottom:0 !important; }
   .tp-workflow-page > div:empty { display:none !important; }
@@ -380,17 +417,17 @@ const CSS = `
     border-color:color-mix(in srgb, var(--tp-mode-a) 54%, rgba(255,255,255,0.10)) !important;
     box-shadow:0 0 0 3px rgba(47,140,255,0.12),0 0 20px rgba(47,140,255,0.10) !important;
   }
-  .tp-workflow-page button:not(.tp-sub-tab) {
+  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-inp-tab-clean):not(.tp-source-mode-btn):not(.tp-source-mode-btn-clean):not(.tp-qual-btn):not(.tp-topo-btn):not(.tp-style-chip) {
     border-radius:9px !important;
     border:1px solid rgba(255,255,255,0.08) !important;
     font-weight:900 !important;
     transition:background 0.18s, border-color 0.18s, color 0.18s, opacity 0.18s, box-shadow 0.18s !important;
   }
-  .tp-workflow-page button:not(.tp-sub-tab):hover {
+  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-inp-tab-clean):not(.tp-source-mode-btn):not(.tp-source-mode-btn-clean):not(.tp-qual-btn):not(.tp-topo-btn):not(.tp-style-chip):hover {
     border-color:rgba(47,140,255,0.28) !important;
     box-shadow:0 10px 26px rgba(0,0,0,0.17),0 0 22px rgba(47,140,255,0.12) !important;
   }
-  .tp-inp-tab { min-height:38px; flex:1;padding:8px 8px !important;border:1px solid transparent !important;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:9px !important;transition:background 0.18s, color 0.18s,border-color 0.18s,box-shadow 0.18s;font-family:inherit;background:transparent !important;color:rgba(148,163,184,0.72) !important; }
+  .tp-inp-tab { min-height:38px; flex:1;padding:8px 8px !important;border:1px solid transparent !important;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:0 !important;transition:background 0.18s, color 0.18s,border-color 0.18s,box-shadow 0.18s;font-family:inherit;background:transparent !important;color:rgba(148,163,184,0.72) !important; }
   .tp-inp-tab.active { background:linear-gradient(135deg,rgba(255,255,255,0.085),rgba(47,140,255,0.10)) !important;color:#f8fafc !important;border-color:rgba(47,140,255,0.30) !important;box-shadow:0 10px 22px rgba(0,0,0,0.16),0 0 20px rgba(47,140,255,0.12) !important; }
   .tp-model-card,
   .anim-card,
@@ -418,7 +455,7 @@ const CSS = `
     color:rgba(226,232,240,0.82) !important;
   }
   .tp-topo-btn.sel,
-  .tp-qual-btn[style*="rgba(108,99,255"],
+  .tp-qual-btn.sel,
   .auto-rig-btn.ready {
     background:linear-gradient(135deg,rgba(255,255,255,0.082),rgba(47,140,255,0.10)) !important;
     border-color:rgba(47,140,255,0.30) !important;
@@ -511,7 +548,7 @@ const CSS = `
   }
   .tp-inp-tab {
     min-height:74px !important;
-    border-radius:18px !important;
+    border-radius:0 !important;
     gap:8px !important;
     background:linear-gradient(145deg,rgba(255,255,255,0.040),rgba(255,255,255,0.014)) !important;
     border:1px solid rgba(255,255,255,0.065) !important;
@@ -559,9 +596,8 @@ const CSS = `
   .tp-model-dd-menu { padding:6px !important; background:rgba(9,8,13,0.96) !important; }
   .tp-model-dd-option { border-radius:14px !important; border-bottom:0 !important; }
   .tp-model-dd-option:hover { background:rgba(139,220,255,0.10) !important; }
-  .tp-source-mode-row { gap:12px !important; margin-top:2px; }
-  .tp-source-mode-row > button,
-  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-rail-btn):not(.tp-gen-btn):not(.tp-inp-tab) {
+  .tp-source-mode-row { gap:0 !important; margin-top:2px; }
+  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-rail-btn):not(.tp-gen-btn):not(.tp-inp-tab):not(.tp-inp-tab-clean):not(.tp-source-mode-btn):not(.tp-source-mode-btn-clean):not(.tp-qual-btn):not(.tp-topo-btn):not(.tp-style-chip) {
     min-height:44px;
     border-radius:18px !important;
     border:1px solid rgba(255,255,255,0.095) !important;
@@ -570,8 +606,7 @@ const CSS = `
     box-shadow:inset 0 1px 0 rgba(255,255,255,0.052) !important;
     backdrop-filter:blur(18px);
   }
-  .tp-source-mode-row > button:hover,
-  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-rail-btn):not(.tp-gen-btn):not(.tp-inp-tab):hover {
+  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-rail-btn):not(.tp-gen-btn):not(.tp-inp-tab):not(.tp-inp-tab-clean):not(.tp-source-mode-btn):not(.tp-source-mode-btn-clean):not(.tp-qual-btn):not(.tp-topo-btn):not(.tp-style-chip):hover {
     transform:translateY(-1px);
     color:#fff !important;
     border-color:rgba(139,220,255,0.30) !important;
@@ -618,21 +653,21 @@ const CSS = `
   .tp-qual-btn,
   .tp-topo-btn {
     min-height:56px !important;
-    border-radius:18px !important;
+    border-radius:0 !important;
     font-size:13px !important;
     font-weight:950 !important;
-    background:linear-gradient(145deg,rgba(255,255,255,0.050),rgba(255,255,255,0.018)) !important;
-    outline:1px solid rgba(255,255,255,0.08) !important;
+    background:transparent !important;
+    outline:none !important;
     color:rgba(226,232,240,0.78) !important;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05) !important;
+    box-shadow:none !important;
+    border:0 !important;
   }
-  .tp-qual-btn[style*="rgba(255, 255, 255, 0.075)"],
-  .tp-qual-btn[style*="rgba(255,255,255,0.075)"],
+  .tp-qual-btn.sel,
   .tp-topo-btn.sel {
     background:linear-gradient(145deg,rgba(139,220,255,0.18),rgba(47,140,255,0.11),rgba(255,255,255,0.045)) !important;
     color:#f8fafc !important;
-    outline:1.5px solid rgba(47,140,255,0.46) !important;
-    box-shadow:0 16px 36px rgba(0,0,0,0.24),0 0 30px rgba(47,140,255,0.16),inset 0 1px 0 rgba(255,255,255,0.14) !important;
+    outline:none !important;
+    box-shadow:none !important;
   }
   .sec-row {
     padding:14px 12px !important;
@@ -729,39 +764,49 @@ const CSS = `
 
   .tp-workflow-page .tp-gen-tabs {
     min-height:54px !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
     padding:0 !important;
     gap:0 !important;
     border:0 !important;
-    background:transparent !important;
-    box-shadow:none !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.058),rgba(255,255,255,0.018)) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.075),0 12px 30px rgba(0,0,0,0.16) !important;
     overflow:hidden !important;
-    border-radius:22px !important;
+    border-radius:20px !important;
     margin-bottom:12px !important;
+    isolation:isolate !important;
   }
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab,
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab:hover,
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab:focus,
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active {
     min-height:54px !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
     border:0 !important;
     border-radius:0 !important;
     box-shadow:none !important;
     outline:0 !important;
-    background:rgba(255,255,255,0.014) !important;
+    background:transparent !important;
     transform:none !important;
-  }
-  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:first-child {
-    border-radius:22px 0 0 22px !important;
-  }
-  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:last-child {
-    border-radius:0 22px 22px 0 !important;
-  }
-  .tp-workflow-page .tp-gen-tabs .tp-inp-tab + .tp-inp-tab {
-    border-left:1px solid rgba(139,220,255,0.13) !important;
+    margin:0 !important;
+    backdrop-filter:none !important;
   }
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active {
-    background:linear-gradient(145deg,rgba(138,43,226,0.20),rgba(47,140,255,0.16),rgba(0,229,255,0.08)) !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.16),rgba(139,220,255,0.075)) !important;
     color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.14) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:first-child {
+    border-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:nth-child(2) {
+    border-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:last-child {
+    border-radius:0 !important;
   }
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab span { display:none !important; }
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab svg { width:21px !important; height:21px !important; }
@@ -769,10 +814,15 @@ const CSS = `
   .tp-workflow-page .tp-source-mode-row,
   .tp-workflow-page .tp-flat-segment-row {
     gap:0 !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
     border-radius:20px !important;
     overflow:hidden !important;
-    background:rgba(5,8,18,0.18) !important;
-    box-shadow:none !important;
+    border:1px solid rgba(255,255,255,0.075) !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.050),rgba(255,255,255,0.016)) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.070),0 12px 30px rgba(0,0,0,0.16) !important;
   }
   .tp-workflow-page .tp-source-mode-row > button,
   .tp-workflow-page .tp-source-mode-row > button:hover,
@@ -785,6 +835,8 @@ const CSS = `
   .tp-workflow-page .tp-flat-segment-row > .model-na > button:hover,
   .tp-workflow-page .tp-flat-segment-row > .model-na > button:focus {
     min-height:48px !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
     border:0 !important;
     outline:0 !important;
     box-shadow:none !important;
@@ -801,15 +853,13 @@ const CSS = `
     flex:1 !important;
     width:100% !important;
   }
-  .tp-workflow-page .tp-source-mode-row > button:first-child,
   .tp-workflow-page .tp-flat-segment-row > button:first-child,
   .tp-workflow-page .tp-flat-segment-row > .model-na:first-child > button {
-    border-radius:20px 0 0 20px !important;
+    border-radius:0 !important;
   }
-  .tp-workflow-page .tp-source-mode-row > button:last-child,
   .tp-workflow-page .tp-flat-segment-row > button:last-child,
   .tp-workflow-page .tp-flat-segment-row > .model-na:last-child > button {
-    border-radius:0 20px 20px 0 !important;
+    border-radius:0 !important;
   }
   .tp-workflow-page .tp-source-mode-row > button + button,
   .tp-workflow-page .tp-flat-segment-row > button + button,
@@ -817,7 +867,12 @@ const CSS = `
   .tp-workflow-page .tp-flat-segment-row > button + .model-na > button {
     border-left:1px solid rgba(139,220,255,0.13) !important;
   }
-  .tp-workflow-page .tp-source-mode-btn.active,
+  .tp-workflow-page .tp-source-mode-btn.active {
+    background:linear-gradient(145deg,rgba(255,255,255,0.17),rgba(139,220,255,0.075)) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.16) !important;
+    text-shadow:none !important;
+  }
   .tp-workflow-page .tp-flat-segment-row > .sel,
   .tp-workflow-page .tp-flat-segment-row > .model-na > .sel {
     background:linear-gradient(145deg,rgba(138,43,226,0.18),rgba(47,140,255,0.13),rgba(0,229,255,0.06)) !important;
@@ -826,11 +881,125 @@ const CSS = `
   .tp-workflow-page .tp-source-mode-row > button,
   .tp-workflow-page .tp-flat-segment-row > button,
   .tp-workflow-page .tp-flat-segment-row > .model-na > button {
-    font-size:10px !important;
+    font-size:9.5px !important;
     font-weight:950 !important;
-    letter-spacing:0.14em !important;
+    letter-spacing:0.08em !important;
+    line-height:1 !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
     text-transform:uppercase !important;
     color:rgba(203,213,225,0.72) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:focus {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:active {
+    border-top-left-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2),
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):active {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:active {
+    border-top-left-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child {
+    border-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:not(:first-child):not(:last-child) {
+    border-radius:0 !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"] {
+    background:linear-gradient(145deg,rgba(255,255,255,0.17),rgba(139,220,255,0.075)) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.16) !important;
+    text-shadow:none !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"] {
+    background:transparent !important;
+    color:rgba(203,213,225,0.72) !important;
+    box-shadow:none !important;
+  }
+  .tp-workflow-page .tp-style-grid {
+    display:grid !important;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:8px !important;
+  }
+  .tp-workflow-page .tp-style-chip,
+  .tp-workflow-page .tp-style-chip:hover,
+  .tp-workflow-page .tp-style-chip:focus {
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:0 !important;
+    width:100% !important;
+    min-height:42px !important;
+    padding:0 12px !important;
+    border-radius:999px !important;
+    border:1px solid rgba(139,220,255,0.13) !important;
+    background:rgba(255,255,255,0.035) !important;
+    color:rgba(203,213,225,0.82) !important;
+    box-shadow:none !important;
+    transform:none !important;
+    overflow:hidden !important;
+  }
+  .tp-workflow-page .tp-style-chip[data-active="true"] {
+    background:linear-gradient(145deg,rgba(138,43,226,0.20),rgba(47,140,255,0.16),rgba(0,229,255,0.08)) !important;
+    border-color:rgba(139,220,255,0.36) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.16),0 0 24px rgba(47,140,255,0.16) !important;
+  }
+  .tp-workflow-page .tp-style-chip-icon {
+    font-size:14px !important;
+    line-height:1 !important;
+    flex:0 0 auto !important;
+    opacity:0.92;
+  }
+  .tp-workflow-page .tp-style-chip-label {
+    width:100% !important;
+    min-width:0 !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+    text-align:center !important;
+    font-size:12px !important;
+    font-weight:900 !important;
+    letter-spacing:0.01em !important;
   }
 
   .tp-custom-select { position:relative; z-index:20; }
@@ -946,6 +1115,356 @@ const CSS = `
     background:rgba(5,8,18,0.18) !important;
     box-shadow:none !important;
     color:rgba(203,213,225,0.52) !important;
+  }
+
+  /* UX stability patch: segmented controls (source mode + quality/topology) */
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn {
+    padding:9px 6px !important;
+    font-size:clamp(9px, 0.95vw, 10.5px) !important;
+    font-weight:850 !important;
+    letter-spacing:0.02em !important;
+    line-height:1.05 !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:clip !important;
+    text-align:center !important;
+    transition:background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.12s !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"]:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"]:focus-visible {
+    background:linear-gradient(145deg,rgba(255,255,255,0.09),rgba(139,220,255,0.06)) !important;
+    color:#e2e8f0 !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 0 18px rgba(47,140,255,0.09) !important;
+  }
+  .tp-workflow-page .tp-flat-segment-row > button,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button {
+    transition:background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.12s !important;
+  }
+  .tp-workflow-page .tp-flat-segment-row > button:not(.sel):not(:disabled):hover,
+  .tp-workflow-page .tp-flat-segment-row > button:not(.sel):not(:disabled):focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(.sel):not(:disabled):hover,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(.sel):not(:disabled):focus-visible {
+    background:linear-gradient(145deg,rgba(255,255,255,0.09),rgba(139,220,255,0.06)) !important;
+    color:#e2e8f0 !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 0 18px rgba(47,140,255,0.09) !important;
+  }
+  .tp-workflow-page .tp-flat-segment-row > .sel,
+  .tp-workflow-page .tp-flat-segment-row > .sel:hover,
+  .tp-workflow-page .tp-flat-segment-row > .sel:focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel:hover,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel:focus-visible {
+    background:linear-gradient(145deg,rgba(138,43,226,0.24),rgba(47,140,255,0.16),rgba(0,229,255,0.08)) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.14),0 0 22px rgba(47,140,255,0.12) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:not(:disabled):active,
+  .tp-workflow-page .tp-flat-segment-row > button:not(:disabled):active,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(:disabled):active {
+    transform:scale(0.985) !important;
+  }
+
+  /* Final segmented-control pass: single-plane rows, divider lines, stable active state */
+  .tp-workflow-page .tp-gen-tabs,
+  .tp-workflow-page .tp-source-mode-row,
+  .tp-workflow-page .tp-flat-segment-row {
+    gap:0 !important;
+    padding:0 !important;
+    overflow:hidden !important;
+    border-radius:20px !important;
+    border:1px solid rgba(139,220,255,0.16) !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.058),rgba(255,255,255,0.02)) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs {
+    min-height:56px !important;
+  }
+  .tp-workflow-page .tp-source-mode-row,
+  .tp-workflow-page .tp-flat-segment-row {
+    min-height:52px !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > button,
+  .tp-workflow-page .tp-flat-segment-row > button:hover,
+  .tp-workflow-page .tp-flat-segment-row > button:focus,
+  .tp-workflow-page .tp-flat-segment-row > button:focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:hover,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:focus,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:focus-visible {
+    margin:0 !important;
+    border:0 !important;
+    border-radius:0 !important;
+    outline:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+    transform:none !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab + .tp-inp-tab,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn + .tp-source-mode-btn,
+  .tp-workflow-page .tp-flat-segment-row > button + button,
+  .tp-workflow-page .tp-flat-segment-row > .model-na + button,
+  .tp-workflow-page .tp-flat-segment-row > button + .model-na > button {
+    border-left:1px solid rgba(139,220,255,0.2) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn,
+  .tp-workflow-page .tp-flat-segment-row > button,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button {
+    min-height:52px !important;
+    padding:0 14px !important;
+    font-size:clamp(10px, 0.95vw, 11.5px) !important;
+    font-weight:900 !important;
+    letter-spacing:0.04em !important;
+    line-height:1.15 !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    text-align:center !important;
+    color:rgba(203,213,225,0.8) !important;
+    transition:background 0.16s, color 0.16s, box-shadow 0.16s !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab {
+    min-height:56px !important;
+    padding:0 10px !important;
+    color:rgba(203,213,225,0.8) !important;
+    transition:background 0.16s, color 0.16s, box-shadow 0.16s !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"],
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .sel,
+  .tp-workflow-page .tp-flat-segment-row > .sel:hover,
+  .tp-workflow-page .tp-flat-segment-row > .sel:focus,
+  .tp-workflow-page .tp-flat-segment-row > .sel:focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel:hover,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel:focus,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel:focus-visible {
+    background:linear-gradient(145deg,rgba(255,255,255,0.16),rgba(139,220,255,0.09)) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.14) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"]:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"]:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"]:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:not(.active):hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:not(.active):focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:not(.active):focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > button:not(.sel):not(:disabled):hover,
+  .tp-workflow-page .tp-flat-segment-row > button:not(.sel):not(:disabled):focus,
+  .tp-workflow-page .tp-flat-segment-row > button:not(.sel):not(:disabled):focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(.sel):not(:disabled):hover,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(.sel):not(:disabled):focus,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(.sel):not(:disabled):focus-visible {
+    background:rgba(255,255,255,0.06) !important;
+    color:#e2e8f0 !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.11) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:not(:first-child):not(:last-child),
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"] {
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.14) !important;
+  }
+  /* Hard stop: never allow inner rounding on segmented controls */
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:hover,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:focus,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:focus-visible,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:active,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active:hover,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active:focus,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:active,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2),
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):active,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:focus-visible,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"],
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:focus-visible,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child:focus-visible,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child:focus-visible,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child:active {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+    box-shadow:none !important;
+    clip-path:inset(0) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs *,
+  .tp-workflow-page .tp-gen-tabs *::before,
+  .tp-workflow-page .tp-gen-tabs *::after,
+  .tp-workflow-page .tp-source-mode-row *,
+  .tp-workflow-page .tp-source-mode-row *::before,
+  .tp-workflow-page .tp-source-mode-row *::after {
+    border-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"] {
+    box-shadow:none !important;
+    background-clip:padding-box !important;
+  }
+  /* Clean segmented controls used by GeneratePanel to avoid legacy radius conflicts */
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:active,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean.active {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+    border:0 !important;
+    outline:0 !important;
+    box-shadow:none !important;
+    text-shadow:none !important;
+    transform:none !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean + .tp-inp-tab-clean,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean + .tp-source-mode-btn-clean {
+    border-left:1px solid rgba(139,220,255,0.2) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.model-na {
+    pointer-events:none !important;
+    opacity:0.35 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean {
+    position:relative !important;
+    color:rgba(203,213,225,0.82) !important;
+    gap:0 !important;
+    overflow:visible !important;
+  }
+  .tp-workflow-page .tp-gen-tabs {
+    overflow:visible !important;
+    position:relative !important;
+    z-index:5 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:not(.active):hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:not(.active):focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:not(.active):focus-visible {
+    background:rgba(255,255,255,0.06) !important;
+    color:#e2e8f0 !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.10) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.active,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.active:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.active:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.active:focus-visible {
+    background:linear-gradient(145deg,rgba(255,255,255,0.16),rgba(139,220,255,0.09)) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.14) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean .tp-tab-icon {
+    width:20px !important;
+    height:20px !important;
+    flex:0 0 auto !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean .tp-tab-label {
+    display:none !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean::after {
+    content:attr(data-tooltip);
+    position:absolute;
+    left:50%;
+    top:calc(100% + 8px);
+    transform:translateX(-50%) translateY(-4px);
+    padding:5px 8px;
+    border-radius:8px;
+    background:rgba(3,7,18,0.96);
+    border:1px solid rgba(139,220,255,0.24);
+    color:#e2e8f0;
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:0.03em;
+    white-space:nowrap;
+    opacity:0;
+    pointer-events:none;
+    z-index:30;
+    transition:opacity 0.14s ease, transform 0.14s ease !important;
+    box-shadow:0 8px 18px rgba(0,0,0,0.35);
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean::before {
+    content:"";
+    position:absolute;
+    left:50%;
+    top:calc(100% + 3px);
+    transform:translateX(-50%) translateY(-4px) rotate(45deg);
+    width:8px;
+    height:8px;
+    border-left:1px solid rgba(139,220,255,0.24);
+    border-top:1px solid rgba(139,220,255,0.24);
+    background:rgba(3,7,18,0.96);
+    opacity:0;
+    pointer-events:none;
+    z-index:29;
+    transition:opacity 0.14s ease, transform 0.14s ease !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:hover::after,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:focus::after,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:focus-visible::after {
+    opacity:1 !important;
+    transform:translateX(-50%) translateY(0) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:hover::before,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:focus::before,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:focus-visible::before {
+    opacity:1 !important;
+    transform:translateX(-50%) translateY(0) rotate(45deg) !important;
   }
 `;
 
