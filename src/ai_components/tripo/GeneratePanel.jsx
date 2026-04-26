@@ -8,11 +8,12 @@ import {
 } from "lucide-react";
 import Enhancer from "../Enhancer";
 import { Tooltip } from "../meshy/ui/Primitives";
+import { MULTIVIEW_UPLOAD_ORDER } from "./multiviewUtils";
 
 /* ─── Tab definitions ─────────────────────────────────────────────────── */
 export const GEN_TABS = [
   { id: "image", icon: Images, label: "Image(s)", tip: "Upload 1-10 source images for high-fidelity reconstruction" },
-  { id: "multi", icon: Box, label: "Multi-view", tip: "Upload 4 specific angles (Front, Left, Right, Back) for maximum control" },
+  { id: "multi", icon: Box, label: "Multi-view", tip: "Upload Tripo views in order: Front, Left, Back, Right" },
   { id: "text", icon: Type, label: "Text", tip: "AI-driven Text-to-3D generation via descriptive prompts" },
 ];
 
@@ -608,14 +609,37 @@ const GeneratePanel = memo(({
   activeStyles = [],
   onStyleToggle = () => { },
 }) => {
-  const MV_SLOTS = [
-    { label: "Front", icon: <User style={{ width: 14, height: 14 }} /> },
-    { label: "Left", icon: <ChevronLeft style={{ width: 14, height: 14 }} /> },
-    { label: "Right", icon: <ChevronRight style={{ width: 14, height: 14 }} /> },
-    { label: "Back", icon: <User style={{ width: 14, height: 14, opacity: 0.5 }} /> },
-  ];
+  const slotIcons = {
+    front: <User style={{ width: 14, height: 14 }} />,
+    left: <ChevronLeft style={{ width: 14, height: 14 }} />,
+    back: <User style={{ width: 14, height: 14, opacity: 0.5 }} />,
+    right: <ChevronRight style={{ width: 14, height: 14 }} />,
+  };
+  const MV_SLOTS = MULTIVIEW_UPLOAD_ORDER.map((slot) => ({
+    ...slot,
+    icon: slotIcons[slot.id],
+  }));
   const batchInputRef = useRef(null);
   const isUploadedItemReady = (item) => Boolean(item?.token || item?.tripoFile);
+  const uploadedMultiviewCount = MULTIVIEW_UPLOAD_ORDER.reduce(
+    (count, _, index) => count + (isUploadedItemReady(multiImages?.[index]) ? 1 : 0),
+    0
+  );
+  const isFrontMultiviewReady = isUploadedItemReady(multiImages?.[0]);
+  const multiviewSourceHelp = {
+    upload: {
+      title: "Upload views",
+      body: "Best for exact control. Add at least Front plus one more view; full order is Front, Left, Back, Right.",
+    },
+    generate_multiview_image: {
+      title: "Generate views",
+      body: "Tripo creates the guide views first, then LudusGen turns that task into a 3D model automatically.",
+    },
+    edit_multiview_image: {
+      title: "Edit views",
+      body: "Use an existing multiview task ID, a reference image, or uploaded guide views to revise the view set before 3D generation.",
+    },
+  };
   const normalizeUploadedItem = (file, preview, payload) => ({
     file,
     preview,
@@ -898,9 +922,21 @@ const GeneratePanel = memo(({
       {genTab === "multi" && (
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
           <div className="tp-source-mode-row" style={sourceModeRowStyle}>
-            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "upload" ? " active" : "")} data-active={multiviewSourceMode === "upload" ? "true" : "false"} aria-pressed={multiviewSourceMode === "upload"} onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("upload")} style={sourceModeBtnStyle(multiviewSourceMode === "upload", 0, 3)}>Upload Views</button>
-            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "generate_multiview_image" ? " active" : "")} data-active={multiviewSourceMode === "generate_multiview_image" ? "true" : "false"} aria-pressed={multiviewSourceMode === "generate_multiview_image"} onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("generate_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "generate_multiview_image", 1, 3)}>Generate Views</button>
-            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "edit_multiview_image" ? " active" : "")} data-active={multiviewSourceMode === "edit_multiview_image" ? "true" : "false"} aria-pressed={multiviewSourceMode === "edit_multiview_image"} onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("edit_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "edit_multiview_image", 2, 3)}>Edit Views</button>
+            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "upload" ? " active" : "")} data-active={multiviewSourceMode === "upload" ? "true" : "false"} aria-pressed={multiviewSourceMode === "upload"} title="Upload existing view images" onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("upload")} style={sourceModeBtnStyle(multiviewSourceMode === "upload", 0, 3)}>Upload</button>
+            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "generate_multiview_image" ? " active" : "")} data-active={multiviewSourceMode === "generate_multiview_image" ? "true" : "false"} aria-pressed={multiviewSourceMode === "generate_multiview_image"} title="Generate Tripo guide views first" onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("generate_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "generate_multiview_image", 1, 3)}>Generate</button>
+            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "edit_multiview_image" ? " active" : "")} data-active={multiviewSourceMode === "edit_multiview_image" ? "true" : "false"} aria-pressed={multiviewSourceMode === "edit_multiview_image"} title="Edit an existing view set" onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("edit_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "edit_multiview_image", 2, 3)}>Edit</button>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 16, background: "rgba(0,229,255,0.055)", border: "1px solid rgba(0,229,255,0.14)", boxShadow: "0 0 22px rgba(0,229,255,0.06)" }}>
+            <Info style={{ width: 15, height: 15, color: "#00e5ff", flex: "0 0 auto", marginTop: 1 }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>
+                {multiviewSourceHelp[multiviewSourceMode]?.title}
+              </div>
+              <p style={{ ...subtleHintStyle, color: "rgba(226,232,240,0.72)" }}>
+                {multiviewSourceHelp[multiviewSourceMode]?.body}
+              </p>
+            </div>
           </div>
 
           {multiviewSourceMode !== "upload" && (
@@ -1072,6 +1108,14 @@ const GeneratePanel = memo(({
       {/* ── Multi-view tab ── */}
       {genTab === "multi" && multiviewSourceMode !== "generate_multiview_image" && (
         <div style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8, padding: "0 2px" }}>
+            <span style={{ color: "#94a3b8", fontSize: 10, fontWeight: 800 }}>
+              {uploadedMultiviewCount}/4 views ready
+            </span>
+            <span style={{ color: isFrontMultiviewReady && uploadedMultiviewCount >= 2 ? "#10B981" : "#F59E0B", fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "right" }}>
+              {isFrontMultiviewReady && uploadedMultiviewCount >= 2 ? "Ready to generate" : "Front + 1 view required"}
+            </span>
+          </div>
           {multiImages?.some(i => i) && (
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
               <button

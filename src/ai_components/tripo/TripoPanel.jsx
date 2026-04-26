@@ -31,6 +31,11 @@ import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX } from "./GeneratePanel";
 import { DEFAULT_MODEL_VERSION, DEFAULT_TEXTURE_MODEL_VERSION, DETAILED_TEXTURE_MODEL_VERSION, TEXTURE_MODEL_VERSIONS } from "./constants";
 import { streamTaskStatus, uploadViaTripoSts } from "./tripoTransfers";
 import { resolveTripoModelUrl, resolveTripoUrlNode } from "./utils/modelUrl";
+import {
+  getReadyMultiviewRefs,
+  hasTaskImagePreview,
+  isMultiviewUploadReady,
+} from "./multiviewUtils";
 import Segment from "./Segment";
 import Retopo from "./Retopo";
 import Texture from "./Texture";
@@ -2109,6 +2114,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     () => [0, 1, 2, 3].every((index) => isUploadedImageReady(multiImages?.[index])),
     [multiImages, isUploadedImageReady]
   );
+  const multiviewUploadsReady = useMemo(
+    () => isMultiviewUploadReady(multiImages),
+    [multiImages]
+  );
 
   const canGen = useMemo(() => {
     if (submitLocked) return false;
@@ -2130,9 +2139,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             return !!prompt.trim() || hasMultiviewReference;
           }
           if (multiviewSourceMode === "edit_multiview_image") {
-            return !!multiviewOriginalTaskId.trim() || multiImages.some((item) => isUploadedImageReady(item)) || hasMultiviewReference;
+            return !!multiviewOriginalTaskId.trim() || multiviewUploadsReady || hasMultiviewReference;
           }
-          return multiImages.length > 0 && multiImages.every((item) => isUploadedImageReady(item));
+          return multiviewUploadsReady;
         }
         return false;
       case "segment":
@@ -2184,7 +2193,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     textureSourceHasTexture, textureEditSourceTaskId, refineBlockedBySelectedSource, focusedInstanceId,
     _taskTick, submitLocked, isSegmentModelVersionSupported, isRetopoModelVersionSupported,
     segmentActionTaskId, retopoActionTaskId, imageSourceMode, multiviewSourceMode, imageReference,
-    multiviewReference, multiviewOriginalTaskId, isUploadedImageReady, hasMultiviewReference, textureMultiViewsReady]);
+    multiviewReference, multiviewOriginalTaskId, isUploadedImageReady, hasMultiviewReference, textureMultiViewsReady,
+    multiviewUploadsReady]);
 
 
 
@@ -2504,7 +2514,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       }
       if (d.status === "success") {
         // prerigcheck tasks don't return a model — they only set rigCheckResult
-        if (!d.modelUrl && d.rigCheckResult === null) {
+        if (!d.modelUrl && d.rigCheckResult === null && !hasTaskImagePreview(d)) {
           throw Object.assign(new Error("Content blocked by Tripo. Credits were not charged."), { type: "nsfw" });
         }
         await onSuccess(d); return;
@@ -3132,7 +3142,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   preprocessTaskType: preprocessBody.type,
                 };
               } else if (multiviewSourceMode === "edit_multiview_image") {
-                const editFiles = (multiImages ?? []).map(toTripoImageRef).filter(Boolean);
+                const editFiles = getReadyMultiviewRefs(multiImages).map(toTripoImageRef).filter(Boolean);
                 const preprocessBody = {
                   type: "edit_multiview_image",
                   ...(prompt.trim() && { prompt: prompt.trim() }),
@@ -3156,7 +3166,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   preprocessTaskType: preprocessBody.type,
                 };
               } else {
-                files = multiImages.map(toTripoImageRef).filter(Boolean);
+                files = getReadyMultiviewRefs(multiImages).map(toTripoImageRef).filter(Boolean);
               }
 
               body = {
