@@ -110,6 +110,14 @@ export const ENDPOINTS = {
   TRIPO_HISTORY_EXPIRED: '/api/tripo/history/expired',
   TRIPO_MODEL_PROXY: (url) => `/api/tripo/model-proxy?url=${encodeURIComponent(url)}`,
 
+  // Marketplace
+  MARKETPLACE_ASSETS: '/api/marketplace/assets',
+  MARKETPLACE_ASSET: (id) => `/api/marketplace/assets/${id}`,
+  MARKETPLACE_UPLOAD: '/api/marketplace/assets/upload',
+  MARKETPLACE_PURCHASE: (id) => `/api/marketplace/assets/${id}/purchase`,
+  MARKETPLACE_DOWNLOAD: (id) => `/api/marketplace/assets/${id}/download`,
+  MARKETPLACE_LIBRARY: '/api/marketplace/me/library',
+
   // Meshy
   MESHY_TASK: (type, id) => `/api/meshy/task/${type}/${id}`,
   MESHY_TEXT_TO_3D: '/api/meshy/text-to-3d',
