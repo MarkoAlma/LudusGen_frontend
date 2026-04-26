@@ -18,6 +18,7 @@ import { ProtectedRoute } from './ProtectedRoute';
 import AIChat from './ai_components/AiChat';
 import { auth } from './firebase/firebaseApp';
 import Forum from './pages/Forum';
+import Marketplace from './pages/Marketplace';
 import { AnimatePresence } from 'framer-motion';
 import CreditTopup from './components/CreditTopup';
 
@@ -75,6 +76,7 @@ function App() {
             <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
             <Route path="/verify-email" element={<PageTransition><VerifyEmail /></PageTransition>} />
             <Route path="/forum/*" element={<PageTransition><Forum /></PageTransition>} />
+            <Route path="/marketplace" element={<PageTransition><Marketplace /></PageTransition>} />
             <Route path="/profile" element={
               <PageTransition>
                 <ProtectedRoute><Settings /></ProtectedRoute>

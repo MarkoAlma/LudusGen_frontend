@@ -10,6 +10,7 @@ export default function AppLayout({ children, hideNav = false, hideFooter = fals
 
   const isHome = location.pathname === '/';
   const isForum = location.pathname.startsWith('/forum');
+  const isMarketplace = location.pathname.startsWith('/marketplace');
 
   return (
     <>
@@ -18,7 +19,7 @@ export default function AppLayout({ children, hideNav = false, hideFooter = fals
       <main className={`relative z-10 ${
         isChat 
           ? 'h-screen flex flex-col overflow-hidden' 
-          : `min-h-screen ${isHome ? '' : 'pt-20 md:pt-24'}`
+          : `min-h-screen ${isHome || isMarketplace ? '' : 'pt-20 md:pt-24'}`
       }`}>
         {isChat ? (
           <div className="flex-1 min-h-0 w-full relative flex flex-col">

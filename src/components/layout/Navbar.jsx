@@ -4,12 +4,23 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, Menu, X, LogOut,
   ChevronDown, LayoutDashboard, MessageSquare,
-  Image as ImageIcon, Music, Box, Users, Home,
-  Zap, Plus, User as UserIcon
+  ImageIcon, Music, Box, Users, Home,
+  Zap, Plus, User as UserIcon, ShoppingBag
 } from 'lucide-react';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { tokens } from '../../styles/tokens';
 import bgMobileMenu from '../../assets/bg-mobile-menu.png';
+
+function NavLink({ to, children, active }) {
+  return (
+    <Link
+      to={to}
+      className={`px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-widest transition-all ${active ? 'text-primary' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -23,7 +34,7 @@ export default function Navbar() {
   const previousUserIdRef = useRef(user?.uid ?? null);
   const suppressUserMenuUntilRef = useRef(0);
 
-  // Animation Variants for Fluidity
+  // Animation Variants
   const containerVariants = {
     hidden: { opacity: 0, x: '20%', scale: 1.05, filter: 'blur(10px)' },
     visible: {
@@ -116,20 +127,18 @@ export default function Navbar() {
     { label: 'AI 3D', icon: Box, path: '/chat?tab=3d' },
   ];
 
-
-
   if (!showNavbar) return null;
-  // Don't show regular Navbar in AI studio. We'll render just the user dropdown manually there.
   if (location.pathname.startsWith('/chat')) return null;
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-[110] transition-all duration-500`}>
+    <header className="fixed top-0 left-0 right-0 z-[110] transition-all duration-500">
       <div className="max-w-7xl mx-auto px-4 pt-3">
-        <nav className={`relative transition-all duration-500 md:rounded-[2.5rem] md:border md:border-white/10 ${scrolled ? 'md:bg-black/60 md:backdrop-blur-3xl md:py-2 md:px-6 md:shadow-2xl md:scale-[0.99]' : 'md:bg-black/20 md:backdrop-blur-2xl md:py-3 md:px-8 py-2 md:glass-panel'
-          }`}>
-          <div className="flex items-center justify-end md:justify-between">
-            {/* Logo - Hidden on mobile */}
-            <Link to="/" className="hidden md:flex items-center gap-3 group outline-none">
+        <nav className={`relative transition-all duration-500 md:rounded-[2.5rem] md:border md:border-white/10 ${
+          scrolled ? 'md:bg-black/60 md:backdrop-blur-3xl md:py-2 md:px-6 md:shadow-2xl md:scale-[0.99]' : 'md:bg-black/20 md:backdrop-blur-2xl md:py-3 md:px-8 py-2 md:glass-panel'
+        }`}>
+          <div className="flex items-center justify-between">
+            {/* Logo */}
+            <Link to="/" className="flex items-center gap-3 group outline-none">
               <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Sparkles className="w-4 h-4 text-primary fill-primary/30" />
               </div>
@@ -152,8 +161,9 @@ export default function Navbar() {
                     setStudioDropdownOpen(!studioDropdownOpen);
                   }}
                   onMouseEnter={() => setStudioDropdownOpen(true)}
-                  className={`flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-widest transition-all ${location.pathname.startsWith('/chat') ? 'text-primary' : 'text-gray-400 hover:text-white hover:bg-white/5'
-                    }`}
+                  className={`flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-widest transition-all ${
+                    location.pathname.startsWith('/chat') ? 'text-primary' : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
                 >
                   AI Studio <ChevronDown className={`w-3.5 h-3.5 transition-transform ${studioDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -173,7 +183,6 @@ export default function Navbar() {
                           const targetTab = urlParams.get('tab');
                           const currentParams = new URLSearchParams(location.search);
                           const currentTab = currentParams.get('tab');
-
                           const isActive = location.pathname.startsWith('/chat') && currentTab === targetTab;
 
                           return (
@@ -188,7 +197,7 @@ export default function Navbar() {
                               </div>
                               <span className="text-xs font-black uppercase tracking-widest">{item.label}</span>
                             </Link>
-                          )
+                          );
                         })}
                       </div>
                     </motion.div>
@@ -196,13 +205,14 @@ export default function Navbar() {
                 </AnimatePresence>
               </div>
 
+              <NavLink to="/marketplace" active={location.pathname.startsWith('/marketplace')}>Marketplace</NavLink>
               <NavLink to="/forum" active={location.pathname.startsWith('/forum')}>Community</NavLink>
             </div>
 
             {/* Actions */}
             <div className="flex items-center gap-4">
               {user ? (
-                <div className="relative" style={{ isolation: "isolate" }}>
+                <div className="relative">
                   <button
                     id="user-menu-trigger"
                     onClick={(e) => {
@@ -236,86 +246,44 @@ export default function Navbar() {
                   <AnimatePresence>
                     {userDropdownOpen && (
                       <>
-                        {/* Backdrop dismiss */}
-                        <div
-                          className="fixed inset-0"
-                          style={{ zIndex: 9998 }}
-                          onClick={() => setUserDropdownOpen(false)}
-                        />
+                        <div className="fixed inset-0" style={{ zIndex: 9998 }} onClick={() => setUserDropdownOpen(false)} />
                         <motion.div
                           initial={{ opacity: 0, y: -8, scale: 0.97 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                          transition={{ type: "spring", stiffness: 420, damping: 30 }}
-                          className="absolute right-0 top-[calc(100%+12px)]"
-                          style={{
-                            zIndex: 9999,
-                            width: 280,
-                            borderRadius: 18,
-                            background: "#16141c",
-                            border: "1px solid rgba(255,255,255,0.09)",
-                            boxShadow: "0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.07)",
-                            overflow: "hidden",
-                          }}
+                          className="absolute right-0 top-[calc(100%+12px)] w-64 rounded-2xl bg-[#16141c] border border-white/10 shadow-2xl overflow-hidden"
+                          style={{ zIndex: 9999 }}
                         >
-                          {/* Profil fejlÃ©c */}
-                          <div className="flex items-center gap-3 px-4 py-4"
-                            style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                            <div className="w-11 h-11 rounded-[13px] overflow-hidden flex-shrink-0 bg-white/10">
-                              <img
-                                src={user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`}
-                                alt="profile"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-bold text-white text-[14px] truncate leading-tight">{user.name}</p>
-                              <p className="text-[#6b7280] text-[12px] truncate mt-0.5">{user.email}</p>
-                            </div>
+                          <div className="p-4 border-b border-white/5">
+                            <p className="font-bold text-white text-sm truncate">{user.name}</p>
+                            <p className="text-gray-500 text-xs truncate mt-0.5">{user.email}</p>
                           </div>
-
-                          {/* Kredit egyenleg */}
-                          <div className="px-4 py-3"
-                            style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                            <p className="text-[#6b7280] text-[10px] font-bold uppercase tracking-[0.12em] mb-2">Kredit egyenleg</p>
-                            <div className="flex items-center justify-between gap-2 px-3 py-3 rounded-2xl"
-                              style={{ background: "rgba(124,58,237,0.07)", border: "1px solid rgba(124,58,237,0.18)" }}>
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center"
-                                  style={{ background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.35)" }}>
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-[#c4b5fd]">
-                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                                  </svg>
-                                </div>
-                                <div>
-                                  <div className="text-white font-black text-[20px] leading-none">{(user.credits ?? 0).toLocaleString()}</div>
-                                  <div className="text-[#a78bfa] text-[11px] font-medium mt-0.5">kredit</div>
-                                </div>
+                          <div className="p-3 border-b border-white/5">
+                            <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Zap className="w-4 h-4 text-primary" />
+                                <span className="text-white font-black">{(user.credits ?? 0).toLocaleString()}</span>
                               </div>
                               <button
                                 onClick={() => { setUserDropdownOpen(false); setShowCreditTopup(true); }}
-                                className="flex items-center gap-1 px-3 py-2 rounded-xl text-[12px] font-bold text-white transition-all hover:opacity-90 active:scale-95 flex-shrink-0"
-                                style={{ background: "linear-gradient(135deg, #9333ea, #ec4899)", boxShadow: "0 3px 12px rgba(147,51,234,0.4)" }}
+                                className="px-2 py-1 rounded-lg bg-primary text-white text-[10px] font-bold uppercase tracking-wider"
                               >
-                                <Plus className="w-3 h-3" /> Feltöltés
+                                Topup
                               </button>
                             </div>
                           </div>
-
-                          {/* MenÃ¼ gombok */}
                           <div className="p-2">
                             <button
                               onClick={() => { setUserDropdownOpen(false); navigate("/profile"); }}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#9ca3af] hover:text-white hover:bg-white/[0.06] transition-all text-[13px] font-medium"
+                              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all text-xs font-bold"
                             >
-                              <UserIcon className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> Profil
+                              <UserIcon className="w-4 h-4" /> Profile Settings
                             </button>
-                            <div className="my-1 mx-3 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
                             <button
                               onClick={() => { setUserDropdownOpen(false); logoutUser(); }}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#f87171] hover:text-[#fca5a5] hover:bg-red-500/10 transition-all text-[13px] font-medium"
                             >
-                              <LogOut className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> Kijelentkezés
+                              <LogOut className="w-4 h-4" /> Sign Out
                             </button>
                           </div>
                         </motion.div>
@@ -324,234 +292,83 @@ export default function Navbar() {
                   </AnimatePresence>
                 </div>
               ) : (
-                <div className="hidden md:block">
-                  <button
-                    onClick={() => setIsAuthOpen(true)}
-                    className="px-6 py-2 rounded-xl bg-white text-black text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/10"
-                  >
-                    Access Hub
-                  </button>
-                </div>
+                <button
+                  onClick={() => setIsAuthOpen(true)}
+                  className="px-6 py-2 rounded-xl bg-white text-black text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all"
+                >
+                  Access Hub
+                </button>
               )}
 
-
-              {/* Mobile Toggle */}
+              {/* Mobile Menu Toggle */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 text-white hover:bg-white/5 rounded-xl transition-all relative z-[120]"
+                className="md:hidden p-2 text-white hover:bg-white/5 rounded-xl transition-all"
               >
-                <div className="w-6 h-6 flex items-center justify-center relative">
-                  <motion.div
-                    animate={{
-                      rotate: mobileMenuOpen ? 90 : 0,
-                      opacity: mobileMenuOpen ? 0 : 1,
-                      scale: mobileMenuOpen ? 0.5 : 1
-                    }}
-                    transition={{ duration: 0.4, ease: "circOut" }}
-                    className="absolute inset-0 flex items-center justify-center"
-                  >
-                    <Menu className="w-6 h-6" />
-                  </motion.div>
-                  <motion.div
-                    initial={{ rotate: -90, opacity: 0, scale: 0.5 }}
-                    animate={{
-                      rotate: mobileMenuOpen ? 0 : -90,
-                      opacity: mobileMenuOpen ? 1 : 0,
-                      scale: mobileMenuOpen ? 1 : 0.5
-                    }}
-                    transition={{ duration: 0.4, ease: "circOut" }}
-                    className="absolute inset-0 flex items-center justify-center"
-                  >
-                    <X className="w-6 h-6" />
-                  </motion.div>
-                </div>
+                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
             </div>
           </div>
         </nav>
       </div>
 
-      {/* Premium Mobile Menu Drawer */}
+      {/* Mobile Menu Drawer */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="fixed inset-0 z-[100] flex flex-col bg-[#050508] overflow-hidden"
+            initial={{ opacity: 0, x: '100%' }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: '100%' }}
+            className="fixed inset-0 z-[100] bg-[#050508] flex flex-col"
           >
-            {/* Ambient Background & Mesh */}
-            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-              {/* Faint Background Image */}
-              <AnimatePresence>
-                <motion.img
-                  key="menu-bg"
-                  src={bgMobileMenu}
-                  initial={{ opacity: 0, scale: 1.05 }}
-                  animate={{ opacity: 0.35, scale: 1, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }}
-                  transition={{ duration: 1.2, ease: [0.23, 1, 0.32, 1] }}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  alt=""
-                />
-              </AnimatePresence>
-
-              {/* Stealth Deep Blue Gradient Overlay (Bottom-Right to Top) */}
-              <div className="absolute inset-0 bg-[linear-gradient(15deg,rgba(2,6,23,0.95)_0%,rgba(2,6,23,0.8)_40%,rgba(0,0,0,0.95)_100%)] z-[1]" />
-
-              {/* Ambient Mesh & Vignette */}
-              <motion.div
-                animate={{
-                  rotate: [0, 90, 180, 270, 360],
-                  scale: [1, 1.1, 1, 0.9, 1]
-                }}
-                transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-                className="absolute -top-1/2 -right-1/2 w-[200%] h-[200%] opacity-30 pointer-events-none mix-blend-screen z-[2]"
-                style={{
-                  background: `radial-gradient(circle at 30% 30%, ${tokens.color.accent.purple}30 0%, transparent 50%),
-                               radial-gradient(circle at 70% 70%, #3b82f630 0%, transparent 50%)`,
-                  filter: 'blur(80px)'
-                }}
-              />
-
-              {/* Light Scanline Overlay */}
-              <div className="absolute inset-0 z-[3] pointer-events-none opacity-20"
-                style={{ background: 'linear-gradient(rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02))', backgroundSize: '100% 4px, 3px 100%' }} />
+            <div className="absolute inset-0 z-0 opacity-30">
+              <img src={bgMobileMenu} className="w-full h-full object-cover" alt="" />
             </div>
 
-            <div className="relative z-10 flex flex-col h-full bg-transparent">
-              {/* Header */}
-              <div className="p-6 flex justify-between items-center border-b border-white/5 bg-white/5">
+            <div className="relative z-10 flex flex-col h-full">
+              <div className="p-6 flex justify-between items-center border-b border-white/5">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-primary to-blue-500 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="text-xl font-black text-white tracking-tight">Ludus<span className="text-primary italic">Gen</span></span>
+                  <Sparkles className="w-6 h-6 text-primary" />
+                  <span className="text-xl font-black text-white italic">LudusGen</span>
                 </div>
+                <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-white">
+                  <X className="w-6 h-6" />
+                </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-6 py-8 flex flex-col">
-                {/* User Card if Authenticated */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 {user && (
-                  <motion.div
-                    variants={itemVariants}
-                    className="mb-8 p-5 rounded-3xl bg-white/[0.03] border border-white/10 shadow-2xl relative overflow-hidden group"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="relative z-10 flex items-center gap-4">
-                      <div className="relative h-14 w-14 rounded-2xl overflow-hidden border-2 border-primary/20 bg-black shadow-inner">
-                        <img src={user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`} alt="user" className="w-full h-full object-cover" />
-                      </div>
-                      <div className="min-w-0">
-                        <h4 className="text-white font-black text-base uppercase italic tracking-tight truncate">{user.name || 'Developer'}</h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                          <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">Node-Active</span>
-                        </div>
-                      </div>
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4">
+                    <img src={user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`} className="w-12 h-12 rounded-xl" alt="" />
+                    <div>
+                      <p className="text-white font-bold">{user.name}</p>
+                      <p className="text-gray-500 text-xs">{(user.credits ?? 0).toLocaleString()} Credits</p>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
-                {/* Bento Grid Navigation */}
-                <div className="flex-1 grid grid-cols-2 gap-4 mb-4 mt-2">
-                  <motion.a
-                    variants={itemVariants}
-                    onClick={() => { setMobileMenuOpen(false); navigate('/'); }}
-                    className="col-span-2 group relative overflow-hidden rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer shadow-2xl"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-fuchsia-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500 rounded-3xl blur-xl" />
-                    <div className="relative z-10 flex items-center sm:block">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center sm:mb-4 group-hover:scale-110 transition-transform duration-300 mr-4 sm:mr-0 shadow-[0_0_20px_rgba(168,85,247,0.3)]">
-                        <Home className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-white font-black text-xl sm:mb-1 uppercase tracking-widest italic">Main Hall</h3>
-                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em] hidden sm:block">Protocol_Dashboard</p>
-                      </div>
-                    </div>
-                  </motion.a>
-
-                  <motion.a
-                    variants={itemVariants}
-                    onClick={() => { setMobileMenuOpen(false); navigate('/chat'); }}
-                    className="group relative overflow-hidden rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer shadow-2xl"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-400 to-blue-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500 rounded-3xl blur-xl" />
-                    <div className="relative z-10">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_20px_rgba(6,182,212,0.3)]">
-                        <Sparkles className="w-6 h-6 text-white" />
-                      </div>
-                      <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-widest italic md:mb-1">Studio</h3>
-                      <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">Neural_Link</p>
-                    </div>
-                  </motion.a>
-
-                  <motion.a
-                    variants={itemVariants}
-                    onClick={() => { setMobileMenuOpen(false); navigate('/forum'); }}
-                    className="group relative overflow-hidden rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer shadow-2xl"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-rose-400 to-pink-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500 rounded-3xl blur-xl" />
-                    <div className="relative z-10">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-pink-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
-                        <Users className="w-6 h-6 text-white" />
-                      </div>
-                      <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-widest italic md:mb-1">Forum</h3>
-                      <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">Comm_Hub</p>
-                    </div>
-                  </motion.a>
-
-                  {user && (
-                    <motion.a
-                      variants={itemVariants}
-                      onClick={() => { setMobileMenuOpen(false); navigate('/profile'); }}
-                      className="group relative overflow-hidden rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-500 hover:scale-[1.02] hover:bg-white/10 cursor-pointer shadow-2xl"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-600 opacity-0 group-hover:opacity-10 transition-opacity duration-500 rounded-3xl blur-xl" />
-                      <div className="relative z-10">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-                          <UserIcon className="w-6 h-6 text-white" />
-                        </div>
-                        <h3 className="text-white font-black text-lg sm:text-xl uppercase tracking-widest italic md:mb-1">Profil</h3>
-                        <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">Account_Hub</p>
-                      </div>
-                    </motion.a>
-                  )}
+                <div className="grid grid-cols-1 gap-3">
+                  <MobileNavItem to="/" icon={Home} label="Home" onClick={() => setMobileMenuOpen(false)} />
+                  <MobileNavItem to="/chat" icon={Sparkles} label="AI Studio" onClick={() => setMobileMenuOpen(false)} />
+                  <MobileNavItem to="/marketplace" icon={ShoppingBag} label="Marketplace" onClick={() => setMobileMenuOpen(false)} />
+                  <MobileNavItem to="/forum" icon={Users} label="Community" onClick={() => setMobileMenuOpen(false)} />
                 </div>
 
-                <motion.div
-                  variants={itemVariants}
-                  className="mt-4"
-                >
-                  {user ? (
-                    <button
-                      onClick={() => { setMobileMenuOpen(false); logoutUser(); }}
-                      className="w-full relative overflow-hidden cursor-pointer group flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-all duration-300"
-                    >
-                      <LogOut className="w-5 h-5 text-red-400 group-hover:scale-110 transition-transform" />
-                      <span className="text-red-400 font-bold text-lg uppercase tracking-wider">Offline</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => { setMobileMenuOpen(false); setIsAuthOpen(true); }}
-                      className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl bg-white text-black font-black text-sm uppercase tracking-widest shadow-[0_10px_40px_rgba(255,255,255,0.15)] active:scale-[0.98] transition-all"
-                    >
-                      Neural_Access
-                    </button>
-                  )}
-                </motion.div>
-              </div>
-
-              {/* Mobile Footer */}
-              <div className="p-8 border-t border-white/5 bg-black/20 text-center">
-                <p className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.5em] italic">Neural Hub â€” Protocol v3.1</p>
-                <div className="flex items-center justify-center gap-4 mt-3 opacity-20">
-                  <div className="w-1 h-1 rounded-full bg-zinc-700" />
-                  <div className="w-1 h-1 rounded-full bg-zinc-700" />
-                  <div className="w-1 h-1 rounded-full bg-zinc-700" />
-                </div>
+                {user ? (
+                  <button
+                    onClick={() => { setMobileMenuOpen(false); logoutUser(); }}
+                    className="w-full p-4 rounded-2xl bg-red-500/10 text-red-400 font-bold uppercase tracking-wider text-center"
+                  >
+                    Sign Out
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setMobileMenuOpen(false); setIsAuthOpen(true); }}
+                    className="w-full p-4 rounded-2xl bg-white text-black font-black uppercase tracking-widest text-center"
+                  >
+                    Neural Access
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
@@ -561,31 +378,17 @@ export default function Navbar() {
   );
 }
 
-function NavLink({ to, children, active }) {
+function MobileNavItem({ to, icon: Icon, label, onClick }) {
+  const location = useLocation();
+  const isActive = location.pathname === to;
   return (
     <Link
       to={to}
-      className={`px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-widest transition-all ${active ? 'text-primary' : 'text-gray-400 hover:text-white hover:bg-white/5'
-        }`}
+      onClick={onClick}
+      className={`flex items-center gap-4 p-4 rounded-2xl transition-all ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 text-gray-400 hover:text-white'}`}
     >
-      {children}
+      <Icon className="w-5 h-5" />
+      <span className="font-bold uppercase tracking-widest text-sm">{label}</span>
     </Link>
-  );
-}
-
-function MobileNavLink({ to, children, onClick, isActive }) {
-  return (
-    <div className="relative overflow-hidden group rounded-2xl border border-transparent hover:border-white/10 hover:bg-white/[0.04] transition-all">
-      <Link
-        to={to}
-        onClick={onClick}
-        className={`block px-5 py-4 text-xl sm:text-2xl font-black italic tracking-tighter transition-colors ${isActive ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}
-      >
-        {children}
-      </Link>
-      {isActive && (
-        <div className="absolute left-0 top-3 bottom-3 w-1 bg-primary rounded-full shadow-[0_0_10px_rgba(138,43,226,0.8)]" />
-      )}
-    </div>
   );
 }

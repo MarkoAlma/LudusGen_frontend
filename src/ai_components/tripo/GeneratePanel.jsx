@@ -36,11 +36,11 @@ export const MODEL_VERSIONS = [
  *  currently selected model doesn't support that feature.
  * ─────────────────────────────────────────────────────────────────────── */
 export const UNIVERSAL_CAPS = {
-  ultraMesh:    true,  texture:   true,  pbr:        true,  tex4K:       true,
-  multiview:    true,  batch:     true,  tPose:      true,  inParts:     true,
-  negPrompt:    true,  smartLowPoly: true, quad:     true,
-  autoSize:     true,  exportUv:  true,  makeBetter: true,
-  modelSeed:    true,  imageSeed: true,  textureSeed: true,
+  ultraMesh: true, texture: true, pbr: true, tex4K: true,
+  multiview: true, batch: true, tPose: true, inParts: true,
+  negPrompt: true, smartLowPoly: true, quad: true,
+  autoSize: true, exportUv: true, makeBetter: true,
+  modelSeed: true, imageSeed: true, textureSeed: true,
 };
 
 export function getModelCaps() {
@@ -75,10 +75,10 @@ function Toggle({ label, value, onChange, hint = false, disabled = false }) {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
         <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>{label}</span>
-        {hint && <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />}
+        {hint && <HelpCircle style={{ width: 13, height: 13, color: "#475569" }} />}
       </div>
       <div className={"tp-switch" + (value ? " on" : "")}
-        style={{ background: value ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
+        style={{ background: value ? "#2f8cff" : "rgba(255,255,255,0.12)" }} />
     </div>
   );
 }
@@ -158,8 +158,8 @@ function Collapsible({ label, children, border = true, extra }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {extra}
           {open
-            ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2d2d48" strokeWidth="2"><polyline points="18 15 12 9 6 15" /></svg>
-            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2d2d48" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>}
+            ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><polyline points="18 15 12 9 6 15" /></svg>
+            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>}
         </div>
       </div>
       {open && <div style={{ padding: "12px 2px 4px", animation: "fadeUp 0.15s ease" }}>{children}</div>}
@@ -215,18 +215,18 @@ function TopoControls({
         >
           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
             <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Smart Low Poly</span>
-            <span style={{ background: "linear-gradient(135deg,#c026d3,#a21caf)", color: "#fff", fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 4 }}>v2</span>
-            <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+            <span style={{ background: "linear-gradient(135deg,#1d4ed8,#2f8cff,#8bdcff)", color: "#02040a", fontSize: 9, fontWeight: 800, padding: "1px 5px", borderRadius: 4 }}>v2</span>
+            <HelpCircle style={{ width: 13, height: 13, color: "#475569" }} />
           </div>
           <div className={"tp-switch" + (smartLowPoly && capsSmartLowPoly ? " on" : "")}
-            style={{ background: smartLowPoly && capsSmartLowPoly ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
+            style={{ background: smartLowPoly && capsSmartLowPoly ? "#2f8cff" : "rgba(255,255,255,0.12)" }} />
         </div>
       </Na>
 
       {smartLowPoly && capsSmartLowPoly && (
-        <div style={{ padding: "6px 9px", borderRadius: 8, background: "rgba(108,99,255,0.06)", border: "1px solid rgba(108,99,255,0.18)", display: "flex", gap: 6, marginBottom: 4 }}>
-          <HelpCircle style={{ width: 11, height: 11, color: "#a5a0ff", marginTop: 1, flexShrink: 0 }} />
-          <p style={{ color: "#a5a0ff", fontSize: 10, margin: 0, lineHeight: 1.5 }}>
+        <div style={{ padding: "6px 9px", borderRadius: 8, background: "rgba(47,140,255,0.07)", border: "1px solid rgba(47,140,255,0.22)", display: "flex", gap: 6, marginBottom: 4, boxShadow: "0 0 18px rgba(47,140,255,0.08)" }}>
+          <HelpCircle style={{ width: 11, height: 11, color: "#8bdcff", marginTop: 1, flexShrink: 0 }} />
+          <p style={{ color: "#bfdbfe", fontSize: 10, margin: 0, lineHeight: 1.5 }}>
             Applied at generation time. Simple inputs work best — may fail on complex geometry.
           </p>
         </div>
@@ -236,7 +236,7 @@ function TopoControls({
       <div style={{ margin: "14px 0 8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Topology</span>
         <Tooltip text="Triangles are standard. Quads provide better flow for sculpting/animation but are slower to generate." side="left">
-          <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
+          <HelpCircle style={{ width: 13, height: 13, color: "#475569" }} />
         </Tooltip>
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
@@ -262,8 +262,8 @@ function TopoControls({
       <div style={{ marginTop: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
           <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Face Limit</span>
-          <HelpCircle style={{ width: 13, height: 13, color: "#1e1e3a" }} />
-          <span style={{ marginLeft: "auto", color: "#2d2d48", fontSize: 9, fontFamily: "monospace" }}>
+          <HelpCircle style={{ width: 13, height: 13, color: "#475569" }} />
+          <span style={{ marginLeft: "auto", color: "#64748b", fontSize: 9, fontFamily: "monospace" }}>
             {cfg.allowAuto ? `Auto – ${(cfg.max / 1000).toFixed(0)}k` : `${cfg.min.toLocaleString()} – ${cfg.max.toLocaleString()}`}
           </span>
         </div>
@@ -273,7 +273,7 @@ function TopoControls({
             onChange={e => setLocalVal(Number(e.target.value))}
             onMouseUp={e => commit(Number(e.target.value))}
             onTouchEnd={e => commit(Number(e.target.value))}
-            style={{ flex: 1, accentColor: "#6c63ff" }}
+            style={{ flex: 1, accentColor: "#2f8cff" }}
           />
           <input
             type="number" min={cfg.min} max={cfg.max} step={cfg.step}
@@ -289,7 +289,7 @@ function TopoControls({
             }}
           />
         </div>
-        <p style={{ color: "#4a4a68", fontSize: 10, margin: "5px 0 0", lineHeight: 1.5 }}>
+        <p style={{ color: "#64748b", fontSize: 10, margin: "5px 0 0", lineHeight: 1.5 }}>
           {showAuto && "Auto — model adaptively determines optimal face count"}
           {!showAuto && smartLowPoly && quad && "Quad smart-low-poly: 500 – 10 000 faces (required)"}
           {!showAuto && smartLowPoly && !quad && "Smart-low-poly: 1 000 – 20 000 faces (required)"}
@@ -315,62 +315,67 @@ function ModelDropdown({ modelVer, setModelVer }) {
   const selected = MODEL_VERSIONS.find(v => v.id === modelVer) ?? MODEL_VERSIONS[0];
 
   const icons = [
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a5a0ff" strokeWidth="2">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8bdcff" strokeWidth="2">
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
     </svg>,
-    <Zap width={13} height={13} color="#a5a0ff" />,
+    <Zap width={13} height={13} color="#8bdcff" />,
     <Zap width={13} height={13} color="#f5c518" />,
   ];
 
   return (
-    <div style={{ marginTop: 14, position: "relative" }}>
-      <span style={{ color: "#4a4a68", fontSize: 12, fontWeight: 600, display: "block", marginBottom: 8 }}>AI Model</span>
+    <div className="tp-model-dd" style={{ marginTop: 14, position: "relative" }}>
+      <span style={{ color: "#64748b", fontSize: 12, fontWeight: 600, display: "block", marginBottom: 8 }}>AI Model</span>
       <button
+        className="tp-model-dd-trigger"
         onClick={() => setOpen(v => !v)}
         style={{
-          width: "100%", padding: "9px 12px", borderRadius: 8,
-          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+          width: "100%", minHeight: 56, padding: "11px 14px", borderRadius: 18,
+          background: "linear-gradient(145deg, rgba(255,255,255,0.060), rgba(255,255,255,0.024))",
+          border: "1px solid rgba(255,255,255,0.10)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           cursor: "pointer", fontFamily: "inherit",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.055), 0 12px 28px rgba(0,0,0,0.16)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 7, background: "rgba(108,99,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 13, background: "linear-gradient(145deg, rgba(47,140,255,0.24), rgba(139,220,255,0.10))", boxShadow: "0 0 22px rgba(47,140,255,0.16)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             {icons[MODEL_VERSIONS.findIndex(v => v.id === modelVer)] ?? icons[0]}
           </div>
-          <span style={{ color: "#e8e8f4", fontSize: 12, fontWeight: 600 }}>{selected.label}</span>
+          <span style={{ color: "#f8fafc", fontSize: 13, fontWeight: 900 }}>{selected.label}</span>
         </div>
-        <ChevronDown style={{ width: 13, height: 13, color: "#2d2d48", transition: "transform 0.2s", transform: open ? "rotate(180deg)" : "none" }} />
+        <ChevronDown style={{ width: 13, height: 13, color: "#64748b", transition: "transform 0.2s", transform: open ? "rotate(180deg)" : "none" }} />
       </button>
 
       {open && (
-        <div style={{
+        <div className="tp-model-dd-menu" style={{
           position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)",
-          background: "#131327", border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: 12, overflow: "hidden", zIndex: 50,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)",
+          background: "rgba(10,9,14,0.96)", border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: 20, overflow: "hidden", zIndex: 50,
+          boxShadow: "0 18px 46px rgba(0,0,0,0.62), 0 0 0 1px rgba(255,255,255,0.04), 0 0 28px rgba(47,140,255,0.10)",
+          backdropFilter: "blur(24px)",
         }}>
           {MODEL_VERSIONS.map((v, i) => (
             <button
               key={v.id}
+              className="tp-model-dd-option"
               onClick={() => { setModelVer(v.id); setOpen(false); }}
               style={{
                 width: "100%", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10,
-                background: modelVer === v.id ? "rgba(108,99,255,0.15)" : "transparent",
+                background: modelVer === v.id ? "rgba(47,140,255,0.12)" : "transparent",
                 border: "none", borderBottom: i < MODEL_VERSIONS.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none",
                 cursor: "pointer", fontFamily: "inherit", textAlign: "left",
               }}
             >
-              <div style={{ width: 26, height: 26, borderRadius: 7, background: "rgba(108,99,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 7, background: "rgba(47,140,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 {icons[i]}
               </div>
               <div style={{ flex: 1 }}>
-                <span style={{ color: modelVer === v.id ? "#a5a0ff" : "#c8c8e0", fontSize: 12, fontWeight: 600, display: "block" }}>{v.label}</span>
-                {i === 0 && <span style={{ color: "#2d2d48", fontSize: 9 }}>~90s · up to 2M polygons (Ultra)</span>}
-                {i === 1 && <span style={{ color: "#2d2d48", fontSize: 9 }}>~25s · balanced speed & quality</span>}
-                {i === 2 && <span style={{ color: "#2d2d48", fontSize: 9 }}>~5s · prototyping only</span>}
+                <span style={{ color: modelVer === v.id ? "#8bdcff" : "#c8c8e0", fontSize: 12, fontWeight: 600, display: "block" }}>{v.label}</span>
+                {i === 0 && <span style={{ color: "#64748b", fontSize: 9 }}>~90s · up to 2M polygons (Ultra)</span>}
+                {i === 1 && <span style={{ color: "#64748b", fontSize: 9 }}>~25s · balanced speed & quality</span>}
+                {i === 2 && <span style={{ color: "#64748b", fontSize: 9 }}>~5s · prototyping only</span>}
               </div>
-              {modelVer === v.id && <div><Check style={{ width: 13, height: 13, color: "#a5a0ff" }} /></div>}
+              {modelVer === v.id && <div><Check style={{ width: 13, height: 13, color: "#8bdcff" }} /></div>}
             </button>
           ))}
         </div>
@@ -607,37 +612,43 @@ const GeneratePanel = memo(({
   const partsDisabled = texOn || pbrOn || quadMesh;
   const sourceModeBtnStyle = (active) => ({
     flex: 1,
-    padding: "8px 10px",
-    borderRadius: 10,
-    border: active ? "1px solid rgba(139,92,246,0.38)" : "1px solid rgba(255,255,255,0.06)",
-    background: active ? "rgba(139,92,246,0.14)" : "rgba(255,255,255,0.03)",
-    color: active ? "#c4b5fd" : "#94a3b8",
+    minHeight: 48,
+    padding: "11px 12px",
+    borderRadius: 18,
+    border: active ? "1px solid rgba(139,220,255,0.42)" : "1px solid rgba(255,255,255,0.075)",
+    background: active
+      ? "linear-gradient(145deg, rgba(139,220,255,0.16), rgba(47,140,255,0.11), rgba(255,255,255,0.055))"
+      : "linear-gradient(145deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018))",
+    color: active ? "#f8fafc" : "#94a3b8",
     fontSize: 10,
-    fontWeight: 800,
-    letterSpacing: "0.08em",
+    fontWeight: 900,
+    letterSpacing: "0.12em",
     textTransform: "uppercase",
     cursor: "pointer",
+    boxShadow: active ? "0 14px 30px rgba(0,0,0,0.22), 0 0 24px rgba(47,140,255,0.14)" : "inset 0 1px 0 rgba(255,255,255,0.06)",
   });
   const fieldStyle = {
     width: "100%",
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid rgba(255,255,255,0.08)",
-    background: "rgba(255,255,255,0.03)",
+    padding: "12px 14px",
+    borderRadius: 16,
+    border: "1px solid rgba(255,255,255,0.10)",
+    background: "linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025))",
     color: "#e2e8f0",
     fontSize: 12,
+    fontWeight: 700,
     boxSizing: "border-box",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.045)",
   };
   const labelStyle = {
-    color: "#94a3b8",
+    color: "rgba(225,226,212,0.70)",
     fontSize: 10,
-    fontWeight: 800,
-    letterSpacing: "0.08em",
+    fontWeight: 950,
+    letterSpacing: "0.14em",
     textTransform: "uppercase",
     display: "block",
     marginBottom: 6,
   };
-  const subtleHintStyle = { color: "#64748b", fontSize: 10, lineHeight: 1.5, margin: 0 };
+  const subtleHintStyle = { color: "rgba(148,163,184,0.78)", fontSize: 10, lineHeight: 1.5, margin: 0 };
   const renderReferenceUploader = (value, setter, uploadHandler, emptyLabel) => {
     const openPicker = () => {
       const inp = document.createElement("input");
@@ -679,13 +690,13 @@ const GeneratePanel = memo(({
             <img src={value.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             {!isUploadedItemReady(value) && (
               <div style={{ position: "absolute", inset: 0, background: "rgba(3,0,10,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Loader2 style={{ width: 18, height: 18, color: "#8b5cf6" }} className="anim-spin" />
+                <Loader2 style={{ width: 18, height: 18, color: "#2f8cff" }} className="anim-spin" />
               </div>
             )}
           </>
         ) : (
           <div style={{ textAlign: "center", padding: 16 }}>
-            <Upload style={{ width: 18, height: 18, color: "#8b5cf6", margin: "0 auto 8px" }} />
+            <Upload style={{ width: 18, height: 18, color: "#2f8cff", margin: "0 auto 8px" }} />
             <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 700 }}>{emptyLabel}</div>
             <p style={{ ...subtleHintStyle, marginTop: 6 }}>Optional reference via STS upload</p>
           </div>
@@ -698,7 +709,7 @@ const GeneratePanel = memo(({
   return (
     <>
       {/* ── Tab bar ── */}
-      <div style={{ display: "flex", gap: 3, padding: "3px", background: "rgba(255,255,255,0.06)", borderRadius: 11, marginBottom: 14 }}>
+      <div className="tp-gen-tabs" style={{ display: "flex", gap: 3, padding: "3px", background: "rgba(255,255,255,0.06)", borderRadius: 11, marginBottom: 14 }}>
         {GEN_TABS.map(t => {
           const tabCap = { image: true, text: true, multi: caps.multiview };
           const disabled = !tabCap[t.id];
@@ -716,7 +727,7 @@ const GeneratePanel = memo(({
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 6,
-                color: genTab === t.id ? "#0a0a1a" : "#4a4a68",
+                color: genTab === t.id ? "#0a0a1a" : "#64748b",
                 cursor: disabled ? "not-allowed" : "pointer",
                 padding: "8px 0",
               }}
@@ -733,13 +744,13 @@ const GeneratePanel = memo(({
 
       {genTab === "image" && (
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="tp-source-mode-row" style={{ display: "flex", gap: 8 }}>
             <button type="button" onClick={() => setImageSourceMode("upload")} style={sourceModeBtnStyle(imageSourceMode === "upload")}>Upload Source</button>
             <button type="button" onClick={() => setImageSourceMode("generate_image")} style={sourceModeBtnStyle(imageSourceMode === "generate_image")}>Generate Image</button>
           </div>
 
           {imageSourceMode === "generate_image" && (
-            <div style={{ padding: 12, borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="tp-inline-option-card" style={{ padding: 12, borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 10 }}>
               <div>
                 <label style={labelStyle}>Image Prompt</label>
                 <textarea
@@ -798,14 +809,14 @@ const GeneratePanel = memo(({
 
       {genTab === "multi" && (
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="tp-source-mode-row" style={{ display: "flex", gap: 8 }}>
             <button type="button" onClick={() => setMultiviewSourceMode("upload")} style={sourceModeBtnStyle(multiviewSourceMode === "upload")}>Upload Views</button>
             <button type="button" onClick={() => setMultiviewSourceMode("generate_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "generate_multiview_image")}>Generate Views</button>
             <button type="button" onClick={() => setMultiviewSourceMode("edit_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "edit_multiview_image")}>Edit Views</button>
           </div>
 
           {multiviewSourceMode !== "upload" && (
-            <div style={{ padding: 12, borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="tp-inline-option-card" style={{ padding: 12, borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 10 }}>
               <div>
                 <label style={labelStyle}>{multiviewSourceMode === "edit_multiview_image" ? "Edit Prompt" : "Multiview Prompt"}</label>
                 <textarea
@@ -895,7 +906,7 @@ const GeneratePanel = memo(({
         <>
           {/* Style prefix buttons */}
           <div style={{ marginBottom: 10 }}>
-            <label style={{ color: "#4a4a68", fontSize: 11, fontWeight: 600, display: "block", marginBottom: 6 }}>
+            <label style={{ color: "#64748b", fontSize: 11, fontWeight: 600, display: "block", marginBottom: 6 }}>
               Style
             </label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
@@ -911,9 +922,9 @@ const GeneratePanel = memo(({
                       padding: "7px 13px", borderRadius: 11,
                       fontSize: 12, fontWeight: 600,
                       cursor: "pointer",
-                      border: active ? "1px solid rgba(139,92,246,0.35)" : "1px solid rgba(255,255,255,0.06)",
-                      background: active ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.035)",
-                      color: active ? "#b5b0ff" : "#5a5a78",
+                      border: active ? "1px solid rgba(47,140,255,0.38)" : "1px solid rgba(255,255,255,0.06)",
+                      background: active ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.035)",
+                      color: active ? "#f8fafc" : "#64748b",
                       transition: "all 0.15s ease",
                       fontFamily: "'SF Pro Text', system-ui, sans-serif",
                     }}
@@ -931,7 +942,7 @@ const GeneratePanel = memo(({
             onChange={val => { setPrompt(val); setErrorMsg?.(""); }}
             onNegativeChange={setNegPrompt}
             onSubmit={() => canGen && handleGen()}
-            color="#6c63ff"
+            color="#2f8cff"
             getIdToken={getIdToken}
             enhancing_prompt={TRIPO_ENHANCE_PROMPT}
             super_enhancing_prompt={TRIPO_SUPER_ENHANCE_PROMPT}
@@ -950,9 +961,9 @@ const GeneratePanel = memo(({
               }}
               onClick={() => caps.tPose && setTPose(v => !v)}
             >
-              <span style={{ color: tPose && caps.tPose ? "#a5a0ff" : "#4a4a68", fontSize: 11, fontWeight: 600 }}>T-Pose</span>
+              <span style={{ color: tPose && caps.tPose ? "#8bdcff" : "#64748b", fontSize: 11, fontWeight: 600 }}>T-Pose</span>
               <div className={"tp-switch" + (tPose && caps.tPose ? " on" : "")}
-                style={{ width: 28, height: 16, background: tPose && caps.tPose ? "#6c63ff" : "rgba(255,255,255,0.12)" }} />
+                style={{ width: 28, height: 16, background: tPose && caps.tPose ? "#2f8cff" : "rgba(255,255,255,0.12)" }} />
             </div>
           </Na>
         </>
@@ -964,7 +975,7 @@ const GeneratePanel = memo(({
        * ─────────────────────────────────────────────────────────────────── */}
       <Na unsupported={!caps.negPrompt} tip={`Negative prompt not supported by ${modelVer}`}>
         <div style={{ marginBottom: 10 }}>
-          <label style={{ color: "#4a4a68", fontSize: 11, fontWeight: 600, display: "block", marginBottom: 5 }}>
+          <label style={{ color: "#64748b", fontSize: 11, fontWeight: 600, display: "block", marginBottom: 5 }}>
             Negative Prompt
           </label>
           <textarea
@@ -1005,7 +1016,7 @@ const GeneratePanel = memo(({
               </button>
             </div>
           )}
-          <div style={{ border: "1.5px solid rgba(139,92,246,0.3)", borderRadius: 14, overflow: "hidden", background: "rgba(139,92,246,0.03)", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
+          <div style={{ border: "1.5px solid rgba(47,140,255,0.28)", borderRadius: 14, overflow: "hidden", background: "rgba(255,255,255,0.035)", boxShadow: "0 0 22px rgba(47,140,255,0.07)" }}>
             <div className="mv-grid">
               {MV_SLOTS.map((slot, i) => {
                 const prev = multiImages?.[i]?.preview;
@@ -1041,7 +1052,7 @@ const GeneratePanel = memo(({
                         <img src={prev} alt={slot.label} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         {isUploading && (
                           <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <Loader2 style={{ width: 14, height: 14, color: "#6c63ff" }} className="anim-spin" />
+                            <Loader2 style={{ width: 14, height: 14, color: "#2f8cff" }} className="anim-spin" />
                           </div>
                         )}
                         <div style={{ position: "absolute", bottom: 4, left: 4, padding: "2px 6px", borderRadius: 4, background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 8, fontWeight: 700, textTransform: "uppercase" }}>
@@ -1069,7 +1080,7 @@ const GeneratePanel = memo(({
       {genTab === "image" && imageSourceMode === "upload" && (
         <div style={{ marginBottom: 14 }}>
           <div
-            className="tp-drop checker"
+            className="tp-drop tp-upload-zone checker"
             style={{
               width: "100%", aspectRatio: (batchImages?.length > 3) ? "1/1" : "1.6/1", borderRadius: 14,
               border: "1.5px dashed rgba(255,255,255,0.08)",
@@ -1104,11 +1115,11 @@ const GeneratePanel = memo(({
                     </button>
                     {!isUploadedItemReady(img) && (
                       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <Loader2 style={{ width: 16, height: 16, color: "#6c63ff" }} className="anim-spin" />
+                        <Loader2 style={{ width: 16, height: 16, color: "#2f8cff" }} className="anim-spin" />
                       </div>
                     )}
                     {isUploadedItemReady(img) && (
-                      <div style={{ position: "absolute", bottom: 4, right: 4, width: 14, height: 14, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #10b981" }}>
+                      <div style={{ position: "absolute", bottom: 4, right: 4, width: 14, height: 14, borderRadius: "50%", background: "#2f8cff", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #8bdcff", boxShadow: "0 0 12px rgba(47,140,255,0.34)" }}>
                         <Check style={{ width: 8, height: 8, color: "#fff" }} />
                       </div>
                     )}
@@ -1116,24 +1127,24 @@ const GeneratePanel = memo(({
                 ))}
                 {batchImages.length < 10 && (
                   <div style={{ borderRadius: 8, border: "1.5px dashed rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)", display: "flex", alignItems: "center", justifyContent: "center", aspectRatio: "1/1", cursor: "pointer" }}>
-                    <Plus style={{ width: 20, height: 20, color: "#4a4a68" }} />
+                    <Plus style={{ width: 20, height: 20, color: "#64748b" }} />
                   </div>
                 )}
               </div>
             ) : (
               <div style={{ textAlign: "center", pointerEvents: "none" }}>
-                <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(108,99,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
-                  <Upload style={{ width: 20, height: 20, color: "#6c63ff" }} />
+                <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(47,140,255,0.10)", boxShadow: "0 0 22px rgba(47,140,255,0.10)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
+                  <Upload style={{ width: 20, height: 20, color: "#2f8cff" }} />
                 </div>
                 <p style={{ color: "#e2e2f0", fontSize: 13, fontWeight: 600, margin: "0 0 4px" }}>Upload Image(s)</p>
-                <p style={{ color: "#4a4a68", fontSize: 11, margin: "2px 0 0" }}>AVIF supported too</p>
-                <p style={{ color: "#4a4a68", fontSize: 11, margin: 0 }}>JPG, PNG, WEBP · Up to 10 images</p>
+                <p style={{ color: "#64748b", fontSize: 11, margin: "2px 0 0" }}>AVIF supported too</p>
+                <p style={{ color: "#64748b", fontSize: 11, margin: 0 }}>JPG, PNG, WEBP · Up to 10 images</p>
               </div>
             )}
           </div>
           {batchImages && batchImages.length > 0 && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, padding: "0 2px" }}>
-              <span style={{ color: "#4a4a68", fontSize: 11, fontWeight: 500 }}>
+              <span style={{ color: "#64748b", fontSize: 11, fontWeight: 500 }}>
                 {batchImages.length === 1 ? "1 image ready" : `${batchImages.length} images ready`}
               </span>
               <button onClick={() => setBatchImages([])} style={{ color: "#ef4444", fontSize: 11, background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }}>
@@ -1150,6 +1161,7 @@ const GeneratePanel = memo(({
       {TABS_WITH_MAKE_BETTER.has(genTab) && (
         <Na unsupported={!caps.makeBetter} tip={`Make Image Better not supported by ${modelVer}`}>
           <div
+            className="tp-setting-card"
             style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "10px 12px", borderRadius: 12, background: "rgba(255,255,255,0.03)",
@@ -1160,17 +1172,17 @@ const GeneratePanel = memo(({
             onClick={() => caps.makeBetter && setMakeBetter(!makeBetter)}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(108,99,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Sparkles style={{ width: 16, height: 16, color: "#6c63ff" }} />
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(47,140,255,0.10)", boxShadow: "0 0 18px rgba(47,140,255,0.09)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Sparkles style={{ width: 16, height: 16, color: "#2f8cff" }} />
               </div>
               <div>
-                <p 
+                <p
                   style={{ color: "#e2e2f0", fontSize: 12, fontWeight: 600, margin: 0, cursor: "help" }}
                   title="AI identifies and fixes common issues in your source image before 3D generation for better accuracy."
                 >
                   Make Image Better
                 </p>
-                <p style={{ color: "#4a4a68", fontSize: 10, margin: 0 }}>AI optimizes input before generation</p>
+                <p style={{ color: "#64748b", fontSize: 10, margin: 0 }}>AI optimizes input before generation</p>
               </div>
             </div>
             <div className={"tp-switch" + (makeBetter && caps.makeBetter ? " on" : "")} />
@@ -1183,8 +1195,8 @@ const GeneratePanel = memo(({
       {/* ── Mesh Quality ── */}
       <div style={{ margin: "14px 0 8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Mesh Quality</span>
-        <HelpCircle 
-          style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+        <HelpCircle
+          style={{ width: 13, height: 13, color: "#475569", cursor: "help" }}
           title="Ultra uses detailed geometry refinement. Standard is faster but with fewer polygons."
         />
       </div>
@@ -1196,9 +1208,9 @@ const GeneratePanel = memo(({
             onClick={() => caps.ultraMesh && setMeshQ("ultra")}
             title={caps.ultraMesh ? "geometry_quality: detailed" : `Requires P1-20260311 or v3.x`}
             style={{
-              background: meshQ === "ultra" && caps.ultraMesh ? "rgba(108,99,255,0.2)" : "rgba(255,255,255,0.05)",
-              color: meshQ === "ultra" && caps.ultraMesh ? "#a5a0ff" : "#3d3d5a",
-              outline: meshQ === "ultra" && caps.ultraMesh ? "1.5px solid rgba(108,99,255,0.4)" : "1.5px solid rgba(255,255,255,0.07)",
+              background: meshQ === "ultra" && caps.ultraMesh ? "rgba(255,255,255,0.075)" : "rgba(255,255,255,0.05)",
+              color: meshQ === "ultra" && caps.ultraMesh ? "#8bdcff" : "#64748b",
+              outline: meshQ === "ultra" && caps.ultraMesh ? "1.5px solid rgba(47,140,255,0.38)" : "1.5px solid rgba(255,255,255,0.07)",
               cursor: caps.ultraMesh ? "pointer" : "not-allowed",
             }}>
             Ultra
@@ -1210,9 +1222,9 @@ const GeneratePanel = memo(({
           onClick={() => setMeshQ("standard")}
           title="geometry_quality: standard"
           style={{
-            background: meshQ === "standard" || !caps.ultraMesh ? "rgba(108,99,255,0.2)" : "rgba(255,255,255,0.05)",
-            color: meshQ === "standard" || !caps.ultraMesh ? "#a5a0ff" : "#3d3d5a",
-            outline: meshQ === "standard" || !caps.ultraMesh ? "1.5px solid rgba(108,99,255,0.4)" : "1.5px solid rgba(255,255,255,0.07)",
+            background: meshQ === "standard" || !caps.ultraMesh ? "rgba(255,255,255,0.075)" : "rgba(255,255,255,0.05)",
+            color: meshQ === "standard" || !caps.ultraMesh ? "#8bdcff" : "#64748b",
+            outline: meshQ === "standard" || !caps.ultraMesh ? "1.5px solid rgba(47,140,255,0.38)" : "1.5px solid rgba(255,255,255,0.07)",
           }}>
           Standard
         </button>
@@ -1243,10 +1255,10 @@ const GeneratePanel = memo(({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
           <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Privacy</span>
-            <HelpCircle 
-              style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
-              title="Private models are only visible to you. Public models appear in the community gallery."
-            />
+          <HelpCircle
+            style={{ width: 13, height: 13, color: "#475569", cursor: "help" }}
+            title="Private models are only visible to you. Public models appear in the community gallery."
+          />
         </div>
         <button onClick={() => setPrivacy(v => v === "public" ? "private" : "public")}
           style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 7, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", cursor: "pointer", color: "#8a8aaa", fontSize: 12, fontWeight: 500, fontFamily: "inherit" }}>
@@ -1277,17 +1289,17 @@ const GeneratePanel = memo(({
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>4K Texture</span>
-                <HelpCircle 
-                  style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                <HelpCircle
+                  style={{ width: 13, height: 13, color: "#475569", cursor: "help" }}
                   title="Generates 4096x4096px textures. Significantly higher detail but takes more time."
                 />
               </div>
               <div className={"tp-switch" + (tex4K && (texOn || pbrOn) && caps.tex4K ? " on" : "")}
-                style={{ background: tex4K && texOn && caps.tex4K ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
+                style={{ background: tex4K && texOn && caps.tex4K ? "#2f8cff" : "rgba(255,255,255,0.12)" }} />
             </div>
           </Na>
           {tex4K && (texOn || pbrOn) && caps.tex4K && (
-            <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
+            <p style={{ color: "#64748b", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
               texture_quality: "HD" — higher resolution, slower generation.
             </p>
           )}
@@ -1305,17 +1317,17 @@ const GeneratePanel = memo(({
             >
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>PBR</span>
-                <HelpCircle 
-                  style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                <HelpCircle
+                  style={{ width: 13, height: 13, color: "#475569", cursor: "help" }}
                   title="Physically Based Rendering: Includes Metallic, Roughness and Normal maps."
                 />
               </div>
               <div className={"tp-switch" + (pbrOn && texOn && caps.pbr ? " on" : "")}
-                style={{ background: pbrOn && texOn && caps.pbr ? "#4c8ef7" : "rgba(255,255,255,0.12)" }} />
+                style={{ background: pbrOn && texOn && caps.pbr ? "#2f8cff" : "rgba(255,255,255,0.12)" }} />
             </div>
           </Na>
           {pbrOn && texOn && caps.pbr && (
-            <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
+            <p style={{ color: "#64748b", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
               Generates albedo, normal, roughness & metallic maps. Overrides texture=true.
             </p>
           )}
@@ -1342,8 +1354,8 @@ const GeneratePanel = memo(({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Model Seed</span>
-                <HelpCircle 
-                  style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                <HelpCircle
+                  style={{ width: 13, height: 13, color: "#475569", cursor: "help" }}
                   title="Controls the geometric variation of the 3D model. Fixed seed ensures reproducible results."
                 />
               </div>
@@ -1356,8 +1368,8 @@ const GeneratePanel = memo(({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Image Seed</span>
-                <HelpCircle 
-                  style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                <HelpCircle
+                  style={{ width: 13, height: 13, color: "#475569", cursor: "help" }}
                   title="Controls how the AI interprets the source image. Fixed seed keeps interpretation consistent."
                 />
               </div>
@@ -1371,8 +1383,8 @@ const GeneratePanel = memo(({
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                   <span style={{ color: "#c8c8e0", fontSize: 13, fontWeight: 500 }}>Texture Seed</span>
-                  <HelpCircle 
-                    style={{ width: 13, height: 13, color: "#1e1e3a", cursor: "help" }} 
+                  <HelpCircle
+                    style={{ width: 13, height: 13, color: "#475569", cursor: "help" }}
                     title="Controls the randomness of texture generation and UV mapping layout."
                   />
                 </div>
@@ -1386,7 +1398,7 @@ const GeneratePanel = memo(({
             <Toggle label="Auto Size" value={autoSize && caps.autoSize} onChange={v => caps.autoSize && setAutoSize(v)} hint disabled={!caps.autoSize} />
           </Na>
           {autoSize && caps.autoSize && (
-            <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
+            <p style={{ color: "#64748b", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
               Scales the model to real-world dimensions (meters).
             </p>
           )}
@@ -1394,7 +1406,7 @@ const GeneratePanel = memo(({
           {/* export_uv */}
           <Toggle label="Export UV" value={exportUv} onChange={setExportUv} hint />
           {!exportUv && (
-            <p style={{ color: "#4a4a68", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
+            <p style={{ color: "#64748b", fontSize: 10, margin: "-4px 0 4px", lineHeight: 1.5 }}>
               Skips UV unwrap during generation — faster & smaller file. UV added at texturing stage.
             </p>
           )}

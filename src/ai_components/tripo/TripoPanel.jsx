@@ -3,7 +3,7 @@ import React, {
 } from "react";
 import {
   Download, Loader2, AlertCircle, Trash2, RotateCcw,
-  Camera, Move3d, Layers, Play, Square, ChevronRight, ChevronLeft, Box, Zap, ChevronDown, Info,
+  Camera, Move3d, Layers, Play, Square, ChevronRight, ChevronLeft, Box, Zap, Info,
   Sparkles, Grid3x3, Scissors, PaintBucket,
   Boxes, PersonStanding, Wand2, Activity,
   PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen
@@ -50,6 +50,7 @@ import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { useStudioPanels } from "../../context/StudioPanelContext";
 import { useJobs } from "../../context/JobsContext";
 import toast from "react-hot-toast";
+import tripoSidebarBg from "../../assets/3d_forge_bg.png";
 
 /* ─── constants ─────────────────────────────────────────────────────── */
 const PAGE_SIZE = 10;
@@ -85,6 +86,51 @@ const TEXTURE_SUBS = [
   { id: "generate", label: "Generate" },
   { id: "paint", label: "Paint", disabled: true, disabledMessage: "waiting for tripo patch" },
 ];
+
+const MODE_UI = {
+  generate: {
+    eyebrow: "Create",
+    description: "Build a new 3D asset from image, multiview or prompt input.",
+    accent: "#8a2be2",
+    accent2: "#00e5ff",
+  },
+  segment: {
+    eyebrow: "Parts",
+    description: "Split selected models into editable object regions.",
+    accent: "#00e5ff",
+    accent2: "#8a2be2",
+  },
+  retopo: {
+    eyebrow: "Mesh",
+    description: "Convert, simplify and prepare topology for export.",
+    accent: "#3B82F6",
+    accent2: "#00e5ff",
+  },
+  texture: {
+    eyebrow: "Surface",
+    description: "Generate or prepare texture passes for the active model.",
+    accent: "#ff007f",
+    accent2: "#ff007f",
+  },
+  refine: {
+    eyebrow: "Improve",
+    description: "Refine the draft source while keeping schema-safe task inputs.",
+    accent: "#ff007f",
+    accent2: "#00e5ff",
+  },
+  stylize: {
+    eyebrow: "Look",
+    description: "Apply a clear visual style preset to the selected asset.",
+    accent: "#8a2be2",
+    accent2: "#ff007f",
+  },
+  animate: {
+    eyebrow: "Motion",
+    description: "Rig compatible models and apply reusable animation clips.",
+    accent: "#00e5ff",
+    accent2: "#8a2be2",
+  },
+};
 
 const MODE_COST = {
   segment: 40,
@@ -123,102 +169,509 @@ function isPostProcessModelVersionSupported(version) {
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
   :root {
-    --bg-base: #0a0a14;
-    --bg-panel: rgba(10, 10, 20, 0.45);
-    --bg-surface: rgba(255, 255, 255, 0.025);
-    --bg-raised: rgba(255, 255, 255, 0.045);
-    --accent: #8b5cf6;
-    --accent-bright: #a78bfa;
-    --accent-glow: rgba(139, 92, 246, 0.25);
+    --bg-base: #050306;
+    --bg-panel: rgba(13, 8, 10, 0.72);
+    --bg-surface: rgba(225, 226, 212, 0.035);
+    --bg-raised: rgba(225, 226, 212, 0.06);
+    --accent: #8a2be2;
+    --accent-bright: #00e5ff;
+    --accent-glow: rgba(138, 43, 226, 0.24);
+    --vu-cream: #e2e8f0;
+    --vu-ash: #94a3b8;
+    --vu-ink: #03000a;
+    --vu-rust: #ff007f;
+    --vu-clay: #1d4ed8;
     --text-primary: #f0f0f8;
     --text-secondary: #94a3b8;
     --text-muted: #475569;
     --text-faint: #1e293b;
     --border: rgba(255, 255, 255, 0.06);
-    --border-accent: rgba(139, 92, 246, 0.28);
+    --border-accent: rgba(47, 140, 255, 0.34);
     --error: #ef4444;
-    --success: #10b981;
+    --success: #2f8cff;
   }
   @keyframes spin   { to { transform: rotate(360deg); } }
   @keyframes fadeUp { from { opacity:0;transform:translateY(6px) } to { opacity:1;transform:none } }
   @keyframes pulseGlow {
-    0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
-    70% { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(47, 140, 255, 0.34); }
+    70% { box-shadow: 0 0 0 6px rgba(47, 140, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(47, 140, 255, 0); }
+  }
+  @keyframes tpAurora {
+    0%,100% { background-position:0% 0%; opacity:0.60; }
+    50% { background-position:100% 70%; opacity:0.82; }
+  }
+  @keyframes tpRailPulse {
+    0%,100% { box-shadow:0 18px 44px rgba(0,0,0,0.34),0 0 22px rgba(138,43,226,0.24),0 0 18px rgba(0,229,255,0.12),inset 0 1px 0 rgba(255,255,255,0.18); }
+    50% { box-shadow:0 20px 54px rgba(0,0,0,0.42),0 0 34px rgba(138,43,226,0.34),0 0 28px rgba(0,229,255,0.18),inset 0 1px 0 rgba(255,255,255,0.26); }
+  }
+  @keyframes tpButtonSheen {
+    0% { background-position:0% 50%; }
+    50% { background-position:100% 50%; }
+    100% { background-position:0% 50%; }
   }
   .anim-spin { animation: spin 1s linear infinite; }
   .fade-up   { animation: fadeUp 0.18s ease forwards; }
   .tp-viewport canvas { position: relative !important; z-index: 0 !important; }
-  .tp-scroll { scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.06) transparent; }
-  .tp-scroll::-webkit-scrollbar { width:3px; }
-  .tp-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:3px; }
-  .tp-nav-btn { display:flex;flex-direction:column;align-items:center;gap:5px;width:100%;padding:10px 0;background:none;border:none;cursor:pointer;position:relative;transition:background 0.14s, opacity 0.14s; }
-  .tp-nav-btn .ico { width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;transition:background 0.14s, transform 0.14s, box-shadow 0.14s; }
-  .tp-nav-btn:hover .ico { background:rgba(255,255,255,0.06); }
-  .tp-nav-btn.active .ico { background:rgba(124,111,255,0.22);box-shadow:0 0 12px rgba(124,111,255,0.2); }
-  .tp-nav-btn .lbl { font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;transition:color 0.14s; }
-  .tp-nav-btn.active .lbl { color:var(--accent-bright); }
-  .tp-nav-btn:not(.active) .lbl { color:var(--text-muted); }
-  .tp-nav-btn:not(.active):hover .lbl { color:var(--text-secondary); }
-  .tp-nav-btn.active::before { content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:26px;background:linear-gradient(180deg,var(--accent-bright),var(--accent));border-radius:0 4px 4px 0;box-shadow:0 0 8px var(--accent-glow); }
-  /* Mobile: hide labels in narrow primary nav */
+  .tp-side-shell { position:relative; isolation:isolate; display:flex; flex-direction:row; background:linear-gradient(180deg,rgba(3,0,10,0.985),rgba(3,5,12,0.995)); border-right:1px solid rgba(0,229,255,0.12); box-shadow:24px 0 84px rgba(0,0,0,0.54),12px 0 56px rgba(138,43,226,0.08); }
+  .tp-side-shell::before { content:''; position:absolute; inset:0; pointer-events:none; z-index:-1; background-image:linear-gradient(90deg,rgba(3,0,10,0.90),rgba(3,7,18,0.78)),radial-gradient(circle at 92% 8%,rgba(138,43,226,0.28),transparent 34%),radial-gradient(circle at 0% 72%,rgba(0,229,255,0.16),transparent 42%),var(--tp-rail-bg); background-size:auto,170% 170%,170% 170%,cover; background-position:center,0% 0%,100% 100%,center; animation:tpAurora 13s ease-in-out infinite; opacity:0.98; }
+  .tp-side-shell::after { content:''; position:absolute; inset:0; pointer-events:none; z-index:1; background:linear-gradient(90deg,rgba(138,43,226,0.08),transparent 12%,transparent 88%,rgba(0,229,255,0.08)),linear-gradient(180deg,rgba(255,255,255,0.04),transparent 42%); opacity:0.72; }
+  .tp-mode-rail { position:relative; z-index:4; width:88px; flex:0 0 88px; display:flex; flex-direction:column; align-items:center; gap:16px; padding:18px 13px; border-right:1px solid rgba(0,229,255,0.13); background:linear-gradient(180deg,rgba(10,11,22,0.74),rgba(4,1,12,0.88)); box-shadow:inset -1px 0 0 rgba(255,255,255,0.04),12px 0 34px rgba(0,229,255,0.045); backdrop-filter:blur(24px); }
+  .tp-mode-rail::after { content:''; position:absolute; right:-1px; top:26px; bottom:26px; width:1px; background:linear-gradient(180deg,transparent,rgba(138,43,226,0.42),rgba(0,229,255,0.42),transparent); pointer-events:none; box-shadow:0 0 22px rgba(0,229,255,0.18); }
+  .tp-rail-brand { width:54px; height:54px; border-radius:20px; display:flex; align-items:center; justify-content:center; color:#f8fafc; font-size:11px; font-weight:950; letter-spacing:0.08em; background:linear-gradient(145deg,rgba(255,255,255,0.14),rgba(138,43,226,0.22) 52%,rgba(0,229,255,0.12)); border:1px solid rgba(255,255,255,0.16); box-shadow:0 18px 42px rgba(0,0,0,0.36),0 0 32px rgba(138,43,226,0.20),inset 0 1px 0 rgba(255,255,255,0.18); }
+  .tp-rail-list { width:100%; display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .tp-rail-btn { width:58px; min-height:66px; border:1px solid rgba(255,255,255,0.075); border-radius:20px; background:linear-gradient(145deg,rgba(255,255,255,0.050),rgba(255,255,255,0.018)); color:rgba(203,213,225,0.58); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; position:relative; overflow:hidden; transition:transform 0.2s,background 0.2s,border-color 0.2s,color 0.2s,box-shadow 0.2s; box-shadow:inset 0 1px 0 rgba(255,255,255,0.04); }
+  .tp-rail-btn::before { content:''; position:absolute; left:-13px; top:17px; bottom:17px; width:3px; border-radius:99px; background:linear-gradient(180deg,#8a2be2,#ff007f,#00e5ff); opacity:0; transform:scaleY(0.35); transition:opacity 0.18s,transform 0.18s; box-shadow:0 0 20px rgba(0,229,255,0.44); }
+  .tp-rail-btn::after { content:''; position:absolute; inset:1px; border-radius:19px; background:linear-gradient(145deg,rgba(255,255,255,0.12),transparent 34%,rgba(0,229,255,0.05)); opacity:0; pointer-events:none; transition:opacity 0.18s; }
+  .tp-rail-btn svg { width:18px; height:18px; position:relative; z-index:1; }
+  .tp-rail-btn .lbl { position:relative; z-index:1; max-width:54px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:7px; line-height:1; font-weight:950; letter-spacing:0.10em; text-transform:uppercase; }
+  .tp-rail-btn:hover { transform:translateY(-2px); color:rgba(255,255,255,0.95); background:linear-gradient(145deg,rgba(255,255,255,0.085),rgba(138,43,226,0.09)); border-color:rgba(0,229,255,0.22); box-shadow:0 16px 34px rgba(0,0,0,0.28),0 0 24px rgba(0,229,255,0.10),inset 0 1px 0 rgba(255,255,255,0.08); }
+  .tp-rail-btn:hover::after { opacity:0.70; }
+  .tp-rail-btn:focus-visible { outline:2px solid rgba(0,229,255,0.58); outline-offset:3px; }
+  .tp-rail-btn.active { color:#ffffff; background:linear-gradient(145deg,rgba(138,43,226,0.34),rgba(47,140,255,0.18) 52%,rgba(0,229,255,0.13)); border-color:rgba(0,229,255,0.46); animation:tpRailPulse 3.2s ease-in-out infinite; }
+  .tp-rail-btn.active::before { opacity:1; transform:scaleY(1); }
+  .tp-rail-btn.active::after { opacity:1; }
+  .tp-controls-col { position:relative; z-index:2; min-width:0; flex:1; background:linear-gradient(180deg,rgba(7,7,16,0.84),rgba(3,0,10,0.96)); }
+  .tp-controls-col::before { content:''; position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 76% 0%,rgba(138,43,226,0.14),transparent 34%),radial-gradient(circle at 10% 82%,rgba(0,229,255,0.08),transparent 36%); }
+  .tp-panel-head { --tp-mode-a:#8a2be2; --tp-mode-b:#00e5ff; position:relative; z-index:2; margin:14px 14px 0; padding:18px 18px 16px; border:1px solid rgba(255,255,255,0.10); border-radius:28px; background:linear-gradient(150deg,rgba(255,255,255,0.078),rgba(13,12,26,0.72) 46%,rgba(5,2,14,0.92)),radial-gradient(circle at 88% 0%,color-mix(in srgb, var(--tp-mode-a) 26%, transparent),transparent 45%),radial-gradient(circle at 10% 100%,color-mix(in srgb, var(--tp-mode-b) 16%, transparent),transparent 48%); box-shadow:0 22px 52px rgba(0,0,0,0.34),0 0 44px color-mix(in srgb, var(--tp-mode-a) 13%, transparent),inset 0 1px 0 rgba(255,255,255,0.12); overflow:hidden; backdrop-filter:blur(24px); }
+  .tp-panel-head::before { content:''; position:absolute; right:-52px; top:-56px; width:160px; height:160px; border-radius:999px; background:radial-gradient(circle, color-mix(in srgb, var(--tp-mode-a) 44%, transparent), rgba(0,229,255,0.055) 45%, transparent 70%); opacity:0.86; pointer-events:none; filter:blur(1px); }
+  .tp-panel-head::after { content:''; position:absolute; left:18px; right:18px; bottom:0; height:1px; background:linear-gradient(90deg,color-mix(in srgb, var(--tp-mode-a) 58%, transparent),color-mix(in srgb, var(--tp-mode-b) 48%, transparent),transparent); opacity:0.90; pointer-events:none; box-shadow:0 0 22px color-mix(in srgb, var(--tp-mode-b) 26%, transparent); }
+  .tp-mode-kicker { position:relative; display:inline-flex; align-items:center; gap:8px; margin-bottom:10px; color:rgba(203,213,225,0.78); font-size:9px; font-weight:950; letter-spacing:0.22em; text-transform:uppercase; }
+  .tp-mode-kicker::before { content:''; width:8px; height:8px; border-radius:999px; background:linear-gradient(135deg,var(--tp-mode-a),var(--tp-mode-b)); box-shadow:0 0 20px color-mix(in srgb, var(--tp-mode-a) 52%, transparent); }
+  .tp-panel-title { position:relative; margin:0; min-height:24px; color:#fff; text-shadow:none; }
+  .tp-panel-desc { position:relative; margin:9px 0 0; color:rgba(203,213,225,0.78); font-size:11px; font-weight:800; line-height:1.58; }
+  .tp-sub-tabs { position:relative; display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; padding:5px; border:1px solid rgba(255,255,255,0.09); border-radius:24px; background:rgba(3,0,10,0.32); box-shadow:inset 0 1px 0 rgba(255,255,255,0.06); }
+  .tp-panel-scroll { position:relative; z-index:2; padding:16px 14px 14px; scrollbar-width:thin; scrollbar-color:rgba(0,229,255,0.22) transparent; }
+  .tp-panel-scroll::-webkit-scrollbar { width:4px; }
+  .tp-panel-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.16); border-radius:999px; }
+  .tp-scroll { scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.16) transparent; }
+  .tp-scroll::-webkit-scrollbar { width:4px; }
+  .tp-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.16); border-radius:999px; }
+  /* Mobile: keep the rail compact */
   @media (max-width: 640px) {
-    .tp-nav-btn .lbl { display: none; }
-    .tp-nav-btn .ico { width: 32px; height: 32px; }
-    .tp-nav-btn { padding: 8px 0; }
+    .tp-mode-rail { width:68px; flex-basis:68px; padding:12px 8px; }
+    .tp-rail-brand { width:44px; height:44px; border-radius:17px; }
+    .tp-rail-btn { width:50px; min-height:50px; border-radius:18px; }
+    .tp-rail-btn .lbl { display:none; }
   }
-  .tp-switch { width:36px;height:20px;border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;cursor:pointer; }
+  .tp-switch { width:36px;height:20px;border-radius:10px;position:relative;transition:background 0.2s,border-color 0.2s,box-shadow 0.2s;flex-shrink:0;cursor:pointer; }
   .tp-switch::after { content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.4); }
   .tp-switch.on::after { transform:translateX(16px); }
   .tp-input { width:100%;padding:9px 12px;border-radius:10px;font-size:12px;color:var(--text-primary);background:var(--bg-raised);border:1px solid var(--border);outline:none;font-family:inherit;transition:border-color 0.18s,background 0.18s,box-shadow 0.18s;box-sizing:border-box; }
   input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none;margin:0; }
-  .tp-input:focus { border-color:var(--border-accent);background:rgba(30,30,54,0.9);box-shadow:0 0 0 3px rgba(139,92,246,0.08); }
+  .tp-input:focus { border-color:var(--border-accent);background:rgba(12,14,18,0.94);box-shadow:0 0 0 3px rgba(47,140,255,0.12),0 0 20px rgba(47,140,255,0.10); }
   .tp-input::placeholder { color:var(--text-muted); }
   .tp-ta { width:100%;padding:10px 13px;border-radius:11px;font-size:12px;color:var(--text-primary);background:var(--bg-raised);border:1px solid var(--border);outline:none;font-family:inherit;resize:none;line-height:1.6;box-sizing:border-box;transition:border-color 0.18s,box-shadow 0.18s; }
   .tp-ta::placeholder { color:var(--text-muted); }
-  .tp-ta:focus { border-color:var(--border-accent);outline:none;box-shadow:0 0 0 3px rgba(139,92,246,0.08); }
-  .tp-drop:hover { border-color:rgba(108,99,255,0.4) !important;box-shadow:0 0 12px rgba(108,99,255,0.06); }
-  .tp-sub-tab { padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;border:none;transition:background 0.13s, color 0.13s;font-family:inherit; }
-  .tp-sub-tab.on { background:rgba(124,111,255,0.25);color:var(--accent-bright);outline:1px solid var(--border-accent); }
-  .tp-sub-tab:not(.on) { background:transparent;color:var(--text-muted); }
-  .tp-sub-tab:not(.on):hover { color:#5a5a7a;background:rgba(255,255,255,0.04); }
-  .tp-inp-tab { flex:1;padding:7px 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:9px;transition:background 0.18s, color 0.18s, box-shadow 0.18s;font-family:inherit;background:transparent; }
-  .tp-inp-tab.active { background:#ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.3),0 0 0 1px rgba(255,255,255,0.05); }
+  .tp-ta:focus { border-color:var(--border-accent);outline:none;box-shadow:0 0 0 3px rgba(47,140,255,0.12),0 0 20px rgba(47,140,255,0.10); }
+  .tp-drop:hover { border-color:rgba(47,140,255,0.28) !important;box-shadow:0 12px 32px rgba(0,0,0,0.18),0 0 22px rgba(47,140,255,0.12); }
+  .tp-sub-tab { padding:10px 12px;border-radius:18px;font-size:10px;font-weight:950;cursor:pointer;border:1px solid transparent;transition:background 0.16s, color 0.16s, border-color 0.16s, box-shadow 0.16s, transform 0.16s;font-family:inherit;letter-spacing:0.08em;text-transform:uppercase; }
+  .tp-sub-tab.on { background:linear-gradient(135deg,color-mix(in srgb, var(--tp-mode-a) 34%, rgba(255,255,255,0.08)),color-mix(in srgb, var(--tp-mode-b) 22%, rgba(255,255,255,0.06)));color:#fff;border-color:color-mix(in srgb, var(--tp-mode-b) 46%, rgba(255,255,255,0.12));box-shadow:0 12px 30px rgba(0,0,0,0.26),0 0 26px color-mix(in srgb, var(--tp-mode-a) 22%, transparent),inset 0 1px 0 rgba(255,255,255,0.20); }
+  .tp-sub-tab:not(.on) { background:rgba(255,255,255,0.045);color:rgba(203,213,225,0.60);border-color:rgba(255,255,255,0.08); }
+  .tp-sub-tab:not(.on):hover { color:rgba(255,255,255,0.92);background:rgba(0,229,255,0.070);border-color:rgba(0,229,255,0.18);transform:translateY(-1px); }
+  .tp-workflow-page { --tp-mode-a:#2f8cff; --tp-mode-b:#8bdcff; display:flex; flex-direction:column; gap:12px; min-width:0; }
+  .tp-workflow-page > div { margin-bottom:0 !important; }
+  .tp-workflow-page > div:empty { display:none !important; }
+  .tp-workflow-page [style*="#2d2d48"],
+  .tp-workflow-page [style*="#1e1e38"],
+  .tp-workflow-page [style*="#3a3a58"],
+  .tp-workflow-page [style*="#4a4a68"],
+  .tp-workflow-page [style*="#5a5a78"],
+  .tp-workflow-page [style*="#64748b"] {
+    color:rgba(148,163,184,0.74) !important;
+  }
+  .tp-workflow-page [style*="#0f0f1e"],
+  .tp-workflow-page [style*="#111122"],
+  .tp-workflow-page [style*="#131327"],
+  .tp-workflow-page [style*="#0d0d1a"] {
+    background:#0b0b0e !important;
+  }
+  .tp-workflow-page [style*="108,99,255"],
+  .tp-workflow-page [style*="139,92,246"],
+  .tp-workflow-page [style*="57,255,136"],
+  .tp-workflow-page [style*="0,229,255"],
+  .tp-workflow-page [style*="#12f7d6"],
+  .tp-workflow-page [style*="#2f8cff"],
+  .tp-workflow-page [style*="#0f766e"],
+  .tp-workflow-page [style*="#38bdf8"],
+  .tp-workflow-page [style*="#8bdcff"],
+  .tp-workflow-page [style*="#4c8ef7"],
+  .tp-workflow-page [style*="#6c63ff"],
+  .tp-workflow-page [style*="#8b5cf6"],
+  .tp-workflow-page [style*="#00e5ff"],
+  .tp-workflow-page [style*="#a855f7"],
+  .tp-workflow-page [style*="#ec4899"] {
+    color:#8bdcff !important;
+    border-color:rgba(47,140,255,0.28) !important;
+    box-shadow:0 10px 26px rgba(0,0,0,0.13) !important;
+  }
+  .tp-workflow-page div[style*="108,99,255"],
+  .tp-workflow-page button[style*="108,99,255"],
+  .tp-workflow-page label[style*="108,99,255"],
+  .tp-workflow-page div[style*="57,255,136"],
+  .tp-workflow-page button[style*="57,255,136"],
+  .tp-workflow-page div[style*="14,163,95"],
+  .tp-workflow-page button[style*="14,163,95"],
+  .tp-workflow-page div[style*="#12f7d6"],
+  .tp-workflow-page button[style*="#12f7d6"],
+  .tp-workflow-page div[style*="#0f766e"],
+  .tp-workflow-page button[style*="#0f766e"],
+  .tp-workflow-page div[style*="#8b5cf6"],
+  .tp-workflow-page button[style*="#8b5cf6"],
+  .tp-workflow-page div[style*="#6c63ff"],
+  .tp-workflow-page button[style*="#6c63ff"] {
+    background:linear-gradient(135deg,rgba(255,255,255,0.072),rgba(47,140,255,0.085)) !important;
+  }
+  .tp-workflow-page [class*="text-cyan"],
+  .tp-workflow-page [class*="text-primary"] {
+    color:#8bdcff !important;
+  }
+  .tp-workflow-page [class*="bg-cyan"],
+  .tp-workflow-page [class*="bg-primary"] {
+    background-color:rgba(47,140,255,0.10) !important;
+  }
+  .tp-workflow-page [class*="border-cyan"],
+  .tp-workflow-page [class*="border-primary"] {
+    border-color:rgba(47,140,255,0.24) !important;
+  }
+  .tp-workflow-page > div[style*="239,68,68"],
+  .tp-workflow-page div[style*="239,68,68"] {
+    background:rgba(239,68,68,0.09) !important;
+    border-color:rgba(239,68,68,0.26) !important;
+  }
+  .tp-workflow-page > div[style*="245,197,24"],
+  .tp-workflow-page div[style*="245,197,24"] {
+    background:rgba(245,158,11,0.09) !important;
+    border-color:rgba(245,158,11,0.24) !important;
+  }
+  .tp-workflow-page > div[style*="34,197,94"],
+  .tp-workflow-page div[style*="34,197,94"] {
+    background:rgba(47,140,255,0.08) !important;
+    border-color:rgba(47,140,255,0.24) !important;
+  }
+  .tp-workflow-page label,
+  .tp-workflow-page > div > span:first-child {
+    color:rgba(161,161,170,0.84) !important;
+    font-size:10px !important;
+    font-weight:900 !important;
+    letter-spacing:0.12em !important;
+    text-transform:uppercase !important;
+  }
+  .tp-workflow-page input,
+  .tp-workflow-page select,
+  .tp-workflow-page textarea,
+  .tp-input,
+  .tp-ta {
+    min-height:38px;
+    border-radius:9px !important;
+    border:1px solid rgba(255,255,255,0.085) !important;
+    background:rgba(255,255,255,0.036) !important;
+    color:#f8fafc !important;
+    font-weight:700 !important;
+    box-shadow:none !important;
+  }
+  .tp-workflow-page textarea,
+  .tp-ta { min-height:82px; line-height:1.55 !important; }
+  .tp-workflow-page input:focus,
+  .tp-workflow-page select:focus,
+  .tp-workflow-page textarea:focus,
+  .tp-input:focus,
+  .tp-ta:focus {
+    border-color:color-mix(in srgb, var(--tp-mode-a) 54%, rgba(255,255,255,0.10)) !important;
+    box-shadow:0 0 0 3px rgba(47,140,255,0.12),0 0 20px rgba(47,140,255,0.10) !important;
+  }
+  .tp-workflow-page button:not(.tp-sub-tab) {
+    border-radius:9px !important;
+    border:1px solid rgba(255,255,255,0.08) !important;
+    font-weight:900 !important;
+    transition:background 0.18s, border-color 0.18s, color 0.18s, opacity 0.18s, box-shadow 0.18s !important;
+  }
+  .tp-workflow-page button:not(.tp-sub-tab):hover {
+    border-color:rgba(47,140,255,0.28) !important;
+    box-shadow:0 10px 26px rgba(0,0,0,0.17),0 0 22px rgba(47,140,255,0.12) !important;
+  }
+  .tp-inp-tab { min-height:38px; flex:1;padding:8px 8px !important;border:1px solid transparent !important;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:9px !important;transition:background 0.18s, color 0.18s,border-color 0.18s,box-shadow 0.18s;font-family:inherit;background:transparent !important;color:rgba(148,163,184,0.72) !important; }
+  .tp-inp-tab.active { background:linear-gradient(135deg,rgba(255,255,255,0.085),rgba(47,140,255,0.10)) !important;color:#f8fafc !important;border-color:rgba(47,140,255,0.30) !important;box-shadow:0 10px 22px rgba(0,0,0,0.16),0 0 20px rgba(47,140,255,0.12) !important; }
+  .tp-model-card,
+  .anim-card,
+  .tex-input-box {
+    border-radius:10px !important;
+    background:rgba(255,255,255,0.028) !important;
+    border:1px solid rgba(255,255,255,0.075) !important;
+    box-shadow:none !important;
+  }
+  .tp-model-card.sel,
+  .anim-card:hover,
+  .tp-model-card:hover:not(.sel) {
+    border-color:rgba(47,140,255,0.30) !important;
+    box-shadow:0 12px 28px rgba(0,0,0,0.18),0 0 20px rgba(47,140,255,0.12) !important;
+  }
+  .tp-switch { background:rgba(255,255,255,0.12) !important; border:1px solid rgba(255,255,255,0.07); }
+  .tp-switch.on { background:linear-gradient(135deg,var(--tp-mode-a),var(--tp-mode-b)) !important; box-shadow:0 0 18px -8px var(--tp-mode-a); }
+  .tp-topo-btn,
+  .tp-qual-btn,
+  .anim-model-dd,
+  .auto-rig-btn {
+    min-height:38px;
+    background:rgba(255,255,255,0.035) !important;
+    border:1px solid rgba(255,255,255,0.08) !important;
+    color:rgba(226,232,240,0.82) !important;
+  }
+  .tp-topo-btn.sel,
+  .tp-qual-btn[style*="rgba(108,99,255"],
+  .auto-rig-btn.ready {
+    background:linear-gradient(135deg,rgba(255,255,255,0.082),rgba(47,140,255,0.10)) !important;
+    border-color:rgba(47,140,255,0.30) !important;
+    color:#f8fafc !important;
+  }
+  .tp-drop,
+  .mv-cell {
+    border-radius:10px !important;
+    border-color:rgba(255,255,255,0.11) !important;
+    background-color:rgba(255,255,255,0.028) !important;
+  }
+  .mv-grid { gap:10px !important; padding:12px !important; }
+  .sec-row { padding:13px 4px !important; border-radius:12px !important; }
+  .sec-row:hover { background:rgba(255,255,255,0.045) !important; }
+  .tp-action-dock {
+    padding:10px 14px 14px !important;
+    border-top:1px solid rgba(255,255,255,0.065);
+    background:linear-gradient(180deg,rgba(255,255,255,0.012),rgba(5,5,8,0.48));
+    box-shadow:0 -14px 38px rgba(47,140,255,0.05);
+  }
+  .tp-action-card {
+    border-radius:12px !important;
+    background:linear-gradient(160deg,rgba(255,255,255,0.064),rgba(255,255,255,0.028)) !important;
+    border:1px solid rgba(255,255,255,0.082) !important;
+    border-left:1px solid rgba(47,140,255,0.32) !important;
+    box-shadow:0 18px 42px rgba(0,0,0,0.25),0 0 32px rgba(47,140,255,0.10) !important;
+  }
   .tp-qual-btn { flex:1;padding:10px 4px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;border:none;transition:background 0.18s, color 0.18s, border-color 0.18s;display:flex;align-items:center;justify-content:center;gap:5px;font-family:inherit; }
-  .tp-gen-btn { width:100%;padding:16px 0;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:0.03em;transition:background 0.22s, transform 0.22s, box-shadow 0.22s;font-family:inherit; }
-  .tp-gen-btn.go { background:linear-gradient(135deg,#8b5cf6,#7c3aed); color:#ffffff; box-shadow:0 12px 40px rgba(139,92,246,0.28),0 4px 12px rgba(0,0,0,0.2); }
-  .tp-gen-btn.go:hover { box-shadow:0 18px 55px rgba(139,92,246,0.4),0 6px 16px rgba(0,0,0,0.25); transform:translateY(-2px) scale(1.02); }
+  .tp-gen-btn { width:100%;padding:16px 0;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:0.04em;transition:background 0.22s, transform 0.22s, box-shadow 0.22s;font-family:inherit; }
+  .tp-gen-btn.go { background:linear-gradient(110deg,#050608 0%,#1d4ed8 32%,#2f8cff 54%,#8bdcff 78%,#050608 100%); background-size:220% 220%; color:#f8fafc; box-shadow:0 18px 44px rgba(0,0,0,0.30),0 0 36px rgba(47,140,255,0.24),inset 0 1px 0 rgba(255,255,255,0.24); animation:tpButtonSheen 6s ease-in-out infinite; }
+  .tp-gen-btn.go:hover { box-shadow:0 22px 52px rgba(0,0,0,0.36),0 0 48px rgba(47,140,255,0.32),inset 0 1px 0 rgba(255,255,255,0.30); transform:translateY(-1px); }
   .tp-gen-btn.no { background:rgba(255,255,255,0.025); color:var(--text-muted); cursor:not-allowed; border:1px solid var(--border); }
-  .tp-model-card { padding:11px 13px;border-radius:11px;background:var(--bg-raised);border:1px solid var(--border);cursor:pointer;transition:background 0.16s, border-color 0.16s, box-shadow 0.16s;margin-bottom:5px;box-shadow:0 1px 3px rgba(0,0,0,0.1); }
-  .tp-model-card.sel { background:rgba(124,111,255,0.14);border-color:var(--border-accent);box-shadow:0 0 0 1px rgba(124,111,255,0.18),0 2px 8px rgba(124,111,255,0.08); }
-  .tp-model-card:hover:not(.sel) { background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.15);box-shadow:0 2px 8px rgba(0,0,0,0.15); }
-  .checker { background-color:#131326;background-image:linear-gradient(45deg,rgba(255,255,255,0.025) 25%,transparent 25%),linear-gradient(-45deg,rgba(255,255,255,0.025) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,rgba(255,255,255,0.025) 75%),linear-gradient(-45deg,transparent 75%,rgba(255,255,255,0.025) 75%);background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0; }
-  .anim-card { border-radius:11px;overflow:hidden;cursor:pointer;transition:transform 0.16s, box-shadow 0.16s, border-color 0.16s; }
-  .anim-card:hover { border-color:rgba(255,255,255,0.22) !important; transform:scale(1.02);box-shadow:0 4px 12px rgba(0,0,0,0.2); }
+  .tp-model-card { padding:11px 13px;border-radius:10px;background:rgba(255,255,255,0.030);border:1px solid rgba(255,255,255,0.075);cursor:pointer;transition:background 0.16s, border-color 0.16s, box-shadow 0.16s;margin-bottom:5px;box-shadow:none; }
+  .tp-model-card.sel { background:linear-gradient(135deg,rgba(255,255,255,0.072),rgba(47,140,255,0.085));border-color:rgba(47,140,255,0.30);box-shadow:0 12px 30px rgba(0,0,0,0.17),0 0 20px rgba(47,140,255,0.12); }
+  .tp-model-card:hover:not(.sel) { background:rgba(255,255,255,0.045);border-color:rgba(255,255,255,0.12);box-shadow:none; }
+  .checker { background-color:#101014;background-image:linear-gradient(45deg,rgba(255,255,255,0.025) 25%,transparent 25%),linear-gradient(-45deg,rgba(255,255,255,0.025) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,rgba(255,255,255,0.025) 75%),linear-gradient(-45deg,transparent 75%,rgba(255,255,255,0.025) 75%);background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0; }
+  .anim-card { border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color 0.16s, background 0.16s; }
+  .anim-card:hover { border-color:rgba(47,140,255,0.30) !important; transform:none;box-shadow:0 12px 28px rgba(0,0,0,0.17),0 0 20px rgba(47,140,255,0.12); }
   .sec-row { display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:11px 4px;user-select:none;border-radius:8px;transition:background 0.14s; }
   .sec-row span { transition:color 0.14s; }
   .sec-row:hover { background:rgba(255,255,255,0.02); }
-  .sec-row:hover span { color:#8a8aaa !important; }
+  .sec-row:hover span { color:rgba(244,244,245,0.86) !important; }
   .tp-topo-btn { flex:1;padding:9px 4px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:background 0.16s, color 0.16s, outline 0.16s;font-family:inherit; }
-  .tp-topo-btn.sel { background:rgba(124,111,255,0.2);color:var(--accent-bright);outline:1.5px solid var(--border-accent);box-shadow:0 2px 6px rgba(124,111,255,0.1); }
+  .tp-topo-btn.sel { background:linear-gradient(135deg,rgba(255,255,255,0.082),rgba(47,140,255,0.10));color:#f8fafc;outline:1px solid rgba(47,140,255,0.30);box-shadow:0 10px 24px rgba(0,0,0,0.16),0 0 20px rgba(47,140,255,0.12); }
   .tp-topo-btn:not(.sel) { background:var(--bg-raised);color:var(--text-secondary);outline:1px solid var(--border); }
-  .tp-topo-btn:not(.sel):hover { background:rgba(255,255,255,0.07);color:#6a6a8a; }
-  .tex-input-box { border:1.5px solid rgba(139,92,246,0.28);border-radius:14px;overflow:hidden;background:rgba(139,92,246,0.03);margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+  .tp-topo-btn:not(.sel):hover { background:rgba(255,255,255,0.07);color:rgba(244,244,245,0.84); }
+  .tex-input-box { border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow:hidden;background:rgba(255,255,255,0.028);margin-bottom:14px;box-shadow:none; }
   .tex-tab-bar { display:flex;background:rgba(255,255,255,0.05);padding:4px;gap:3px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.15); }
   .tex-tab { flex:1;padding:7px 0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:10px;transition:background 0.18s, color 0.18s, box-shadow 0.18s;font-family:inherit; }
   .tex-tab.on { background:rgba(255,255,255,0.14);box-shadow:0 2px 6px rgba(0,0,0,0.3); }
   .mv-grid { display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:11px; }
   .mv-cell { border-radius:10px;aspect-ratio:1/1;border:1.5px dashed rgba(255,255,255,0.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:border-color 0.16s,box-shadow 0.16s;position:relative; }
-  .mv-cell:hover { border-color:rgba(108,99,255,0.4);box-shadow:0 0 10px rgba(108,99,255,0.06); }
+  .mv-cell:hover { border-color:rgba(47,140,255,0.30);box-shadow:0 12px 28px rgba(0,0,0,0.18),0 0 20px rgba(47,140,255,0.12); }
   .magic-mode-tab { flex:1;padding:8px 0;border:none;cursor:pointer;font-size:12px;font-weight:600;border-radius:11px;transition:background 0.18s, color 0.18s, box-shadow 0.18s;font-family:inherit; }
   .magic-mode-tab.on { background:#ffffff;color:#0a0a1a;box-shadow:0 2px 8px rgba(0,0,0,0.3); }
   .magic-mode-tab:not(.on) { background:transparent;color:#5a5a7a; }
   .anim-model-dd { width:100%;padding:10px 12px;border-radius:11px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);cursor:pointer;display:flex;align-items:center;gap:8px;transition:border-color 0.16s,box-shadow 0.16s; }
-  .anim-model-dd:hover { border-color:rgba(139,92,246,0.35);box-shadow:0 0 10px rgba(139,92,246,0.05); }
+  .anim-model-dd:hover { border-color:rgba(47,140,255,0.30);box-shadow:0 12px 28px rgba(0,0,0,0.17),0 0 20px rgba(47,140,255,0.12); }
   .auto-rig-btn { width:100%;padding:13px 0;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:7px;font-family:inherit;transition:background 0.2s, transform 0.2s, box-shadow 0.2s; }
   .auto-rig-btn.ready { background:rgba(255,255,255,0.08);color:#c8c8e0;box-shadow:0 2px 8px rgba(0,0,0,0.1); }
   .auto-rig-btn.ready:hover { background:rgba(255,255,255,0.12);box-shadow:0 4px 12px rgba(0,0,0,0.15); transform:translateY(-1px); }
   .auto-rig-btn.disabled { background:rgba(255,255,255,0.03);color:#1e1e38;cursor:not-allowed; }
+
+  /* Full Generate-panel skin: buttons, cards, inputs, dropzones */
+  .tp-panel-scroll::before {
+    content:'';
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    background:
+      linear-gradient(180deg, rgba(3,0,10,0.30), rgba(3,0,10,0.78)),
+      radial-gradient(circle at 18% 10%, rgba(138,43,226,0.18), transparent 34%),
+      radial-gradient(circle at 80% 72%, rgba(0,229,255,0.12), transparent 34%),
+      var(--tp-rail-bg);
+    background-size:auto, auto, auto, cover;
+    background-position:center;
+    opacity:0.28;
+    mix-blend-mode:screen;
+  }
+  .tp-workflow-page { position:relative; gap:16px; }
+  .tp-gen-tabs {
+    min-height:88px;
+    padding:5px !important;
+    gap:5px !important;
+    border-radius:24px !important;
+    border:1px solid rgba(255,255,255,0.10);
+    background:linear-gradient(145deg,rgba(255,255,255,0.075),rgba(255,255,255,0.026)) !important;
+    box-shadow:0 18px 44px rgba(0,0,0,0.24),inset 0 1px 0 rgba(255,255,255,0.08);
+    backdrop-filter:blur(22px);
+  }
+  .tp-inp-tab {
+    min-height:74px !important;
+    border-radius:18px !important;
+    gap:8px !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.040),rgba(255,255,255,0.014)) !important;
+    border:1px solid rgba(255,255,255,0.065) !important;
+    color:rgba(148,163,184,0.82) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.035) !important;
+  }
+  .tp-inp-tab span { font-size:13px !important; font-weight:950 !important; letter-spacing:0 !important; text-transform:none !important; }
+  .tp-inp-tab svg { width:20px !important; height:20px !important; }
+  .tp-inp-tab.active {
+    background:linear-gradient(145deg,rgba(139,220,255,0.18),rgba(47,140,255,0.12),rgba(255,255,255,0.055)) !important;
+    color:#f8fafc !important;
+    border-color:rgba(139,220,255,0.35) !important;
+    box-shadow:0 18px 38px rgba(0,0,0,0.30),0 0 34px rgba(47,140,255,0.16),inset 0 1px 0 rgba(255,255,255,0.16) !important;
+  }
+  .tp-model-dd > span,
+  .tp-workflow-page label,
+  .tp-workflow-page > div > span:first-child {
+    color:rgba(203,213,225,0.74) !important;
+    font-size:10px !important;
+    font-weight:950 !important;
+    letter-spacing:0.17em !important;
+    text-transform:uppercase !important;
+  }
+  .tp-model-dd-trigger,
+  .tp-workflow-page input,
+  .tp-workflow-page select,
+  .tp-workflow-page textarea,
+  .tp-input,
+  .tp-ta {
+    border-radius:18px !important;
+    border:1px solid rgba(255,255,255,0.11) !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.060),rgba(255,255,255,0.024)) !important;
+    color:#f8fafc !important;
+    font-weight:800 !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.055),0 12px 28px rgba(0,0,0,0.13) !important;
+    backdrop-filter:blur(18px);
+  }
+  .tp-model-dd-trigger:hover,
+  .tp-workflow-page input:hover,
+  .tp-workflow-page select:hover,
+  .tp-workflow-page textarea:hover {
+    border-color:rgba(139,220,255,0.28) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.07),0 16px 34px rgba(0,0,0,0.18),0 0 28px rgba(47,140,255,0.10) !important;
+  }
+  .tp-model-dd-menu { padding:6px !important; background:rgba(9,8,13,0.96) !important; }
+  .tp-model-dd-option { border-radius:14px !important; border-bottom:0 !important; }
+  .tp-model-dd-option:hover { background:rgba(139,220,255,0.10) !important; }
+  .tp-source-mode-row { gap:12px !important; margin-top:2px; }
+  .tp-source-mode-row > button,
+  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-rail-btn):not(.tp-gen-btn):not(.tp-inp-tab) {
+    min-height:44px;
+    border-radius:18px !important;
+    border:1px solid rgba(255,255,255,0.095) !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.052),rgba(255,255,255,0.020)) !important;
+    color:rgba(226,232,240,0.82) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.052) !important;
+    backdrop-filter:blur(18px);
+  }
+  .tp-source-mode-row > button:hover,
+  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-rail-btn):not(.tp-gen-btn):not(.tp-inp-tab):hover {
+    transform:translateY(-1px);
+    color:#fff !important;
+    border-color:rgba(139,220,255,0.30) !important;
+    box-shadow:0 16px 34px rgba(0,0,0,0.22),0 0 30px rgba(47,140,255,0.12),inset 0 1px 0 rgba(255,255,255,0.09) !important;
+  }
+  .tp-inline-option-card,
+  .tp-setting-card,
+  .tex-input-box {
+    border-radius:22px !important;
+    border:1px solid rgba(255,255,255,0.10) !important;
+    background:linear-gradient(155deg,rgba(255,255,255,0.062),rgba(255,255,255,0.024)) !important;
+    box-shadow:0 16px 38px rgba(0,0,0,0.20),inset 0 1px 0 rgba(255,255,255,0.06) !important;
+    backdrop-filter:blur(20px);
+  }
+  .tp-upload-zone,
+  .tp-drop,
+  .mv-cell {
+    border-radius:24px !important;
+    border:1.5px dashed rgba(139,220,255,0.20) !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.035),rgba(3,0,10,0.22)),radial-gradient(circle at 50% 18%,rgba(47,140,255,0.10),transparent 44%) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05),0 18px 42px rgba(0,0,0,0.18) !important;
+  }
+  .tp-upload-zone:hover,
+  .tp-drop:hover,
+  .mv-cell:hover {
+    border-color:rgba(139,220,255,0.44) !important;
+    box-shadow:0 18px 42px rgba(0,0,0,0.24),0 0 34px rgba(47,140,255,0.14),inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  }
+  .tp-switch {
+    width:38px !important;
+    height:22px !important;
+    border-radius:999px !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.16),rgba(255,255,255,0.055)) !important;
+    border:1px solid rgba(255,255,255,0.12) !important;
+    box-shadow:inset 0 1px 2px rgba(0,0,0,0.34) !important;
+  }
+  .tp-switch::after { width:18px; height:18px; background:#f8fafc; }
+  .tp-switch.on {
+    background:linear-gradient(135deg,#1d4ed8,#2f8cff,#8bdcff) !important;
+    border-color:rgba(139,220,255,0.42) !important;
+    box-shadow:0 0 22px rgba(47,140,255,0.22),inset 0 1px 0 rgba(255,255,255,0.24) !important;
+  }
+  .tp-switch.on::after { transform:translateX(16px); }
+  .tp-qual-btn,
+  .tp-topo-btn {
+    min-height:56px !important;
+    border-radius:18px !important;
+    font-size:13px !important;
+    font-weight:950 !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.050),rgba(255,255,255,0.018)) !important;
+    outline:1px solid rgba(255,255,255,0.08) !important;
+    color:rgba(226,232,240,0.78) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  }
+  .tp-qual-btn[style*="rgba(255, 255, 255, 0.075)"],
+  .tp-qual-btn[style*="rgba(255,255,255,0.075)"],
+  .tp-topo-btn.sel {
+    background:linear-gradient(145deg,rgba(139,220,255,0.18),rgba(47,140,255,0.11),rgba(255,255,255,0.045)) !important;
+    color:#f8fafc !important;
+    outline:1.5px solid rgba(47,140,255,0.46) !important;
+    box-shadow:0 16px 36px rgba(0,0,0,0.24),0 0 30px rgba(47,140,255,0.16),inset 0 1px 0 rgba(255,255,255,0.14) !important;
+  }
+  .sec-row {
+    padding:14px 12px !important;
+    margin:4px -2px;
+    border-radius:18px !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.026),rgba(255,255,255,0.010));
+    border-top:1px solid rgba(255,255,255,0.055) !important;
+  }
+  .sec-row:hover { background:rgba(139,220,255,0.065) !important; }
+  .tp-action-dock {
+    padding:12px 14px 18px !important;
+    border-top:1px solid rgba(255,255,255,0.085);
+    background:linear-gradient(180deg,rgba(3,0,10,0.04),rgba(3,0,10,0.62));
+    box-shadow:0 -18px 46px rgba(0,229,255,0.06);
+  }
+  .tp-action-card {
+    border-radius:24px !important;
+    border:1px solid rgba(139,220,255,0.18) !important;
+    border-left:1px solid rgba(139,220,255,0.28) !important;
+    background:linear-gradient(155deg,rgba(255,255,255,0.075),rgba(255,255,255,0.026)),radial-gradient(circle at 8% 0%,rgba(47,140,255,0.16),transparent 48%) !important;
+    box-shadow:0 22px 56px rgba(0,0,0,0.34),0 0 42px rgba(47,140,255,0.13),inset 0 1px 0 rgba(255,255,255,0.10) !important;
+  }
+  .tp-gen-btn {
+    min-height:54px !important;
+    border-radius:18px !important;
+    font-size:13px !important;
+    font-weight:950 !important;
+    letter-spacing:0.16em !important;
+  }
+  .tp-gen-btn.go {
+    background:linear-gradient(115deg,#06121f 0%,#1d4ed8 30%,#2f8cff 54%,#8bdcff 75%,#f8fafc 100%) !important;
+    color:#ffffff !important;
+    box-shadow:0 22px 52px rgba(0,0,0,0.38),0 0 44px rgba(47,140,255,0.32),inset 0 1px 0 rgba(255,255,255,0.28) !important;
+  }
+  .tp-gen-btn.no {
+    background:linear-gradient(145deg,rgba(255,255,255,0.035),rgba(255,255,255,0.014)) !important;
+    color:rgba(148,163,184,0.44) !important;
+    border:1px solid rgba(255,255,255,0.08) !important;
+  }
 
   /* ── Model-NA: feature not available with selected model ─────────────
    * Wrapper dims the child UI and blocks all pointer interaction.
@@ -580,10 +1033,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       || item?.params?.animated === true;
 
     if (isSegment) return "#f59e0b";
-    if (isFillParts) return "#c084fc";
-    if (isAnim) return "#22d3ee";
+    if (isFillParts) return "#2f8cff";
+    if (isAnim) return "#2f8cff";
     if (isRig) return "#f472b6";
-    if (source === "trellis") return "#34d399";
+    if (source === "trellis") return "#8bdcff";
     if (source === "upload") return "#94a3b8";
     return "#64748b";
   }, [selectedPreviewItem, color]);
@@ -788,7 +1241,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [brushMode, setBrushMode] = useState("Gen Mode");
   const [brushPrompt, setBrushPrompt] = useState("");
   const [creativity, setCreativity] = useState(0.6);
-  const [brushColor, setBrushColor] = useState("#8b5cf6");
+  const [brushColor, setBrushColor] = useState("#39ff88");
   const [brushSize, setBrushSize] = useState(10);
   const [brushOpacity, setBrushOpacity] = useState(1);
   const brushHardness = 1;
@@ -2695,7 +3148,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       animate: "3D Rigging & Animation",
     })[mode] ?? mode;
   }, [mode, segSub, texSub]);
-
+  const modeMeta = MODE_UI[mode] ?? MODE_UI.generate;
   const handleDlClose = useCallback(() => {
     if (dlItem?.blobUrl) revokeBlobUrl(dlItem.blobUrl);
     setDlOpen(false); setDlItem(null);
@@ -2785,43 +3238,56 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setRightOpen={setRightOpen}
       onRightToggle={handleRightToggle}
       leftWidth={320}
-      leftSecondaryWidth={392}
+      leftSecondaryWidth={416}
       rightWidth={rightW}
       overlay={isMobile}
       leftSidebar={globalSidebar}
       leftSecondarySidebar={
-        <div className="h-full flex flex-row overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
-          {/* Tripo Tool Strip (72px) */}
-          <div className="w-[72px] h-full flex flex-col bg-[#030308] border-r border-white/5">
-            {NAV.map(n => {
-              const Icon = n.icon;
-              return (
-                <Tooltip key={n.id} text={n.label} side="right">
-                  <button
-                    onClick={() => {
-                      setMode(n.id);
-                      setLeftSecondaryOpen(true);
-                      if (isMobile) setRightOpen(false);
-                    }}
-                    className={"tp-nav-btn" + (mode === n.id ? " active" : "")}
-                  >
-                    <div className="ico"><Icon style={{ width: 18, height: 18, color: mode === n.id ? "var(--accent-bright)" : "var(--text-muted)" }} /></div>
-                    <span className="lbl">{n.label}</span>
-                  </button>
-                </Tooltip>
-              );
-            })}
+        <div
+          className="tp-side-shell h-full overflow-hidden backdrop-blur-3xl"
+          style={{ "--tp-rail-bg": `url(${tripoSidebarBg})` }}
+        >
+          <div className="tp-mode-rail">
+            <div className="tp-rail-brand">3D</div>
+            <div className="tp-rail-list">
+              {NAV.map(n => {
+                const Icon = n.icon;
+                return (
+                  <Tooltip key={n.id} text={n.label} side="right">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode(n.id);
+                        setLeftSecondaryOpen(true);
+                        if (isMobile) setRightOpen(false);
+                      }}
+                      className={"tp-rail-btn" + (mode === n.id ? " active" : "")}
+                      aria-current={mode === n.id ? "page" : undefined}
+                      aria-label={n.label}
+                    >
+                      <Icon />
+                      <span className="lbl">{n.label}</span>
+                    </button>
+                  </Tooltip>
+                );
+              })}
+            </div>
           </div>
-
-          {/* Tripo Controls (320px) */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="p-4 py-3 border-b border-white/5 flex-shrink-0">
-              <h3 className="m-0 text-[13px] font-black tracking-widest uppercase text-white flex items-center gap-2 italic">
-                <Activity className="w-4 h-4 text-primary opacity-50" />
+          <div
+            className="tp-controls-col flex-1 flex flex-col overflow-hidden"
+            style={{ "--tp-mode-a": modeMeta.accent, "--tp-mode-b": modeMeta.accent2 }}
+          >
+            <div className="tp-panel-head flex-shrink-0">
+              <div className="tp-mode-kicker">
+                <span>{modeMeta.eyebrow}</span>
+              </div>
+              <h3 className="tp-panel-title text-[13px] font-black tracking-widest uppercase flex items-center gap-2 italic">
+                <Activity className="w-4 h-4 opacity-70" style={{ color: modeMeta.accent }} />
                 {modeTitle}
               </h3>
+              <p className="tp-panel-desc">{modeMeta.description}</p>
               {mode === "segment" && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 10 }}>
+                <div className="tp-sub-tabs">
                   {SEGMENT_SUBS.map(s => {
                     const isDisabled = s.id === "fill_parts" && !isFillPartsCompatible;
                     return (
@@ -2840,7 +3306,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 </div>
               )}
               {mode === "texture" && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 10 }}>
+                <div className="tp-sub-tabs">
                   {TEXTURE_SUBS.map(s => {
                     const isDisabled = !!s.disabled;
                     return (
@@ -2866,8 +3332,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 </div>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto p-4 tp-scroll">
-              <div style={mode !== "generate" ? { display: "none" } : undefined}>
+            <div className="tp-panel-scroll flex-1 overflow-y-auto tp-scroll">
+              <div className="tp-workflow-page" style={mode !== "generate" ? { display: "none" } : undefined}>
                 <GeneratePanel
                   genTab={genTab} setGenTab={setGenTab}
                   modelVer={modelVer} setModelVer={setModelVer}
@@ -2908,13 +3374,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   getIdToken={getIdToken}
                   handleMultiImg={handleMultiImg}
                   handleBatchImg={handleBatchImg}
-                  color={color} isRunning={isRunning} handleGen={handleGen}
+                  color={modeMeta.accent} isRunning={isRunning} handleGen={handleGen}
                   setErrorMsg={setErrorMsg} activeStyles={activeStyle}
                   onStyleToggle={handleStyleToggle}
                   aiSuggestedNeg={aiSuggestedNeg} setAiSuggestedNeg={setAiSuggestedNeg}
                 />
               </div>
-              <div style={mode !== "segment" ? { display: "none" } : undefined}>
+              <div className="tp-workflow-page" style={mode !== "segment" ? { display: "none" } : undefined}>
                 <Segment
                   segSub={segSub}
                   activeTaskId={activeTaskId}
@@ -2922,13 +3388,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   isSegmentOutput={isSegOutput}
                   isGeneratedInParts={isGeneratedInParts}
                   isFillPartsCompatible={isFillPartsCompatible}
-                  color={color}
+                  color={modeMeta.accent}
                 />
               </div>
-              <div style={mode !== "retopo" ? { display: "none" } : undefined}>
-                <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={color} />
+              <div className="tp-workflow-page" style={mode !== "retopo" ? { display: "none" } : undefined}>
+                <Retopo quad={quadMesh} setQuad={setQuadMesh} smartLowPoly={smartLowPoly} setSmartLowPoly={setSmartLowPoly} polycount={polycount} setPolycount={setPolycount} outFormat={outFormat} setOutFormat={setOutFormat} pivotToBottom={pivotToBottom} setPivotToBottom={setPivotToBottom} activeTaskId={activeTaskId} color={modeMeta.accent} />
               </div>
-              <div style={mode !== "texture" ? { display: "none" } : undefined}>
+              <div className="tp-workflow-page" style={mode !== "texture" ? { display: "none" } : undefined}>
                 <Texture
                   mode={texSub === "paint" ? "texture_edit" : "texture"}
                   activeTaskId={texSub === "paint" ? (textureEditSourceTaskId || textureEditTaskId || activeTaskId) : (textureSelectedTaskId || activeTaskId)}
@@ -2957,22 +3423,22 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   brushOpacity={brushOpacity} setBrushOpacity={setBrushOpacity}
                   uvOverlapWarning={paintUvOverlapWarning}
                   canvasRef={canvasRef}
-                  color={color}
+                  color={modeMeta.accent}
                   onClearPaint={() => sceneRef.current?.clearPaint()}
                   paintModeDisabled={TRIPO_PAINT_MODE_DISABLED}
                   paintModeDisabledMessage={TRIPO_PAINT_MODE_DISABLED_MESSAGE}
                 />
               </div>
-              <div style={mode !== "animate" ? { display: "none" } : undefined}>
-                <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} rigBtnLocked={rigBtnLocked} handleAutoRig={handleAutoRig} rigType={rigType} setRigType={setRigType} rigSpec={rigSpec} setRigSpec={setRigSpec} detectedRigType={detectedRigType} detectedRigModelVer={detectedRigModelVer} detectedRigSpec={detectedRigSpec} rigCompat={rigCompat} animOutFormat={animOutFormat} setAnimOutFormat={setAnimOutFormat} animBakeAnimation={animBakeAnimation} setAnimBakeAnimation={setAnimBakeAnimation} animExportGeometry={animExportGeometry} setAnimExportGeometry={setAnimExportGeometry} animAnimateInPlace={animAnimateInPlace} setAnimAnimateInPlace={setAnimAnimateInPlace} color={color} />
+              <div className="tp-workflow-page" style={mode !== "animate" ? { display: "none" } : undefined}>
+                <Animate animId={animId} activeTaskId={activeTaskId} animSearch={animSearch} setAnimSearch={setAnimSearch} animCat={animCat} setAnimCat={setAnimCat} selAnim={selAnim} setSelAnim={setSelAnim} animModelVer={animModelVer} setAnimModelVer={setAnimModelVer} filtAnims={filtAnims} rigStep={rigStep} rigBtnLocked={rigBtnLocked} handleAutoRig={handleAutoRig} rigType={rigType} setRigType={setRigType} rigSpec={rigSpec} setRigSpec={setRigSpec} detectedRigType={detectedRigType} detectedRigModelVer={detectedRigModelVer} detectedRigSpec={detectedRigSpec} rigCompat={rigCompat} animOutFormat={animOutFormat} setAnimOutFormat={setAnimOutFormat} animBakeAnimation={animBakeAnimation} setAnimBakeAnimation={setAnimBakeAnimation} animExportGeometry={animExportGeometry} setAnimExportGeometry={setAnimExportGeometry} animAnimateInPlace={animAnimateInPlace} setAnimAnimateInPlace={setAnimAnimateInPlace} color={modeMeta.accent} />
               </div>
               {mode === "refine" && (
-                <div className="flex flex-col gap-4">
+                <div className="tp-workflow-page">
                   {activeTaskId && (
-                    <div className="p-3 rounded-xl bg-primary/5 border border-primary/15 shadow-sm">
+                    <div className="p-3 rounded-xl bg-white/[0.055] border border-sky-400/25 shadow-[0_0_24px_rgba(47,140,255,0.08)]">
                       <div className="flex items-center gap-2 mb-2">
-                        <Box className="w-3.5 h-3.5 text-primary" />
-                        <span className="text-primary font-black uppercase tracking-wider text-[10px]">Active Mesh for Refinement</span>
+                        <Box className="w-3.5 h-3.5 text-sky-200" />
+                        <span className="text-sky-100 font-black uppercase tracking-wider text-[10px]">Active Mesh for Refinement</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <p className="text-white/90 text-[11px] font-bold truncate max-w-[200px]">{activeDisplayName || "Untitled Model"}</p>
@@ -3006,8 +3472,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                       <div className="space-y-3">
                         <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10">
                           <div className="flex items-center gap-2 mb-2">
-                            <Activity className="w-3.5 h-3.5 text-cyan-300" />
-                            <span className="text-cyan-200 font-black uppercase tracking-wider text-[10px]">Schema Match</span>
+                            <Activity className="w-3.5 h-3.5 text-sky-200" />
+                            <span className="text-sky-100 font-black uppercase tracking-wider text-[10px]">Schema Match</span>
                           </div>
                           <p className="text-zinc-500 text-[10px] leading-relaxed m-0">
                             Refine sends only <span className="font-mono text-zinc-300">type: refine_model</span> and <span className="font-mono text-zinc-300">draft_model_task_id</span>. Prompt and negative prompt are not part of the Tripo refine schema.
@@ -3018,7 +3484,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                           <div className="flex items-center justify-between gap-3 mb-2">
                             <span className="text-zinc-500 font-black uppercase tracking-widest text-[9px]">Resolved Draft Source</span>
                             {refineResolvedFromUpstream && (
-                              <span className="text-[8px] font-black uppercase tracking-widest text-cyan-200 bg-cyan-400/10 border border-cyan-400/20 rounded-full px-2 py-1">Upstream</span>
+                              <span className="text-[8px] font-black uppercase tracking-widest text-sky-100 bg-sky-400/10 border border-sky-300/20 rounded-full px-2 py-1">Upstream</span>
                             )}
                           </div>
                           <p className="text-white/85 text-[11px] font-bold truncate m-0">{refineDraftDisplayName || refineSourceDisplayName || "Selected model"}</p>
@@ -3033,7 +3499,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                               type="button"
                               whileTap={{ scale: 0.97 }}
                               onClick={() => handleUseOriginalModel(refineSourceTaskId)}
-                              className="mt-3 w-full h-8 rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 text-[9px] font-black uppercase tracking-widest"
+                              className="mt-3 w-full h-8 rounded-lg border border-sky-300/25 bg-white/[0.055] text-sky-50 text-[9px] font-black uppercase tracking-widest shadow-[0_0_18px_rgba(47,140,255,0.08)]"
                             >
                               Use original model
                             </motion.button>
@@ -3060,14 +3526,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 </div>
               )}
               {mode === "stylize" && (
-                <div>
+                <div className="tp-workflow-page">
                   {activeTaskId && (
-                    <div className="p-2 px-3 rounded-lg bg-primary/10 border border-primary/25 mb-4">
-                      <p className="text-primary font-bold text-[11px] m-0">Selected model</p>
+                    <div className="p-2 px-3 rounded-lg bg-white/[0.055] border border-sky-300/20 mb-4">
+                      <p className="text-sky-100 font-bold text-[11px] m-0">Selected model</p>
                       <p className="text-[#2d2d48] text-[9px] mt-1 font-mono truncate">{activeTaskId}</p>
                     </div>
                   )}
-                  <div className="flex items-center gap-2 mb-3 p-1.5 px-2 rounded bg-white/5 border border-white/10 font-mono text-[10px] text-primary italic">
+                  <div className="flex items-center gap-2 mb-3 p-1.5 px-2 rounded bg-white/5 border border-white/10 font-mono text-[10px] text-sky-100 italic">
                     task: "stylize_model"
                   </div>
                   <div className="mb-4">
@@ -3077,7 +3543,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                         <button
                           key={s}
                           onClick={() => setStylizeStyle(s)}
-                          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${stylizeStyle === s ? 'bg-primary/20 text-white border border-primary/50' : 'bg-white/5 text-zinc-600 border border-white/5'}`}
+                          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${stylizeStyle === s ? 'bg-white/[0.075] text-white border border-sky-300/30 shadow-[0_0_18px_rgba(47,140,255,0.10)]' : 'bg-white/5 text-zinc-600 border border-white/5'}`}
                         >
                           {s.replace("_", " ")}
                         </button>
@@ -3094,31 +3560,30 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               )}
             </div>
             {/* Action bar */}
-            <div style={{ padding: "6px 10px 10px", flexShrink: 0 }}>
-              <div style={{
+            <div className="tp-action-dock" style={{ padding: "6px 10px 10px", flexShrink: 0 }}>
+              <div className="tp-action-card" style={{
                 position: "relative",
                 borderRadius: 12,
-                background: "#0d0b1a",
-                border: "1px solid rgba(139,92,246,0.18)",
+                background: "linear-gradient(160deg,rgba(255,255,255,0.075),rgba(255,255,255,0.030))",
+                border: "1px solid rgba(255,255,255,0.08)",
                 overflow: "hidden",
-                borderLeft: "3px solid #8b5cf6",
-                boxShadow: "0 0 24px rgba(139,92,246,0.08), inset 0 1px 0 rgba(255,255,255,0.04)",
+                borderLeft: "1px solid rgba(47,140,255,0.34)",
+                boxShadow: "0 18px 42px rgba(0,0,0,0.26), 0 0 34px rgba(47,140,255,0.11)",
               }}>
-                {/* purple corner glow */}
-                <div style={{ position: "absolute", top: 0, left: 0, width: 120, height: 60, background: "radial-gradient(ellipse at 0% 0%, rgba(139,92,246,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
+                <div style={{ position: "absolute", top: 0, left: 0, width: 140, height: 70, background: "radial-gradient(ellipse at 0% 0%, rgba(47,140,255,0.16) 0%, transparent 70%)", pointerEvents: "none" }} />
 
                 {/* Model name row */}
                 <div style={{ padding: "10px 12px 0", position: "relative", zIndex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontSize: 8, fontWeight: 700, color: "rgba(139,92,246,0.6)", textTransform: "uppercase", letterSpacing: "0.18em", fontFamily: "'JetBrains Mono', monospace" }}>ASSET NAME</span>
-                    <div style={{ flex: 1, height: 1, background: "rgba(139,92,246,0.12)" }} />
+                    <span style={{ fontSize: 8, fontWeight: 700, color: "rgba(139,220,255,0.88)", textTransform: "uppercase", letterSpacing: "0.18em", fontFamily: "'JetBrains Mono', monospace" }}>ASSET NAME</span>
+                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
                   </div>
                   <input
                     className="tp-input"
                     placeholder={prompt ? prompt.trim().split(/\s+/).slice(0, 2).join(" ") || "Model neve…" : "Model neve…"}
                     value={modelName}
                     onChange={e => setModelName(e.target.value)}
-                    style={{ width: "100%", fontSize: 11, height: 32, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "#e8e0ff", letterSpacing: "0.04em" }}
+                    style={{ width: "100%", fontSize: 11, height: 32, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", color: "#f8fafc", letterSpacing: "0.04em" }}
                   />
                 </div>
 
@@ -3128,12 +3593,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                     <div className="fade-up">
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
-                          <Loader2 style={{ width: 11, height: 11, color: "#8b5cf6", flexShrink: 0 }} className="anim-spin" />
-                          <span style={{ fontSize: 11, fontWeight: 900, color: "#e8e0ff", textTransform: "uppercase", letterSpacing: "0.14em", fontFamily: "'JetBrains Mono', monospace" }}>Feldolgozás</span>
+                          <Loader2 style={{ width: 11, height: 11, color: "#2f8cff", flexShrink: 0 }} className="anim-spin" />
+                          <span style={{ fontSize: 11, fontWeight: 900, color: "#f8fafc", textTransform: "uppercase", letterSpacing: "0.14em", fontFamily: "'JetBrains Mono', monospace" }}>Feldolgozás</span>
                         </div>
                         <span style={{
-                          fontSize: 9, fontWeight: 700, color: "#c084fc", textTransform: "uppercase", letterSpacing: "0.1em",
-                          background: "rgba(139,92,246,0.18)", border: "1px solid rgba(139,92,246,0.35)",
+                          fontSize: 9, fontWeight: 700, color: "#8bdcff", textTransform: "uppercase", letterSpacing: "0.1em",
+                          background: "rgba(47,140,255,0.11)", border: "1px solid rgba(47,140,255,0.30)",
                           borderRadius: 20, padding: "2px 8px", fontFamily: "'JetBrains Mono', monospace",
                         }}>FELDOLGOZÁS</span>
                       </div>
@@ -3158,12 +3623,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                       {/* Running header row */}
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
-                          <Loader2 style={{ width: 11, height: 11, color: "#8b5cf6", flexShrink: 0 }} className="anim-spin" />
-                          <span style={{ fontSize: 11, fontWeight: 900, color: "#e8e0ff", textTransform: "uppercase", letterSpacing: "0.14em", fontFamily: "'JetBrains Mono', monospace" }}>{genLabel}</span>
+                          <Loader2 style={{ width: 11, height: 11, color: "#2f8cff", flexShrink: 0 }} className="anim-spin" />
+                          <span style={{ fontSize: 11, fontWeight: 900, color: "#f8fafc", textTransform: "uppercase", letterSpacing: "0.14em", fontFamily: "'JetBrains Mono', monospace" }}>{genLabel}</span>
                         </div>
                         <span style={{
-                          fontSize: 9, fontWeight: 700, color: "#c084fc", textTransform: "uppercase", letterSpacing: "0.1em",
-                          background: "rgba(139,92,246,0.18)", border: "1px solid rgba(139,92,246,0.35)",
+                          fontSize: 9, fontWeight: 700, color: "#8bdcff", textTransform: "uppercase", letterSpacing: "0.1em",
+                          background: "rgba(47,140,255,0.11)", border: "1px solid rgba(47,140,255,0.30)",
                           borderRadius: 20, padding: "2px 8px", fontFamily: "'JetBrains Mono', monospace",
                         }}>FELDOLGOZÁS</span>
                       </div>
@@ -3172,16 +3637,16 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                         <div style={{
                           position: "absolute", left: 0, top: 0, height: "100%",
                           width: `${progress}%`,
-                          background: "linear-gradient(90deg, #a855f7, #ec4899)",
+                          background: "linear-gradient(90deg, #1d4ed8, #2f8cff, #8bdcff)",
                           borderRadius: 3,
-                          boxShadow: "0 0 8px rgba(236,72,153,0.6)",
+                          boxShadow: "0 0 14px rgba(47,140,255,0.42)",
                           transition: "width 0.4s ease",
                         }} />
                       </div>
                       {/* Sub row */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                         <span style={{ fontSize: 8, fontWeight: 600, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.14em", fontFamily: "'JetBrains Mono', monospace" }}>TRIPO</span>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: "#a855f7", fontFamily: "'JetBrains Mono', monospace" }}>{progress}%</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: "#8bdcff", fontFamily: "'JetBrains Mono', monospace" }}>{progress}%</span>
                       </div>
                       <button
                         style={{
@@ -3244,7 +3709,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                             display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                             fontFamily: "'JetBrains Mono', monospace", transition: "all 0.15s",
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.color = "#e8e0ff"; e.currentTarget.style.borderColor = "rgba(139,92,246,0.3)"; e.currentTarget.style.background = "rgba(139,92,246,0.08)"; }}
+                          onMouseEnter={e => { e.currentTarget.style.color = "#f8fafc"; e.currentTarget.style.borderColor = "rgba(47,140,255,0.34)"; e.currentTarget.style.background = "rgba(47,140,255,0.10)"; }}
                           onMouseLeave={e => { e.currentTarget.style.color = "rgba(255,255,255,0.35)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
                         >
                           <Download style={{ width: 10, height: 10 }} /> EXPORT ENGINE
@@ -3281,7 +3746,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       }
     >
       <TripoWorkspaceWrapper
-        color={color}
+        color={modeMeta.accent}
         viewMode={viewMode}
         setViewMode={setViewMode}
         lightMode={lightMode}
@@ -3392,7 +3857,7 @@ function TripoWorkspaceWrapper({
             <Tooltip key={v.id} text={v.tip} side="bottom">
               <button
                 onClick={() => setViewMode(v.id)}
-                className={`px-2 sm:px-3 py-1 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${viewMode === v.id ? 'bg-primary/20 text-white border border-primary/30 shadow-primary-glow' : 'text-zinc-600 hover:text-zinc-400'}`}
+                className={`px-2 sm:px-3 py-1 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${viewMode === v.id ? 'bg-white/[0.075] text-white border border-sky-300/30 shadow-[0_0_20px_rgba(47,140,255,0.12)]' : 'text-zinc-600 hover:text-zinc-400'}`}
               >
                 {v.label}
               </button>
@@ -3442,7 +3907,7 @@ function TripoWorkspaceWrapper({
               wireOpacity={wireOp}
               wireHexColor={wireC.replace("#", "0x")}
               segmentHighlight={segmentHighlight}
-              segmentEdgeColor={0x00ff88}
+              segmentEdgeColor={0x2f8cff}
               showRig={showRig && !!riggedId}
               onRigDetected={onRigDetected}
               onAnimClipsDetected={onAnimClipsDetected}
@@ -3469,7 +3934,7 @@ function TripoWorkspaceWrapper({
               initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black backdrop-blur-2xl"
             >
-              <Loader2 className="w-8 h-8 text-primary anim-spin mb-4" />
+              <Loader2 className="w-8 h-8 text-sky-300 anim-spin mb-4" />
               <p className="text-[11px] font-black text-white uppercase tracking-[0.3em] italic">Fetching Spatial Voxel Map</p>
             </motion.div>
           )}
@@ -3483,9 +3948,9 @@ function TripoWorkspaceWrapper({
               exit={{ opacity: 0 }}
               className="absolute inset-0 z-40 flex items-center justify-center bg-[#05050c]/55 backdrop-blur-xl"
             >
-              <div className="glass-panel flex flex-col items-center gap-4 rounded-[2rem] border border-white/10 bg-[#0f0f17]/70 px-8 py-7 shadow-[0_0_40px_rgba(138,43,226,0.12)]">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 shadow-[0_0_24px_rgba(138,43,226,0.18)]">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <div className="glass-panel flex flex-col items-center gap-4 rounded-[1.25rem] border border-white/10 bg-[#0f0f17]/70 px-8 py-7 shadow-[0_22px_70px_rgba(0,0,0,0.34)]">
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-sky-300/25 bg-white/[0.065] shadow-[0_0_28px_rgba(47,140,255,0.16)]">
+                  <Loader2 className="h-6 w-6 animate-spin text-sky-300" />
                 </div>
                 <div className="text-center">
                   <p className="text-[11px] font-black uppercase tracking-[0.35em] italic text-white">Segment View</p>
@@ -3503,7 +3968,7 @@ function TripoWorkspaceWrapper({
               <div className="w-[120px] h-[120px] rounded-[2.5rem] bg-white/[0.02] border border-white/5 flex items-center justify-center mb-8 shadow-2xl mx-auto">
                 <Box className="w-12 h-12 text-zinc-800" />
               </div>
-              <h3 className="text-emerald font-black text-[22px] tracking-[0.4em] uppercase italic mb-2">Awaiting Directive</h3>
+              <h3 className="text-sky-200 font-black text-[22px] tracking-[0.4em] uppercase italic mb-2">Awaiting Directive</h3>
               <p className="text-zinc-900/40 text-[9px] font-black uppercase tracking-[0.5em] italic">Inhabit the viewport via spatial forge</p>
             </div>
           </div>
@@ -3512,13 +3977,13 @@ function TripoWorkspaceWrapper({
         {/* Animation clip picker — visible when GLB has 2+ clips */}
         {animClips.length > 1 && modelUrl && !isRunning && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-black/70 backdrop-blur-xl border border-white/10 shadow-2xl">
-            <Play className="w-3.5 h-3.5 text-cyan-400 mr-1 flex-shrink-0" />
+            <Play className="w-3.5 h-3.5 text-sky-300 mr-1 flex-shrink-0" />
             {animClips.map((clip, i) => (
               <button
                 key={i}
                 onClick={() => onSwitchClip(i)}
                 className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${activeClipIdx === i
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,229,255,0.15)]'
+                  ? 'bg-white/[0.075] text-sky-50 border border-sky-300/30 shadow-[0_0_20px_rgba(47,140,255,0.12)]'
                   : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
                   }`}
               >
@@ -3550,7 +4015,7 @@ function TripoWorkspaceWrapper({
           <div className="w-px h-5 bg-white/5 mx-0.5 sm:mx-1 hidden sm:block" />
           <button
             onClick={() => setAutoSpin(v => !v)}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${autoSpin ? 'bg-primary text-white shadow-primary-glow' : 'bg-white/5 text-zinc-600 border border-white/5 hover:text-zinc-400'}`}
+            className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${autoSpin ? 'bg-white/[0.075] text-white border border-sky-300/30 shadow-[0_0_20px_rgba(47,140,255,0.12)]' : 'bg-white/5 text-zinc-600 border border-white/5 hover:text-zinc-400'}`}
           >
             {autoSpin ? <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current" /> : <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current" />}
             <span className="hidden sm:inline">{autoSpin ? "Spin Active" : "Start Spinner"}</span>
@@ -3560,7 +4025,7 @@ function TripoWorkspaceWrapper({
           {modelUrl && (
             <button
               onClick={() => { setDlItem(null); setDlOpen(true); }}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl bg-primary text-white text-[10px] sm:text-[11px] font-black uppercase tracking-widest shadow-primary-heavy hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl bg-white/[0.075] border border-sky-300/30 text-white text-[10px] sm:text-[11px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(47,140,255,0.12)] hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
             >
               <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Production Export</span><span className="sm:hidden">Export</span>
             </button>
@@ -3573,15 +4038,15 @@ function TripoWorkspaceWrapper({
       {/* ── FOOTER: Spatial Logic Stream ── */}
       {activeH && !isRunning && (
         <div className="h-10 bg-[#0a0a0f] border-t border-white/5 px-4 flex items-center justify-between relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-transparent opacity-50" />
+          <div className="absolute inset-0 bg-gradient-to-r from-sky-400/5 via-transparent to-transparent opacity-50" />
           <div className="relative z-10 text-[8px] font-black uppercase tracking-[0.4em] text-zinc-600 italic flex items-center gap-2">
-            <div className="w-2 h-0.5 bg-primary/30" />
+            <div className="w-2 h-0.5 bg-sky-300/30" />
             <span className="hidden sm:inline">Spatial Logic Stream v2.4.0</span>
             <span className="sm:hidden">SLS v2.4</span>
           </div>
           <div className="flex items-center gap-3 sm:gap-8 relative z-10">
             <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest flex items-center gap-2">
-              <span className="hidden sm:inline">Neural Precision:</span><span className="sm:hidden">NP:</span> <span className="text-emerald-500/60">Optimized</span>
+              <span className="hidden sm:inline">Neural Precision:</span><span className="sm:hidden">NP:</span> <span className="text-sky-300/70">Optimized</span>
             </span>
             <div className="w-[1px] h-3 bg-white/5 hidden sm:block" />
             <span className="text-[8px] font-black text-zinc-700 uppercase tracking-widest">
@@ -3616,7 +4081,7 @@ function SelectedHistoryPreview({ item, color, viewerItemId, selectedItemId }) {
   const aura = `${color}85`;
   const border = `${color}aa`;
   const panelBg = `${color}1a`;
-  const statusColor = isSelected ? color : (isMirroringViewer ? "#22d3ee" : color);
+  const statusColor = isSelected ? color : (isMirroringViewer ? "#2f8cff" : color);
   const statusLabel = isSelected ? "selected" : (isMirroringViewer ? "viewer loaded" : "preview");
 
   return (

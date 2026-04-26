@@ -158,6 +158,9 @@ export default function Shared3DHistory({
         if (!item.model_url) {
           return false;
         }
+        if (item.marketplaceLocked || item.marketplaceAssetId || item.mode === 'marketplace') {
+          return true;
+        }
         const ts = getItemTs(item); return ts === 0 || (now - ts) < HISTORY_TTL_MS;
       });
       setHistory(items);
@@ -181,6 +184,7 @@ export default function Shared3DHistory({
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         .filter(item => {
           if (!item.model_url) return false;
+          if (item.marketplaceLocked || item.marketplaceAssetId || item.mode === 'marketplace') return true;
           const ts = getItemTs(item); return ts === 0 || (now - ts) < HISTORY_TTL_MS;
         });
       setHistory(prev => { const s = new Set(prev.map(i => i.id)); return [...prev, ...items.filter(i => !s.has(i.id))]; });
