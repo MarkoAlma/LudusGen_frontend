@@ -11,14 +11,14 @@ const NOTIF_COLORS = {
 };
 
 const formatNotifTime = (ts) => {
-  if (!ts?.toDate) return "Most";
+  if (!ts?.toDate) return "Now";
   const diff = Date.now() - ts.toDate();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "Most";
-  if (m < 60) return `${m}p`;
+  if (m < 1) return "Now";
+  if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}ó`;
-  return `${Math.floor(h / 24)}n`;
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
 };
 
 export default function NotifDropdown({ 
@@ -39,14 +39,14 @@ export default function NotifDropdown({
       <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-primary" />
-          <span className="text-sm font-black text-white uppercase tracking-wider">Értesítések</span>
+          <span className="text-sm font-black text-white uppercase tracking-wider">Notifications</span>
         </div>
         {notifications.length > 0 && (
           <button 
             onClick={onDeleteAll}
             className="text-[10px] font-black uppercase tracking-widest text-red-400/60 hover:text-red-400 transition-colors"
           >
-            Összes törlése
+            Clear all
           </button>
         )}
       </div>
@@ -57,8 +57,8 @@ export default function NotifDropdown({
              <div className="w-12 h-12 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-center mx-auto mb-4">
                 <Bell className="w-6 h-6 text-gray-700" />
              </div>
-             <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">Nincs új értesítés</p>
-             <p className="text-xs text-gray-700 font-medium">Amint történik valami izgalmas, itt fogod látni!</p>
+             <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">No new notifications</p>
+             <p className="text-xs text-gray-700 font-medium">When something interesting happens, you will see it here.</p>
           </div>
         ) : (
           <div className="divide-y divide-white/5">
@@ -108,7 +108,7 @@ export default function NotifDropdown({
               onClick={onClose}
               className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 hover:text-white transition-colors"
             >
-               Bezárás
+               Close
             </button>
          </div>
       )}

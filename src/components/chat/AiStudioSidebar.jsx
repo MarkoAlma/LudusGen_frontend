@@ -312,7 +312,7 @@ export default function AiStudioSidebar({
                     <div className="pt-3 pb-1 space-y-1.5">
                       {[
                         {
-                          label: 'Beszéd',
+                          label: 'Speech',
                           icon: <Mic className="w-4 h-4" />,
                           models: AUDIO_SPEECH_MODELS,
                           getRestoredId: () => {
@@ -324,7 +324,7 @@ export default function AiStudioSidebar({
                           }
                         },
                         {
-                          label: 'Zene',
+                          label: 'Music',
                           icon: <Music className="w-4 h-4" />,
                           models: AUDIO_MUSIC_MODELS,
                           getRestoredId: () => {
@@ -372,7 +372,7 @@ export default function AiStudioSidebar({
                                 {item.label}
                               </span>
                               <span className="ml-auto text-[8px] font-bold text-zinc-700 uppercase tracking-widest">
-                                {item.models.length} modell
+                                {item.models.length} models
                               </span>
                             </div>
                           </button>
@@ -383,7 +383,7 @@ export default function AiStudioSidebar({
                     <div className="pt-3 pb-1 space-y-1.5">
                       {[
                         {
-                          label: 'Képgenerálás',
+                          label: 'Image generation',
                           icon: <ImageIcon className="w-4 h-4" />,
                           models: IMAGE_GEN_MODELS,
                           getRestoredId: () => {
@@ -395,7 +395,7 @@ export default function AiStudioSidebar({
                           }
                         },
                         {
-                          label: 'Képszerkesztés',
+                          label: 'Image editing',
                           icon: <Pencil className="w-4 h-4" />,
                           models: IMAGE_EDIT_MODELS,
                           getRestoredId: () => {
@@ -443,7 +443,7 @@ export default function AiStudioSidebar({
                                 {item.label}
                               </span>
                               <span className="ml-auto text-[8px] font-bold text-zinc-700 uppercase tracking-widest">
-                                {item.models.length} modell
+                                {item.models.length} models
                               </span>
                             </div>
                           </button>

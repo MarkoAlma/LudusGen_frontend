@@ -7,7 +7,7 @@ export default function AuthShell({ children, isOpen, onClose }) {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[1000] flex items-start lg:items-center justify-center p-3 sm:p-4 overflow-y-auto">
         {/* Cinematic Animated Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -26,7 +26,7 @@ export default function AuthShell({ children, isOpen, onClose }) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 20 }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="relative z-10 w-full max-w-[1000px] min-h-[600px] md:min-h-[650px] flex rounded-3xl overflow-hidden glass-panel border border-white/10 shadow-[0_0_80px_rgba(138,43,226,0.15)] bg-[#03000a]/80"
+          className="relative z-10 my-3 sm:my-4 w-full max-w-[1000px] min-h-[650px] flex rounded-3xl overflow-hidden glass-panel border border-white/10 shadow-[0_0_80px_rgba(138,43,226,0.15)] bg-[#03000a]/80"
           onClick={(e) => e.stopPropagation()}
         >
           <button 
@@ -69,9 +69,9 @@ export default function AuthShell({ children, isOpen, onClose }) {
           </div>
 
           {/* Right Side Form Wrapper */}
-          <div className="flex-1 p-8 md:p-12 flex flex-col justify-center overflow-y-auto relative">
+          <div className="flex-1 min-w-0 p-5 sm:p-7 md:p-10 flex flex-col relative">
             <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
-            <div className="relative z-10 w-full max-w-[400px] mx-auto">
+            <div className="relative z-10 w-full max-w-[400px] mx-auto my-auto py-2">
               {children}
             </div>
           </div>

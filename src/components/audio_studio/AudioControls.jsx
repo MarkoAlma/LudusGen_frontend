@@ -21,12 +21,12 @@ import {
 import { ALL_MODELS } from '../../ai_components/models';
 
 const TTS_VOICES = [
-  { id: "alloy", label: "Alloy", desc: "Semleges, kiegyensúlyozott" },
-  { id: "echo", label: "Echo", desc: "Melankolikus, mély" },
-  { id: "fable", label: "Fable", desc: "Kifejező, brit akcentus" },
-  { id: "onyx", label: "Onyx", desc: "Mély, tekintélyes" },
-  { id: "nova", label: "Nova", desc: "Energikus, barátságos" },
-  { id: "shimmer", label: "Shimmer", desc: "Lágy, kellemes" },
+  { id: "alloy", label: "Alloy", desc: "Neutral, balanced" },
+  { id: "echo", label: "Echo", desc: "Melancholic, deep" },
+  { id: "fable", label: "Fable", desc: "Expressive, British accent" },
+  { id: "onyx", label: "Onyx", desc: "Deep, authoritative" },
+  { id: "nova", label: "Nova", desc: "Energetic, friendly" },
+  { id: "shimmer", label: "Shimmer", desc: "Soft, pleasant" },
 ];
 
 const MINIMAX_SAMPLE_RATES = [16000, 24000, 32000, 44100];
@@ -38,9 +38,9 @@ const DEAPI_FILE_FORMATS = [
   { id: "flac", label: "FLAC" },
 ];
 const DEAPI_TTS_MODES = [
-  { id: "custom_voice", label: "Preset", desc: "Kesz hang" },
-  { id: "voice_clone", label: "Clone", desc: "Referencia" },
-  { id: "voice_design", label: "Design", desc: "Leiras" },
+  { id: "custom_voice", label: "Preset", desc: "Ready voice" },
+  { id: "voice_clone", label: "Clone", desc: "Reference" },
+  { id: "voice_design", label: "Design", desc: "Description" },
 ];
 const DEAPI_TTS_LANGUAGES = [
   { id: "en", label: "EN" },
@@ -72,16 +72,23 @@ const DEAPI_TTS_VOICES = [
   { id: "Dylan", label: "Dylan", desc: "Qwen3" },
 ];
 const MINIMAX_OUTPUT_FORMATS = [
-  { id: "url", label: "URL", desc: "24 órás link" },
-  { id: "hex", label: "HEX", desc: "Beágyazott adat" },
+  { id: "url", label: "URL", desc: "24-hour link" },
+  { id: "hex", label: "HEX", desc: "Embedded data" },
 ];
 const DEAPI_TIME_SIGNATURES = [
-  { id: "", label: "Auto", description: "nincs megadva" },
-  { id: "2", label: "2", description: "ütemmutató" },
-  { id: "3", label: "3", description: "ütemmutató" },
-  { id: "4", label: "4", description: "ütemmutató" },
-  { id: "6", label: "6", description: "ütemmutató" },
+  { id: "", label: "Auto", description: "not set" },
+  { id: "2", label: "2", description: "time signature" },
+  { id: "3", label: "3", description: "time signature" },
+  { id: "4", label: "4", description: "time signature" },
+  { id: "6", label: "6", description: "time signature" },
 ];
+const DEAPI_TURBO_INT8_MODEL_SLUG = "acestep_1_5_xl_turbo_int8";
+const normalizeDeapiModelSlug = (slug) => String(slug || "").trim().toLowerCase();
+const isDeapiTurboInt8ModelSlug = (slug) => normalizeDeapiModelSlug(slug) === DEAPI_TURBO_INT8_MODEL_SLUG;
+const getDeapiLimitNumber = (limits, key, fallback) => {
+  const value = Number(limits?.[key]);
+  return Number.isFinite(value) ? value : fallback;
+};
 
 const RIVA_LANGUAGES = [
   { code: "EN-US", label: "English" },
@@ -108,15 +115,15 @@ const EMOTION_EMOJI = {
 };
 
 const EMOTION_LABELS = {
-  Neutral: "Semleges",
-  Angry: "Mérges",
-  Calm: "Nyugodt",
-  Happy: "Vidám",
-  Sad: "Szomorú",
-  Fearful: "Félő",
-  Disgust: "Undorodó",
-  Disgusted: "Undorodó",
-  PleasantSurprised: "Meglepett",
+  Neutral: "Neutral",
+  Angry: "Angry",
+  Calm: "Calm",
+  Happy: "Happy",
+  Sad: "Sad",
+  Fearful: "Fearful",
+  Disgust: "Disgusted",
+  Disgusted: "Disgusted",
+  PleasantSurprised: "Surprised",
 };
 
 const formatSampleRate = (value) => {
@@ -508,12 +515,15 @@ export default function AudioControls({
   const deapiCaptionMax = Number.isFinite(Number(deapiLimits.max_caption)) ? Number(deapiLimits.max_caption) : 300;
   const deapiDurationMin = Number.isFinite(Number(deapiLimits.min_duration)) ? Number(deapiLimits.min_duration) : 10;
   const deapiDurationMax = Number.isFinite(Number(deapiLimits.max_duration)) ? Number(deapiLimits.max_duration) : 600;
-  const deapiStepsMin = Number.isFinite(Number(deapiLimits.min_steps)) ? Number(deapiLimits.min_steps) : 1;
-  const deapiStepsMax = Number.isFinite(Number(deapiLimits.max_steps)) ? Number(deapiLimits.max_steps) : 100;
-  const deapiGuidanceMin = Number.isFinite(Number(deapiLimits.min_guidance)) ? Number(deapiLimits.min_guidance) : 0;
-  const deapiGuidanceMax = Number.isFinite(Number(deapiLimits.max_guidance)) ? Number(deapiLimits.max_guidance) : 20;
-  const deapiBpmMin = Number.isFinite(Number(deapiLimits.min_bpm)) ? Number(deapiLimits.min_bpm) : 30;
-  const deapiBpmMax = Number.isFinite(Number(deapiLimits.max_bpm)) ? Number(deapiLimits.max_bpm) : 300;
+  const isTurboInt8DeapiModel = isDeapiTurboInt8ModelSlug(deapiModelSlug);
+  const deapiStepsMin = isTurboInt8DeapiModel ? 8 : getDeapiLimitNumber(deapiLimits, "min_steps", 1);
+  const deapiStepsMax = isTurboInt8DeapiModel ? 8 : getDeapiLimitNumber(deapiLimits, "max_steps", 100);
+  const deapiGuidanceMin = isTurboInt8DeapiModel ? 1 : getDeapiLimitNumber(deapiLimits, "min_guidance", 0);
+  const deapiGuidanceMax = isTurboInt8DeapiModel ? 1 : getDeapiLimitNumber(deapiLimits, "max_guidance", 20);
+  const rawDeapiBpmMin = getDeapiLimitNumber(deapiLimits, "min_bpm", 30);
+  const rawDeapiBpmMax = getDeapiLimitNumber(deapiLimits, "max_bpm", 300);
+  const deapiBpmMax = isTurboInt8DeapiModel ? Math.min(rawDeapiBpmMax, 200) : rawDeapiBpmMax;
+  const deapiBpmMin = Math.min(rawDeapiBpmMin, deapiBpmMax);
   const deapiReferenceDurationMin = Number.isFinite(Number(deapiLimits.min_ref_audio_duration)) ? Number(deapiLimits.min_ref_audio_duration) : 5;
   const deapiReferenceDurationMax = Number.isFinite(Number(deapiLimits.max_ref_audio_duration)) ? Number(deapiLimits.max_ref_audio_duration) : 60;
   const deapiCaptionLength = deapiCaption.trim().length;
@@ -678,7 +688,7 @@ export default function AudioControls({
                         ) : null}
                       </span>
                       {isActive ? (
-                        <span className="shrink-0 text-[8px] font-black uppercase" style={{ color }}>Aktív</span>
+                        <span className="shrink-0 text-[8px] font-black uppercase" style={{ color }}>Active</span>
                       ) : null}
                     </button>
                   );
@@ -709,7 +719,7 @@ export default function AudioControls({
 
             <div className="min-w-0 flex-1 text-left">
               <p className="mb-0.5 text-[9px] font-black uppercase tracking-[0.25em] leading-none text-zinc-600">
-                {isTTS ? 'Neurális szintézis' : 'Zenei generálás'}
+                {isTTS ? 'Neural synthesis' : 'Music generation'}
               </p>
               <p className="truncate text-[12px] font-black leading-none text-white">{selectedModel.name}</p>
             </div>
@@ -729,8 +739,8 @@ export default function AudioControls({
                 className="absolute left-4 right-4 top-full z-50 mt-1 overflow-hidden rounded-xl border border-white/10 bg-[#0d0d14]/98 shadow-2xl backdrop-blur-xl"
               >
                 <div className="flex items-center justify-between border-b border-white/5 px-4 py-2.5">
-                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">Hang modellek</span>
-                  <span className="text-[8px] font-bold text-zinc-600">{availableModels.length} modell</span>
+                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">Audio models</span>
+                  <span className="text-[8px] font-bold text-zinc-600">{availableModels.length} models</span>
                 </div>
                 <div className="max-h-72 overflow-y-auto py-1">
                   {availableModels.map((model) => (
@@ -751,7 +761,7 @@ export default function AudioControls({
                         <span className="text-[9px] font-medium text-zinc-600">{model.provider}</span>
                       </div>
                       {selectedModel.id === model.id ? (
-                        <span className="flex-shrink-0 text-[8px] font-black uppercase text-emerald-500">Aktív</span>
+                        <span className="flex-shrink-0 text-[8px] font-black uppercase text-emerald-500">Active</span>
                       ) : null}
                     </button>
                   ))}
@@ -768,26 +778,26 @@ export default function AudioControls({
             <>
               <SectionShell
                 color={color}
-                eyebrow="Bemenet"
-                title="Beszédre váró szöveg"
-                subtitle="A Magpie TTS változtatás nélkül marad"
+                eyebrow="Input"
+                title="Text for speech"
+                subtitle="Magpie TTS stays unchanged"
                 icon={Sparkles}
               >
                 <TextAreaField
-                  label="Szöveg"
+                  label="Text"
                   value={text}
                   onChange={setText}
-                  placeholder="Gépelj vagy másolj be szöveget..."
+                  placeholder="Type or paste text..."
                   rows={5}
-                  hint="A jobb oldali kimenet azonnal lejátszható lesz."
+                  hint="The output on the right will be playable immediately."
                 />
               </SectionShell>
 
               <SectionShell
                 color={color}
-                eyebrow="Alapbeállítások"
-                title="Hangprofil és előadás"
-                subtitle="A beszédszintézis rész megőrizve"
+                eyebrow="Basic settings"
+                title="Voice profile and performance"
+                subtitle="Speech synthesis settings preserved"
                 icon={Settings2}
               >
                 {isDeapiTTS ? (
@@ -816,7 +826,7 @@ export default function AudioControls({
 
                     <div className="grid grid-cols-2 gap-2">
                       <Select
-                        label="Nyelv"
+                        label="Language"
                         options={deapiTtsLanguageOptions}
                         value={deapiTtsLang}
                         onChange={setDeapiTtsLang}
@@ -824,7 +834,7 @@ export default function AudioControls({
                         compact
                       />
                       <Select
-                        label="Formatum"
+                        label="Format"
                         options={DEAPI_FILE_FORMATS}
                         value={deapiTtsFormat}
                         onChange={setDeapiTtsFormat}
@@ -835,7 +845,7 @@ export default function AudioControls({
 
                     <div className="grid grid-cols-2 gap-2">
                       <Select
-                        label="Mintavetel"
+                        label="Sample rate"
                         options={DEAPI_TTS_SAMPLE_RATES}
                         value={String(deapiTtsSampleRate)}
                         onChange={(value) => setDeapiTtsSampleRate(Number(value))}
@@ -843,7 +853,7 @@ export default function AudioControls({
                         compact
                       />
                       <TextInputField
-                        label="Sebesseg"
+                        label="Speed"
                         type="text"
                         inputMode="decimal"
                         value={deapiTtsSpeed}
@@ -906,7 +916,7 @@ export default function AudioControls({
                         >
                           <div className="min-w-0">
                             <p className="break-words text-[9px] font-black uppercase tracking-[0.08em] text-white">
-                              {deapiTtsReferenceAudio ? 'Referencia csere' : 'Referencia audio'}
+                              {deapiTtsReferenceAudio ? 'Replace reference' : 'Reference audio'}
                             </p>
                             <p className="mt-1 break-words text-[8px] font-semibold uppercase tracking-[0.03em] leading-snug text-zinc-500">
                               MP3, WAV, FLAC, OGG, M4A | max 10 MB | {deapiTtsRefDurationMin}-{deapiTtsRefDurationMax}s
@@ -933,7 +943,7 @@ export default function AudioControls({
                                 type="button"
                                 onClick={onDeapiTtsReferenceAudioClear}
                                 className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-white/6 bg-white/[0.03] text-zinc-400 transition-all hover:border-white/12 hover:text-white"
-                                aria-label="Referencia audio torlese"
+                                aria-label="Remove reference audio"
                               >
                                 <X className="h-4 w-4" />
                               </button>
@@ -942,10 +952,10 @@ export default function AudioControls({
                         ) : null}
 
                         <TextAreaField
-                          label="Referencia szoveg"
+                          label="Reference text"
                           value={deapiTtsRefText}
                           onChange={setDeapiTtsRefText}
-                          placeholder="A referencia audio szovege, ha ismert"
+                          placeholder="Reference audio transcript, if known"
                           rows={3}
                           compact
                         />
@@ -954,12 +964,12 @@ export default function AudioControls({
 
                     {effectiveDeapiTtsMode === "voice_design" ? (
                       <TextAreaField
-                        label="Hang leirasa"
+                        label="Voice description"
                         value={deapiTtsInstruct}
                         onChange={setDeapiTtsInstruct}
                         placeholder="Pl. A warm female voice with a British accent"
                         rows={4}
-                        hint="Ebbol keszit uj hangkaraktert."
+                        hint="Creates a new voice character from this."
                         compact
                       />
                     ) : null}
@@ -967,7 +977,7 @@ export default function AudioControls({
                 ) : isNvidiaRiva ? (
                   <>
                     <Select
-                      label="Szintézis nyelve"
+                      label="Synthesis language"
                       options={RIVA_LANGUAGES}
                       value={rivaLang}
                       onChange={setRivaLang}
@@ -977,7 +987,7 @@ export default function AudioControls({
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 px-1">
                         <Activity className="h-3 w-3 text-zinc-600" />
-                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 italic">Hang profil</span>
+                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 italic">Voice profile</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         {rivaVoices.map((voice) => (
@@ -1014,7 +1024,7 @@ export default function AudioControls({
                       <div className="space-y-4">
                         <div className="flex items-center gap-2 px-1">
                           <Smile className="h-3 w-3 text-zinc-600" />
-                          <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 italic">Érzelmi tónus</span>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 italic">Emotional tone</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {(rivaVoices.find((voice) => voice.name === rivaVoiceName)?.emotions || []).map((emotion) => (
@@ -1051,7 +1061,7 @@ export default function AudioControls({
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 px-1">
                         <Activity className="h-3 w-3 text-zinc-600" />
-                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 italic">Hang karakter</span>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 italic">Voice character</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         {TTS_VOICES.map((voice) => (
@@ -1088,7 +1098,7 @@ export default function AudioControls({
                       <div className="flex items-center justify-between px-1">
                         <div className="flex items-center gap-2">
                           <Volume2 className="h-3 w-3 text-zinc-600" />
-                          <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 italic">Beszédsebesség</span>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 italic">Speech speed</span>
                         </div>
                         <span className="text-[10px] font-black italic" style={{ color }}>{speed}x</span>
                       </div>
@@ -1117,18 +1127,18 @@ export default function AudioControls({
               <SectionShell
                 color={color}
                 eyebrow="Prompt"
-                title="Zenei prompt"
-                subtitle="Írd le, milyen zene készüljön"
+                title="Music prompt"
+                subtitle="Describe the music you want"
                 icon={Music}
                 compact
               >
                 <TextAreaField
-                  label="Zenei prompt"
+                  label="Music prompt"
                   value={deapiCaption}
                   onChange={setDeapiCaption}
                   placeholder="Pl. upbeat electronic dance music with energetic synths and bright festival drops..."
                   rows={4}
-                  hint={`Limit: ${deapiCaptionMin}-${deapiCaptionMax} • Jelenleg: ${deapiCaptionLength}${deapiCaptionLength > deapiCaptionMax ? " • Túl hosszú" : deapiCaptionLength < deapiCaptionMin ? " • Túl rövid" : ""}`}
+                  hint={`Limit: ${deapiCaptionMin}-${deapiCaptionMax} • Current: ${deapiCaptionLength}${deapiCaptionLength > deapiCaptionMax ? " • Too long" : deapiCaptionLength < deapiCaptionMin ? " • Too short" : ""}`}
                   compact
                 />
 
@@ -1179,17 +1189,17 @@ export default function AudioControls({
 
               <SectionShell
                 color={color}
-                eyebrow="Dalszöveg és vokál"
-                title="Dalszöveg mód"
-                subtitle="Válassz énekes vagy instrumentális irányt"
+                eyebrow="Lyrics and vocal"
+                title="Lyrics mode"
+                subtitle="Choose a vocal or instrumental direction"
                 icon={Sparkles}
                 compact
               >
                 <div className="grid grid-cols-3 gap-2">
                   <OptionCard
                     color={color}
-                    label="Instrumentális"
-                    description="Nincs vokál"
+                    label="Instrumental"
+                    description="No vocal"
                     active={deapiLyricsMode === "instrumental"}
                     onClick={() => setDeapiLyricsMode("instrumental")}
                     compact
@@ -1197,7 +1207,7 @@ export default function AudioControls({
                   <OptionCard
                     color={color}
                     label="Auto-Lyrics"
-                    description="AI szöveg"
+                    description="AI lyrics"
                     active={deapiLyricsMode === "auto-lyrics"}
                     onClick={() => setDeapiLyricsMode("auto-lyrics")}
                     compact
@@ -1205,7 +1215,7 @@ export default function AudioControls({
                   <OptionCard
                     color={color}
                     label="Lyrics"
-                    description="Saját"
+                    description="Custom"
                     active={deapiLyricsMode === "lyrics"}
                     onClick={() => setDeapiLyricsMode("lyrics")}
                     compact
@@ -1218,9 +1228,9 @@ export default function AudioControls({
                       label="Lyrics"
                       value={deapiLyrics}
                       onChange={setDeapiLyrics}
-                      placeholder="Teljes dalszöveg szekciókkal, pl. [Verse], [Chorus]"
+                      placeholder="Full lyrics with sections, e.g. [Verse], [Chorus]"
                       rows={5}
-                      hint="Csak lyrics módban kerül beküldésre."
+                      hint="Only sent in lyrics mode."
                       compact
                     />
                   </div>
@@ -1229,9 +1239,9 @@ export default function AudioControls({
 
               <SectionShell
                 color={color}
-                eyebrow="Generálási paraméterek"
-                title="Finomhangolás"
-                subtitle="Idő, tempó és generálási erősség"
+                eyebrow="Generation parameters"
+                title="Fine tuning"
+                subtitle="Time, tempo, and generation strength"
                 icon={Activity}
                 compact
               >
@@ -1246,50 +1256,54 @@ export default function AudioControls({
                     min={deapiDurationMin}
                     max={deapiDurationMax}
                     step={1}
-                    hint="10–600 másodperc"
+                    hint="10-600 seconds"
                     compact
                     showLimit={false}
                   />
-                  <TextInputField
-                    label="Inference steps"
-                    type="text"
-                    inputMode="numeric"
-                    value={deapiInferenceSteps}
-                    onChange={setDeapiInferenceSteps}
-                    onCommit={onCommitDeapiInferenceSteps}
-                    min={deapiStepsMin}
-                    max={deapiStepsMax}
-                    step={1}
-                    hint="Turbo modelhez jellemzően 8"
-                    compact
-                    showLimit={false}
-                  />
-                  <TextInputField
-                    label="Guidance scale"
-                    type="text"
-                    inputMode="decimal"
-                    value={deapiGuidanceScale}
-                    onChange={setDeapiGuidanceScale}
-                    onCommit={onCommitDeapiGuidanceScale}
-                    min={deapiGuidanceMin}
-                    max={deapiGuidanceMax}
-                    step={0.1}
-                    hint="0–20"
-                    compact
-                    showLimit={false}
-                  />
+                  {!isTurboInt8DeapiModel && (
+                    <>
+                      <TextInputField
+                        label="Inference steps"
+                        type="text"
+                        inputMode="numeric"
+                        value={deapiInferenceSteps}
+                        onChange={setDeapiInferenceSteps}
+                        onCommit={onCommitDeapiInferenceSteps}
+                        min={deapiStepsMin}
+                        max={deapiStepsMax}
+                        step={1}
+                        hint="Usually 8 for Turbo models"
+                        compact
+                        showLimit={false}
+                      />
+                      <TextInputField
+                        label="Guidance scale"
+                        type="text"
+                        inputMode="decimal"
+                        value={deapiGuidanceScale}
+                        onChange={setDeapiGuidanceScale}
+                        onCommit={onCommitDeapiGuidanceScale}
+                        min={deapiGuidanceMin}
+                        max={deapiGuidanceMax}
+                        step={0.1}
+                        hint="0–20"
+                        compact
+                        showLimit={false}
+                      />
+                    </>
+                  )}
                   <TextInputField
                     label="Seed"
                     type="text"
                     inputMode="numeric"
                     value={deapiSeed}
-                    onChange={setDeapiSeed}
+                    onChange={(value) => setDeapiSeed(value.replace(/\D/g, ""))}
                     step={1}
-                    hint="-1 = random"
+                    hint="Empty = random (-1)"
                     compact
                   />
                   <Select
-                    label="Formátum"
+                    label="Format"
                     options={DEAPI_FILE_FORMATS}
                     value={deapiFormat}
                     onChange={setDeapiFormat}
@@ -1306,6 +1320,7 @@ export default function AudioControls({
                     min={deapiBpmMin}
                     max={deapiBpmMax}
                     step={1}
+                    hint={isTurboInt8DeapiModel ? "Max 200" : undefined}
                     compact
                     showLimit={false}
                   />
@@ -1317,7 +1332,7 @@ export default function AudioControls({
                     value={deapiKeyscale}
                     onChange={setDeapiKeyscale}
                     placeholder="C major"
-                    hint='Pl. "C major", "F# minor"'
+                    hint='E.g. "C major", "F# minor"'
                     compact
                   />
                 </div>
@@ -1351,9 +1366,9 @@ export default function AudioControls({
 
               <SectionShell
                 color={color}
-                eyebrow="Referencia audio"
+                eyebrow="Reference audio"
                 title="Style transfer input"
-                subtitle="Opcionális audio mintával"
+                subtitle="Optional audio sample"
                 icon={Upload}
                 compact
               >
@@ -1376,7 +1391,7 @@ export default function AudioControls({
                 >
                   <div className="min-w-0">
                     <p className="break-words text-[9px] font-black uppercase tracking-[0.08em] text-white">
-                      {deapiReferenceAudio ? 'Referencia audio csere' : 'Referencia audio feltöltés'}
+                      {deapiReferenceAudio ? 'Replace reference audio' : 'Upload reference audio'}
                     </p>
                     <p className="mt-1 break-words text-[8px] font-semibold uppercase tracking-[0.03em] leading-snug text-zinc-500">
                       MP3, WAV, FLAC, OGG, M4A | max 10 MB | {deapiReferenceDurationMin}-{deapiReferenceDurationMax}s
@@ -1403,7 +1418,7 @@ export default function AudioControls({
                         type="button"
                         onClick={onDeapiReferenceAudioClear}
                         className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-white/6 bg-white/[0.03] text-zinc-400 transition-all hover:border-white/12 hover:text-white"
-                        aria-label="Referencia audio törlése"
+                        aria-label="Remove reference audio"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -1416,9 +1431,9 @@ export default function AudioControls({
             <>
               <SectionShell
                 color={color}
-                eyebrow="Zenei koncepció"
-                title="Stílus, hangulat, jelenet"
-                subtitle="A prompt írja le a teljes zenei irányt"
+                eyebrow="Music concept"
+                title="Style, mood, scene"
+                subtitle="The prompt describes the full musical direction"
                 icon={Music}
               >
                 <TextAreaField
@@ -1427,15 +1442,15 @@ export default function AudioControls({
                   onChange={setMusicPrompt}
                   placeholder="Pl. cinematic sci-fi score, dark synth bass, slow build, neon city at midnight..."
                   rows={5}
-                  hint="A MiniMax docs szerint itt a stílus, hangulat és szituáció a legfontosabb."
+                  hint="According to the MiniMax docs, style, mood, and situation matter most here."
                 />
               </SectionShell>
 
               <SectionShell
                 color={color}
-                eyebrow="Vokál és dalszöveg"
-                title="Énekes dal vagy instrumentális"
-                subtitle="Szövegmező + AI dalszöveg generálás"
+                eyebrow="Vocal and lyrics"
+                title="Vocal song or instrumental"
+                subtitle="Text field + AI lyrics generation"
                 icon={Sparkles}
               >
                 <TextAreaField
@@ -1447,16 +1462,16 @@ export default function AudioControls({
                   disabled={musicInstrumental}
                   hint={
                     musicInstrumental
-                      ? 'Instrumentális módban a dalszöveg mező inaktív.'
-                      : 'Támogatott struktúra tagek: [Intro], [Verse], [Chorus], [Bridge], [Outro] és további szekciók.'
+                      ? 'In instrumental mode, the lyrics field is disabled.'
+                      : 'Supported structure tags: [Intro], [Verse], [Chorus], [Bridge], [Outro], and other sections.'
                   }
                 />
 
                 <div className="grid grid-cols-1 gap-3">
                   <ToggleCard
                     color={color}
-                    label="AI Dalszöveg"
-                    description="Ha üres a lyrics mező, a promptból ír teljes dalszöveget."
+                    label="AI Lyrics"
+                    description="If the lyrics field is empty, full lyrics are written from the prompt."
                     active={musicLyricsOptimizer}
                     onClick={() => setMusicLyricsOptimizer((value) => !value)}
                     icon={Sparkles}
@@ -1464,8 +1479,8 @@ export default function AudioControls({
                   />
                   <ToggleCard
                     color={color}
-                    label="Instrumentális"
-                    description="Vokál nélküli zene, ilyenkor a prompt kötelező."
+                    label="Instrumental"
+                    description="Music without vocals; the prompt is required in this mode."
                     active={musicInstrumental}
                     onClick={() => setMusicInstrumental((value) => !value)}
                     icon={Mic}
@@ -1475,13 +1490,13 @@ export default function AudioControls({
 
               <SectionShell
                 color={color}
-                eyebrow="Kimenet és minőség"
+                eyebrow="Output and quality"
                 title="Export pipeline"
-                subtitle="A design a kép AI vezérlőkhöz igazítva"
+                subtitle="Designed to match the image AI controls"
                 icon={Settings2}
               >
                 <div className="space-y-3">
-                  <div className="px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic">Kimeneti mód</div>
+                  <div className="px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic">Output mode</div>
                   <div className="grid grid-cols-2 gap-3">
                     {MINIMAX_OUTPUT_FORMATS.map((option) => (
                       <OptionCard
@@ -1499,15 +1514,15 @@ export default function AudioControls({
 
                 <ToggleCard
                   color={color}
-                  label="Stream mód"
-                  description="A streamelt válasz végül összefűzve kerül vissza. Streamnél csak HEX engedett."
+                  label="Stream mode"
+                  description="The streamed response is stitched together at the end. Only HEX is allowed while streaming."
                   active={musicStream}
                   onClick={() => setMusicStream((value) => !value)}
                   icon={Activity}
                 />
 
                 <div className="space-y-3">
-                  <div className="px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic">Mintavétel</div>
+                  <div className="px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic">Sample rate</div>
                   <div className="grid grid-cols-2 gap-3">
                     {MINIMAX_SAMPLE_RATES.map((sampleRate) => (
                       <OptionCard
@@ -1523,7 +1538,7 @@ export default function AudioControls({
                 </div>
 
                 <div className="space-y-3">
-                  <div className="px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic">Bitráta</div>
+                  <div className="px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic">Bitrate</div>
                   <div className="grid grid-cols-2 gap-3">
                     {MINIMAX_BITRATES.map((bitrate) => (
                       <OptionCard
@@ -1539,7 +1554,7 @@ export default function AudioControls({
                 </div>
 
                 <div className="space-y-3">
-                  <div className="px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic">Fájlformátum</div>
+                  <div className="px-1 text-[9px] font-black uppercase tracking-[0.34em] text-zinc-600 italic">File format</div>
                   <div className="grid grid-cols-3 gap-3">
                     {MINIMAX_FILE_FORMATS.map((format) => (
                       <OptionCard
@@ -1555,9 +1570,9 @@ export default function AudioControls({
                 </div>
 
                 <div className="rounded-[1.25rem] border border-white/6 bg-black/20 p-4">
-                  <p className="text-[9px] font-black uppercase tracking-[0.34em] text-zinc-500 italic">MiniMax szabályok</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.34em] text-zinc-500 italic">MiniMax rules</p>
                   <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-600">
-                    Instrumentális módban prompt kell. Énekes módban vagy saját lyrics kell, vagy AI dalszöveg-generálás prompt alapján.
+                    Instrumental mode requires a prompt. Vocal mode requires either custom lyrics or AI lyrics generated from the prompt.
                   </p>
                 </div>
               </SectionShell>
@@ -1583,11 +1598,11 @@ export default function AudioControls({
               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.5 }}>
                 <Activity className="h-4 w-4" />
               </motion.div>
-              <span>Alkotás...</span>
+              <span>Creating...</span>
             </>
           ) : (
             <>
-              <span>Létrehozás indítása</span>
+              <span>Start creation</span>
               <Zap className="h-4 w-4 fill-current" />
             </>
           )}

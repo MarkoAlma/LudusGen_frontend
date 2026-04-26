@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Download, 
-  Trash2, 
-  ChevronLeft, 
-  ChevronRight, 
-  X, 
-  RefreshCw, 
-  Clock, 
+import {
+  Download,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  RefreshCw,
+  Clock,
   Trash,
   Loader2,
   Inbox,
@@ -75,11 +75,11 @@ function Lightbox({ images, startIndex, onClose }) {
           >
             {/* Low-res Thumbnail Placeholder */}
             {imgLoading && (
-                <img
-                    src={img.thumbUrl}
-                    alt="placeholder"
-                    className="max-w-[92vw] max-h-[92vh] object-contain rounded-2xl blur-xl opacity-30 absolute inset-0 m-auto"
-                />
+              <img
+                src={img.thumbUrl}
+                alt="placeholder"
+                className="max-w-[92vw] max-h-[92vh] object-contain rounded-2xl blur-xl opacity-30 absolute inset-0 m-auto"
+              />
             )}
 
             {/* High-res Full Image */}
@@ -89,18 +89,18 @@ function Lightbox({ images, startIndex, onClose }) {
               onLoad={() => setImgLoading(false)}
               className={`relative z-10 max-w-[92vw] max-h-[92vh] object-contain rounded-2xl shadow-2xl transition-all duration-700 ${imgLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
             />
-            
+
             {imgLoading && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/10 backdrop-blur-[2px] rounded-2xl">
                 <div className="relative">
-                    <Loader2 className="w-12 h-12 text-violet-500/40 animate-spin" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-                    </div>
+                  <Loader2 className="w-12 h-12 text-violet-500/40 animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+                  </div>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                    <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em] italic">Adat lekérése</p>
-                    <p className="text-[8px] font-bold text-white/10 uppercase tracking-widest leading-none">Nagy felbontású archívum</p>
+                  <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em] italic">Fetching data</p>
+                  <p className="text-[8px] font-bold text-white/10 uppercase tracking-widest leading-none">High-resolution archive</p>
                 </div>
               </div>
             )}
@@ -109,15 +109,15 @@ function Lightbox({ images, startIndex, onClose }) {
 
         {/* Info Overlay Top - Only show when NOT loading for cleaner look */}
         {!imgLoading && (
-            <motion.div 
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="absolute top-8 left-1/2 -translate-x-1/2 max-w-xl w-[90%] p-4 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 text-center shadow-2xl pointer-events-none z-30"
-            >
-                <p className="text-white text-[10px] font-medium leading-relaxed uppercase tracking-[0.15em] italic opacity-80 line-clamp-2">
-                    {activePrompt}
-                </p>
-            </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute top-8 left-1/2 -translate-x-1/2 max-w-xl w-[90%] p-4 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 text-center shadow-2xl pointer-events-none z-30"
+          >
+            <p className="text-white text-[10px] font-medium leading-relaxed uppercase tracking-[0.15em] italic opacity-80 line-clamp-2">
+              {activePrompt}
+            </p>
+          </motion.div>
         )}
 
         {/* Controls Overlay Bottom */}
@@ -130,7 +130,7 @@ function Lightbox({ images, startIndex, onClose }) {
               <ChevronLeft className="w-5 h-5" />
             </button>
           )}
-          
+
           <button
             onClick={() => {
               const a = document.createElement('a');
@@ -141,7 +141,7 @@ function Lightbox({ images, startIndex, onClose }) {
               document.body.removeChild(a);
             }}
             className="w-10 h-10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 transition-all"
-            title="Teljes kép letöltése"
+            title="Download full image"
           >
             <Download className="w-5 h-5" />
           </button>
@@ -208,7 +208,7 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title, message, isLoadi
               <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-start gap-4 text-left">
                 <Info className="w-5 h-5 text-zinc-500 shrink-0 mt-0.5" />
                 <p className="text-[10px] font-medium text-zinc-500 leading-relaxed uppercase tracking-wider">
-                  Ez a művelet végleges és nem visszavonható. Minden metaadat és fájl törlődik.
+                  This action is permanent and cannot be undone. All metadata and files will be deleted.
                 </p>
               </div>
             </div>
@@ -220,14 +220,14 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title, message, isLoadi
                 disabled={isLoading}
                 className="py-4 rounded-2xl text-[10px] font-black text-white/40 uppercase tracking-[0.3em] hover:bg-white/5 hover:text-white transition-all disabled:opacity-50"
               >
-                Mégse
+                Cancel
               </button>
               <button
                 onClick={onConfirm}
                 disabled={isLoading}
                 className="py-4 rounded-2xl bg-red-500 text-[10px] font-black text-white uppercase tracking-[0.3em] hover:bg-red-400 hover:shadow-[0_0_30px_rgba(239,68,68,0.3)] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Törlés véglegesítése'}
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm delete'}
               </button>
             </div>
           </motion.div>
@@ -286,11 +286,11 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
       const data = await res.json();
       if (data.success) {
         setImages(prev => prev.filter(img => img.id !== id));
-        toast.success('Kép törölve');
+        toast.success('Image deleted');
         setConfirmModal({ isOpen: false, type: null, targetId: null });
       }
     } catch (err) {
-      toast.error('Hiba a törlés során');
+      toast.error('Delete failed');
     } finally {
       setDeletingId(null);
     }
@@ -307,13 +307,13 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
       const data = await res.json();
       if (data.success) {
         setImages([]);
-        toast.success('Összes kép törölve');
+        toast.success('All images deleted');
         setConfirmModal({ isOpen: false, type: null, targetId: null });
       } else {
-        toast.error(data.message || 'Bulk törlés sikertelen');
+        toast.error(data.message || 'Bulk delete failed');
       }
     } catch (err) {
-      toast.error('Hiba a törlés során');
+      toast.error('Delete failed');
     } finally {
       setDeletingAll(false);
     }
@@ -323,7 +323,7 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-10 h-10 text-white/20 animate-spin" />
-        <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">Archívum betöltése...</p>
+        <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">Loading archive...</p>
       </div>
     );
   }
@@ -335,10 +335,10 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
           <Inbox className="w-8 h-8" />
         </div>
         <div className="space-y-2">
-            <h3 className="text-sm font-black text-white/40 uppercase tracking-[0.5em] italic">Az archívum üres</h3>
-            <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest max-w-[200px] leading-relaxed">
-                Generálj képeket, hogy feltöltsd a személyes tárolódat
-            </p>
+          <h3 className="text-sm font-black text-white/40 uppercase tracking-[0.5em] italic">Archive is empty</h3>
+          <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest max-w-[200px] leading-relaxed">
+            Generate images to fill your personal storage
+          </p>
         </div>
       </div>
     );
@@ -346,26 +346,26 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
 
   return (
     <div className="relative z-10 flex-1 h-full overflow-y-auto scrollbar-hide px-4 pb-40 pt-[calc(env(safe-area-inset-top,0px)+5rem)] sm:px-8 sm:pt-10">
-      
+
       {/* Header Info */}
       <div className="mb-8 flex flex-col gap-4 border-b border-white/5 pb-6 sm:mb-12 sm:flex-row sm:items-center sm:justify-between sm:pb-8">
         <div className="flex items-center gap-4">
-            <div className="h-10 w-10 shrink-0 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
-                <Clock className="w-5 h-5" />
-            </div>
-            <div>
-                <h2 className="text-lg font-black text-white italic uppercase tracking-[0.2em] leading-none">Generálási előzmények</h2>
-                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1.5">{images.length} mentett elem</p>
-            </div>
+          <div className="h-10 w-10 shrink-0 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
+            <Clock className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-black text-white italic uppercase tracking-[0.2em] leading-none">Generation history</h2>
+            <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1.5">{images.length} saved images</p>
+          </div>
         </div>
-        
-        <button 
-            onClick={() => setConfirmModal({ isOpen: true, type: 'all', targetId: null })}
-            disabled={deletingAll}
-            title="Galéria ürítése"
-            className="h-10 w-10 shrink-0 rounded-xl bg-red-500/5 border border-red-500/10 flex items-center justify-center self-end text-red-500/40 hover:text-red-400 transition-all hover:bg-red-500/10 disabled:opacity-50 sm:self-auto"
+
+        <button
+          onClick={() => setConfirmModal({ isOpen: true, type: 'all', targetId: null })}
+          disabled={deletingAll}
+          title="Clear gallery"
+          className="h-10 w-10 shrink-0 rounded-xl bg-red-500/5 border border-red-500/10 flex items-center justify-center self-end text-red-500/40 hover:text-red-400 transition-all hover:bg-red-500/10 disabled:opacity-50 sm:self-auto"
         >
-            {deletingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          {deletingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
         </button>
       </div>
 
@@ -380,74 +380,74 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
             className="group relative aspect-square rounded-[1.8rem] overflow-hidden border border-white/5 bg-[#0d0d12] hover:border-white/20 transition-all duration-500 cursor-pointer"
             onClick={() => setLightboxIdx(idx)}
           >
-            <img 
-              src={img.thumbUrl} 
-              alt={img.prompt} 
+            <img
+              src={img.thumbUrl}
+              alt={img.prompt}
               className="w-full h-full object-cover transition-transform duration-[2000ms] group-hover:scale-110"
               loading="lazy"
             />
-            
+
             {/* Hover Overlay */}
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-between p-5">
               <div className="flex justify-end gap-2">
-                <button 
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onUsePrompt(img.prompt);
-                        toast.success('Prompt betöltve');
-                    }}
-                    className="h-9 w-9 shrink-0 rounded-lg bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white/20"
-                    title="Use Prompt"
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUsePrompt(img.prompt);
+                    toast.success('Prompt loaded');
+                  }}
+                  className="h-9 w-9 shrink-0 rounded-lg bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white/20"
+                  title="Use Prompt"
                 >
-                    <Copy className="w-4 h-4" />
+                  <Copy className="w-4 h-4" />
                 </button>
-                <button 
-                    onClick={(e) => handleDeleteStart(e, img.id)}
-                    disabled={deletingId === img.id}
-                    className="h-9 w-9 shrink-0 rounded-lg bg-red-500/20 backdrop-blur-md border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/40"
-                    title="Delete Image"
+                <button
+                  onClick={(e) => handleDeleteStart(e, img.id)}
+                  disabled={deletingId === img.id}
+                  className="h-9 w-9 shrink-0 rounded-lg bg-red-500/20 backdrop-blur-md border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/40"
+                  title="Delete Image"
                 >
-                    {deletingId === img.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash className="w-4 h-4" />}
+                  {deletingId === img.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash className="w-4 h-4" />}
                 </button>
               </div>
 
               <div className="space-y-2">
                 <p className="text-[9px] text-white/60 font-medium line-clamp-2 italic uppercase leading-relaxed tracking-wider">
-                    {img.prompt}
+                  {img.prompt}
                 </p>
                 <div className="flex items-center gap-2">
-                   <div className="px-1.5 py-0.5 rounded bg-white/10 text-[7px] font-black text-white/40 uppercase tracking-widest">{img.modelId.split('/').pop()}</div>
-                   <div className="px-1.5 py-0.5 rounded bg-white/10 text-[7px] font-black text-white/40 uppercase tracking-widest">{img.aspect_ratio}</div>
+                  <div className="px-1.5 py-0.5 rounded bg-white/10 text-[7px] font-black text-white/40 uppercase tracking-widest">{img.modelId.split('/').pop()}</div>
+                  <div className="px-1.5 py-0.5 rounded bg-white/10 text-[7px] font-black text-white/40 uppercase tracking-widest">{img.aspect_ratio}</div>
                 </div>
               </div>
             </div>
 
             {/* View Overlay Center Icon */}
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300">
-                <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center scale-75 group-hover:scale-100 transition-transform duration-500">
-                    <ZoomIn className="w-5 h-5" />
-                </div>
+              <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center scale-75 group-hover:scale-100 transition-transform duration-500">
+                <ZoomIn className="w-5 h-5" />
+              </div>
             </div>
           </motion.div>
         ))}
       </div>
 
       {lightboxIdx !== null && (
-        <Lightbox 
+        <Lightbox
           images={images}
           startIndex={lightboxIdx}
           onClose={() => setLightboxIdx(null)}
         />
       )}
 
-      <ConfirmationModal 
+      <ConfirmationModal
         isOpen={confirmModal.isOpen}
         onClose={() => setConfirmModal({ isOpen: false, type: null, targetId: null })}
         onConfirm={confirmModal.type === 'all' ? handleDeleteAll : handleDelete}
-        title={confirmModal.type === 'all' ? "Galéria ürítése" : "Elem törlése"}
-        message={confirmModal.type === 'all' 
-            ? `Biztosan törölni szeretnéd az összes (${images.length}) mentett elemet?` 
-            : "Biztosan törölni szeretnéd ezt a képet a tárolóból?"}
+        title={confirmModal.type === 'all' ? "Clear gallery" : "Delete item"}
+        message={confirmModal.type === 'all'
+          ? `Are you sure you want to delete all (${images.length}) saved items?`
+          : "Are you sure you want to delete this image from storage?"}
         isLoading={deletingAll || deletingId !== null}
       />
     </div>

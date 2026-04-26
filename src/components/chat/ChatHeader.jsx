@@ -95,7 +95,7 @@ export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySi
               <button
                 onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
                 className="flex items-center gap-1 px-1.5 py-1 rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition-all"
-                title="Modell váltás"
+                title="Switch model"
               >
                 <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${modelDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -110,7 +110,7 @@ export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySi
                     className="absolute top-full left-0 mt-2 w-72 rounded-xl border border-white/10 bg-[#0a0a0f]/95 backdrop-blur-xl shadow-2xl z-50 overflow-hidden"
                   >
                     <div className="px-3 py-2 border-b border-white/5">
-                      <span className="text-[8px] font-black text-gray-500 uppercase tracking-[0.3em]">Modell váltás</span>
+                      <span className="text-[8px] font-black text-gray-500 uppercase tracking-[0.3em]">Model switch</span>
                     </div>
                     <div className="max-h-80 overflow-y-auto py-1">
                       {CHAT_MODELS.map(model => (
@@ -136,7 +136,7 @@ export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySi
                             </span>
                           </div>
                           {selectedModel?.id === model.id && (
-                            <span className="text-[8px] font-black text-emerald-500 uppercase">Aktív</span>
+                            <span className="text-[8px] font-black text-emerald-500 uppercase">Active</span>
                           )}
                         </button>
                       ))}
@@ -168,10 +168,10 @@ export default function ChatHeader({ selectedModel, setSidebarOpen, setHistorySi
           <button
             onClick={onNewChat}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 hover:border-primary/30 hover:shadow-[0_0_15px_rgba(138,43,226,0.15)] active:scale-95 transition-all duration-300"
-            title="Új beszélgetés"
+            title="New conversation"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] hidden sm:inline">Új</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] hidden sm:inline">New</span>
           </button>
 
           {/* Model name — top-right */}

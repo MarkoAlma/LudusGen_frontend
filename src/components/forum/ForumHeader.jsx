@@ -39,7 +39,7 @@ export default function ForumHeader({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Keresés a tudásbázisban..."
+            placeholder="Search the knowledge base..."
             className="w-full bg-white/[0.02] border border-white/5 rounded-[1.5rem] py-3.5 sm:py-5 pl-11 sm:pl-14 pr-6 text-white placeholder-gray-700 focus:outline-none focus:border-primary/40 focus:bg-white/[0.05] transition-all shadow-[0_0_30px_rgba(0,0,0,0.2)] text-sm font-medium tracking-tight"
           />
           <div className="absolute right-4 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-gray-500 uppercase tracking-widest">
@@ -88,7 +88,7 @@ export default function ForumHeader({
             className="flex-1 md:flex-none px-5 sm:px-8 py-3.5 sm:py-5 rounded-[1.5rem] bg-primary text-white font-black flex items-center justify-center gap-2 sm:gap-3 transition-all hover:scale-[1.03] active:scale-95 shadow-[0_10px_40px_rgba(138,43,226,0.3)] hover:shadow-[0_15px_50px_rgba(138,43,226,0.4)] relative overflow-hidden group text-sm sm:text-base"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-            <span className="sm:hidden">Új</span><span className="hidden sm:inline">Új Téma</span> <Plus className="w-4 h-4" />
+            <span className="sm:hidden">New</span><span className="hidden sm:inline">New Topic</span> <Plus className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -108,18 +108,18 @@ export default function ForumHeader({
                   </div>
                </div>
                <h2 className="text-3xl sm:text-5xl md:text-7xl font-black text-white italic tracking-tighter mb-4 sm:mb-6 leading-none">
-                  Kutass. <span className="text-primary group-hover:text-white transition-colors">Alkoss.</span> <br />
-                  <span className="text-gray-600">Dominálj.</span>
+                  Research. <span className="text-primary group-hover:text-white transition-colors">Create.</span> <br />
+                  <span className="text-gray-600">Dominate.</span>
                </h2>
                <p className="text-gray-500 font-bold text-xs sm:text-sm md:text-lg max-w-xl leading-relaxed">
-                  Fedezd fel a legújabb AI áttöréseket, oszd meg technikai tudásodat, és fejlődj együtt a LudusGen közösséggel.
+                  Discover the latest AI breakthroughs, share technical knowledge, and grow with the LudusGen community.
                </p>
             </div>
 
             <div className="flex flex-col sm:flex-row lg:flex-col gap-4 sm:gap-6 w-full lg:w-auto min-w-[200px] sm:min-w-[240px]">
-               <StatItem label="Aktív Témák" value="8,421" sub="+12 ma" />
-               <StatItem label="Mérnökök" value="2.4K" sub="42 online" />
-               <StatItem label="Sikeres Gen" value="15M+" sub="Asset-ek száma" />
+               <StatItem label="Active Topics" value="8,421" sub="+12 today" />
+               <StatItem label="Engineers" value="2.4K" sub="42 online" />
+               <StatItem label="Successful Gen" value="15M+" sub="Asset count" />
             </div>
          </div>
       </div>

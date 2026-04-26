@@ -1,19 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, PenSquare, MessageSquare, Hash, Zap, Sparkles, Plus, BarChart2, Eye, Layout } from 'lucide-react';
+import { X, PenSquare, MessageSquare, Hash, Zap, Sparkles, Plus, BarChart2, Eye, Layout, Code, Image, Music, Box } from 'lucide-react';
 
 const CATEGORIES = [
-  { id: "chat", label: "Chat AI", emoji: "💬", color: "#a78bfa" },
   { id: "code", label: "Code AI", emoji: "🧠", color: "#34d399" },
-  { id: "image", label: "Kép AI", emoji: "🖼️", color: "#f472b6" },
-  { id: "audio", label: "Hang AI", emoji: "🎵", color: "#fb923c" },
+  { id: "image", label: "Image AI", emoji: "🖼️", color: "#f472b6" },
+  { id: "audio", label: "Audio AI", emoji: "🎵", color: "#fb923c" },
   { id: "threed", label: "3D AI", emoji: "🧊", color: "#38bdf8" },
 ];
+
+const CATEGORY_ICONS = {
+  code: Code,
+  image: Image,
+  audio: Music,
+  threed: Box,
+};
+
+const DEFAULT_CATEGORY = "code";
+const normalizeCategory = (category) => CATEGORIES.some(c => c.id === category) ? category : DEFAULT_CATEGORY;
 
 export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defaultCategory }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [selectedCat, setSelectedCat] = useState(defaultCategory || "chat");
+  const [selectedCat, setSelectedCat] = useState(normalizeCategory(defaultCategory));
   const [tags, setTags] = useState("");
   const [preview, setPreview] = useState(false);
   
@@ -27,7 +36,7 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
       if (editPost) {
         setTitle(editPost.title || "");
         setContent(editPost.content || "");
-        setSelectedCat(editPost.category || "chat");
+        setSelectedCat(normalizeCategory(editPost.category));
         setTags(editPost.tags?.join(", ") || "");
         if (editPost.poll) {
           setAddPoll(true);
@@ -41,7 +50,7 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
       } else {
         setTitle("");
         setContent("");
-        setSelectedCat(defaultCategory || "chat");
+        setSelectedCat(normalizeCategory(defaultCategory));
         setTags("");
         setAddPoll(false);
         setPollQ("");
@@ -104,9 +113,9 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
                 </div>
                 <div>
                    <h3 className="text-xl font-black text-white italic tracking-tighter">
-                     {editPost ? 'Téma Szerkesztése' : 'Új Téma Indítása'}
+                     {editPost ? 'Edit Topic' : 'Start New Topic'}
                    </h3>
-                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-600">Osszd meg tudásod a közösséggel</p>
+                   <p className="text-[10px] font-black uppercase tracking-widest text-gray-600">Share your knowledge with the community</p>
                 </div>
              </div>
              <div className="flex items-center gap-4">
@@ -115,7 +124,7 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${preview ? 'bg-primary text-white' : 'bg-white/5 text-gray-500 hover:text-white'}`}
                 >
                    {preview ? <Layout className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                   {preview ? 'Szerkesztés' : 'Előnézet'}
+                   {preview ? 'Edit' : 'Preview'}
                 </button>
                 <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/5 text-gray-500 transition-all">
                    <X className="w-6 h-6" />
@@ -130,7 +139,9 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
              <div>
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-4 block">Selected Category</label>
                 <div className="grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
-                   {CATEGORIES.map(cat => (
+                   {CATEGORIES.map(cat => {
+                     const Icon = CATEGORY_ICONS[cat.id] || Hash;
+                     return (
                      <button
                        key={cat.id}
                        onClick={() => setSelectedCat(cat.id)}
@@ -138,37 +149,37 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
                          selectedCat === cat.id ? 'bg-primary/20 border-primary/40 text-white opacity-100 grayscale-0' : 'bg-white/5 border-white/5 text-gray-500 opacity-50 grayscale hover:grayscale-0 hover:opacity-100 hover:border-white/20'
                        }`}
                      >
-                        <span className="text-xl">{cat.emoji}</span>
+                        <Icon className="h-5 w-5" style={{ color: cat.color }} />
                         <span className="text-[9px] font-black uppercase text-center">{cat.label}</span>
                      </button>
-                   ))}
+                   )})}
                 </div>
              </div>
 
              {/* Title Input */}
              <div>
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-3 block">Téma Címe</label>
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-3 block">Topic Title</label>
                 <input 
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Hogyan tudok tökéletes promptot írni MJ-ben?"
+                  placeholder="How can I write the perfect prompt in MJ?"
                   className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white placeholder-gray-700 focus:outline-none focus:border-primary/50 transition-all font-bold"
                 />
              </div>
 
              {/* Content Area */}
              <div>
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-3 block">Tartalom (Markdown támogatott)</label>
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-3 block">Content (Markdown supported)</label>
                 {preview ? (
                    <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-6 min-h-[160px] text-sm text-gray-300 font-medium leading-relaxed">
-                      {content || <span className="text-gray-700 italic">Nincs megjelenítendő tartalom...</span>}
+                      {content || <span className="text-gray-700 italic">Nothing to preview yet...</span>}
                    </div>
                 ) : (
                   <textarea 
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    placeholder="Írd le a részleteket..."
+                    placeholder="Write the details..."
                     rows={6}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl p-6 text-sm text-gray-300 placeholder-gray-700 focus:outline-none focus:border-primary/50 transition-all resize-none font-medium leading-relaxed"
                   />
@@ -177,7 +188,7 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
 
              {/* Tags */}
              <div>
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-3 block">Tagek (Vesszővel elválasztva)</label>
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-3 block">Tags (comma separated)</label>
                 <div className="relative">
                    <input 
                      type="text"
@@ -195,7 +206,7 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
                 <div className="flex items-center justify-between">
                    <div className="flex items-center gap-2">
                       <BarChart2 className="w-4 h-4 text-primary" />
-                      <span className="text-[10px] font-black uppercase tracking-widest text-white">Szavazás hozzáadása</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-white">Add poll</span>
                    </div>
                    <button 
                      onClick={() => setAddPoll(!addPoll)}
@@ -217,7 +228,7 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
                            type="text"
                            value={pollQ}
                            onChange={(e) => setPollQ(e.target.value)}
-                           placeholder="Mi a kérdésed?"
+                           placeholder="What is your question?"
                            className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs text-white placeholder-gray-700 focus:outline-none"
                          />
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -227,7 +238,7 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
                                  type="text"
                                  value={opt}
                                  onChange={(e) => updatePollOpt(i, e.target.value)}
-                                 placeholder={`${i+1}. opció`}
+                                 placeholder={`${i+1}. option`}
                                  className="bg-white/5 border border-white/10 rounded-xl p-3 text-[10px] text-gray-300 placeholder-gray-700 focus:outline-none focus:border-white/20"
                                />
                             ))}
@@ -236,7 +247,7 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
                                  onClick={addPollOpt}
                                  className="bg-white/5 border border-white/10 border-dashed rounded-xl p-3 flex items-center justify-center gap-2 text-[10px] text-gray-600 hover:text-white transition-all"
                                >
-                                  <Plus className="w-3 h-3" /> Opció hozzáadása
+                                  <Plus className="w-3 h-3" /> Add option
                                </button>
                             )}
                          </div>
@@ -252,14 +263,14 @@ export default function ForumModals({ isOpen, onClose, onSubmit, editPost, defau
                onClick={onClose}
                className="flex-1 py-4 rounded-2xl bg-white/5 border border-white/10 text-gray-500 font-bold hover:text-white hover:bg-white/10 transition-all"
              >
-                Mégse
+                Cancel
              </button>
              <button
                onClick={handleFormSubmit}
                disabled={title.length < 5}
                className="flex-[2] py-4 rounded-2xl bg-white text-black font-black flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-30 disabled:grayscale"
              >
-                {editPost ? 'Változtatások Mentése' : 'Téma Közzététele'} <Zap className="w-5 h-5 fill-current" />
+                {editPost ? 'Save Changes' : 'Publish Topic'} <Zap className="w-5 h-5 fill-current" />
              </button>
           </div>
         </motion.div>

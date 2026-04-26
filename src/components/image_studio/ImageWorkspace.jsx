@@ -2,10 +2,44 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, ZoomIn, RefreshCw, AlertCircle, ImageIcon, Share2, X, ChevronLeft, ChevronRight, Sparkles, Zap } from 'lucide-react';
+import { API_BASE } from '../../api/client';
+
+function normalizeImageUrl(url) {
+  const value = String(url || '').trim();
+  if (!value) return '';
+  if (/^(https?:|data:|blob:)/i.test(value)) return value;
+  return value.length > 100 ? `data:image/png;base64,${value}` : value;
+}
+
+function getImageDisplayUrl(img) {
+  if (typeof img === 'string') return normalizeImageUrl(img);
+  return normalizeImageUrl(img?.fullUrl || img?.full_url || img?.url || img?.image_url || img?.b64_json);
+}
+
+function getImageDownloadUrl(img) {
+  if (typeof img === 'string') return normalizeImageUrl(img);
+  return normalizeImageUrl(img?.downloadUrl || img?.download_url || img?.fullUrl || img?.full_url || img?.url || img?.image_url || img?.b64_json);
+}
+
+function getImageFilename(img, idx = 0) {
+  const id = typeof img === 'object' && img ? (img.imageId || img.id || img.requestId) : null;
+  return `ludusgen_${id || `${Date.now()}_${idx + 1}`}.png`;
+}
+
+function triggerDownload(href, filename) {
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
 
 // ── Lightbox Modal ──────────────────────────────────────────────────────────────
-function Lightbox({ images, startIndex, onClose }) {
+function Lightbox({ images, startIndex, onClose, onDownload }) {
   const [current, setCurrent] = useState(startIndex);
+  const currentImage = images[current];
+  const currentUrl = getImageDisplayUrl(currentImage);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -36,7 +70,7 @@ function Lightbox({ images, startIndex, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <img
-          src={images[current]}
+          src={currentUrl}
           alt="Full size"
           className="max-w-[92vw] max-h-[92vh] object-contain rounded-2xl shadow-2xl"
         />
@@ -52,12 +86,7 @@ function Lightbox({ images, startIndex, onClose }) {
             </button>
           )}
           <button
-            onClick={() => {
-              const a = document.createElement('a');
-              a.href = images[current];
-              a.download = `ludusgen_${Date.now()}.png`;
-              a.click();
-            }}
+            onClick={() => onDownload(currentImage, current)}
             className="w-9 h-9 rounded-xl flex items-center justify-center text-white hover:bg-white/10 transition-all"
           >
             <Download className="w-4 h-4" />
@@ -93,6 +122,12 @@ function Lightbox({ images, startIndex, onClose }) {
 // ── Egy képkártya ───────────────────────────────────────────────────────────────
 function ImageCard({ img, idx, onZoom, onDownload }) {
   const [hovered, setHovered] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const imageUrl = getImageDisplayUrl(img);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [imageUrl]);
 
   return (
     <motion.div
@@ -105,11 +140,20 @@ function ImageCard({ img, idx, onZoom, onDownload }) {
     >
       {/* Kép – valódi aspect ratio, NEM blur hover-nél */}
       <img
-        src={img}
+        src={imageUrl}
         alt={`Generated ${idx + 1}`}
-        className="w-full h-auto object-contain block transition-transform duration-[3000ms] group-hover:scale-[1.025]"
+        onError={() => setImageError(true)}
+        className={`w-full h-auto object-contain block transition-transform duration-[3000ms] group-hover:scale-[1.025] ${imageError ? 'opacity-0' : 'opacity-100'}`}
         draggable={false}
       />
+      {imageError && (
+        <div className="min-h-72 flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <AlertCircle className="w-7 h-7 text-zinc-700" />
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-zinc-600 leading-relaxed">
+            Preview unavailable
+          </p>
+        </div>
+      )}
 
       {/* Overlay – csak alulról terjed, a kép NEM mosódik el */}
       <AnimatePresence>
@@ -131,7 +175,7 @@ function ImageCard({ img, idx, onZoom, onDownload }) {
                   <ZoomIn className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={() => onDownload(img)}
+                  onClick={() => onDownload(img, idx)}
                   className="w-11 h-11 rounded-[1.1rem] bg-white text-black flex items-center justify-center hover:scale-105 transition-all active:scale-95 shadow-xl"
                 >
                   <Download className="w-5 h-5" />
@@ -148,7 +192,7 @@ function ImageCard({ img, idx, onZoom, onDownload }) {
       {/* Badge jobb felül */}
       <div className="absolute top-4 left-4 px-2.5 py-1 bg-black/50 backdrop-blur-md border border-white/8 rounded-lg text-[8px] font-black text-white/40 uppercase tracking-[0.25em] flex items-center gap-1.5">
         <div className="w-1 h-1 rounded-full bg-violet-400 animate-pulse" />
-        Kimenet #{idx + 1}
+        Output #{idx + 1}
       </div>
     </motion.div>
   );
@@ -156,17 +200,50 @@ function ImageCard({ img, idx, onZoom, onDownload }) {
 
 // ── Fő komponens ────────────────────────────────────────────────────────────────
 // ── Fő komponens ────────────────────────────────────────────────────────────────
-export default function ImageWorkspace({ isGenerating, images, onClear, error, selectedModel, genProgress = 0, genStatus = '', genElapsed = 0 }) {
+export default function ImageWorkspace({ isGenerating, images, onClear, error, selectedModel, genProgress = 0, genStatus = '', genElapsed = 0, activityLabel = 'Creating image', getIdToken }) {
   const [lightboxIdx, setLightboxIdx] = useState(null);
 
-  const downloadImage = (url) => {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ludusgen_${Date.now()}.png`;
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const downloadImage = async (img, idx = 0) => {
+    const url = getImageDownloadUrl(img);
+    if (!url) return;
+
+    const filename = getImageFilename(img, idx);
+
+    try {
+      if (url.startsWith('data:')) {
+        const blob = await (await fetch(url)).blob();
+        const objectUrl = URL.createObjectURL(blob);
+        triggerDownload(objectUrl, filename);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        return;
+      }
+
+      if (typeof getIdToken === 'function') {
+        const token = await getIdToken();
+        const response = await fetch(`${API_BASE}/api/image/download`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            imageUrl: url,
+            imageKey: typeof img === 'object' && img ? img.fullKey : null,
+            filename,
+          }),
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        triggerDownload(objectUrl, filename);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        return;
+      }
+    } catch (err) {
+      console.warn('Image download proxy failed, falling back to direct download:', err);
+    }
+
+    triggerDownload(url, filename);
   };
 
   // Elrendezés: 1 kép → teljes szélesség, 2-4 kép → 2 oszlop
@@ -199,7 +276,7 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
               <AlertCircle className="w-8 h-8" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black text-white italic tracking-tighter uppercase">Protokoll hiba</h3>
+              <h3 className="text-xl font-black text-white italic tracking-tighter uppercase">Protocol error</h3>
               <p className="text-zinc-600 max-w-sm font-bold text-[11px] uppercase tracking-widest leading-relaxed">{error}</p>
             </div>
           </motion.div>
@@ -228,7 +305,7 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
                 </div>
                 <div className="space-y-5">
                   <h3 className="text-2xl font-black text-white italic tracking-[0.4em] uppercase">
-                    Kép alkotása<span className="animate-pulse">...</span>
+                    {activityLabel}<span className="animate-pulse">...</span>
                   </h3>
                   {genStatus && (
                     <div className={`text-[8px] font-black uppercase tracking-widest px-3 py-1.5 rounded-md border ${
@@ -264,8 +341,8 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <h3 className="text-sm font-black text-zinc-800 italic uppercase tracking-[0.5em]">Rendszer készenlét</h3>
-                  <p className="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">Adj meg egy leírást a motor indításához</p>
+                  <h3 className="text-sm font-black text-zinc-800 italic uppercase tracking-[0.5em]">System ready</h3>
+                  <p className="text-[9px] font-bold text-zinc-800 uppercase tracking-widest">Enter a prompt to start the engine</p>
                 </div>
               </div>
             )}
@@ -282,7 +359,7 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
           >
             {images.map((img, idx) => (
               <ImageCard
-                key={idx}
+                key={typeof img === 'string' ? img : (img.id || img.imageId || img.url || idx)}
                 img={img}
                 idx={idx}
                 onZoom={setLightboxIdx}
@@ -302,17 +379,17 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
           className="fixed bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 z-40 px-6 py-3 rounded-[2rem] bg-white/[0.02] backdrop-blur-3xl border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
         >
           <button
-            onClick={() => images.forEach(downloadImage)}
+            onClick={() => images.forEach((img, idx) => downloadImage(img, idx))}
             className="px-6 py-3 rounded-xl bg-white/5 border border-white/5 text-zinc-500 font-black text-[10px] uppercase tracking-[0.2em] hover:text-white hover:bg-white/10 transition-all flex items-center gap-3"
           >
-            Összes letöltése <Download className="w-4 h-4" />
+            Download all <Download className="w-4 h-4" />
           </button>
           <div className="w-px h-5 bg-white/5 mx-2" />
           <button 
             onClick={onClear}
             className="px-6 py-3 rounded-xl bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:scale-105 transition-all flex items-center gap-3"
           >
-            Képernyő ürítése <X className="w-4 h-4" />
+            Clear screen <X className="w-4 h-4" />
           </button>
         </motion.div>
       )}
@@ -324,6 +401,7 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
             images={images}
             startIndex={lightboxIdx}
             onClose={() => setLightboxIdx(null)}
+            onDownload={downloadImage}
           />
         )}
       </AnimatePresence>

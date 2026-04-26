@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -20,6 +20,8 @@ export default function Navbar() {
   const { setIsAuthOpen, showNavbar, user, logoutUser, setShowCreditTopup } = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
+  const previousUserIdRef = useRef(user?.uid ?? null);
+  const suppressUserMenuUntilRef = useRef(0);
 
   // Animation Variants for Fluidity
   const containerVariants = {
@@ -79,7 +81,22 @@ export default function Navbar() {
   useEffect(() => {
     setMobileMenuOpen(false);
     setStudioDropdownOpen(false);
+    setUserDropdownOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const currentUserId = user?.uid ?? null;
+
+    if (currentUserId !== previousUserIdRef.current) {
+      setUserDropdownOpen(false);
+
+      if (currentUserId && !previousUserIdRef.current) {
+        suppressUserMenuUntilRef.current = window.performance.now() + 650;
+      }
+
+      previousUserIdRef.current = currentUserId;
+    }
+  }, [user?.uid]);
 
   // Close mobile menu on resize to desktop
   useEffect(() => {
@@ -188,7 +205,17 @@ export default function Navbar() {
                 <div className="relative" style={{ isolation: "isolate" }}>
                   <button
                     id="user-menu-trigger"
-                    onClick={(e) => { e.stopPropagation(); setUserDropdownOpen(!userDropdownOpen); }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+
+                      if (window.performance.now() < suppressUserMenuUntilRef.current) {
+                        setUserDropdownOpen(false);
+                        return;
+                      }
+
+                      setUserDropdownOpen((open) => !open);
+                    }}
                     className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-2xl border border-white/10 hover:border-white/20 transition-all"
                     style={{ background: "rgba(255,255,255,0.04)" }}
                   >
@@ -285,7 +312,7 @@ export default function Navbar() {
                             </button>
                             <div className="my-1 mx-3 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
                             <button
-                              onClick={logoutUser}
+                              onClick={() => { setUserDropdownOpen(false); logoutUser(); }}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[#f87171] hover:text-[#fca5a5] hover:bg-red-500/10 transition-all text-[13px] font-medium"
                             >
                               <LogOut className="w-4 h-4 flex-shrink-0" strokeWidth={2} /> Kijelentkezés

@@ -18,12 +18,12 @@ import AudioWorkspace from '../components/audio_studio/AudioWorkspace';
 import { API_BASE, enhancePrompt } from "../api/client";
 
 const TTS_VOICES = [
-  { id: "alloy", label: "Alloy", desc: "Semleges, kiegyensúlyozott" },
-  { id: "echo", label: "Echo", desc: "Melankolikus, mély" },
-  { id: "fable", label: "Fable", desc: "Kifejező, brit akcentus" },
-  { id: "onyx", label: "Onyx", desc: "Mély, tekintélyes" },
-  { id: "nova", label: "Nova", desc: "Energikus, barátságos" },
-  { id: "shimmer", label: "Shimmer", desc: "Lágy, kellemes" },
+  { id: "alloy", label: "Alloy", desc: "Neutral, balanced" },
+  { id: "echo", label: "Echo", desc: "Melancholic, deep" },
+  { id: "fable", label: "Fable", desc: "Expressive, British accent" },
+  { id: "onyx", label: "Onyx", desc: "Deep, authoritative" },
+  { id: "nova", label: "Nova", desc: "Energetic, friendly" },
+  { id: "shimmer", label: "Shimmer", desc: "Soft, pleasant" },
 ];
 
 const TTS_FORMATS = ["mp3", "opus", "aac", "flac"];
@@ -42,101 +42,101 @@ const RIVA_LANGUAGES = [
 
 const RIVA_VOICES = {
   "EN-US": [
-    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
-    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
-    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
-    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
-    { name: "Leo", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
-    { name: "Louise", desc: "Női hang", emotions: [] },
-    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
-    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
-    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
-    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Aria", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "Isabela", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Jason", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Leo", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
+    { name: "Louise", desc: "Female voice", emotions: [] },
+    { name: "Mia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Ray", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Sofia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
   "ES-US": [
-    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
-    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
-    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
-    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
-    { name: "Leo", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
-    { name: "Louise", desc: "Női hang", emotions: [] },
-    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
-    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
-    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
-    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Aria", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "Isabela", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Jason", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Leo", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
+    { name: "Louise", desc: "Female voice", emotions: [] },
+    { name: "Mia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Ray", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Sofia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
   "FR-FR": [
-    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
-    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
-    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
-    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
-    { name: "Leo", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
-    { name: "Louise", desc: "Női hang", emotions: [] },
-    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
-    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
-    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
-    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Aria", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "Isabela", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Jason", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Leo", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
+    { name: "Louise", desc: "Female voice", emotions: [] },
+    { name: "Mia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Ray", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Sofia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
   "DE-DE": [
-    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
-    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
-    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
-    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Diego", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "Mia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Sofia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
   "ZH-CN": [
-    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
-    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
-    { name: "HouZhen", desc: "Férfi hang", emotions: [] },
-    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
-    { name: "Long", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
-    { name: "Louise", desc: "Női hang", emotions: [] },
-    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
-    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
-    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
-    { name: "Siwei", desc: "Női hang", emotions: [] },
+    { name: "Aria", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "HouZhen", desc: "Male voice", emotions: [] },
+    { name: "Isabela", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Long", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Louise", desc: "Female voice", emotions: [] },
+    { name: "Mia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Ray", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Siwei", desc: "Female voice", emotions: [] },
   ],
   "IT-IT": [
-    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
-    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Isabela", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Pascal", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
   ],
   "VI-VN": [
-    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
-    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
-    { name: "Leo", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
-    { name: "Long", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
-    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
-    { name: "Phung", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Disgusted", "Fearful", "Happy", "Sad"] },
-    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
-    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Aria", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Jason", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Leo", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
+    { name: "Long", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Mia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Phung", desc: "Male voice", emotions: ["Neutral", "Angry", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Ray", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Sofia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
   "HI-IN": [
-    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
-    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
-    { name: "HouZhen", desc: "Férfi hang", emotions: [] },
-    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
-    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
-    { name: "Leo", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
-    { name: "Long", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
-    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
-    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
-    { name: "Phung", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Disgusted", "Fearful", "Happy", "Sad"] },
-    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
-    { name: "Siwei", desc: "Női hang", emotions: [] },
-    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Aria", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "HouZhen", desc: "Male voice", emotions: [] },
+    { name: "Isabela", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Jason", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Leo", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Sad"] },
+    { name: "Long", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Mia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Phung", desc: "Male voice", emotions: ["Neutral", "Angry", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Ray", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Siwei", desc: "Female voice", emotions: [] },
+    { name: "Sofia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
   "JA-JP": [
-    { name: "Aria", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
-    { name: "Diego", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
-    { name: "HouZhen", desc: "Férfi hang", emotions: [] },
-    { name: "Isabela", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
-    { name: "Jason", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
-    { name: "Long", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
-    { name: "Louise", desc: "Női hang", emotions: [] },
-    { name: "Mia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
-    { name: "Pascal", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
-    { name: "Ray", desc: "Férfi hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
-    { name: "Siwei", desc: "Női hang", emotions: [] },
-    { name: "Sofia", desc: "Női hang", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Aria", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "Sad"] },
+    { name: "Diego", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "PleasantSurprised"] },
+    { name: "HouZhen", desc: "Male voice", emotions: [] },
+    { name: "Isabela", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy", "PleasantSurprised", "Sad"] },
+    { name: "Jason", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Happy"] },
+    { name: "Long", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgusted", "Fearful", "Happy", "Sad"] },
+    { name: "Louise", desc: "Female voice", emotions: [] },
+    { name: "Mia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Happy", "Sad"] },
+    { name: "Pascal", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Disgust", "Happy", "Sad"] },
+    { name: "Ray", desc: "Male voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
+    { name: "Siwei", desc: "Female voice", emotions: [] },
+    { name: "Sofia", desc: "Female voice", emotions: ["Neutral", "Angry", "Calm", "Fearful", "Happy"] },
   ],
 };
 
@@ -153,15 +153,15 @@ const EMOTION_EMOJI = {
 };
 
 const EMOTION_LABELS = {
-  Neutral: "Semleges",
-  Angry: "Mérges",
-  Calm: "Nyugodt",
-  Happy: "Vidám",
-  Sad: "Szomorú",
-  Fearful: "Félő",
-  Disgust: "Undorodó",
-  Disgusted: "Undorodó",
-  PleasantSurprised: "Meglepett",
+  Neutral: "Neutral",
+  Angry: "Angry",
+  Calm: "Calm",
+  Happy: "Happy",
+  Sad: "Sad",
+  Fearful: "Fearful",
+  Disgust: "Disgusted",
+  Disgusted: "Disgusted",
+  PleasantSurprised: "Surprised",
 };
 
 const DEAPI_REFERENCE_AUDIO_MAX_BYTES = 10 * 1024 * 1024;
@@ -238,6 +238,45 @@ const findSupportedDeapiModelOption = (slug) => {
   const normalizedSlug = normalizeDeapiModelSlug(slug);
   return DEAPI_MUSIC_MODEL_OPTIONS.find((model) => normalizeDeapiModelSlug(model.slug) === normalizedSlug) || null;
 };
+const DEAPI_TURBO_INT8_MODEL_SLUG = "acestep_1_5_xl_turbo_int8";
+const isDeapiTurboInt8ModelSlug = (slug) => normalizeDeapiModelSlug(slug) === DEAPI_TURBO_INT8_MODEL_SLUG;
+const getDeapiLimitNumber = (limits, key, fallback) => {
+  const value = Number(limits?.[key]);
+  return Number.isFinite(value) ? value : fallback;
+};
+const getDeapiGuidanceLimits = (model, modelSlug) => {
+  if (isDeapiTurboInt8ModelSlug(modelSlug)) {
+    return { min: 1, max: 1 };
+  }
+
+  const limits = model?.limits || {};
+  return {
+    min: getDeapiLimitNumber(limits, "min_guidance", 0),
+    max: getDeapiLimitNumber(limits, "max_guidance", 20),
+  };
+};
+const getDeapiBpmLimits = (model, modelSlug) => {
+  const limits = model?.limits || {};
+  const rawMin = getDeapiLimitNumber(limits, "min_bpm", 30);
+  const rawMax = getDeapiLimitNumber(limits, "max_bpm", 300);
+  const max = isDeapiTurboInt8ModelSlug(modelSlug) ? Math.min(rawMax, 200) : rawMax;
+
+  return {
+    min: Math.min(rawMin, max),
+    max,
+  };
+};
+const getDeapiStepLimits = (model, modelSlug) => {
+  if (isDeapiTurboInt8ModelSlug(modelSlug)) {
+    return { min: 8, max: 8 };
+  }
+
+  const limits = model?.limits || {};
+  return {
+    min: getDeapiLimitNumber(limits, "min_steps", 1),
+    max: getDeapiLimitNumber(limits, "max_steps", 100),
+  };
+};
 
 const getDeapiModelGenerationDefaults = (modelSlug) => {
   const normalizedSlug = String(modelSlug || "").toLowerCase();
@@ -254,7 +293,7 @@ const DEAPI_MUSIC_DEFAULTS = {
   lyrics: "",
   duration: "60",
   ...getDeapiModelGenerationDefaults("AceStep_1_5_Base"),
-  seed: -1,
+  seed: "",
   format: "mp3",
   bpm: "",
   keyscale: "",
@@ -285,7 +324,7 @@ const readAudioDuration = (file) =>
     };
     audio.onerror = () => {
       cleanup();
-      reject(new Error("A referencia audio metadata nem olvashato be"));
+      reject(new Error("Reference audio metadata could not be read"));
     };
     audio.src = objectUrl;
   });
@@ -300,7 +339,7 @@ const extractEnhancerJson = (raw = "") => {
   const jsonStart = cleaned.indexOf("{");
   const jsonEnd = cleaned.lastIndexOf("}");
   if (jsonStart < 0 || jsonEnd <= jsonStart) {
-    throw new Error("Az AI valasza nem ervenyes JSON.");
+    throw new Error("The AI response is not valid JSON.");
   }
 
   return JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
@@ -637,7 +676,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         if (err.name === 'AbortError') return;
         if (!cancelled) {
           setDeapiModels([]);
-          setDeapiModelsError(err.message || 'A deAPI modelllista nem tölthető be');
+          setDeapiModelsError(err.message || 'The deAPI model list could not be loaded');
         }
       } finally {
         if (!cancelled) setDeapiModelsLoading(false);
@@ -653,9 +692,12 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
   }, [getIdToken, isDeapiMusic, selectedModel.deapiModelSlug]);
 
   useEffect(() => {
-    if (!isDeapiMusic || !selectedDeapiModel?.limits) return;
+    if (!isDeapiMusic) return;
 
-    const limits = selectedDeapiModel.limits;
+    const limits = selectedDeapiModel?.limits || {};
+    const stepLimits = getDeapiStepLimits(selectedDeapiModel, deapiModelSlug);
+    const guidanceLimits = getDeapiGuidanceLimits(selectedDeapiModel, deapiModelSlug);
+    const bpmLimits = getDeapiBpmLimits(selectedDeapiModel, deapiModelSlug);
     const clampNumber = (value, { min = null, max = null, fallback = null, integer = false } = {}) => {
       const parsed = Number(value);
       if (!Number.isFinite(parsed)) return fallback;
@@ -677,9 +719,9 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
 
     setDeapiInferenceSteps((currentValue) => {
       const nextValue = clampNumber(currentValue, {
-        min: Number(limits.min_steps ?? 1),
-        max: Number(limits.max_steps ?? 100),
-        fallback: Number(limits.min_steps ?? 8),
+        min: stepLimits.min,
+        max: stepLimits.max,
+        fallback: stepLimits.min,
         integer: true,
       });
       return Number.isFinite(nextValue) ? nextValue : currentValue;
@@ -687,9 +729,9 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
 
     setDeapiGuidanceScale((currentValue) => {
       const nextValue = clampNumber(currentValue, {
-        min: Number(limits.min_guidance ?? 0),
-        max: Number(limits.max_guidance ?? 20),
-        fallback: Number(limits.min_guidance ?? 1),
+        min: guidanceLimits.min,
+        max: guidanceLimits.max,
+        fallback: guidanceLimits.min,
       });
       return Number.isFinite(nextValue) ? nextValue : currentValue;
     });
@@ -697,22 +739,23 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
     setDeapiBpm((currentValue) => {
       if (currentValue === "") return currentValue;
       const nextValue = clampNumber(currentValue, {
-        min: Number(limits.min_bpm ?? 30),
-        max: Number(limits.max_bpm ?? 300),
+        min: bpmLimits.min,
+        max: bpmLimits.max,
         fallback: "",
         integer: true,
       });
       return Number.isFinite(nextValue) ? nextValue : currentValue;
     });
-  }, [isDeapiMusic, selectedDeapiModel?.slug]);
+  }, [isDeapiMusic, selectedDeapiModel?.slug, deapiModelSlug]);
 
   const handleDeapiPromptEnhance = async () => {
     if (!isDeapiMusic || !deapiCaption.trim() || deapiEnhancingPrompt) return;
 
     const durationMin = Number(selectedDeapiModel?.limits?.min_duration ?? 10);
     const durationMax = Number(selectedDeapiModel?.limits?.max_duration ?? 600);
-    const bpmMin = Number(selectedDeapiModel?.limits?.min_bpm ?? 30);
-    const bpmMax = Number(selectedDeapiModel?.limits?.max_bpm ?? 300);
+    const bpmLimits = getDeapiBpmLimits(selectedDeapiModel, deapiModelSlug);
+    const bpmMin = bpmLimits.min;
+    const bpmMax = bpmLimits.max;
 
     setDeapiEnhancingPrompt(true);
     setDeapiEnhancerError("");
@@ -757,19 +800,19 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       const nextTimeSignature = normalizeEnhancerTimeSignature(payload.timesignature);
 
       if (!nextPrompt) {
-        throw new Error("Az AI valaszabol hianyzik a prompt.");
+        throw new Error("The AI response is missing the prompt.");
       }
       if (!nextKeyscale) {
-        throw new Error("Az AI valaszabol hianyzik a key scale.");
+        throw new Error("The AI response is missing the key scale.");
       }
       if (!Number.isFinite(nextDuration)) {
-        throw new Error("Az AI valaszabol hianyzik a duration.");
+        throw new Error("The AI response is missing the duration.");
       }
       if (!Number.isFinite(nextBpm)) {
-        throw new Error("Az AI valaszabol hianyzik a BPM.");
+        throw new Error("The AI response is missing the BPM.");
       }
       if (!nextLyricsMode) {
-        throw new Error("Az AI valaszabol hianyzik a lyrics/instrumental valasztas.");
+        throw new Error("The AI response is missing the lyrics/instrumental choice.");
       }
 
       setDeapiCaption(nextPrompt);
@@ -781,13 +824,13 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
 
       toast.success(
         nextLyricsMode === "lyrics"
-          ? "Az AI kitoltotte a promptot es enekes modra allt. A dalszoveget mar te adod meg."
+          ? "The AI filled the prompt and switched to vocal mode. You provide the lyrics."
           : nextLyricsMode === "auto-lyrics"
-            ? "Az AI kitoltotte a promptot es auto-lyrics modra allt."
-          : "Az AI kitoltotte a zenei promptot es a fo parameterokat."
+            ? "The AI filled the prompt and switched to auto-lyrics mode."
+          : "The AI filled the music prompt and main parameters."
       );
     } catch (err) {
-      const message = err.message || "A zenei prompt enhancer sikertelen.";
+      const message = err.message || "The music prompt enhancer failed.";
       setDeapiEnhancerError(message);
       toast.error(message);
     } finally {
@@ -833,7 +876,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
 
     const lyricsText = unwrapAiText(raw);
     if (!lyricsText) {
-      throw new Error("Az AI nem adott vissza dalszoveget az auto-lyrics modhoz.");
+      throw new Error("The AI did not return lyrics for auto-lyrics mode.");
     }
 
     return lyricsText;
@@ -874,37 +917,34 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
   };
 
   const commitDeapiInferenceSteps = () => {
-    const minValue = Number(selectedDeapiModel?.limits?.min_steps ?? 1);
-    const maxValue = Number(selectedDeapiModel?.limits?.max_steps ?? 100);
+    const limits = getDeapiStepLimits(selectedDeapiModel, deapiModelSlug);
     setDeapiInferenceSteps((currentValue) =>
       clampDeapiCommittedValue(currentValue, {
-        min: minValue,
-        max: maxValue,
-        fallback: minValue,
+        min: limits.min,
+        max: limits.max,
+        fallback: limits.min,
         integer: true,
       })
     );
   };
 
   const commitDeapiGuidanceScale = () => {
-    const minValue = Number(selectedDeapiModel?.limits?.min_guidance ?? 0);
-    const maxValue = Number(selectedDeapiModel?.limits?.max_guidance ?? 20);
+    const limits = getDeapiGuidanceLimits(selectedDeapiModel, deapiModelSlug);
     setDeapiGuidanceScale((currentValue) =>
       clampDeapiCommittedValue(currentValue, {
-        min: minValue,
-        max: maxValue,
-        fallback: minValue,
+        min: limits.min,
+        max: limits.max,
+        fallback: limits.min,
       })
     );
   };
 
   const commitDeapiBpm = () => {
-    const minValue = Number(selectedDeapiModel?.limits?.min_bpm ?? 30);
-    const maxValue = Number(selectedDeapiModel?.limits?.max_bpm ?? 300);
+    const limits = getDeapiBpmLimits(selectedDeapiModel, deapiModelSlug);
     setDeapiBpm((currentValue) =>
       clampDeapiCommittedValue(currentValue, {
-        min: minValue,
-        max: maxValue,
+        min: limits.min,
+        max: limits.max,
         fallback: "",
         integer: true,
         allowEmpty: true,
@@ -927,12 +967,12 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
     const hasSupportedExtension = DEAPI_REFERENCE_AUDIO_EXTENSIONS.has(fileExtension);
 
     if (!hasSupportedMime && !hasSupportedExtension) {
-      toast.error("Csak MP3, WAV, FLAC, OGG vagy M4A referencia audio toltheto fel.");
+      toast.error("Only MP3, WAV, FLAC, OGG, or M4A reference audio can be uploaded.");
       return;
     }
 
     if (file.size > DEAPI_REFERENCE_AUDIO_MAX_BYTES) {
-      toast.error("A referencia audio merete legfeljebb 10 MB lehet.");
+      toast.error("Reference audio can be at most 10 MB.");
       return;
     }
 
@@ -942,7 +982,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       const maxDuration = Number(selectedDeapiModel?.limits?.max_ref_audio_duration ?? 60);
 
       if (Number.isFinite(duration) && (duration < minDuration || duration > maxDuration)) {
-        toast.error(`A referencia audio hossza ${minDuration}-${maxDuration} masodperc kozott lehet.`);
+        toast.error(`Reference audio duration must be between ${minDuration}-${maxDuration} seconds.`);
         return;
       }
 
@@ -954,7 +994,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         duration,
       });
     } catch (err) {
-      toast.error(err.message || "A referencia audio nem olvashato be.");
+      toast.error(err.message || "Reference audio could not be read.");
     }
   };
 
@@ -973,12 +1013,12 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
     const hasSupportedExtension = DEAPI_REFERENCE_AUDIO_EXTENSIONS.has(fileExtension);
 
     if (!hasSupportedMime && !hasSupportedExtension) {
-      toast.error("Csak MP3, WAV, FLAC, OGG vagy M4A referencia audio toltheto fel.");
+      toast.error("Only MP3, WAV, FLAC, OGG, or M4A reference audio can be uploaded.");
       return;
     }
 
     if (file.size > DEAPI_REFERENCE_AUDIO_MAX_BYTES) {
-      toast.error("A referencia audio merete legfeljebb 10 MB lehet.");
+      toast.error("Reference audio can be at most 10 MB.");
       return;
     }
 
@@ -987,7 +1027,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       const minDuration = Number(effectiveDeapiTtsLimits.minRefAudioDuration ?? 5);
       const maxDuration = Number(effectiveDeapiTtsLimits.maxRefAudioDuration ?? 15);
       if (Number.isFinite(duration) && (duration < minDuration || duration > maxDuration)) {
-        toast.error(`Voice clone modban a referencia audio hossza ${minDuration}-${maxDuration} masodperc lehet.`);
+        toast.error(`In voice clone mode, reference audio must be ${minDuration}-${maxDuration} seconds long.`);
         return;
       }
 
@@ -999,7 +1039,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         duration,
       });
     } catch (err) {
-      toast.error(err.message || "A referencia audio nem olvashato be.");
+      toast.error(err.message || "Reference audio could not be read.");
     }
   };
 
@@ -1056,7 +1096,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
   };
 
   const fetchArchivedAudioBlobUrl = async (audioId) => {
-    if (!audioId) throw new Error("Hiányzó audio azonosító");
+    if (!audioId) throw new Error("Missing audio ID");
     const token = getIdToken ? await getIdToken() : null;
     const res = await fetch(`${API_BASE}/api/audio/history/${audioId}/file`, {
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -1097,7 +1137,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       const payload = await res.json();
       setHistory(Array.isArray(payload.items) ? payload.items : []);
     } catch (err) {
-      console.warn("Audio archívum betöltési hiba:", err.message);
+      console.warn("Audio archive load error:", err.message);
       setHistory([]);
     }
   };
@@ -1129,7 +1169,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
 
   const readAudioEventStream = async (res, jobId) => {
     const reader = res.body?.getReader();
-    if (!reader) throw new Error("Nem olvashato a generatasi stream.");
+    if (!reader) throw new Error("Generation stream is not readable.");
 
     const decoder = new TextDecoder();
     let buffer = "";
@@ -1168,7 +1208,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       }
 
       if (event.type === "error") {
-        throw new Error(event.message || "Generatasi hiba");
+        throw new Error(event.message || "Generation error");
       }
 
       return null;
@@ -1193,7 +1233,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       if (finalEvent) return finalEvent;
     }
 
-    throw new Error("A generatasi stream eredmeny nelkul zarult.");
+    throw new Error("The generation stream ended without a result.");
   };
 
   const handleGenerate = async () => {
@@ -1211,7 +1251,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
     setGenerationStatus("");
     setGenerationElapsed(0);
     closeMobileStudioPanel();
-    const jobId = startJob(isTTS ? 'audio' : 'music', (content || 'Hanggenerálás').slice(0, 48), 'audio');
+    const jobId = startJob(isTTS ? 'audio' : 'music', (content || 'Audio generation').slice(0, 48), 'audio');
     setCurrentJobId(jobId);
     generationController.current = new AbortController();
     updateJob(jobId, { progress: 0, updatedAt: Date.now() });
@@ -1276,6 +1316,32 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       } else {
         if (isDeapiMusic) {
           const formData = new FormData();
+          const stepLimits = getDeapiStepLimits(selectedDeapiModel, deapiModelSlug);
+          const guidanceLimits = getDeapiGuidanceLimits(selectedDeapiModel, deapiModelSlug);
+          const bpmLimits = getDeapiBpmLimits(selectedDeapiModel, deapiModelSlug);
+          const safeInferenceSteps = clampDeapiCommittedValue(deapiInferenceSteps, {
+            min: stepLimits.min,
+            max: stepLimits.max,
+            fallback: stepLimits.min,
+            integer: true,
+          });
+          const safeGuidanceScale = clampDeapiCommittedValue(deapiGuidanceScale, {
+            min: guidanceLimits.min,
+            max: guidanceLimits.max,
+            fallback: guidanceLimits.min,
+          });
+          const safeBpm = clampDeapiCommittedValue(deapiBpm, {
+            min: bpmLimits.min,
+            max: bpmLimits.max,
+            fallback: "",
+            integer: true,
+            allowEmpty: true,
+          });
+          const seedText = String(deapiSeed ?? "").trim();
+          const parsedSeed = Number(seedText);
+          const safeSeed = seedText === "" || !Number.isFinite(parsedSeed)
+            ? -1
+            : Math.trunc(parsedSeed);
           const deapiPayload = {
             apiId: selectedModel.apiId,
             provider: selectedModel.provider,
@@ -1284,11 +1350,11 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
             lyrics: resolvedDeapiLyrics,
             lyrics_mode: deapiLyricsMode,
             duration: deapiDuration,
-            inference_steps: deapiInferenceSteps,
-            guidance_scale: deapiGuidanceScale,
-            seed: deapiSeed,
+            inference_steps: safeInferenceSteps,
+            guidance_scale: safeGuidanceScale,
+            seed: safeSeed,
             format: deapiFormat.trim(),
-            bpm: deapiBpm === "" ? null : Number(deapiBpm),
+            bpm: safeBpm === "" ? null : Number(safeBpm),
             keyscale: deapiKeyscale.trim() || null,
             timesignature: deapiTimesignature ? Number(deapiTimesignature) : null,
             vocal_language: "unknown",
@@ -1346,7 +1412,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       const playbackAudioUrl = data.audioId
         ? await fetchArchivedAudioBlobUrl(data.audioId)
         : data.audioUrl;
-      if (!playbackAudioUrl) throw new Error("Nem érkezett vissza lejátszható audio.");
+      if (!playbackAudioUrl) throw new Error("No playable audio was returned.");
       setAudioUrl(playbackAudioUrl);
       setAudioInfo(
         isTTS
@@ -1373,8 +1439,8 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         await loadHistory();
       }
     } catch (err) {
-      setError(err.message || "Generálási hiba");
-      markJobError(jobId, err.message || 'Generálási hiba');
+      setError(err.message || "Generation error");
+      markJobError(jobId, err.message || 'Generation error');
     } finally {
       setIsGenerating(false);
     }
@@ -1401,14 +1467,14 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
             {[
               {
                 id: 'forge',
-                label: 'ALKOTÁS',
+                label: 'CREATE',
                 icon: <Zap className="w-5 h-5" />,
                 isActive: view === 'forge',
                 onClick: () => { setView('forge'); setLeftSecondaryOpen(true); },
               },
               {
                 id: 'history',
-                label: 'ARCHÍVUM',
+                label: 'ARCHIVE',
                 icon: <History className="w-5 h-5" />,
                 isActive: view === 'history',
                 onClick: () => {
@@ -1565,7 +1631,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
                 ? await fetchArchivedAudioBlobUrl(item.audioId)
                 : item.audioUrl;
 
-              if (!nextAudioUrl) throw new Error("Az archív audio nem tölthető be.");
+              if (!nextAudioUrl) throw new Error("Archived audio could not be loaded.");
               if (item.audioId && item.storage === 'b2') {
                 setAudioUrl(nextAudioUrl);
               } else {
@@ -1583,8 +1649,8 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
               if (!options.keepHistory) setView('forge');
               return { audioUrl: nextAudioUrl, audioInfo: nextAudioInfo };
             } catch (err) {
-              console.warn("Archiv audio betoltesi hiba:", err.message);
-              setError(err.message || "Az archív audio nem tölthető be.");
+              console.warn("Archived audio load error:", err.message);
+              setError(err.message || "Archived audio could not be loaded.");
               if (!options.keepHistory) setView('forge');
               throw err;
             }

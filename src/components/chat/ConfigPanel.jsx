@@ -191,7 +191,7 @@ export default function ConfigPanel({
                   </div>
                   <div>
                     <h3 className="text-xs text-gray-300 font-bold">Config</h3>
-                    <p className="text-[9px] text-gray-600 font-bold">Model paraméterek</p>
+                    <p className="text-[9px] text-gray-600 font-bold">Model parameters</p>
                   </div>
                 </div>
                 <button
@@ -213,7 +213,7 @@ export default function ConfigPanel({
                   <textarea
                     value={systemPrompt}
                     onChange={(e) => setSystemPrompt(e.target.value)}
-                    placeholder="Add meg a system promptot..."
+                    placeholder="Enter the system prompt..."
                     rows={4}
                     className="w-full bg-white/[0.03] border border-white/5 rounded-xl p-3 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-primary/50 transition-all duration-500 resize-none leading-relaxed font-bold"
                   />
@@ -232,7 +232,7 @@ export default function ConfigPanel({
                   max={2}
                   step={0.05}
                   color={themeColor}
-                  description="Alacsonyabb = fókuszáltabb, magasabb = kreatívabb."
+                  description="Lower = more focused, higher = more creative."
                 />
 
                 <SliderControl
@@ -244,7 +244,7 @@ export default function ConfigPanel({
                   max={8192}
                   step={128}
                   color={themeColor}
-                  description="A válasz maximális hossza tokenekben."
+                  description="Maximum response length in tokens."
                 />
 
                 <SliderControl
@@ -256,7 +256,7 @@ export default function ConfigPanel({
                   max={1}
                   step={0.05}
                   color={themeColor}
-                  description="Nucleus sampling — alacsonyabb = determinisztikusabb."
+                  description="Nucleus sampling - lower = more deterministic."
                 />
 
                 <SliderControl
@@ -268,7 +268,7 @@ export default function ConfigPanel({
                   max={2}
                   step={0.1}
                   color={themeColor}
-                  description="Ismétlődő szavak büntetése."
+                  description="Penalizes repeated words."
                 />
 
                 <SliderControl
@@ -280,13 +280,13 @@ export default function ConfigPanel({
                   max={2}
                   step={0.1}
                   color={themeColor}
-                  description="Új témák ösztönzése."
+                  description="Encourages new topics."
                 />
               </div>
 
               {/* Footer */}
               <div className="px-5 py-3 border-t border-white/5">
-                <span className="text-[9px] text-gray-700 font-bold">A változások azonnal érvényesek</span>
+                <span className="text-[9px] text-gray-700 font-bold">Changes apply immediately</span>
               </div>
             </div>
           </motion.div>

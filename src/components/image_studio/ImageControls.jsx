@@ -6,7 +6,7 @@ import { ALL_MODELS } from '../../ai_components/models';
 import { createPortal } from 'react-dom';
 import { API_BASE } from '../../api/client';
 
-function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slotsAvailable }) {
+export function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slotsAvailable }) {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState([]);
@@ -98,9 +98,9 @@ function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slotsAvaila
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-5 border-b border-white/5">
           <div>
-            <h3 className="text-sm font-black text-white italic uppercase tracking-[0.2em]">Galéria</h3>
+            <h3 className="text-sm font-black text-white italic uppercase tracking-[0.2em]">Gallery</h3>
             <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1">
-              {selected.length > 0 ? `${selected.length} / ${slotsAvailable} kiválasztva` : `Maximum ${slotsAvailable} kép`}
+              {selected.length > 0 ? `${selected.length} / ${slotsAvailable} selected` : `Maximum ${slotsAvailable} images`}
             </p>
           </div>
           <button
@@ -119,8 +119,8 @@ function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slotsAvaila
             </div>
           ) : images.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
-              <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">Üres galéria</p>
-              <p className="text-[9px] font-bold text-white/10 uppercase tracking-widest">Generálj képeket először</p>
+              <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">Empty gallery</p>
+              <p className="text-[9px] font-bold text-white/10 uppercase tracking-widest">Generate images first</p>
             </div>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
@@ -168,7 +168,7 @@ function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slotsAvaila
               className="w-full py-3 rounded-2xl bg-violet-600 text-white text-[11px] font-black uppercase tracking-[0.2em] hover:bg-violet-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {adding ? 'Betöltés...' : `${selected.length} kép hozzáadása`}
+              {adding ? 'Loading...' : `Add ${selected.length} images`}
             </button>
           </div>
         )}
@@ -290,7 +290,7 @@ export default function ImageControls({
             {/* Model name */}
             <div className="flex-1 min-w-0 text-left">
               <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.25em] leading-none mb-0.5">
-                {isEditMode ? 'Képszerkesztés' : 'Képgenerálás'}
+                {isEditMode ? 'Image editing' : 'Image generation'}
               </p>
               <p className="text-[12px] font-black text-white truncate leading-none">
                 {selectedModel.name}
@@ -315,9 +315,9 @@ export default function ImageControls({
                 {/* Header */}
                 <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
                   <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">
-                    {isEditMode ? 'Szerkesztő modellek' : 'Generáló modellek'}
+                    {isEditMode ? 'Editing models' : 'Generation models'}
                   </span>
-                  <span className="text-[8px] text-zinc-600 font-bold">{availableModels.length} modell</span>
+                  <span className="text-[8px] text-zinc-600 font-bold">{availableModels.length} models</span>
                 </div>
 
                 {/* Model list */}
@@ -361,7 +361,7 @@ export default function ImageControls({
                           </span>
                         )}
                         {isActive && (
-                          <span className="text-[8px] font-black text-emerald-500 uppercase flex-shrink-0">Aktív</span>
+                          <span className="text-[8px] font-black text-emerald-500 uppercase flex-shrink-0">Active</span>
                         )}
                       </button>
                     );
@@ -381,7 +381,7 @@ export default function ImageControls({
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic">
-                Pozitív leírás
+                Positive prompt
               </label>
               <Sparkles className="w-3.5 h-3.5 text-primary opacity-30 animate-pulse" />
             </div>
@@ -405,12 +405,12 @@ export default function ImageControls({
           {isModelScopeEdit && !isGoogleImage && !isFlux && (
             <div className="space-y-3">
               <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic px-1">
-                Tiltott elemek (negatív prompt)
+                Negative prompt
               </label>
               <textarea
                 value={negativePrompt}
                 onChange={(e) => setNegativePrompt(e.target.value)}
-                placeholder="Mit ne tartalmazzon a kép? (pl. torz végtagok, szöveg...)"
+                placeholder="What should the image avoid? (e.g. distorted limbs, text...)"
                 rows={1}
                 className="w-full bg-white/[0.01] border border-white/5 rounded-2xl p-4 text-[13px] text-zinc-500 placeholder-zinc-800 focus:outline-none focus:border-white/10 transition-all resize-none leading-relaxed"
               />
@@ -421,7 +421,7 @@ export default function ImageControls({
           {isModelScopeEdit && (
             <div className="space-y-3 pt-2">
               <label className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-600 italic px-1">
-                Referencia képek
+                Reference images
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {inputImages.map((img, idx) => (
@@ -442,7 +442,7 @@ export default function ImageControls({
                       className="w-full h-full rounded-xl border border-dashed border-white/10 flex flex-col items-center justify-center text-zinc-700 hover:border-primary/40 hover:text-primary transition-all bg-white/[0.01] group"
                     >
                       <Plus className="w-5 h-5 mb-1 group-hover:scale-110 transition-transform" />
-                      <span className="text-[8px] font-black uppercase tracking-widest">Kép csatolása ({3 - inputImages.length} szabad)</span>
+                      <span className="text-[8px] font-black uppercase tracking-widest">Attach image ({3 - inputImages.length} slots left)</span>
                     </button>
 
                     <AnimatePresence>
@@ -459,7 +459,7 @@ export default function ImageControls({
                             className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.04] transition-all"
                           >
                             <Upload className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-                            <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">Gépről</span>
+                            <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">From device</span>
                           </button>
                           <div className="h-px bg-white/5 mx-3" />
                           <button
@@ -467,7 +467,7 @@ export default function ImageControls({
                             className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/[0.04] transition-all"
                           >
                             <Images className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-                            <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">Galériából</span>
+                            <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">From gallery</span>
                           </button>
                         </motion.div>
                       )}
@@ -496,7 +496,7 @@ export default function ImageControls({
         <div className="px-6 space-y-6 pb-24">
           <div className="flex items-center gap-2 px-1 mb-2">
             <Settings2 className="w-3.5 h-3.5 text-zinc-600" />
-            <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Alapbeállítások</span>
+            <span className="text-[9px] font-black uppercase tracking-[0.4em] text-zinc-500 italic">Basic settings</span>
           </div>
 
           {/* Quality selector */}
@@ -504,7 +504,7 @@ export default function ImageControls({
             <div className="space-y-3">
               <div className="flex items-center gap-2 px-1">
                 <Layers className="w-3 h-3 text-zinc-600" />
-                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Kidolgozottság</span>
+                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Quality</span>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {Object.entries(QUALITY_PRESETS).map(([key, p]) => (
@@ -533,7 +533,7 @@ export default function ImageControls({
             <div className="space-y-3">
               <div className="flex items-center gap-2 px-1">
                 <Maximize2 className="w-3 h-3 text-zinc-600" />
-                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Képméret és arány</span>
+                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Image size and ratio</span>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {(isFlux ? FLUX_SIZES : ASPECT_RATIO_LIST).map((ar, idx) => {
@@ -566,7 +566,7 @@ export default function ImageControls({
           {isFal && !isModelScopeEdit && (
             <div className="space-y-3">
               <div className="flex justify-between items-center px-1">
-                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Képek száma</span>
+                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Number of images</span>
                 <span className="text-[10px] font-black italic" style={{ color }}>{numImages}</span>
               </div>
               <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -590,7 +590,7 @@ export default function ImageControls({
           >
             <div className="flex items-center gap-2">
               <Settings2 className={`w-3.5 h-3.5 transition-transform duration-500 ${showAdvanced ? 'rotate-90' : ''}`} />
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] italic">Haladó beállítások</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] italic">Advanced settings</span>
             </div>
             <motion.div
               animate={{ rotate: showAdvanced ? 180 : 0 }}
@@ -611,14 +611,14 @@ export default function ImageControls({
                 {/* Seed */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
-                    <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Véletlenszerűségi mag (Seed)</span>
-                    <span className="text-[8px] text-zinc-800 font-bold uppercase tracking-widest">(Opcionális)</span>
+                    <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Random seed</span>
+                    <span className="text-[8px] text-zinc-800 font-bold uppercase tracking-widest">(Optional)</span>
                   </div>
                   <input
                     type="number"
                     value={seed}
                     onChange={(e) => setSeed(e.target.value)}
-                    placeholder="Entrópia érték (pl. 42)"
+                    placeholder="Seed value (e.g. 42)"
                     className="w-full bg-white/[0.01] border border-white/5 rounded-xl p-3 text-[12px] text-zinc-500 placeholder-zinc-800 focus:outline-none focus:border-white/10 transition-all font-mono"
                   />
                 </div>
@@ -628,7 +628,7 @@ export default function ImageControls({
                   <div className="space-y-6">
                     <div className="space-y-3">
                       <div className="flex justify-between items-center px-1">
-                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Kidolgozási lépések</span>
+                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Generation steps</span>
                         <span className="text-[10px] font-black italic" style={{ color }}>{steps}</span>
                       </div>
                       <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -645,7 +645,7 @@ export default function ImageControls({
                     </div>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center px-1">
-                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">AI követési szigor</span>
+                        <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Prompt guidance</span>
                         <span className="text-[10px] font-black italic" style={{ color }}>{guidance}</span>
                       </div>
                       <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -672,7 +672,7 @@ export default function ImageControls({
                   >
                     <div className="flex items-center gap-3">
                       <Sparkles className="w-3.5 h-3.5 opacity-40" />
-                      <span className="text-[10px] font-black uppercase tracking-widest italic">AI kiterjesztés</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest italic">AI prompt extension</span>
                     </div>
                     <div className="w-8 h-4 rounded-full relative transition-colors bg-white/5 shadow-inner">
                       <motion.div
@@ -713,18 +713,18 @@ export default function ImageControls({
               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1.5 }}>
                 <Activity className="w-4 h-4" />
               </motion.div>
-              <span>Alkotás...</span>
+              <span>Creating...</span>
             </>
           ) : isEnhancerBusy ? (
             <>
               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
                 <Sparkles className="w-4 h-4" />
               </motion.div>
-              <span>Elemzés...</span>
+              <span>Analyzing...</span>
             </>
           ) : (
             <>
-              <span>Kép létrehozása</span> <Zap className="w-4 h-4 fill-current" />
+              <span>Create image</span> <Zap className="w-4 h-4 fill-current" />
             </>
           )}
         </button>

@@ -15,42 +15,61 @@ import {
   Hash, TrendingUp, Star, Heart, Smile, Lock, CheckCircle,
   AlertCircle, Award, Edit3, X, BarChart2, RefreshCw,
   ArrowUp, Zap, AtSign, Bold, Italic, Code,
-  List, Quote, ChevronRight,
+  List, Quote, ChevronRight, Image, Music, Box,
   PenSquare, Shield, Search, Rss, Link, Unlock,
 } from "lucide-react";
 import ForumAnimatedBg from "../components/ForumAnimatedBg";
+import {
+  applyProfileToForumComment,
+  applyProfileToForumPost,
+  fetchPublicProfile,
+  getProfileAvatarUrl,
+  getProfileDisplayName,
+  getProfileInitial,
+} from "../utils/communityProfiles";
 
 const CATEGORIES = {
-  chat: { label: "Chat AI", emoji: "💬", color: "#a78bfa" },
-  code: { label: "Code AI", emoji: "🧠", color: "#34d399" },
-  image: { label: "Kép AI", emoji: "🖼️", color: "#f472b6" },
-  audio: { label: "Hang AI", emoji: "🎵", color: "#fb923c" },
-  threed: { label: "3D AI", emoji: "🧊", color: "#38bdf8" },
+  code: { label: "Code AI", color: "#34d399", icon: Code },
+  image: { label: "Image AI", color: "#f472b6", icon: Image },
+  audio: { label: "Audio AI", color: "#fb923c", icon: Music },
+  threed: { label: "3D AI", color: "#38bdf8", icon: Box },
 };
+
+const CategoryIcon = ({ category, className = "w-3 h-3", style = {} }) => {
+  const Icon = category?.icon || Hash;
+  return <Icon className={className} style={{ color: category?.color, ...style }} />;
+};
+
+const CategoryLabel = ({ category, className = "" }) => (
+  <span className={`inline-flex items-center gap-1 ${className}`}>
+    <CategoryIcon category={category} className="w-3 h-3" />
+    {category?.label || "Code AI"}
+  </span>
+);
 
 const ADMIN_UIDS = ["T7fU9Zp3N5M9wz2G8xQ4L1rV6bY2"];
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
-// ─── Kapcsolódó témák fallback ─────────────────────────────────
+// ─── Related topics fallback ─────────────────────────────────
 const RELATED_MOCK = [
   {
-    id: "rm1", category: "chat",
-    title: "ChatGPT vs Claude: melyik a jobb asszisztens minden napra?",
-    likes: 89, comments: 24, time: "3 napja",
-    tags: ["gpt-4o", "claude"],
-  },
-  {
     id: "rm2", category: "code",
-    title: "GitHub Copilot vs Cursor AI — 2025-ös összehasonlítás",
-    likes: 134, comments: 41, time: "5 napja",
+    title: "GitHub Copilot vs Cursor AI - 2025 comparison",
+    likes: 134, comments: 41, time: "5 d ago",
     tags: ["cursor", "copilot"],
   },
   {
     id: "rm3", category: "image",
-    title: "Midjourney Sref kódok: stilus-konzisztenciát gyártás titka",
-    likes: 201, comments: 58, time: "1 hete",
+    title: "Midjourney Sref codes: the secret to style consistency",
+    likes: 201, comments: 58, time: "1 w ago",
     tags: ["midjourney", "prompt"],
+  },
+  {
+    id: "rm4", category: "audio",
+    title: "Suno v4 prompting: structure, chorus, mood",
+    likes: 76, comments: 18, time: "4 d ago",
+    tags: ["suno", "prompt"],
   },
 ];
 
@@ -59,21 +78,21 @@ const INITIAL_COMMENTS = [
   {
     id: 1, parentId: null,
     author: "typescript_king", avatar: "T", avatarColor: "#34d399",
-    content: "Teljesen egyetértek a hosszú fájloknál tapasztalt különbséggel. Nálam egy 800 soros React komponens refaktorálásnál Claude egyszerűen sokkal jobb volt. GPT-4o kb. a felénél \"elveszett\".",
-    time: "1 órája", likes: 34, likedIds: [], pinned: true,
+    content: "I completely agree about the difference on long files. In my 800-line React component refactor, Claude was simply much better. GPT-4o got \"lost\" halfway through.",
+    time: "1 h ago", likes: 34, likedIds: [], pinned: true,
     replies: [
       {
         id: 11, parentId: 1,
         author: "devmaster_hu", avatar: "D", avatarColor: "#7c3aed",
-        content: "Igen, pontosan ez volt az én tapasztalatom is! A 200k token context ablak sokat számít ilyen esetekben.",
-        time: "45 perce", likes: 12, likedIds: [], isOP: true,
+        content: "Yes, exactly my experience too. The 200k-token context window matters a lot in these cases.",
+        time: "45 min ago", likes: 12, likedIds: [], isOP: true,
         replies: [],
       },
       {
         id: 12, parentId: 1,
         author: "react_wizard", avatar: "R", avatarColor: "#f472b6",
-        content: "Érdekes, én épp fordítva tapasztaltam... lehet hogy modell verzió kérdése? Melyik Claude-ot teszteltél?",
-        time: "30 perce", likes: 5, likedIds: [],
+        content: "Interesting, I had the opposite experience... maybe it depends on the model version? Which Claude did you test?",
+        time: "30 min ago", likes: 5, likedIds: [],
         replies: [],
       },
     ],
@@ -81,14 +100,14 @@ const INITIAL_COMMENTS = [
   {
     id: 2, parentId: null,
     author: "pixel_witch", avatar: "P", avatarColor: "#db2777",
-    content: "A unit teszt rész meglepett engem is. Gondoltam Claude lesz jobb ott is, de tényleg úgy tűnik a GPT jobban ismeri a Jest/Vitest szintaxist. Valaki próbálta már Cursor-ral mindkettőt?",
-    time: "55 perce", likes: 21, likedIds: [], pinned: false,
+    content: "The unit test part surprised me too. I expected Claude to be better there as well, but GPT really seems to know Jest/Vitest syntax better. Has anyone tried both in Cursor?",
+    time: "55 min ago", likes: 21, likedIds: [], pinned: false,
     replies: [],
   },
   {
     id: 3, parentId: null,
     author: "prompt_guru", avatar: "G", avatarColor: "#a78bfa",
-    content: `Jó összehasonlítás! Én még annyit tennék hozzá: a **system prompt** minősége hatalmas különbséget tesz. Én ezzel a sablonnal dolgozom:
+    content: `Good comparison! I would add one thing: the quality of the **system prompt** makes a huge difference. This is the template I use:
 
 \`\`\`
 You are an expert software engineer. When refactoring code:
@@ -98,14 +117,14 @@ You are an expert software engineer. When refactoring code:
 4. Point out potential bugs you notice
 \`\`\`
 
-Ezzel Claude teljesítménye még jobban kiemelkedik.`,
-    time: "40 perce", likes: 67, likedIds: [], pinned: false,
+This makes Claude's performance stand out even more.`,
+    time: "40 min ago", likes: 67, likedIds: [], pinned: false,
     replies: [
       {
         id: 31, parentId: 3,
         author: "beatmaker99", avatar: "B", avatarColor: "#ea580c",
-        content: "Ez arany, köszönjük! Rögtön ki is próbálom.",
-        time: "25 perce", likes: 8, likedIds: [],
+        content: "This is gold, thanks! I am trying it right away.",
+        time: "25 min ago", likes: 8, likedIds: [],
         replies: [],
       },
     ],
@@ -113,8 +132,8 @@ Ezzel Claude teljesítménye még jobban kiemelkedik.`,
   {
     id: 4, parentId: null,
     author: "3d_builder", avatar: "3", avatarColor: "#0284c7",
-    content: "Érdemes lenne ugyanezt Gemini 2.5 Pro-val is elvégezni. Nemrég valaki azt mondta, hogy kódolásban már az is verheti a Claude-ot.",
-    time: "20 perce", likes: 15, likedIds: [], pinned: false,
+    content: "It would be worth running the same test with Gemini 2.5 Pro. Someone recently said it may already beat Claude at coding.",
+    time: "20 min ago", likes: 15, likedIds: [], pinned: false,
     replies: [],
   },
 ];
@@ -122,17 +141,17 @@ Ezzel Claude teljesítménye még jobban kiemelkedik.`,
 
 // ─── Firebase timestamp → olvasható szöveg ────────────────────────
 const formatFirebaseTime = (timestamp) => {
-  if (!timestamp?.toDate) return "Nemrég";
+  if (!timestamp?.toDate) return "Recently";
   const date = timestamp.toDate();
   const diff = Date.now() - date;
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "Most";
-  if (m < 60) return `${m} perce`;
+  if (m < 1) return "Now";
+  if (m < 60) return `${m} min ago`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} órája`;
+  if (h < 24) return `${h} h ago`;
   const d = Math.floor(h / 24);
-  if (d < 7) return `${d} napja`;
-  return `${Math.floor(d / 7)} hete`;
+  if (d < 7) return `${d} d ago`;
+  return `${Math.floor(d / 7)} w ago`;
 };
 
 
@@ -140,6 +159,39 @@ const formatFirebaseTime = (timestamp) => {
 // ─── Markdown renderer ────────────────────────────────────────────
 const renderMd = (text) => {
   if (!text) return null;
+  const safeUrl = (url) => /^(https?:\/\/|mailto:)/i.test(String(url || "").trim()) ? String(url).trim() : "";
+  const renderInline = (line, keyPrefix) => {
+    return String(line || "")
+      .split(/(`[^`]+`|\[[^\]]+\]\((?:https?:\/\/|mailto:)[^)]+\)|\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*)/gi)
+      .map((chunk, ci) => {
+        if (!chunk) return null;
+
+        const linkMatch = chunk.match(/^\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^)]+)\)$/i);
+        if (linkMatch) {
+          const href = safeUrl(linkMatch[2]);
+          return href ? (
+            <a key={`${keyPrefix}-link-${ci}`} href={href} target="_blank" rel="noreferrer" className="text-purple-300 hover:text-purple-200 underline underline-offset-2">
+              {linkMatch[1]}
+            </a>
+          ) : linkMatch[1];
+        }
+
+        if (chunk.startsWith("`") && chunk.endsWith("`")) {
+          return <code key={`${keyPrefix}-code-${ci}`} className="px-1.5 py-0.5 rounded text-xs" style={{ background: "#0c0a12", color: "#67e8f9", border: "1px solid rgba(255,255,255,0.06)" }}>{chunk.slice(1, -1)}</code>;
+        }
+        if (chunk.startsWith("***") && chunk.endsWith("***")) {
+          return <strong key={`${keyPrefix}-bold-italic-${ci}`} className="text-white font-semibold"><em className="italic">{chunk.slice(3, -3)}</em></strong>;
+        }
+        if (chunk.startsWith("**") && chunk.endsWith("**")) {
+          return <strong key={`${keyPrefix}-bold-${ci}`} className="text-white font-semibold">{chunk.slice(2, -2)}</strong>;
+        }
+        if (chunk.startsWith("*") && chunk.endsWith("*")) {
+          return <em key={`${keyPrefix}-italic-${ci}`} className="text-gray-300 italic">{chunk.slice(1, -1)}</em>;
+        }
+        return chunk;
+      });
+  };
+
   const parts = text.split(/(```[\s\S]*?```)/g);
   return parts.map((part, i) => {
     if (part.startsWith("```")) {
@@ -164,18 +216,13 @@ const renderMd = (text) => {
     return (
       <span key={i}>
         {part.split("\n").map((line, li, arr) => {
-          if (line.startsWith("## ")) return <h2 key={li} className="text-white font-bold text-base mt-5 mb-2 flex items-center gap-2"><span className="w-0.5 h-5 rounded-full bg-purple-500 inline-block" />{line.slice(3)}</h2>;
-          if (line.startsWith("# ")) return <h1 key={li} className="text-white font-bold text-lg mt-4 mb-2">{line.slice(2)}</h1>;
-          if (line.startsWith("> ")) return <blockquote key={li} className="my-2 pl-3 border-l-2 border-purple-500 text-gray-400 italic text-sm">{line.slice(2)}</blockquote>;
-          const parsed = line.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g).map((chunk, ci) => {
-            if (chunk.startsWith("**") && chunk.endsWith("**")) return <strong key={ci} className="text-white font-semibold">{chunk.slice(2, -2)}</strong>;
-            if (chunk.startsWith("*") && chunk.endsWith("*")) return <em key={ci} className="text-gray-300 italic">{chunk.slice(1, -1)}</em>;
-            if (chunk.startsWith("`") && chunk.endsWith("`")) return <code key={ci} className="px-1.5 py-0.5 rounded text-xs" style={{ background: "#0c0a12", color: "#67e8f9", border: "1px solid rgba(255,255,255,0.06)" }}>{chunk.slice(1, -1)}</code>;
-            return chunk;
-          });
-          if (line.match(/^\d+\. /)) return <div key={li} className="flex gap-2 my-0.5"><span className="text-purple-400 flex-shrink-0 font-bold text-xs mt-0.5">{line.match(/^\d+/)[0]}.</span><span className="text-gray-300 text-sm">{line.replace(/^\d+\. /, "")}</span></div>;
-          if (line.startsWith("- ")) return <div key={li} className="flex gap-2 my-0.5"><span className="text-purple-400 flex-shrink-0 mt-1.5">•</span><span className="text-gray-300 text-sm">{parsed.slice(1)}</span></div>;
-          return <React.Fragment key={li}>{parsed}{li < arr.length - 1 && <br />}</React.Fragment>;
+          const orderedMatch = line.match(/^(\d+)\. (.*)$/);
+          if (line.startsWith("## ")) return <h2 key={li} className="text-white font-bold text-base mt-5 mb-2 flex items-center gap-2"><span className="w-0.5 h-5 rounded-full bg-purple-500 inline-block" />{renderInline(line.slice(3), `h2-${i}-${li}`)}</h2>;
+          if (line.startsWith("# ")) return <h1 key={li} className="text-white font-bold text-lg mt-4 mb-2">{renderInline(line.slice(2), `h1-${i}-${li}`)}</h1>;
+          if (line.startsWith("> ")) return <blockquote key={li} className="my-2 pl-3 border-l-2 border-purple-500 text-gray-400 italic text-sm">{renderInline(line.slice(2), `quote-${i}-${li}`)}</blockquote>;
+          if (orderedMatch) return <div key={li} className="flex gap-2 my-0.5"><span className="text-purple-400 flex-shrink-0 font-bold text-xs mt-0.5">{orderedMatch[1]}.</span><span className="text-gray-300 text-sm">{renderInline(orderedMatch[2], `ol-${i}-${li}`)}</span></div>;
+          if (line.startsWith("- ")) return <div key={li} className="flex gap-2 my-0.5"><span className="text-purple-400 flex-shrink-0 mt-1.5">•</span><span className="text-gray-300 text-sm">{renderInline(line.slice(2), `ul-${i}-${li}`)}</span></div>;
+          return <React.Fragment key={li}>{renderInline(line, `line-${i}-${li}`)}{li < arr.length - 1 && <br />}</React.Fragment>;
         })}
       </span>
     );
@@ -188,7 +235,7 @@ const CopyCodeBtn = ({ code }) => {
     <button onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
       className="cursor-pointer flex items-center gap-1 px-2 py-0.5 rounded-md text-xs transition-all"
       style={{ background: copied ? "rgba(74,222,128,0.15)" : "rgba(255,255,255,0.08)", color: copied ? "#4ade80" : "#9ca3af", border: `1px solid ${copied ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.08)"}` }}>
-      {copied ? <><Check className="w-3 h-3" /> Másolva</> : <><Copy className="w-3 h-3" /> Másolás</>}
+      {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
     </button>
   );
 };
@@ -207,7 +254,27 @@ const GlassCard = ({ children, style = {}, className = "" }) => (
   }}>{children}</div>
 );
 
-const PollWidget = ({ poll, color, currentUserId, onVote }) => {
+const AuthRequiredCard = ({ color, title = "Sign-in required", text = "You can read freely, but you need to sign in to interact.", onAction }) => (
+  <GlassCard style={{ background: "rgba(255,255,255,0.025)", border: `1px solid ${color}25` }}>
+    <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+          <Lock className="w-3.5 h-3.5" style={{ color }} /> {title}
+        </h3>
+        <p className="text-gray-500 text-xs mt-1 leading-relaxed">{text}</p>
+      </div>
+      <button
+        onClick={onAction}
+        className="cursor-pointer px-4 py-2 rounded-xl text-xs text-white font-bold transition-all hover:opacity-90 active:scale-[0.97] flex-shrink-0"
+        style={{ background: `linear-gradient(135deg, ${color}, ${color}CC)`, boxShadow: `0 8px 20px ${color}20` }}
+      >
+        Sign in
+      </button>
+    </div>
+  </GlassCard>
+);
+
+const PollWidget = ({ poll, color, currentUserId, onVote, onRequireAuth }) => {
   const userVotes = poll.userVotes || {};
   const myVote = currentUserId ? userVotes[currentUserId] : null;
 
@@ -220,7 +287,10 @@ const PollWidget = ({ poll, color, currentUserId, onVote }) => {
   const total = Object.values(voteCounts).reduce((s, v) => s + v, 0);
 
   const handleVote = (optId) => {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+      onRequireAuth?.();
+      return;
+    }
     const newVotes = { ...userVotes };
     if (newVotes[currentUserId] === optId) {
       delete newVotes[currentUserId];
@@ -264,7 +334,7 @@ const PollWidget = ({ poll, color, currentUserId, onVote }) => {
         );
       })}
       <p className="text-gray-600 text-xs text-right mt-3">
-        {myVote ? `${total} szavazat` : "Szavazz az eredmények megtekintéséhez!"}
+        {myVote ? `${total} votes` : "Vote to see the results!"}
       </p>
     </div>
   );
@@ -273,7 +343,7 @@ const PollWidget = ({ poll, color, currentUserId, onVote }) => {
 // ─── Reaction bar ─────────────────────────────────────────────────
 
 
-const CommentEditor = ({ placeholder, onSubmit, onCancel, color, isReply = false, defaultValue = "", submitLabel = "Közzétesz" }) => {
+const CommentEditor = ({ placeholder, onSubmit, onCancel, color, isReply = false, defaultValue = "", submitLabel = "Publish" }) => {
   const [text, setText] = useState(defaultValue);
 
   return (
@@ -294,11 +364,11 @@ const CommentEditor = ({ placeholder, onSubmit, onCancel, color, isReply = false
       />
 
       <div className="flex items-center justify-between mt-2 px-1">
-        <span className="text-gray-700 text-[0.65rem] font-bold uppercase tracking-widest opacity-40">Ctrl+Enter = küldés</span>
+        <span className="text-gray-700 text-[0.65rem] font-bold uppercase tracking-widest opacity-40">Ctrl+Enter = send</span>
         <div className="flex gap-3">
           {onCancel && (
             <button onClick={onCancel} className="cursor-pointer px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-white hover:bg-white/5 transition-all">
-              Mégse
+              Cancel
             </button>
           )}
           <button onClick={() => { if (text.trim()) { onSubmit(text); setText(""); } }}
@@ -317,18 +387,18 @@ const CommentEditor = ({ placeholder, onSubmit, onCancel, color, isReply = false
 const ReportModal = ({ isOpen, onClose }) => {
   const [reason, setReason] = useState("");
   if (!isOpen) return null;
-  const reasons = ["Spam vagy hirdetés", "Sértő vagy zaklató tartalom", "Félrevezető információ", "Szerzői jog megsértése", "Egyéb"];
+  const reasons = ["Spam or advertising", "Abusive or harassing content", "Misleading information", "Copyright violation", "Other"];
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
       <div className="relative w-full max-w-sm rounded-2xl overflow-hidden"
         style={{ background: "#13111c", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-          <h3 className="text-white font-bold text-sm flex items-center gap-2"><Flag className="w-4 h-4 text-red-400" /> Bejelentés</h3>
+          <h3 className="text-white font-bold text-sm flex items-center gap-2"><Flag className="w-4 h-4 text-red-400" /> Report</h3>
           <button onClick={onClose} className="cursor-pointer text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all"><X className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4 space-y-2">
-          <p className="text-gray-400 text-xs mb-3">Miért szeretnéd bejelenteni ezt a tartalmat?</p>
+          <p className="text-gray-400 text-xs mb-3">Why do you want to report this content?</p>
           {reasons.map(r => (
             <label key={r} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all"
               style={{ background: reason === r ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${reason === r ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.06)"}` }}>
@@ -343,11 +413,11 @@ const ReportModal = ({ isOpen, onClose }) => {
         </div>
         <div className="px-5 py-4 border-t border-white/5 flex gap-2">
           <button onClick={onClose} className="cursor-pointer flex-1 py-2 rounded-xl text-sm text-gray-400 hover:text-white transition-all"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>Mégse</button>
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>Cancel</button>
           <button disabled={!reason} onClick={onClose}
             className="cursor-pointer flex-1 py-2 rounded-xl text-sm text-white font-semibold transition-all disabled:opacity-30"
             style={{ background: "linear-gradient(135deg,#dc2626,#4c1d95)" }}>
-            Bejelentés küldése
+            Send report
           </button>
         </div>
       </div>
@@ -356,7 +426,7 @@ const ReportModal = ({ isOpen, onClose }) => {
 };
 
 // ─── Comment card ─────────────────────────────────────────────────
-const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeComment, currentUser = "én", currentUserId }) => {
+const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeComment, currentUserId }) => {
   const [showReplies, setShowReplies] = useState(true);
   const [replyOpen, setReplyOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -366,10 +436,11 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
   const [showMenu, setShowMenu] = useState(false);
   const [quoting, setQuoting] = useState(false);
   const menuRef = useRef(null);
-  const isOwn = comment.author === currentUser;
+  const isOwn = !!currentUserId && comment.authorId === currentUserId;
 
   const liked = useMemo(() => comment.likedIds?.includes(currentUserId), [comment.likedIds, currentUserId]);
   const likeCount = comment.likes || 0;
+  const requestAuth = () => onLikeComment?.(comment.id);
 
   useEffect(() => {
     const h = e => { if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false); };
@@ -383,7 +454,7 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
   };
 
   const handleQuoteReply = (text) => {
-    const quoted = `> *${comment.author} írta:*\n> ${comment.content.slice(0, 100).replace(/\n/g, "\n> ")}${comment.content.length > 100 ? "..." : ""}\n\n${text}`;
+    const quoted = `> *${comment.author} wrote:*\n> ${comment.content.slice(0, 100).replace(/\n/g, "\n> ")}${comment.content.length > 100 ? "..." : ""}\n\n${text}`;
     onAddReply?.(comment.id, quoted);
     setQuoting(false);
   };
@@ -407,7 +478,7 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
         {comment.pinned && (
           <div className="flex items-center gap-1 mb-2 text-purple-400">
             <Pin className="w-2.5 h-2.5" />
-            <span className="text-xs font-semibold">Moderátor által kiemelve</span>
+            <span className="text-xs font-semibold">Highlighted by moderator</span>
           </div>
         )}
 
@@ -421,7 +492,7 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="font-semibold text-xs truncate" style={{ color: comment.avatarColor }}>{comment.author}</span>
                 {comment.isOP && <span className="text-xs px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap" style={{ background: `${color}20`, color, border: `1px solid ${color}35` }}>OP</span>}
-                {isOwn && !comment.isOP && <span className="text-xs px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap" style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af" }}>Te</span>}
+                {isOwn && !comment.isOP && <span className="text-xs px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap" style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af" }}>You</span>}
               </div>
               <div className="flex items-center gap-1 text-gray-600 text-xs">
                 <Clock className="w-2.5 h-2.5" />{comment.time}
@@ -438,18 +509,18 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
               <div className="absolute right-0 top-full mt-1 rounded-xl overflow-hidden w-44"
                 style={{ zIndex: 9999, background: "rgba(16,12,24,0.98)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 12px 40px rgba(0,0,0,0.7)" }}>
                 <button onClick={copyCommentLink} className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/8 transition-colors">
-                  <Copy className="w-3.5 h-3.5" /> Link másolása
+                  <Copy className="w-3.5 h-3.5" /> Copy link
                 </button>
-                <button onClick={() => { setQuoting(true); setShowMenu(false); }} className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/8 transition-colors">
-                  <Quote className="w-3.5 h-3.5" /> Idézett válasz
+                <button onClick={() => { if (!currentUserId) { requestAuth(); setShowMenu(false); return; } setQuoting(true); setShowMenu(false); }} className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/8 transition-colors">
+                  <Quote className="w-3.5 h-3.5" /> Quote reply
                 </button>
                 {isOwn && (
                   <button onClick={() => { setEditing(true); setShowMenu(false); }} className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/8 transition-colors">
-                    <Edit3 className="w-3.5 h-3.5" /> Szerkesztés
+                    <Edit3 className="w-3.5 h-3.5" /> Edit
                   </button>
                 )}
-                <button onClick={() => { setShowReport(true); setShowMenu(false); }} className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-400/10 transition-colors">
-                  <Flag className="w-3.5 h-3.5" /> Bejelentés
+                <button onClick={() => { if (!currentUserId) { requestAuth(); setShowMenu(false); return; } setShowReport(true); setShowMenu(false); }} className="cursor-pointer w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-400/10 transition-colors">
+                  <Flag className="w-3.5 h-3.5" /> Report
                 </button>
               </div>
             )}
@@ -465,9 +536,9 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
               <div className="flex gap-2 mt-2">
                 <button onClick={() => { setContent(editedContent); setEditing(false); }}
                   className="cursor-pointer px-3 py-1.5 rounded-lg text-xs text-white font-semibold transition-all"
-                  style={{ background: `linear-gradient(135deg, ${color}, ${color}99)` }}>Mentés</button>
+                  style={{ background: `linear-gradient(135deg, ${color}, ${color}99)` }}>Save</button>
                 <button onClick={() => { setEditing(false); setEditedContent(content); }}
-                  className="cursor-pointer px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-all">Mégse</button>
+                  className="cursor-pointer px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-all">Cancel</button>
               </div>
             </div>
           ) : renderMd(content)}
@@ -488,9 +559,9 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
           </button>
 
           {!isReply && (
-            <button onClick={() => { setReplyOpen(v => !v); setQuoting(false); }}
+            <button onClick={() => { if (!currentUserId) { requestAuth(); return; } setReplyOpen(v => !v); setQuoting(false); }}
               className="cursor-pointer flex items-center gap-1 text-xs text-gray-600 hover:text-gray-300 transition-colors px-2 py-1 rounded-lg hover:bg-white/8">
-              <Reply className="w-3 h-3" /> Válasz
+              <Reply className="w-3 h-3" /> Reply
             </button>
           )}
 
@@ -499,7 +570,7 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
               className="cursor-pointer flex items-center gap-1 text-xs transition-all px-2 py-1 rounded-lg hover:bg-white/8"
               style={{ color }}>
               {showReplies ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              {comment.replies.length} válasz
+              {comment.replies.length} replies
             </button>
           )}
         </div>
@@ -507,10 +578,10 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
         {(replyOpen || quoting) && !isReply && (
           <div className="pl-9 mt-3">
             <CommentEditor
-              placeholder={quoting ? `Idézett válasz ${comment.author}-nak...` : `Válasz ${comment.author}-nak...`}
+              placeholder={quoting ? `Quote reply to ${comment.author}...` : `Reply to ${comment.author}...`}
               onSubmit={quoting ? handleQuoteReply : handleReply}
               onCancel={() => { setReplyOpen(false); setQuoting(false); }}
-              color={color} isReply submitLabel="Válasz küldése"
+              color={color} isReply submitLabel="Send reply"
             />
           </div>
         )}
@@ -600,14 +671,20 @@ const TableOfContents = ({ content, color }) => {
 
 
 // ─── Helpful widget ───────────────────────────────────────────────
-const HelpfulWidget = ({ color }) => {
+const HelpfulWidget = ({ color, currentUserId, onRequireAuth }) => {
   const [voted, setVoted] = useState(null);
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      <span className="text-gray-500 text-xs whitespace-nowrap">Hasznos volt ez a bejegyzés?</span>
+      <span className="text-gray-500 text-xs whitespace-nowrap">Was this post helpful?</span>
       <div className="flex items-center gap-2">
-        {["Igen 👍", "Nem 👎"].map((label, i) => (
-          <button key={label} onClick={() => setVoted(i)}
+        {["Yes 👍", "No 👎"].map((label, i) => (
+          <button key={label} onClick={() => {
+            if (!currentUserId) {
+              onRequireAuth?.();
+              return;
+            }
+            setVoted(i);
+          }}
             className="cursor-pointer px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95 whitespace-nowrap"
             style={{
               background: voted === i ? (i === 0 ? "rgba(74,222,128,0.2)" : "rgba(239,68,68,0.15)") : "rgba(255,255,255,0.04)",
@@ -618,7 +695,7 @@ const HelpfulWidget = ({ color }) => {
           </button>
         ))}
       </div>
-      {voted !== null && <span className="text-green-400 text-xs whitespace-nowrap">Köszönjük!</span>}
+      {voted !== null && <span className="text-green-400 text-xs whitespace-nowrap">Thanks!</span>}
     </div>
   );
 };
@@ -639,7 +716,7 @@ const PermalinkWidget = ({ category, slug, color }) => {
     <GlassCard>
       <div className="px-4 pt-4 pb-3">
         <h4 className="text-white font-semibold text-xs uppercase tracking-wider flex items-center gap-2 mb-2">
-          <Link className="w-3.5 h-3.5" style={{ color }} /> Közvetlen link
+          <Link className="w-3.5 h-3.5" style={{ color }} /> Direct link
         </h4>
         <div className="flex items-center gap-2 p-2 rounded-xl"
           style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -647,7 +724,7 @@ const PermalinkWidget = ({ category, slug, color }) => {
           <button onClick={handleCopy}
             className="cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all flex-shrink-0"
             style={{ background: copied ? "rgba(74,222,128,0.15)" : `${color}20`, color: copied ? "#4ade80" : color, border: `1px solid ${copied ? "rgba(74,222,128,0.3)" : color + "40"}` }}>
-            {copied ? <><Check className="w-3 h-3" /> Másolva!</> : <><Copy className="w-3 h-3" /> Másolás</>}
+            {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
           </button>
         </div>
       </div>
@@ -671,7 +748,7 @@ const UserProfileModal = ({
         {/* Header */}
         <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-white/5 flex items-center justify-between flex-shrink-0">
           <h3 className="text-white font-bold text-sm flex items-center gap-2 min-w-0">
-            <User className="w-4 h-4 flex-shrink-0" style={{ color: authorColor }} /> <span className="truncate">Felhasználó profil</span>
+            <User className="w-4 h-4 flex-shrink-0" style={{ color: authorColor }} /> <span className="truncate">User profile</span>
           </h3>
           <button onClick={onClose} className="cursor-pointer p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all flex-shrink-0"><X className="w-4 h-4" /></button>
         </div>
@@ -688,7 +765,7 @@ const UserProfileModal = ({
                 <div className="min-w-0">
                   <div className="text-white font-bold text-sm sm:text-base truncate" style={{ color: authorColor }}>{author}</div>
                   <div className="text-gray-500 text-[10px] uppercase font-bold tracking-widest mt-0.5 truncate">
-                    Fórum tag - {authorJoinedDate}
+                    Forum member - {authorJoinedDate}
                   </div>
                 </div>
                 {currentUserId && authorId && currentUserId !== authorId && (
@@ -702,8 +779,8 @@ const UserProfileModal = ({
                     }}
                   >
                     <Rss className="w-3 h-3" />
-                    <span className="hidden sm:inline">{isFollowing ? "Követed" : "Követés"}</span>
-                    <span className="sm:hidden">{isFollowing ? "Követed" : "+"}</span>
+                    <span className="hidden sm:inline">{isFollowing ? "Following" : "Follow"}</span>
+                    <span className="sm:hidden">{isFollowing ? "Following" : "+"}</span>
                   </button>
                 )}
               </div>
@@ -711,9 +788,9 @@ const UserProfileModal = ({
           </div>
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "Bejegyzés", value: authorPosts.length, color: authorColor },
-              { label: "Megtekintés", value: totalViews.toLocaleString(), color: "#38bdf8" },
-              { label: "Hozzászólás", value: totalComments.toLocaleString(), color: "#4ade80" },
+              { label: "Posts", value: authorPosts.length, color: authorColor },
+              { label: "Views", value: totalViews.toLocaleString(), color: "#38bdf8" },
+              { label: "Comments", value: totalComments.toLocaleString(), color: "#4ade80" },
             ].map(s => (
               <div key={s.label} className="text-center py-2 rounded-xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
                 <div className="font-bold text-sm" style={{ color: s.color }}>{s.value}</div>
@@ -725,12 +802,12 @@ const UserProfileModal = ({
         {/* Posts list */}
         <div className="flex-1 overflow-y-auto px-5 py-3">
           <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3 flex items-center gap-2">
-            <PenSquare className="w-3.5 h-3.5" style={{ color: authorColor }} /> Bejegyzései ({authorPosts.length})
+            <PenSquare className="w-3.5 h-3.5" style={{ color: authorColor }} /> Posts ({authorPosts.length})
           </h4>
           {authorPosts.length > 0 ? (
             <div className="space-y-2">
               {authorPosts.map(p => {
-                const pc = CATEGORIES[p.category];
+                const pc = CATEGORIES[p.category] || CATEGORIES.code;
                 return (
                   <button key={p.id} onClick={() => { onClose(); onOpenPost?.(p); }}
                     className="cursor-pointer w-full text-left p-3 rounded-xl transition-all hover:bg-white/5 group"
@@ -738,7 +815,9 @@ const UserProfileModal = ({
                     <div className="flex items-center gap-1.5 mb-1">
                       {p.pinned && <span className="text-xs px-1 py-0.5 rounded-full" style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", fontSize: "0.6rem" }}>📌</span>}
                       {p.hot && <span className="text-xs px-1 py-0.5 rounded-full" style={{ background: "rgba(251,113,33,0.15)", color: "#fb923c", fontSize: "0.6rem" }}>🔥</span>}
-                      <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: `${pc?.color || authorColor}15`, color: pc?.color || authorColor, fontSize: "0.65rem" }}>{pc?.emoji} {pc?.label}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded-full inline-flex items-center gap-1" style={{ background: `${pc?.color || authorColor}15`, color: pc?.color || authorColor, fontSize: "0.65rem" }}>
+                        <CategoryLabel category={pc} />
+                      </span>
                     </div>
                     <p className="text-white text-xs font-semibold leading-snug group-hover:text-purple-200 transition-colors line-clamp-2">{p.title}</p>
                     <div className="flex items-center gap-3 mt-1.5 text-gray-600 text-xs">
@@ -754,7 +833,7 @@ const UserProfileModal = ({
           ) : (
             <div className="flex flex-col items-center py-8 gap-2">
               <PenSquare className="w-8 h-8 text-gray-700" />
-              <p className="text-gray-600 text-xs">Még nincs bejegyzése</p>
+              <p className="text-gray-600 text-xs">No posts yet</p>
             </div>
           )}
         </div>
@@ -764,7 +843,7 @@ const UserProfileModal = ({
   );
 };
 
-// ─── Törlés megerősítő dialog (lokális, poszt nézetben) ───────────
+// ─── Delete megerősítő dialog (lokális, poszt nézetben) ───────────
 const ConfirmDeleteModal = ({ isOpen, onConfirm, onCancel }) => {
   if (!isOpen) return null;
   return createPortal(
@@ -777,19 +856,19 @@ const ConfirmDeleteModal = ({ isOpen, onConfirm, onCancel }) => {
             style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
             <Trash2 className="w-4 h-4 text-red-400" />
           </div>
-          <h3 className="text-white font-semibold text-sm">Biztosan törlöd?</h3>
+          <h3 className="text-white font-semibold text-sm">Are you sure?</h3>
         </div>
-        <p className="text-gray-400 text-xs mb-5 leading-relaxed">A poszt véglegesen törlődik. Ez a művelet nem vonható vissza.</p>
+        <p className="text-gray-400 text-xs mb-5 leading-relaxed">The post will be permanently deleted. This action cannot be undone.</p>
         <div className="flex gap-2">
           <button onClick={onCancel}
             className="cursor-pointer flex-1 py-2 rounded-xl text-xs text-gray-400 hover:text-white transition-all"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            Mégse
+            Cancel
           </button>
           <button onClick={onConfirm}
             className="cursor-pointer flex-1 py-2 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90"
             style={{ background: "linear-gradient(135deg, #7c3aed, #dc2626)" }}>
-            Törlés
+            Delete
           </button>
         </div>
       </div>
@@ -815,6 +894,7 @@ export default function ForumPost({
   onLike,
   isFollowing: propIsFollowing,
   onToggleFollow: propOnToggleFollow,
+  onRequireAuth,
 }) {
   const [comments, setComments] = useState([]);
   const [isLoadingComments, setIsLoadingComments] = useState(true);
@@ -835,20 +915,62 @@ export default function ForumPost({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [authorUserDoc, setAuthorUserDoc] = useState(null);
+  const [commentAuthorProfiles, setCommentAuthorProfiles] = useState({});
   const [mobilePostSidebarOpen, setMobilePostSidebarOpen] = useState(false);
 
 
-  const { user: globalUser } = useContext(MyUserContext);
-  const cat = CATEGORIES[post?.category] || CATEGORIES.chat;
+  const { user: globalUser, setIsAuthOpen } = useContext(MyUserContext);
+  const cat = CATEGORIES[post?.category] || CATEGORIES.code;
   const color = cat.color;
+  const isCommunityAuthenticated = !!(currentUserId || globalUser?.uid);
+  const currentAuthorProfile = useMemo(() => {
+    const uid = currentUserId || globalUser?.uid;
+    if (!uid && !globalUser) return null;
+
+    return {
+      uid,
+      displayName: globalUser?.displayName || "",
+      name: globalUser?.name || globalUser?.displayName || "",
+      email: globalUser?.email || "",
+      profilePicture: globalUser?.profilePicture || globalUser?.photoURL || null,
+      photoURL: globalUser?.photoURL || null,
+      createdAt: globalUser?.createdAt || null,
+    };
+  }, [
+    currentUserId,
+    globalUser?.uid,
+    globalUser?.displayName,
+    globalUser?.name,
+    globalUser?.email,
+    globalUser?.profilePicture,
+    globalUser?.photoURL,
+    globalUser?.createdAt,
+  ]);
+  const authorProfile = useMemo(() => {
+    if (!post?.authorId) return null;
+    if ((currentUserId && post.authorId === currentUserId) || (globalUser?.uid && post.authorId === globalUser.uid)) {
+      return currentAuthorProfile;
+    }
+    return authorUserDoc;
+  }, [authorUserDoc, currentAuthorProfile, currentUserId, globalUser?.uid, post?.authorId]);
+  const displayPost = useMemo(() => {
+    return applyProfileToForumPost(post, authorProfile);
+  }, [authorProfile, post]);
+  const requireCommunityAuth = useCallback(() => {
+    if (isCommunityAuthenticated) return true;
+    if (onRequireAuth) return onRequireAuth();
+    setIsAuthOpen(true);
+    return false;
+  }, [isCommunityAuthenticated, onRequireAuth, setIsAuthOpen]);
+  const isOwnAuthor = !!currentUserId && !!post?.authorId && currentUserId === post.authorId;
 
   // JAVÍTÁS: jogosultság-számítás
   // Ha nincs authorId (mock poszt) → mindenki kezelheti; ha van → csak a saját uid
   // Az isAdmin prop-ot kiegészítjük a helyi ADMIN_UIDS ellenőrzéssel is
   const isLocalAdmin = !!currentUserId && ADMIN_UIDS.includes(currentUserId);
   const effectiveIsAdmin = isAdmin || isLocalAdmin;
-  const isOwn = !post?.authorId || (!!currentUserId && currentUserId === post?.authorId);
-  const canManage = isOwn || effectiveIsAdmin;
+  const isOwn = !!currentUserId && (!post?.authorId || currentUserId === post?.authorId);
+  const canManage = !!currentUserId && (isOwn || effectiveIsAdmin);
 
   const relatedPosts = (allPosts.length > 1
     ? allPosts.filter(p => p.id !== post?.id && p.category === post?.category)
@@ -856,17 +978,23 @@ export default function ForumPost({
   ).slice(0, 3);
 
   const authorPosts = useMemo(() => {
-    return allPosts.filter(p => p.author === post?.author);
-  }, [allPosts, post?.author]);
+    if (post?.authorId) return allPosts.filter(p => p.authorId === post.authorId);
+    return allPosts.filter(p => p.author === displayPost?.author);
+  }, [allPosts, displayPost?.author, post?.authorId]);
 
   const authorStats = {
     themes: authorPosts.length,
     comments: authorPosts.reduce((s, p) => s + (p.comments || 0), 0),
   };
 
-  // ── Szerző adatainak lekérése (Biztonságos API-n keresztül) ────────
   useEffect(() => {
-    if (!post?.authorId || authorUserDoc) return;
+    setAuthorUserDoc(null);
+  }, [post?.authorId]);
+
+  // ── Author adatainak lekérése (Biztonságos API-n keresztül) ────────
+  useEffect(() => {
+    if (!post?.authorId || authorUserDoc?.uid === post.authorId) return;
+    if ((currentUserId && post.authorId === currentUserId) || (globalUser?.uid && post.authorId === globalUser.uid)) return;
     const fetchAuthor = async () => {
       try {
         const token = await auth.currentUser?.getIdToken();
@@ -891,18 +1019,18 @@ export default function ForumPost({
           }
         }
       } catch (e) {
-        console.error("[ForumPost] Hiba a szerző adatainak lekérésekor (API):", e);
+        console.error("[ForumPost] Failed to load author data (API):", e);
       }
     };
     fetchAuthor();
-  }, [post?.authorId, authorUserDoc]);
+  }, [authorUserDoc?.uid, currentUserId, globalUser?.uid, post?.authorId]);
 
   const authorJoinedDate = useMemo(() => {
     let date = null;
 
     // 1. Próbáljuk a valódi regisztrációs dátumot
-    if (authorUserDoc?.createdAt) {
-      date = authorUserDoc.createdAt.toDate ? authorUserDoc.createdAt.toDate() : new Date(authorUserDoc.createdAt._seconds * 1000);
+    if (authorProfile?.createdAt) {
+      date = authorProfile.createdAt.toDate ? authorProfile.createdAt.toDate() : new Date(authorProfile.createdAt._seconds * 1000);
     }
     // 2. Fallback: legelső poszt dátuma
     else if (authorPosts.length > 0) {
@@ -921,7 +1049,7 @@ export default function ForumPost({
       .replace(/\./g, ". ");
 
     return formatted.trim();
-  }, [authorUserDoc, authorPosts]);
+  }, [authorProfile, authorPosts]);
 
 
 
@@ -950,9 +1078,9 @@ export default function ForumPost({
         slug: post.slug,
         ...extraData
       });
-      console.log("[ForumPost] Értesítés létrehozva:", { recipientId, type, text, ...extraData });
+      console.log("[ForumPost] Notification created:", { recipientId, type, text, ...extraData });
     } catch (e) {
-      console.error("[ForumPost] Hiba az értesítés létrehozásakor:", e);
+      console.error("[ForumPost] Failed to create notification:", e);
     }
   }, [currentUserId, post?.id, post?.category, post?.slug]);
 
@@ -961,7 +1089,7 @@ export default function ForumPost({
 
   // ── Following Sync (Fallback for direct URL access) ────────────────
   useEffect(() => {
-    if (propOnToggleFollow || !currentUserId || !post?.authorId) return;
+    if (propOnToggleFollow || !currentUserId || !post?.authorId || isOwnAuthor) return;
     const q = query(
       collection(db, "forum_follows"),
       where("followerId", "==", currentUserId),
@@ -971,15 +1099,17 @@ export default function ForumPost({
       setInternalIsFollowing(!snap.empty);
     });
     return unsub;
-  }, [currentUserId, post?.authorId, propOnToggleFollow]);
+  }, [currentUserId, post?.authorId, propOnToggleFollow, isOwnAuthor]);
 
   const handleToggleFollow = async () => {
+    if (!requireCommunityAuth()) return;
+    if (isOwnAuthor) return;
     if (propOnToggleFollow) {
       propOnToggleFollow(post.authorId);
       return;
     }
     // Deep fallback logic
-    if (!currentUserId || !post?.authorId) return;
+    if (!currentUserId || !post?.authorId || currentUserId === post.authorId) return;
     try {
       const q = query(
         collection(db, "forum_follows"),
@@ -1034,7 +1164,7 @@ export default function ForumPost({
         return dateB - dateA;
       });
 
-      console.log(`[ForumPost] ${assembled.length} hozzászólás lekérve (statikus sorrend)`);
+      console.log(`[ForumPost] ${assembled.length} comments loaded (static order)`);
 
       if (assembled.length === 0 && (typeof post.id === 'number' || String(post.id).length < 5)) {
         setComments(INITIAL_COMMENTS);
@@ -1042,7 +1172,7 @@ export default function ForumPost({
         setComments(assembled);
       }
     } catch (err) {
-      console.error("[ForumPost] Firebase hiba:", err);
+      console.error("[ForumPost] Firebase error:", err);
       if (typeof post.id === 'number' || String(post.id).length < 5) setComments(INITIAL_COMMENTS);
     } finally {
       setIsLoadingComments(false);
@@ -1057,17 +1187,18 @@ export default function ForumPost({
 
 
   const handleAddComment = async (text) => {
+    if (!requireCommunityAuth()) return;
     if (!post?.id) return;
 
     try {
       const nc = {
         postId: post.id,
         parentId: null,
-        author: globalUser?.displayName || globalUser?.email?.split("@")[0] || "Felhasználó",
+        author: getProfileDisplayName(currentAuthorProfile, "User"),
         authorId: currentUserId || null,
-        avatar: (globalUser?.displayName?.[0] || globalUser?.email?.[0] || "F").toUpperCase(),
+        avatar: getProfileInitial(currentAuthorProfile, "User"),
         avatarColor: color,
-        avatarUrl: globalUser?.profilePicture || null,
+        avatarUrl: getProfileAvatarUrl(currentAuthorProfile),
         content: text,
         createdAt: serverTimestamp(),
         likes: 0,
@@ -1078,7 +1209,7 @@ export default function ForumPost({
       };
 
       await addDoc(collection(db, "forum_comments"), nc);
-      console.log("[ForumPost] Hozzászólás mentve a Firebase-be");
+      console.log("[ForumPost] Comment saved to Firebase");
       fetchComments(); // Frissítés beküldés után
 
 
@@ -1086,30 +1217,31 @@ export default function ForumPost({
 
       // Értesítés a bejegyzés szerzőjének (ha nem saját magunknak írunk)
       if (post.authorId && post.authorId !== currentUserId) {
-        const authorName = globalUser?.displayName || "Valaki";
+        const authorName = getProfileDisplayName(currentAuthorProfile, "Someone");
         createNotification(
           post.authorId,
           "comment",
-          `${authorName} hozzászólt a(z) "${post.title}" témádhoz.`
+          `${authorName} commented on your topic: "${post.title}".`
         );
       }
     } catch (e) {
-      console.error("[ForumPost] Hiba a hozzászólás mentésekor:", e);
+      console.error("[ForumPost] Failed to save comment:", e);
     }
   };
 
   const handleAddReply = async (parentId, text) => {
+    if (!requireCommunityAuth()) return;
     if (!post?.id || !parentId) return;
 
     try {
       const nr = {
         postId: post.id,
         parentId: parentId,
-        author: globalUser?.displayName || globalUser?.email?.split("@")[0] || "Felhasználó",
+        author: getProfileDisplayName(currentAuthorProfile, "User"),
         authorId: currentUserId || null,
-        avatar: (globalUser?.displayName?.[0] || globalUser?.email?.[0] || "F").toUpperCase(),
+        avatar: getProfileInitial(currentAuthorProfile, "User"),
         avatarColor: color,
-        avatarUrl: globalUser?.profilePicture || null,
+        avatarUrl: getProfileAvatarUrl(currentAuthorProfile),
         content: text,
         createdAt: serverTimestamp(),
         likes: 0,
@@ -1119,29 +1251,30 @@ export default function ForumPost({
       };
 
       await addDoc(collection(db, "forum_comments"), nr);
-      console.log("[ForumPost] Válasz mentve a Firebase-be (parentId:", parentId, ")");
+      console.log("[ForumPost] Reply saved to Firebase (parentId:", parentId, ")");
       fetchComments(); // Frissítés beküldés után
 
 
 
 
-      // Értesítés a szülő hozzászólás szerzőjének
-      // Megkeressük a szülő hozzászólást a listában
+      // Értesítés a szülő comments szerzőjének
+      // Megkeressük a szülő commentst a listában
       const parentComment = comments.find(c => c.id === parentId);
       if (parentComment && parentComment.authorId && parentComment.authorId !== currentUserId) {
-        const authorName = globalUser?.displayName || "Valaki";
+        const authorName = getProfileDisplayName(currentAuthorProfile, "Someone");
         createNotification(
           parentComment.authorId,
           "reply",
-          `${authorName} válaszolt a hozzászólásodra itt: "${post.title}".`
+          `${authorName} replied to your comment in "${post.title}".`
         );
       }
     } catch (e) {
-      console.error("[ForumPost] Hiba a válasz mentésekor:", e);
+      console.error("[ForumPost] Failed to save reply:", e);
     }
   };
 
   const handleLikeComment = useCallback(async (commentId) => {
+    if (!requireCommunityAuth()) return;
     if (!currentUserId) return;
     try {
       const commentRef = doc(db, "forum_comments", commentId);
@@ -1184,23 +1317,94 @@ export default function ForumPost({
         });
       });
     } catch (e) {
-      console.error("[ForumPost] Hiba a hozzászólás lájkolásakor:", e);
+      console.error("[ForumPost] Failed to like comment:", e);
     }
-  }, [currentUserId]);
+  }, [currentUserId, requireCommunityAuth]);
 
 
 
 
-  // A hozzászólások listájának elérése a useCallback-ek számára
+  // A commentsok listájának elérése a useCallback-ek számára
+  const flatComments = useMemo(
+    () => comments.flatMap(c => [c, ...(c.replies || [])]),
+    [comments]
+  );
+
+  useEffect(() => {
+    const signedInUser = auth.currentUser;
+    if (!signedInUser) return undefined;
+
+    const currentUid = currentUserId || globalUser?.uid;
+    const missingAuthorIds = Array.from(
+      new Set(flatComments.map(c => c.authorId).filter(Boolean))
+    ).filter(uid => uid !== currentUid && !(uid in commentAuthorProfiles));
+
+    if (missingAuthorIds.length === 0) return undefined;
+
+    let cancelled = false;
+
+    const loadCommentAuthorProfiles = async () => {
+      try {
+        const token = await signedInUser.getIdToken();
+        const profiles = await Promise.all(
+          missingAuthorIds.map(async (uid) => [
+            uid,
+            await fetchPublicProfile(API_BASE, uid, token).catch(() => null),
+          ])
+        );
+
+        if (cancelled) return;
+
+        setCommentAuthorProfiles(prev => {
+          const next = { ...prev };
+          profiles.forEach(([uid, profile]) => {
+            next[uid] = profile;
+          });
+          return next;
+        });
+      } catch (e) {
+        console.error("[ForumPost] Failed to load comment author profiles:", e);
+      }
+    };
+
+    loadCommentAuthorProfiles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [commentAuthorProfiles, currentUserId, flatComments, globalUser?.uid]);
+
+  const getCommentAuthorProfile = useCallback((authorId) => {
+    if (!authorId) return null;
+    if ((currentUserId && authorId === currentUserId) || (globalUser?.uid && authorId === globalUser.uid)) {
+      return currentAuthorProfile;
+    }
+    return commentAuthorProfiles[authorId] || null;
+  }, [commentAuthorProfiles, currentAuthorProfile, currentUserId, globalUser?.uid]);
+
+  const hydrateComment = useCallback((comment) => {
+    const hydrated = applyProfileToForumComment(comment, getCommentAuthorProfile(comment?.authorId));
+    if (!hydrated?.replies?.length) return hydrated;
+    return {
+      ...hydrated,
+      replies: hydrated.replies.map(reply => applyProfileToForumComment(reply, getCommentAuthorProfile(reply?.authorId))),
+    };
+  }, [getCommentAuthorProfile]);
+
+  const profileAwareComments = useMemo(
+    () => comments.map(comment => hydrateComment(comment)),
+    [comments, hydrateComment]
+  );
+
   const allCommentsRef = useRef([]);
   useEffect(() => {
-    allCommentsRef.current = comments.flatMap(c => [c, ...(c.replies || [])]);
-  }, [comments]);
+    allCommentsRef.current = profileAwareComments.flatMap(c => [c, ...(c.replies || [])]);
+  }, [profileAwareComments]);
 
-  const totalComments = comments.reduce((s, c) => s + 1 + (c.replies?.length || 0), 0);
+  const totalComments = profileAwareComments.reduce((s, c) => s + 1 + (c.replies?.length || 0), 0);
 
 
-  const filteredComments = comments.filter(c =>
+  const filteredComments = profileAwareComments.filter(c =>
     !commentSearch || c.content.toLowerCase().includes(commentSearch.toLowerCase()) || c.author.toLowerCase().includes(commentSearch.toLowerCase())
   );
 
@@ -1231,12 +1435,12 @@ export default function ForumPost({
         <UserProfileModal
           isOpen={showProfile}
           onClose={() => setShowProfile(false)}
-          author={post.author}
+          author={displayPost.author}
           authorId={post.authorId}
-          authorAvatar={post.avatar}
-          authorAvatarUrl={post.avatarUrl}
-          authorColor={post.avatarColor}
-          authorPosts={allPosts.filter(p => p.author === post.author)}
+          authorAvatar={displayPost.avatar}
+          authorAvatarUrl={displayPost.avatarUrl}
+          authorColor={displayPost.avatarColor}
+          authorPosts={authorPosts}
           onOpenPost={onOpenPost}
           isFollowing={isFollowing}
           onToggleFollow={handleToggleFollow}
@@ -1245,7 +1449,7 @@ export default function ForumPost({
           authorStats={authorStats}
         />
 
-        {/* Törlés megerősítő (lokális) */}
+        {/* Delete megerősítő (lokális) */}
         <ConfirmDeleteModal
           isOpen={showDeleteConfirm}
           onConfirm={() => {
@@ -1261,11 +1465,11 @@ export default function ForumPost({
             <div className="px-3 sm:px-4 py-2 sm:py-2.5 flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <button onClick={onBack} className="cursor-pointer flex items-center gap-1.5 text-gray-500 hover:text-white transition-colors group">
                 <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
-                <span className="text-xs font-medium">Fórum</span>
+                <span className="text-xs font-medium">Forum</span>
               </button>
               <ChevronRight className="w-3 h-3 text-gray-700 flex-shrink-0" />
               <span className="text-xs px-2 py-0.5 rounded-md font-medium whitespace-nowrap" style={{ color, background: `${color}10`, border: `1px solid ${color}18` }}>
-                {cat.emoji} {cat.label}
+                <CategoryLabel category={cat} />
               </span>
               <ChevronRight className="w-3 h-3 text-gray-700 flex-shrink-0" />
               <span className="text-gray-500 text-xs truncate max-w-[150px] sm:max-w-[400px]">{post.title}</span>
@@ -1278,13 +1482,15 @@ export default function ForumPost({
                 <div className="p-4 sm:p-6">
                   <div className="flex items-center gap-2 mb-3 flex-wrap">
                     <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
-                      {post.pinned && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.2)" }}><Pin className="w-2.5 h-2.5" />Kitűzve</span>}
-                      {post.hot && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap" style={{ background: "rgba(251,113,33,0.12)", color: "#fb923c", border: "1px solid rgba(251,113,33,0.2)" }}><Flame className="w-2.5 h-2.5" />Felkapott</span>}
-                      {post.solved && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap" style={{ background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}><CheckCircle className="w-2.5 h-2.5" />Megoldva</span>}
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap" style={{ background: `${color}12`, color, border: `1px solid ${color}25` }}>{cat.emoji} {cat.label}</span>
+                      {post.pinned && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.2)" }}><Pin className="w-2.5 h-2.5" />Pinned</span>}
+                      {post.hot && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap" style={{ background: "rgba(251,113,33,0.12)", color: "#fb923c", border: "1px solid rgba(251,113,33,0.2)" }}><Flame className="w-2.5 h-2.5" />Trending</span>}
+                      {post.solved && <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap" style={{ background: "rgba(74,222,128,0.12)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" }}><CheckCircle className="w-2.5 h-2.5" />Solved</span>}
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap inline-flex items-center gap-1" style={{ background: `${color}12`, color, border: `1px solid ${color}25` }}>
+                        <CategoryLabel category={cat} />
+                      </span>
                     </div>
                     <span className="text-gray-600 text-xs flex items-center gap-1 flex-shrink-0">
-                      <Clock className="w-2.5 h-2.5" />{post.readTime} perc
+                      <Clock className="w-2.5 h-2.5" />{post.readTime} min
                     </span>
                   </div>
 
@@ -1292,35 +1498,37 @@ export default function ForumPost({
 
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 mb-6 py-4 border-y border-white/10">
                     <div className="relative cursor-pointer group flex-shrink-0" onClick={() => setShowProfile(true)}>
-                      {post.avatarUrl ? (
-                        <img src={post.avatarUrl} alt="avatar" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl object-cover ring-2 ring-white/5 group-hover:ring-[color:var(--accent)] transition-all" style={{ '--accent': color }} />
+                      {displayPost.avatarUrl ? (
+                        <img src={displayPost.avatarUrl} alt="avatar" className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl object-cover ring-2 ring-white/5 group-hover:ring-[color:var(--accent)] transition-all" style={{ '--accent': color }} />
                       ) : (
                         <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center font-bold text-base sm:text-lg text-white group-hover:scale-105 transition-all"
-                          style={{ background: `linear-gradient(135deg, ${post.avatarColor}45, ${post.avatarColor}25)`, border: `1px solid ${post.avatarColor}35` }}>
-                          {post.avatar}
+                          style={{ background: `linear-gradient(135deg, ${displayPost.avatarColor}45, ${displayPost.avatarColor}25)`, border: `1px solid ${displayPost.avatarColor}35` }}>
+                          {displayPost.avatar}
                         </div>
                       )}
-                      <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-emerald-500 border-2 border-[#0a0118]" title="Elérhető" />
+                      <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-emerald-500 border-2 border-[#0a0118]" title="Available" />
                     </div>
 
                     <div className="flex-1 min-w-0 w-full sm:w-auto">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="font-bold text-sm sm:text-base text-white hover:underline cursor-pointer truncate" onClick={() => setShowProfile(true)} style={{ color: post.avatarColor }}>{post.author}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-500 font-medium uppercase tracking-wider whitespace-nowrap">Szerző</span>
+                        <span className="font-bold text-sm sm:text-base text-white hover:underline cursor-pointer truncate" onClick={() => setShowProfile(true)} style={{ color: displayPost.avatarColor }}>{displayPost.author}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-500 font-medium uppercase tracking-wider whitespace-nowrap">Author</span>
                       </div>
                       <div className="flex items-center gap-2 sm:gap-3 text-gray-500 text-xs flex-wrap">
                         <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {post.time}</span>
                         <span className="w-1 h-1 rounded-full bg-gray-800" />
-                        <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {post.views?.toLocaleString()} megtekintés</span>
+                        <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {post.views?.toLocaleString()} views</span>
                       </div>
                     </div>
 
                     <div className="flex sm:ml-auto items-center gap-1.5 flex-wrap w-full sm:w-auto">
-                      <button onClick={handleToggleFollow}
-                        className="cursor-pointer flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
-                        style={{ background: isFollowing ? `${color}20` : "rgba(255,255,255,0.04)", color: isFollowing ? color : "#9ca3af", border: `1px solid ${isFollowing ? color + "40" : "rgba(255,255,255,0.08)"}` }}>
-                        <Rss className="w-3 h-3" /><span className="hidden sm:inline">{isFollowing ? "Követed" : "Követés"}</span><span className="sm:hidden">{isFollowing ? "Követed" : "+"}</span>
-                      </button>
+                      {!isOwnAuthor && post?.authorId && (
+                        <button onClick={handleToggleFollow}
+                          className="cursor-pointer flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
+                          style={{ background: isFollowing ? `${color}20` : "rgba(255,255,255,0.04)", color: isFollowing ? color : "#9ca3af", border: `1px solid ${isFollowing ? color + "40" : "rgba(255,255,255,0.08)"}` }}>
+                          <Rss className="w-3 h-3" /><span className="hidden sm:inline">{isFollowing ? "Following" : "Follow"}</span><span className="sm:hidden">{isFollowing ? "Following" : "+"}</span>
+                        </button>
+                      )}
                       <button onClick={() => onBookmark?.(post?.id)} className="cursor-pointer p-2 rounded-xl transition-all hover:bg-white/8"
                         style={{ color: isBookmarked ? "#fbbf24" : "#6b7280" }}>
                         <Bookmark className={`w-4 h-4 ${isBookmarked ? "fill-current" : ""}`} />
@@ -1328,7 +1536,7 @@ export default function ForumPost({
                       <button onClick={handleShare} className="cursor-pointer flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs transition-all hover:bg-white/8"
                         style={{ color: copied ? "#4ade80" : "#6b7280" }}>
                         {copied ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
-                        <span className="hidden sm:inline">{copied ? "Másolva!" : "Megosztás"}</span>
+                        <span className="hidden sm:inline">{copied ? "Copied!" : "Share"}</span>
                       </button>
                     </div>
                   </div>
@@ -1337,7 +1545,10 @@ export default function ForumPost({
                     {renderMd(post.content)}
                   </div>
 
-                  {post.poll && <PollWidget poll={post.poll} color={color} currentUserId={currentUserId} onVote={(newPoll) => onToggle?.(post.id, "poll", newPoll)} />}
+                  {post.poll && <PollWidget poll={post.poll} color={color} currentUserId={currentUserId} onRequireAuth={requireCommunityAuth} onVote={(newPoll) => {
+                    if (!requireCommunityAuth()) return;
+                    onToggle?.(post.id, "poll", newPoll);
+                  }} />}
 
                   <div className="flex gap-1.5 flex-wrap mb-5">
                     {post.tags?.map(t => (
@@ -1356,27 +1567,36 @@ export default function ForumPost({
                         </button>
                         <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-600"
                           style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                          <MessageSquare className="w-4 h-4" />{totalComments} hozzászólás
+                          <MessageSquare className="w-4 h-4" />{totalComments} comments
                         </div>
                       </div>
                     </div>
 
-                    <HelpfulWidget color={color} />
+                    <HelpfulWidget color={color} currentUserId={currentUserId} onRequireAuth={requireCommunityAuth} />
                   </div>
                 </div>
               </GlassCard>
 
-              {!post.solved && (
+              {!post.solved && !currentUserId && (
+                <AuthRequiredCard
+                  color={color}
+                  title="Join the conversation"
+                  text="As a guest, you can read topics and comments. Sign in to comment, like, follow, and vote."
+                  onAction={requireCommunityAuth}
+                />
+              )}
+
+              {!post.solved && currentUserId && (
                 <GlassCard>
                   <div className="p-3 sm:p-5">
                     <h3 className="text-white font-semibold text-sm flex items-center gap-2 mb-3">
-                      <Sparkles className="w-3.5 h-3.5" style={{ color }} /> Szólj hozzá
+                      <Sparkles className="w-3.5 h-3.5" style={{ color }} /> Add a comment
                     </h3>
                     <div className="flex gap-2 sm:gap-3">
                       {globalUser?.profilePicture ? <img src={globalUser.profilePicture} alt="avatar" className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl object-cover flex-shrink-0 mt-0.5" /> : <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white flex-shrink-0 mt-0.5"
-                        style={{ background: `${color}40`, border: `1px solid ${color}35` }}>{(globalUser?.displayName?.[0] || globalUser?.email?.[0] || "É").toUpperCase()}</div>}
+                        style={{ background: `${color}40`, border: `1px solid ${color}35` }}>{(globalUser?.displayName?.[0] || globalUser?.email?.[0] || "U").toUpperCase()}</div>}
                       <div className="flex-1 min-w-0">
-                        <CommentEditor placeholder="Írd meg a véleményed..." onSubmit={handleAddComment} color={color} />
+                        <CommentEditor placeholder="Write your thoughts..." onSubmit={handleAddComment} color={color} />
                       </div>
                     </div>
                   </div>
@@ -1386,7 +1606,7 @@ export default function ForumPost({
               {post.solved && (
                 <div className="flex items-center gap-3 p-4 rounded-2xl" style={{ background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.2)" }}>
                   <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
-                  <p className="text-green-300 text-sm">Ez a téma meg lett oldva. Nem lehet új hozzászólást írni.</p>
+                  <p className="text-green-300 text-sm">This topic has been solved. New comments are closed.</p>
                 </div>
               )}
 
@@ -1394,13 +1614,13 @@ export default function ForumPost({
                 <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
                   <h3 className="text-white font-semibold text-sm flex items-center gap-2">
                     <MessageSquare className="w-3.5 h-3.5" style={{ color }} />
-                    Hozzászólások ({totalComments})
+                    Comments ({totalComments})
                   </h3>
                   <div className="flex items-center gap-2 flex-wrap">
                     {showCommentSearch && (
                       <div className="relative">
                         <input value={commentSearch} onChange={e => setCommentSearch(e.target.value)}
-                          placeholder="Keresés..."
+                          placeholder="Search..."
                           className="w-36 sm:w-48 px-3 py-1.5 rounded-xl text-white text-xs placeholder-gray-600 focus:outline-none"
                           style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${color}30` }} />
                         {commentSearch && <button onClick={() => setCommentSearch("")} className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 text-gray-600"><X className="w-3 h-3" /></button>}
@@ -1414,8 +1634,8 @@ export default function ForumPost({
                     <div className="flex items-center gap-0.5 p-0.5 rounded-lg"
                       style={{ background: "#13111c", border: "1px solid rgba(255,255,255,0.06)" }}>
                       {[
-                        { id: "top", label: "Legjobb" },
-                        { id: "new", label: "Legújabb" },
+                        { id: "top", label: "Top" },
+                        { id: "new", label: "Newest" },
                       ].map(s => (
                         <button key={s.id} onClick={() => setSortComments(s.id)}
                           className="cursor-pointer px-2.5 py-1 rounded-md text-xs transition-all"
@@ -1442,7 +1662,7 @@ export default function ForumPost({
                       <div className="flex flex-col items-center justify-center py-12 gap-3 rounded-2xl"
                         style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
                         <MessageSquare className="w-10 h-10 text-gray-700" />
-                        <p className="text-gray-500 text-sm">{commentSearch ? "Nincs találat" : "Légy az első hozzászóló!"}</p>
+                        <p className="text-gray-500 text-sm">{commentSearch ? "No results" : "Be the first to comment!"}</p>
                       </div>
                     )}
                 </div>
@@ -1452,11 +1672,11 @@ export default function ForumPost({
                 <GlassCard>
                   <div className="px-5 pt-4 pb-4">
                     <h3 className="text-white font-semibold text-sm flex items-center gap-2 mb-3">
-                      <Sparkles className="w-3.5 h-3.5" style={{ color }} /> Kapcsolódó témák
+                      <Sparkles className="w-3.5 h-3.5" style={{ color }} /> Related topics
                     </h3>
                     <div className="space-y-2">
                       {relatedPosts.map(p => {
-                        const rc = CATEGORIES[p.category];
+                        const rc = CATEGORIES[p.category] || CATEGORIES.code;
                         return (
                           <button key={p.id} onClick={() => onOpenPost?.(p)}
                             className="cursor-pointer w-full text-left p-3 rounded-xl transition-all hover:bg-white/5 group"
@@ -1466,7 +1686,7 @@ export default function ForumPost({
                               <ChevronRight className="w-3.5 h-3.5 text-gray-600 flex-shrink-0 mt-0.5 group-hover:text-gray-400 transition-colors" />
                             </div>
                             <div className="flex items-center gap-2 mt-1.5 text-gray-600 text-xs">
-                              <span style={{ color: rc?.color }}>{rc?.emoji} {rc?.label}</span>
+                              <span className="inline-flex items-center gap-1" style={{ color: rc?.color }}><CategoryLabel category={rc} /></span>
                               <span>·</span>
                               <Heart className="w-2.5 h-2.5" />{p.likes}
                               <span>·</span>
@@ -1496,15 +1716,15 @@ export default function ForumPost({
 
               <GlassCard>
                 <div className="px-4 pt-4 pb-3">
-                  <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3">Bejegyzés infó</h4>
+                  <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3">Post info</h4>
                   {[
-                    { label: "Szerző", value: post.author, color: post.avatarColor },
-                    { label: "Kategória", value: `${cat.emoji} ${cat.label}`, color },
-                    { label: "Közzétéve", value: post.time },
-                    { label: "Megtekintés", value: post.views?.toLocaleString() },
-                    { label: "Hozzászólások", value: totalComments },
-                    { label: "Kedvelések", value: Math.max(0, likeCount) },
-                    { label: "Olvasási idő", value: `${post.readTime} perc` },
+                    { label: "Author", value: displayPost.author, color: displayPost.avatarColor },
+                    { label: "Category", value: <CategoryLabel category={cat} />, color },
+                    { label: "Published", value: post.time },
+                    { label: "Views", value: post.views?.toLocaleString() },
+                    { label: "Comments", value: totalComments },
+                    { label: "Likes", value: Math.max(0, likeCount) },
+                    { label: "Read time", value: `${post.readTime} min` },
                   ].map(item => (
                     <div key={item.label} className="flex justify-between items-center py-1.5 border-b border-white/5 last:border-0">
                       <span className="text-gray-600 text-xs">{item.label}</span>
@@ -1514,23 +1734,23 @@ export default function ForumPost({
                 </div>
               </GlassCard>
 
-              <GlassCard style={{ border: `1px solid ${post.avatarColor}20` }}>
+              <GlassCard style={{ border: `1px solid ${displayPost.avatarColor}20` }}>
                 <div className="px-4 pt-4 pb-4">
                   <div className="flex items-center gap-2.5 mb-3">
-                    {post.avatarUrl ? <img src={post.avatarUrl} alt="avatar" className="w-10 h-10 rounded-xl object-cover" /> : <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
-                      style={{ background: post.avatarColor + "45", border: `1px solid ${post.avatarColor}35` }}>{post.avatar}</div>}
+                    {displayPost.avatarUrl ? <img src={displayPost.avatarUrl} alt="avatar" className="w-10 h-10 rounded-xl object-cover" /> : <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
+                      style={{ background: displayPost.avatarColor + "45", border: `1px solid ${displayPost.avatarColor}35` }}>{displayPost.avatar}</div>}
                     <div>
-                      <div className="text-white font-bold text-sm" style={{ color: post.avatarColor }}>{post.author}</div>
+                      <div className="text-white font-bold text-sm" style={{ color: displayPost.avatarColor }}>{displayPost.author}</div>
                       <div className="text-gray-500 text-[10px] uppercase font-bold tracking-widest mt-0.5 whitespace-nowrap">
-                        Fórum tag - {authorJoinedDate}
+                        Forum member - {authorJoinedDate}
                       </div>
                     </div>
                   </div>
 
                   <button onClick={() => setShowProfile(true)}
                     className="cursor-pointer w-full py-2 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90"
-                    style={{ background: `linear-gradient(135deg, ${post.avatarColor}50, ${post.avatarColor}30)`, border: `1px solid ${post.avatarColor}40` }}>
-                    Profil megtekintése
+                    style={{ background: `linear-gradient(135deg, ${displayPost.avatarColor}50, ${displayPost.avatarColor}30)`, border: `1px solid ${displayPost.avatarColor}40` }}>
+                    View profile
                   </button>
                 </div>
               </GlassCard>
@@ -1538,7 +1758,7 @@ export default function ForumPost({
               {post.tags?.length > 0 && (
                 <GlassCard>
                   <div className="px-4 pt-4 pb-3">
-                    <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-2">Címkék</h4>
+                    <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-2">Tags</h4>
                     <div className="flex gap-1.5 flex-wrap">
                       {post.tags.map(t => (
                         <span key={t} className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -1553,14 +1773,14 @@ export default function ForumPost({
                 <GlassCard>
                   <div className="px-4 pt-4 pb-3">
                     <h4 className="text-gray-500 text-xs uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                      <Shield className="w-3 h-3" /> {effectiveIsAdmin && !isOwn ? "Admin műveletek" : "Saját téma"}
+                      <Shield className="w-3 h-3" /> {effectiveIsAdmin && !isOwn ? "Admin actions" : "My topic"}
                     </h4>
                     <div className="space-y-0.5">
                       {isOwn && (
                         <button onClick={() => onEdit?.(post)}
                           className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                           style={{ color: "#60a5fa" }}>
-                          <Edit3 className="w-3.5 h-3.5" /> Szerkesztés
+                          <Edit3 className="w-3.5 h-3.5" /> Edit
                         </button>
                       )}
                       {isOwn && (
@@ -1568,7 +1788,7 @@ export default function ForumPost({
                           className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                           style={{ color: post.solved ? "#6b7280" : "#4ade80" }}>
                           <CheckCircle className="w-3.5 h-3.5" />
-                          {post.solved ? "Megoldás visszavonása" : "Megoldottnak jelölés"}
+                          {post.solved ? "Reopen" : "Mark as solved"}
                         </button>
                       )}
                       {effectiveIsAdmin && (
@@ -1576,7 +1796,7 @@ export default function ForumPost({
                           className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                           style={{ color: "#fbbf24" }}>
                           <Pin className="w-3.5 h-3.5" />
-                          {post.pinned ? "Kitűzés eltávolítása" : "Kitűzés"}
+                          {post.pinned ? "Remove pin" : "Pin"}
                         </button>
                       )}
                       {effectiveIsAdmin && (
@@ -1584,14 +1804,14 @@ export default function ForumPost({
                           className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                           style={{ color: "#fb923c" }}>
                           <Flame className="w-3.5 h-3.5" />
-                          {post.hot ? "Felkapott eltávolítása" : "Felkapott jelölés"}
+                          {post.hot ? "Remove trending" : "Mark as trending"}
                         </button>
                       )}
                       <div className="border-t border-white/5 mt-1 pt-1">
                         <button onClick={() => onDelete?.(post.id, post.authorId)}
                           className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-red-400/10"
                           style={{ color: "#f87171" }}>
-                          <Trash2 className="w-3.5 h-3.5" /> Téma törlése
+                          <Trash2 className="w-3.5 h-3.5" /> Delete topic
                         </button>
                       </div>
                     </div>
@@ -1630,7 +1850,7 @@ export default function ForumPost({
                     onClick={e => e.stopPropagation()}
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-white font-bold text-sm">Téma infó</h3>
+                      <h3 className="text-white font-bold text-sm">Topic info</h3>
                       <button onClick={() => setMobilePostSidebarOpen(false)} className="p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all">
                         <X className="w-5 h-5" />
                       </button>
@@ -1642,15 +1862,15 @@ export default function ForumPost({
                       )}
                       <GlassCard>
                         <div className="px-4 pt-4 pb-3">
-                          <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3">Bejegyzés infó</h4>
+                          <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3">Post info</h4>
                           {[
-                            { label: "Szerző", value: post.author, color: post.avatarColor },
-                            { label: "Kategória", value: `${cat.emoji} ${cat.label}`, color },
-                            { label: "Közzétéve", value: post.time },
-                            { label: "Megtekintés", value: post.views?.toLocaleString() },
-                            { label: "Hozzászólások", value: totalComments },
-                            { label: "Kedvelések", value: Math.max(0, likeCount) },
-                            { label: "Olvasási idő", value: `${post.readTime} perc` },
+                            { label: "Author", value: displayPost.author, color: displayPost.avatarColor },
+                            { label: "Category", value: <CategoryLabel category={cat} />, color },
+                            { label: "Published", value: post.time },
+                            { label: "Views", value: post.views?.toLocaleString() },
+                            { label: "Comments", value: totalComments },
+                            { label: "Likes", value: Math.max(0, likeCount) },
+                            { label: "Read time", value: `${post.readTime} min` },
                           ].map(item => (
                             <div key={item.label} className="flex justify-between items-center py-1.5 border-b border-white/5 last:border-0">
                               <span className="text-gray-600 text-xs">{item.label}</span>
@@ -1659,29 +1879,29 @@ export default function ForumPost({
                           ))}
                         </div>
                       </GlassCard>
-                      <GlassCard style={{ border: `1px solid ${post.avatarColor}20` }}>
+                      <GlassCard style={{ border: `1px solid ${displayPost.avatarColor}20` }}>
                         <div className="px-4 pt-4 pb-4">
                           <div className="flex items-center gap-2.5 mb-3">
-                            {post.avatarUrl ? <img src={post.avatarUrl} alt="avatar" className="w-10 h-10 rounded-xl object-cover" /> : <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
-                              style={{ background: post.avatarColor + "45", border: `1px solid ${post.avatarColor}35` }}>{post.avatar}</div>}
+                            {displayPost.avatarUrl ? <img src={displayPost.avatarUrl} alt="avatar" className="w-10 h-10 rounded-xl object-cover" /> : <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm text-white"
+                              style={{ background: displayPost.avatarColor + "45", border: `1px solid ${displayPost.avatarColor}35` }}>{displayPost.avatar}</div>}
                             <div>
-                              <div className="text-white font-bold text-sm" style={{ color: post.avatarColor }}>{post.author}</div>
+                              <div className="text-white font-bold text-sm" style={{ color: displayPost.avatarColor }}>{displayPost.author}</div>
                               <div className="text-gray-500 text-[10px] uppercase font-bold tracking-widest mt-0.5 whitespace-nowrap">
-                                Fórum tag - {authorJoinedDate}
+                                Forum member - {authorJoinedDate}
                               </div>
                             </div>
                           </div>
                           <button onClick={() => setShowProfile(true)}
                             className="cursor-pointer w-full py-2 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90"
-                            style={{ background: `linear-gradient(135deg, ${post.avatarColor}50, ${post.avatarColor}30)`, border: `1px solid ${post.avatarColor}40` }}>
-                            Profil megtekintése
+                            style={{ background: `linear-gradient(135deg, ${displayPost.avatarColor}50, ${displayPost.avatarColor}30)`, border: `1px solid ${displayPost.avatarColor}40` }}>
+                            View profile
                           </button>
                         </div>
                       </GlassCard>
                       {post.tags?.length > 0 && (
                         <GlassCard>
                           <div className="px-4 pt-4 pb-3">
-                            <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-2">Címkék</h4>
+                            <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-2">Tags</h4>
                             <div className="flex gap-1.5 flex-wrap">
                               {post.tags.map(t => (
                                 <span key={t} className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -1695,14 +1915,14 @@ export default function ForumPost({
                         <GlassCard>
                           <div className="px-4 pt-4 pb-3">
                             <h4 className="text-gray-500 text-xs uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                              <Shield className="w-3 h-3" /> {effectiveIsAdmin && !isOwn ? "Admin műveletek" : "Saját téma"}
+                              <Shield className="w-3 h-3" /> {effectiveIsAdmin && !isOwn ? "Admin actions" : "My topic"}
                             </h4>
                             <div className="space-y-0.5">
                               {isOwn && (
                                 <button onClick={() => onEdit?.(post)}
                                   className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                                   style={{ color: "#60a5fa" }}>
-                                  <Edit3 className="w-3.5 h-3.5" /> Szerkesztés
+                                  <Edit3 className="w-3.5 h-3.5" /> Edit
                                 </button>
                               )}
                               {isOwn && (
@@ -1710,7 +1930,7 @@ export default function ForumPost({
                                   className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                                   style={{ color: post.solved ? "#6b7280" : "#4ade80" }}>
                                   <CheckCircle className="w-3.5 h-3.5" />
-                                  {post.solved ? "Megoldás visszavonása" : "Megoldottnak jelölés"}
+                                  {post.solved ? "Reopen" : "Mark as solved"}
                                 </button>
                               )}
                               {effectiveIsAdmin && (
@@ -1718,7 +1938,7 @@ export default function ForumPost({
                                   className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                                   style={{ color: "#fbbf24" }}>
                                   <Pin className="w-3.5 h-3.5" />
-                                  {post.pinned ? "Kitűzés eltávolítása" : "Kitűzés"}
+                                  {post.pinned ? "Remove pin" : "Pin"}
                                 </button>
                               )}
                               {effectiveIsAdmin && (
@@ -1726,14 +1946,14 @@ export default function ForumPost({
                                   className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-white/8"
                                   style={{ color: "#fb923c" }}>
                                   <Flame className="w-3.5 h-3.5" />
-                                  {post.hot ? "Felkapott eltávolítása" : "Felkapott jelölés"}
+                                  {post.hot ? "Remove trending" : "Mark as trending"}
                                 </button>
                               )}
                               <div className="border-t border-white/5 mt-1 pt-1">
                                 <button onClick={() => onDelete?.(post.id, post.authorId)}
                                   className="cursor-pointer w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs transition-all hover:bg-red-400/10"
                                   style={{ color: "#f87171" }}>
-                                  <Trash2 className="w-3.5 h-3.5" /> Téma törlése
+                                  <Trash2 className="w-3.5 h-3.5" /> Delete topic
                                 </button>
                               </div>
                             </div>

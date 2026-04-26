@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useContext, useMemo } from 'react';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { useJobs } from '../../context/JobsContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings2, PanelLeftClose, PanelLeftOpen, Sparkles, Layers, Box, Pencil, History } from 'lucide-react';
+import { Settings2, PanelLeftClose, PanelLeftOpen, Sparkles, Layers, Box, Pencil, History, Maximize2 } from 'lucide-react';
 import ImageControls from './ImageControls';
+import ImageUpscaleControls from './ImageUpscaleControls';
 import ImageWorkspace from './ImageWorkspace';
 import ImageGallery from './ImageGallery';
 import ImageStudioBG from '../../assets/image_studio_v2.png';
@@ -397,6 +398,28 @@ const PROVIDER_META = {
   modelscope: { label: "ModelScope", color: "#9333ea", dot: "#c084fc" },
 };
 
+const UPSCALE_COLOR = '#8b5cf6';
+
+async function dataUrlToBlob(dataUrl) {
+  const res = await fetch(dataUrl);
+  return res.blob();
+}
+
+function normalizeGeneratedImage(img) {
+  if (!img) return null;
+  if (typeof img === 'string') return img;
+
+  const url = img.fullUrl || img.full_url || img.url || img.image_url || img.b64_json;
+  if (!url) return null;
+
+  return {
+    ...img,
+    url,
+    fullUrl: img.fullUrl || img.full_url || url,
+    downloadUrl: img.downloadUrl || img.download_url || url,
+  };
+}
+
 const getProvider = (m) => m.provider || "fal";
 const getNvidiaType = (apiId = "") => {
   const id = apiId.toLowerCase();
@@ -426,6 +449,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
   const [genStatus, setGenStatus] = useState('');
   const [genElapsed, setGenElapsed] = useState(0);
   const [inputImages, setInputImages] = useState([]);
+  const [upscaleImage, setUpscaleImage] = useState(null);
   const [isEnhancerBusy, setIsEnhancerBusy] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
@@ -444,7 +468,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
   const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(false);
   const [offsets, setOffsets] = useState({ left: 320, right: 0 });
-  const [view, setView] = useState('gen'); // gen | gallery
+  const [view, setView] = useState('gen'); // gen | upscale | gallery
   const [currentJobId, setCurrentJobId] = useState(null);
   const abortControllerRef = useRef(null);
 
@@ -601,7 +625,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
   const handleGenerate = async () => {
     if (!prompt.trim() || isGenerating || isEnhancerBusy) return;
     if (selectedModel.needsInputImage && inputImages.length === 0) {
-      setError("Ehhez a modellhez tölts fel legalább egy szerkesztendő képet!");
+      setError("Upload at least one image to edit for this model.");
       return;
     }
 
@@ -612,7 +636,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
     setGenStatus('');
     setGenElapsed(0);
     closeMobileStudioPanel();
-    const jobId = startJob('image', prompt.trim().slice(0, 48) || 'Képgenerálás', 'image');
+    const jobId = startJob('image', prompt.trim().slice(0, 48) || 'Image generation', 'image');
     // Azonnal mentjük az új job ID-t, hogy navigáció után is az aktuális generálást találja meg
     sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
     setSelectedJobId(jobId);
@@ -678,16 +702,14 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
             setGenElapsed(event.elapsed ?? 0);
             updateJob(jobId, { progress, updatedAt: Date.now() });
           } else if (event.type === 'done') {
-            const images = (event.images || []).map(img =>
-              typeof img === 'string' ? img : (img.url || img.b64_json || img.image_url)
-            ).filter(Boolean);
+            const images = (event.images || []).map(normalizeGeneratedImage).filter(Boolean);
             setGeneratedImages(images);
             setGenProgress(100);
             markJobDoneAndSeen(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now(), resultImages: images });
             setSelectedJobId(jobId);
             sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
           } else if (event.type === 'error') {
-            throw new Error(event.message || 'Hiba történt');
+            throw new Error(event.message || 'Something went wrong');
           }
         }
       }
@@ -697,7 +719,93 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
         return;
       }
       setError(err.message);
-      markJobError(jobId, err.message || 'Hiba történt');
+      markJobError(jobId, err.message || 'Something went wrong');
+    } finally {
+      setIsGenerating(false);
+      setGenStatus('');
+      setGenProgress(0);
+      setGenElapsed(0);
+    }
+  };
+
+  const handleUpscale = async () => {
+    if (!upscaleImage?.dataUrl || isGenerating) return;
+
+    setIsGenerating(true);
+    setGeneratedImages([]);
+    setError(null);
+    setGenProgress(0);
+    setGenStatus('');
+    setGenElapsed(0);
+    closeMobileStudioPanel();
+
+    const jobId = startJob('image', 'RealESRGAN x4 upscale', 'image');
+    sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
+    setSelectedJobId(jobId);
+    setCurrentJobId(jobId);
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    updateJob(jobId, { progress: 0, updatedAt: Date.now() });
+
+    try {
+      const token = await getIdToken();
+      const imageBlob = await dataUrlToBlob(upscaleImage.dataUrl);
+      const formData = new FormData();
+      formData.append('image', imageBlob, upscaleImage.name || 'upscale-source.png');
+      formData.append('jobId', jobId);
+
+      const res = await fetch(`${API_BASE}/api/upscale-image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        signal,
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.message || `HTTP ${res.status}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let event;
+          try { event = JSON.parse(line.slice(6)); } catch { continue; }
+          if (event.type === 'status') {
+            const progress = event.progress ?? 0;
+            setGenProgress(progress);
+            setGenStatus(event.status ?? '');
+            setGenElapsed(event.elapsed ?? 0);
+            updateJob(jobId, { progress, updatedAt: Date.now() });
+          } else if (event.type === 'done') {
+            const images = (event.images || []).map(normalizeGeneratedImage).filter(Boolean);
+            setGeneratedImages(images);
+            setGenProgress(100);
+            markJobDoneAndSeen(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now(), resultImages: images });
+            setSelectedJobId(jobId);
+            sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
+          } else if (event.type === 'error') {
+            throw new Error(event.message || 'Something went wrong');
+          }
+        }
+      }
+    } catch (err) {
+      if (err.name === 'AbortError' || signal.aborted) {
+        console.log('Image upscale aborted by user.');
+        return;
+      }
+      setError(err.message);
+      markJobError(jobId, err.message || 'Something went wrong');
     } finally {
       setIsGenerating(false);
       setGenStatus('');
@@ -726,12 +834,12 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
           {/* Tool Strip (72px) */}
           {/* Tool Strip (72px) — 2 mód gomb */}
           <div className={isMobile
-            ? "w-full shrink-0 grid grid-cols-3 gap-2 border-b border-white/5 bg-[#030308] px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+4.5rem)]"
+            ? "w-full shrink-0 grid grid-cols-4 gap-2 border-b border-white/5 bg-[#030308] px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+4.5rem)]"
             : "w-[72px] h-full flex flex-col items-center pt-6 space-y-3 border-r border-white/5 bg-[#030308]"}>
             {[
               {
                 id: 'generate',
-                label: 'GENERÁLÁS',
+                label: 'GENERATE',
                 icon: <Sparkles className="w-5 h-5" />,
                 isActive: !selectedModel.needsInputImage && view === 'gen',
                 onClick: () => {
@@ -746,7 +854,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
               },
               {
                 id: 'edit',
-                label: 'SZERKESZTÉS',
+                label: 'EDIT',
                 icon: <Pencil className="w-5 h-5" />,
                 isActive: !!selectedModel.needsInputImage && view === 'gen',
                 onClick: () => {
@@ -760,8 +868,18 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
                 },
               },
               {
+                id: 'upscale',
+                label: 'UPSCALE',
+                icon: <Maximize2 className="w-5 h-5" />,
+                isActive: view === 'upscale',
+                onClick: () => {
+                  setError(null);
+                  setView('upscale');
+                },
+              },
+              {
                 id: 'gallery',
-                label: 'GALÉRIA',
+                label: 'GALLERY',
                 icon: <History className="w-5 h-5" />,
                 isActive: view === 'gallery',
                 onClick: () => {
@@ -803,7 +921,16 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
           </div>
 
           <div className="flex-1 h-full min-h-0 overflow-hidden">
-            {view !== 'gallery' && (
+            {view === 'upscale' ? (
+              <ImageUpscaleControls
+                sourceImage={upscaleImage}
+                setSourceImage={setUpscaleImage}
+                isUpscaling={isGenerating}
+                onUpscale={handleUpscale}
+                getIdToken={getIdToken}
+                error={view === 'upscale' ? error : null}
+              />
+            ) : view !== 'gallery' && (
               <ImageControls
                 selectedModel={selectedModel}
                 onModelChange={onModelChange}
@@ -894,10 +1021,12 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
                 setSelectedJobId(null);
               }}
               error={error}
-              selectedModel={selectedModel}
+              selectedModel={view === 'upscale' ? { ...selectedModel, color: UPSCALE_COLOR } : selectedModel}
               genProgress={genProgress}
               genStatus={genStatus}
               genElapsed={genElapsed}
+              activityLabel={view === 'upscale' ? 'Upscaling image' : 'Creating image'}
+              getIdToken={getIdToken}
             />
           )}
         </div>

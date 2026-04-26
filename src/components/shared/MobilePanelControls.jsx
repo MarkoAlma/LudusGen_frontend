@@ -5,8 +5,8 @@ import { useStudioPanels } from '../../context/StudioPanelContext';
 
 const PANEL_LABELS = {
   L1: 'AI',
-  L2: 'Eszközök',
-  R: 'Elozmeny',
+  L2: 'Tools',
+  R: 'History',
 };
 
 const PANEL_ICONS = {
@@ -23,7 +23,7 @@ export default function MobilePanelControls({ color = '#8b5cf6', panels = [] }) 
 
   const activePanel = panels.find((panelId) => mobileActive === panelId && panelState[panelId]) || null;
   const ActiveIcon = activePanel ? PANEL_ICONS[activePanel] : LayoutGrid;
-  const activeLabel = activePanel ? PANEL_LABELS[activePanel] : 'Panelek';
+  const activeLabel = activePanel ? PANEL_LABELS[activePanel] : 'Panels';
 
   const handleToggle = (panelId) => {
     const isActive = mobileActive === panelId && panelState[panelId];
@@ -45,7 +45,7 @@ export default function MobilePanelControls({ color = '#8b5cf6', panels = [] }) 
             exit={{ opacity: 0 }}
             onClick={() => setMenuOpen(false)}
             className="fixed inset-0 z-[68] bg-transparent"
-            aria-label="Panel menu bezarasa"
+            aria-label="Close panel menu"
           />
         )}
       </AnimatePresence>
@@ -64,7 +64,7 @@ export default function MobilePanelControls({ color = '#8b5cf6', panels = [] }) 
             className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-[#0a0a14]/82 text-white shadow-[0_16px_38px_rgba(0,0,0,0.42)] backdrop-blur-2xl"
             style={{ boxShadow: activePanel ? `0 12px 32px rgba(0,0,0,0.38), 0 0 0 1px ${color}22` : undefined }}
             aria-expanded={menuOpen}
-            aria-label={`${activeLabel} panel megnyitasa`}
+            aria-label={`Open ${activeLabel} panel`}
           >
             <div
               className="flex h-7 w-7 items-center justify-center rounded-xl border"
@@ -94,7 +94,7 @@ export default function MobilePanelControls({ color = '#8b5cf6', panels = [] }) 
                 className="absolute right-0 top-[calc(100%+10px)] w-52 overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a14]/92 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.48)] backdrop-blur-2xl"
               >
                 <div className="mb-2 px-2 pt-1 text-[9px] font-black uppercase tracking-[0.24em] text-zinc-500">
-                  Panelek
+                  Panels
                 </div>
 
                 <div className="space-y-1">
@@ -127,7 +127,7 @@ export default function MobilePanelControls({ color = '#8b5cf6', panels = [] }) 
                             {PANEL_LABELS[panelId]}
                           </div>
                           <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500">
-                            {isActive ? 'Aktiv panel' : 'Megnyitas'}
+                            {isActive ? 'Active panel' : 'Open'}
                           </div>
                         </div>
                         {isActive && (

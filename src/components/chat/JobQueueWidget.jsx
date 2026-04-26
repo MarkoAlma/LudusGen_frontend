@@ -10,9 +10,9 @@ import { useJobs } from '../../context/JobsContext';
 // ── Panel-type → icon & palette ──────────────────────────────────
 const PANEL_META = {
   chat: { icon: MessageSquare, label: 'Chat', color: '#8b5cf6', glow: 'rgba(139,92,246,0.35)' },
-  image: { icon: Image, label: 'Kép', color: '#f59e0b', glow: 'rgba(245,158,11,0.35)' },
-  audio: { icon: Volume2, label: 'Hang', color: '#10b981', glow: 'rgba(16,185,129,0.35)' },
-  music: { icon: Music2, label: 'Zene', color: '#06b6d4', glow: 'rgba(6,182,212,0.35)' },
+  image: { icon: Image, label: 'Image', color: '#f59e0b', glow: 'rgba(245,158,11,0.35)' },
+  audio: { icon: Volume2, label: 'Audio', color: '#10b981', glow: 'rgba(16,185,129,0.35)' },
+  music: { icon: Music2, label: 'Music', color: '#06b6d4', glow: 'rgba(6,182,212,0.35)' },
   threed: { icon: Box, label: '3D', color: '#a78bfa', glow: 'rgba(167,139,250,0.35)' },
   trellis: { icon: Layers, label: 'Trellis', color: '#38bdf8', glow: 'rgba(56,189,248,0.35)' },
   tripo: { icon: Cpu, label: 'Tripo', color: '#d946ef', glow: 'rgba(217,70,239,0.35)' },
@@ -20,10 +20,10 @@ const PANEL_META = {
 };
 
 const STATUS_META = {
-  running: { label: 'Folyamat', ring: true },
-  queued: { label: 'Várólista', ring: false },
-  done: { label: 'Kész', ring: false },
-  error: { label: 'Hiba', ring: false },
+  running: { label: 'Running', ring: true },
+  queued: { label: 'Queued', ring: false },
+  done: { label: 'Done', ring: false },
+  error: { label: 'Error', ring: false },
 };
 
 // Animated spinning ring for running jobs
@@ -183,10 +183,10 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
             </span>
           )}
           {isDone && (
-            <span className="text-[8px] font-bold text-emerald-400">✓ Kész</span>
+            <span className="text-[8px] font-bold text-emerald-400">✓ Done</span>
           )}
           {isError && (
-            <span className="text-[8px] font-bold text-rose-400">✕ Hiba</span>
+            <span className="text-[8px] font-bold text-rose-400">✕ Error</span>
           )}
         </div>
       </div>
@@ -198,7 +198,7 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
             cancelJob(job.id);
           }}
           className="w-6 h-6 rounded-lg flex items-center justify-center text-zinc-600 hover:text-white hover:bg-white/10 transition-all duration-200 active:scale-90 group/cancel"
-          title="Leállítás / Törlés"
+          title="Stop / Delete"
         >
           <X className="w-3 h-3 transition-transform group-hover/cancel:scale-110" />
         </button>
@@ -245,7 +245,7 @@ export default function JobQueueWidget({ onOpenJob }) {
               <span className="h-2 w-2 rounded-full bg-zinc-700" />
             )}
             <p className="text-[9px] font-black uppercase tracking-[0.32em] text-zinc-400">
-              Folyamatban
+              In progress
             </p>
           </div>
 
@@ -261,7 +261,7 @@ export default function JobQueueWidget({ onOpenJob }) {
                 border: '1px solid rgba(139,92,246,0.25)',
               }}
             >
-              {activeCount} aktív
+              {activeCount} active
             </motion.span>
           )}
         </div>
@@ -280,7 +280,7 @@ export default function JobQueueWidget({ onOpenJob }) {
               >
                 <Wand2 className="w-4 h-4 text-zinc-700" />
                 <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-zinc-700">
-                  Nincs aktív feladat
+                  No active tasks
                 </p>
               </motion.div>
             ) : (

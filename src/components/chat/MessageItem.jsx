@@ -159,20 +159,20 @@ export default function MessageItem({ message, themeColor }) {
     // Today: show time
     if (diffDays === 0) return timeStr;
     // Yesterday
-    if (diffDays === 1) return 'tegnap';
+    if (diffDays === 1) return 'yesterday';
     // This week
-    if (diffDays < 7) return `${diffDays} napja`;
+    if (diffDays < 7) return `${diffDays} days ago`;
     // This month (weeks)
-    if (diffWeeks === 1) return '1 hete';
-    if (diffWeeks < 4) return `${diffWeeks} hete`;
+    if (diffWeeks === 1) return '1 week ago';
+    if (diffWeeks < 4) return `${diffWeeks} weeks ago`;
     // Months
     const diffMonths = Math.floor(diffMs / 2592000000);
-    if (diffMonths === 1) return '1 hónapja';
-    if (diffMonths < 12) return `${diffMonths} hónapja`;
+    if (diffMonths === 1) return '1 month ago';
+    if (diffMonths < 12) return `${diffMonths} months ago`;
     // Years
     const diffYears = Math.floor(diffMs / 31536000000);
-    if (diffYears === 1) return '1 éve';
-    return `${diffYears} éve`;
+    if (diffYears === 1) return '1 year ago';
+    return `${diffYears} years ago`;
   }, [message.timestamp, message.createdAt]);
 
   return (
@@ -196,7 +196,7 @@ export default function MessageItem({ message, themeColor }) {
         {/* Meta: Name + Timestamp */}
         <div className={`flex items-center gap-3 mb-2 ${isAi ? '' : 'flex-row-reverse'}`}>
           <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/60">
-            {isAi ? (msgModel?.name || 'AI') : 'Te'}
+            {isAi ? (msgModel?.name || 'AI') : 'You'}
           </span>
           <div className="w-1 h-1 rounded-full bg-white/20" />
           <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{timestamp}</span>
@@ -236,7 +236,7 @@ export default function MessageItem({ message, themeColor }) {
                     />
                   ))}
                 </div>
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-300 italic">Válasz generálása...</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-300 italic">Generating response...</span>
               </div>
             )}
           </div>

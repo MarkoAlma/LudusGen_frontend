@@ -21,7 +21,7 @@ export default function MessageList({ messages, loadingHistory, selectedModel, o
                 borderTopColor: 'transparent' 
               }}
             />
-            <span className="text-[10px] text-gray-400">Történet betöltése...</span>
+            <span className="text-[10px] text-gray-400">Loading history...</span>
           </div>
         </div>
       )}

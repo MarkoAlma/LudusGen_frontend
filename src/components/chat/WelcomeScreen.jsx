@@ -3,10 +3,10 @@ import { motion } from 'framer-motion';
 import { MessageSquare, Sparkles, PenTool, Code2, Globe, Lightbulb } from 'lucide-react';
 
 const SUGGESTION_CHIPS = [
-  { icon: PenTool, text: 'Írj egy rövid történetet egy idős utazóról', color: '#a78bfa' },
-  { icon: Code2, text: 'Magyarázd el a React hookokat egyszerűen', color: '#60a5fa' },
-  { icon: Globe, text: 'Mi a különbség a REST és GraphQL között?', color: '#34d399' },
-  { icon: Lightbulb, text: 'Adj ötletet egy startuphoz AI témában', color: '#fbbf24' },
+  { icon: PenTool, text: 'Write a short story about an elderly traveler', color: '#a78bfa' },
+  { icon: Code2, text: 'Explain React hooks simply', color: '#60a5fa' },
+  { icon: Globe, text: ' What is the difference between REST and GraphQL?', color: '#34d399' },
+  { icon: Lightbulb, text: 'Suggest an AI startup idea', color: '#fbbf24' },
 ];
 
 export default function WelcomeScreen({ themeColor, selectedModel, onSuggestionClick }) {
@@ -40,9 +40,9 @@ export default function WelcomeScreen({ themeColor, selectedModel, onSuggestionC
             transition={{ delay: 0.1, duration: 0.4 }}
             className="text-center px-4"
           >
-            <h3 className="text-xl sm:text-2xl font-black text-white italic tracking-tighter mb-2">Üdvözöljük!</h3>
+            <h3 className="text-xl sm:text-2xl font-black text-white italic tracking-tighter mb-2">Welcome!</h3>
             <p className="text-xs sm:text-sm text-gray-400 max-w-sm leading-relaxed font-bold mx-auto opacity-80">
-              Indítson egy beszélgetést az AI asszisztenssel. Írjon egy üzenetet lent, vagy válasszon egy témát.
+              Start a conversation with the AI assistant. Write a message below, or choose a topic.
             </p>
           </motion.div>
 
@@ -53,7 +53,7 @@ export default function WelcomeScreen({ themeColor, selectedModel, onSuggestionC
             className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/10"
           >
             <Sparkles className="w-3.5 h-3.5" style={{ color: themeColor }} />
-            <span className="text-[10px] sm:text-xs text-gray-400 font-bold">{selectedModel?.name || 'AI'} készen áll</span>
+            <span className="text-[10px] sm:text-xs text-gray-400 font-bold">{selectedModel?.name || 'AI'} is ready</span>
           </motion.div>
 
           <motion.div

@@ -146,7 +146,7 @@ function Enhancer({
     }
 
     const json = await res.json();
-    if (!json.success) throw new Error(json.message || 'API hiba');
+    if (!json.success) throw new Error(json.message || 'API error');
     return (json.content || '').trim();
   }, [authHeaders]);
 
@@ -172,7 +172,7 @@ function Enhancer({
     }
 
     const json = await res.json();
-    if (!json.success) throw new Error(json.message || 'Vision describe hiba');
+    if (!json.success) throw new Error(json.message || 'Vision describe error');
     return (json.description || '').trim();
   }, [authHeaders, gemmaVisionPrompt]);
 
@@ -242,7 +242,7 @@ function Enhancer({
           }
         } catch (vErr) {
           console.warn('Vision describe failed, falling back to text-only enhance:', vErr.message);
-          setStreamError(`⚠️ Képelemzés sikertelen (${vErr.message}), csak szöveges prompttal próbálom.`);
+          setStreamError(`⚠️ Image analysis failed (${vErr.message}); trying text-only prompt.`);
         } finally {
           setDescribingImages(false);
         }
@@ -252,7 +252,7 @@ function Enhancer({
       const raw = await callChat(systemPrompt, userContent, 0.4, 0.9, 2048);
       pushUndo();
       const ok = applyResult(raw);
-      if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
+      if (!ok) setStreamError('The AI returned an empty response. Try again.');
       else if (streamError?.startsWith('⚠️')) setStreamError(null);
     } catch (err) {
       console.error('Enhance hiba:', err);
@@ -273,7 +273,7 @@ function Enhancer({
       const raw = await callChat(dechanting_prompt, value.trim(), 0.4, 0.9, 800);
       pushUndo();
       const ok = applyResult(raw);
-      if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
+      if (!ok) setStreamError('The AI returned an empty response. Try again.');
     } catch (err) {
       console.error('Dechance hiba:', err);
       setStreamError(err.message || 'Simplify sikertelen');
@@ -327,12 +327,12 @@ function Enhancer({
 
   // Enhance gomb tooltip szövege
   const enhanceTooltip = !hasContent
-    ? 'Írj be egy promptot először'
+    ? 'Enter a prompt first'
     : describingImages
-      ? 'Képelemzés folyamatban…'
+      ? 'Image analysis in progress...'
       : hasImages
-        ? `AI prompt fejlesztés (${inputImages.length} kép → vision + reprompt)`
-        : 'AI prompt fejlesztés';
+        ? `AI prompt enhancement (${inputImages.length} images -> vision + reprompt)`
+        : 'AI prompt enhancement';
 
   return (
     <div style={{ marginBottom: 14 }}>
@@ -394,7 +394,7 @@ function Enhancer({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           disabled={disabled}
-          placeholder={stylePrefix ? 'Írj le egy promptot angolul…' : 'Írj le egy promptot angolul…\npl. a rustic log cabin with a stone chimney'}
+          placeholder={stylePrefix ? 'Describe a prompt in English...' : 'Describe a prompt in English...\ne.g. a rustic log cabin with a stone chimney'}
           rows={5}
           style={{
             width: '100%', boxSizing: 'border-box',
@@ -424,7 +424,7 @@ function Enhancer({
             letterSpacing: '0.06em', textTransform: 'uppercase',
             fontFamily: "'SF Mono', 'JetBrains Mono', monospace",
           }}>
-            ⌘↵ generálás
+            Cmd+Enter generate
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             {hasContent && (
@@ -456,7 +456,7 @@ function Enhancer({
         }}>
           <Eye style={{ width: 11, height: 11, color: '#34d399', flexShrink: 0 }} />
           <span style={{ fontSize: 10, color: '#6ee7b7', lineHeight: 1.4 }}>
-            Gemma 3 27B elemzi a képeket ({inputImages.length} db)…
+            Gemma 3 27B is analyzing the images ({inputImages.length})...
           </span>
           <Loader2 style={{ width: 10, height: 10, color: '#34d399', marginLeft: 'auto', flexShrink: 0, animation: 'enhancerSpin 1s linear infinite' }} />
         </div>
@@ -494,14 +494,14 @@ function Enhancer({
         }}>
           <Eye style={{ width: 9, height: 9, color: '#34d399', flexShrink: 0 }} />
           <span style={{ fontSize: 9, color: '#6ee7b7', lineHeight: 1.4 }}>
-            Enhance: Gemma {inputImages.length} képet elemez → Cerebras fejleszti a promptot
+              Enhance: Gemma analyzes {inputImages.length} images, then Cerebras improves the prompt
           </span>
         </div>
       )}
 
       {/* Action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5, marginTop: 7 }}>
-        <Tooltip text={!hasContent ? 'Írj be egy promptot először' : 'Prompt egyszerűsítése'} side="top">
+        <Tooltip text={!hasContent ? 'Enter a prompt first' : 'Simplify prompt'} side="top">
           <ActionButton
             onClick={handleDechance}
             disabled={simplifyDisabled}
@@ -527,7 +527,7 @@ function Enhancer({
           />
         </Tooltip>
         {super_enhancing_prompt && (
-          <Tooltip text={!hasContent ? 'Írj be egy promptot először' : 'Super Enhance — extra felület-, anyag- és konstrukciós részletek'} side="top">
+          <Tooltip text={!hasContent ? 'Enter a prompt first' : 'Super Enhance - extra surface, material, and construction details'} side="top">
             <ActionButton
               onClick={() => handleEnhance(true)}
               disabled={enhanceDisabled}

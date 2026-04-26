@@ -7,7 +7,6 @@ import LudusGenAdmin from './pages/Admin';
 import AuthModal from './pages/Login';
 import { useContext } from 'react';
 import { MyUserContext } from './context/MyUserProvider';
-import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 import { Toaster } from 'react-hot-toast';

@@ -13,9 +13,9 @@ const CODE_MODELS = CODE_GROUP
 
 // Price map for Code models (fallback for models without badge)
 const MODEL_PRICES = {
-  'trinity-large': 'Ingyenes',
-  'gemini-3-flash': 'Ingyenes',
-  'gemini-2.5-pro': 'Prémium',
+  'trinity-large': 'Free',
+  'gemini-3-flash': 'Free',
+  'gemini-2.5-pro': 'Premium',
   'groq-gpt120b': '$0.50 / 1M tok',
   'groq-qwen3': '$0.30 / 1M tok',
   'groq-llama70b': '$0.60 / 1M tok',
@@ -23,7 +23,7 @@ const MODEL_PRICES = {
   'mistral-large': '$2.00 / 1M tok',
   'nvidia-glm4.7': '$0.40 / 1M tok',
   'deepseek-v3.2': '$0.80 / 1M tok',
-  'google-gemma-3-27b-it': 'Ingyenes',
+  'google-gemma-3-27b-it': 'Free',
   'gpt4o_code': '$5.00 / 1M tok',
 };
 
@@ -78,7 +78,7 @@ export default function ModelBar({
           <button
             onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
             className="flex items-center gap-2 pl-1 pr-3 py-1.5 rounded-xl hover:bg-white/[0.04] transition-all duration-300 text-gray-400 hover:text-white"
-            aria-label="Modell váltás"
+            aria-label="Switch model"
             aria-expanded={modelDropdownOpen}
             aria-haspopup="listbox"
           >
@@ -111,8 +111,8 @@ export default function ModelBar({
               >
                 {/* Header */}
                 <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
-                  <span className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Kód AI választás</span>
-                  <span className="text-[8px] text-gray-600 font-bold">{CODE_MODELS.length} modell</span>
+                  <span className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Code AI selection</span>
+                  <span className="text-[8px] text-gray-600 font-bold">{CODE_MODELS.length} models</span>
                 </div>
 
                 {/* Model list */}
@@ -163,7 +163,7 @@ export default function ModelBar({
 
                         {/* Active indicator */}
                         {isActive && (
-                          <span className="text-[8px] font-black text-emerald-500 uppercase shrink-0">Aktív</span>
+                          <span className="text-[8px] font-black text-emerald-500 uppercase shrink-0">Active</span>
                         )}
                       </button>
                     );
@@ -181,10 +181,10 @@ export default function ModelBar({
         <button
           onClick={onNewChat}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.04] active:scale-95 transition-all duration-300"
-          title="Új munkaablak nyitása"
+          title="Open new workspace"
         >
           <Plus className="w-3 h-3" />
-          <span className="text-[10px] font-medium tracking-wide hidden sm:inline">Új chat</span>
+          <span className="text-[10px] font-medium tracking-wide hidden sm:inline">New chat</span>
         </button>
 
         <div className="w-px h-4 bg-white/10 hidden sm:block mx-1" />
@@ -193,7 +193,7 @@ export default function ModelBar({
         <button
           onClick={() => setHistorySidebarOpen(true)}
           className="xl:hidden p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all"
-          title="Előzmények megnyitása"
+          title="Open history"
         >
           <History className="w-4 h-4" />
         </button>
@@ -202,7 +202,7 @@ export default function ModelBar({
         <button
           onClick={onConfigOpen}
           className="p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all duration-500 group/btn"
-          title="Beállítások"
+          title="Settings"
         >
           <Settings2 className="w-4 h-4 group-hover/btn:rotate-90 transition-transform duration-500" />
         </button>

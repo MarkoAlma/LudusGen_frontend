@@ -95,12 +95,12 @@ const formatHistoryDate = (item) => {
 const isMusicHistoryItem = (item) => item?.type === "music";
 
 const getHistoryKind = (item) => isMusicHistoryItem(item)
-  ? { id: "music", label: "Zene", accent: "#a855f7", Icon: Music }
-  : { id: "voice", label: "Hang", accent: "#06b6d4", Icon: Mic };
+  ? { id: "music", label: "Music", accent: "#a855f7", Icon: Music }
+  : { id: "voice", label: "Voice", accent: "#06b6d4", Icon: Mic };
 
 const getHistoryTitle = (item) => {
   const title = item?.title || item?.caption || item?.prompt || item?.text || item?.lyrics;
-  return String(title || "Névtelen audio").trim();
+  return String(title || "Untitled audio").trim();
 };
 
 const getHistoryMeta = (item) => {
@@ -190,7 +190,7 @@ export default function AudioWorkspace({
       triggerBlobDownload(blob, filename);
     } catch (err) {
       console.error("Audio download failed:", err);
-      setDownloadError(err.message || "A letöltés nem sikerült.");
+      setDownloadError(err.message || "Download failed.");
     } finally {
       setIsDownloading(false);
     }
@@ -233,12 +233,12 @@ export default function AudioWorkspace({
       const result = await onHistorySelect?.(item, { keepHistory: true });
       const nextAudioUrl = result?.audioUrl || item?.audioUrl || "";
       const nextAudioInfo = result?.audioInfo || buildHistoryAudioInfo(item);
-      if (!nextAudioUrl) throw new Error("Az archív audio nem tölthető be.");
+      if (!nextAudioUrl) throw new Error("Archived audio could not be loaded.");
       setActiveHistoryAudioUrl(nextAudioUrl);
       setActiveHistoryAudioInfo(nextAudioInfo);
     } catch (err) {
-      console.warn("Archiv modal betoltesi hiba:", err.message);
-      setHistoryModalError(err.message || "Az archív audio nem tölthető be.");
+      console.warn("Archive modal load error:", err.message);
+      setHistoryModalError(err.message || "Archived audio could not be loaded.");
     } finally {
       setIsHistoryAudioLoading(false);
     }
@@ -266,8 +266,8 @@ export default function AudioWorkspace({
       await audio.play();
       setIsHistoryModalPlaying(true);
     } catch (err) {
-      console.warn("Archiv modal lejatszasi hiba:", err.message);
-      setHistoryModalError("A lejátszás nem indítható el.");
+      console.warn("Archive modal playback error:", err.message);
+      setHistoryModalError("Playback could not be started.");
     }
   };
 
@@ -286,9 +286,9 @@ export default function AudioWorkspace({
     return counts;
   }, { all: 0, voice: 0, music: 0 });
   const historyFilters = [
-    { id: "all", label: "Mind", count: historyCounts.all, Icon: Layout },
-    { id: "voice", label: "Hang", count: historyCounts.voice, Icon: Mic },
-    { id: "music", label: "Zene", count: historyCounts.music, Icon: Music },
+    { id: "all", label: "All", count: historyCounts.all, Icon: Layout },
+    { id: "voice", label: "Voice", count: historyCounts.voice, Icon: Mic },
+    { id: "music", label: "Music", count: historyCounts.music, Icon: Music },
   ];
   const filteredHistory = safeHistory.filter((item) => {
     if (historyFilter === "all") return true;
@@ -321,8 +321,8 @@ export default function AudioWorkspace({
                   <History className="w-5 h-5 text-white/40" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-sm font-black text-white italic uppercase tracking-[0.2em]">Archívum</h2>
-                  <p className="mt-0.5 text-[10px] font-bold text-white/25 uppercase tracking-widest">Hangok és zenék</p>
+                  <h2 className="text-sm font-black text-white italic uppercase tracking-[0.2em]">Archive</h2>
+                  <p className="mt-0.5 text-[10px] font-bold text-white/25 uppercase tracking-widest">Voices and music</p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -372,9 +372,9 @@ export default function AudioWorkspace({
                             ? 'border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-300'
                             : 'border-cyan-400/20 bg-cyan-500/10 text-cyan-300'
                         }`}>
-                          {item.type === 'music' ? 'Zene' : 'Hang'}
+                          {item.type === 'music' ? 'Music' : 'Voice'}
                         </span>
-                        <span className="text-[8px] font-black uppercase tracking-[0.18em] text-white/25">{formatHistoryDate(item) || "archívum"}</span>
+                        <span className="text-[8px] font-black uppercase tracking-[0.18em] text-white/25">{formatHistoryDate(item) || "archive"}</span>
                       </div>
                       <div className="line-clamp-2 text-[13px] font-black leading-snug text-white">
                         {getHistoryTitle(item)}
@@ -395,8 +395,8 @@ export default function AudioWorkspace({
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-white/25">
                     <History className="h-6 w-6" />
                   </div>
-                  <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/45">Nincs találat</div>
-                  <div className="mt-2 text-[9px] font-bold uppercase tracking-widest text-white/20">Az archívum ebben a szűrőben üres</div>
+                  <div className="text-[11px] font-black uppercase tracking-[0.24em] text-white/45">No results</div>
+                  <div className="mt-2 text-[9px] font-bold uppercase tracking-widest text-white/20">The archive is empty for this filter</div>
                 </div>
               ) : null}
             </div>
@@ -413,7 +413,7 @@ export default function AudioWorkspace({
               <AlertCircle className="h-8 w-8" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-xl font-black uppercase tracking-tight text-white italic">Protokoll hiba</h3>
+              <h3 className="text-xl font-black uppercase tracking-tight text-white italic">Protocol error</h3>
               <p className="max-w-md text-[11px] font-bold uppercase tracking-widest leading-relaxed text-zinc-600">
                 {error}
               </p>
@@ -433,7 +433,7 @@ export default function AudioWorkspace({
                 <div className="flex flex-col items-center gap-4">
                   <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/10">
                     <Activity className="w-3.5 h-3.5 text-primary animate-pulse" />
-                    <span className="text-[10px] font-black text-white italic uppercase tracking-[0.2em]">Audio generálás</span>
+                    <span className="text-[10px] font-black text-white italic uppercase tracking-[0.2em]">Audio generation</span>
                   </div>
                   <div className="w-64 max-w-[72vw] flex flex-col items-center gap-2">
                     <div className="flex items-center justify-center rounded-md border border-white/5 bg-white/[0.025] px-3 py-1.5 text-[8px] font-black uppercase tracking-widest text-zinc-400">
@@ -466,9 +466,9 @@ export default function AudioWorkspace({
 
                 <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 sm:px-8 sm:py-8 md:p-12">
                   <div className="mb-6 sm:mb-8 md:mb-12 flex flex-col items-center text-center gap-2">
-                    <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em] italic">Hang sikeresen létrehozva</div>
+                    <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.5em] italic">Audio created successfully</div>
                     <h3 className="text-3xl font-black text-white uppercase tracking-wider line-clamp-1 italic">
-                      Neurális Mester v1
+                      Neural Master v1
                     </h3>
                   </div>
 
@@ -492,7 +492,7 @@ export default function AudioWorkspace({
                           onClick={handleDownload}
                           disabled={isDownloading}
                           className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all disabled:cursor-wait disabled:opacity-50"
-                          title={isDownloading ? "Letöltés..." : "Letöltés"}
+                          title={isDownloading ? "Downloading..." : "Download"}
                         >
                           {isDownloading ? (
                             <Activity className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
@@ -518,11 +518,11 @@ export default function AudioWorkspace({
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]" />
                     <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest italic">
-                      {audioInfo?.stream ? 'Streamelt jel' : 'Stabil jel'}
+                      {audioInfo?.stream ? 'Streamed signal' : 'Stable signal'}
                     </span>
                   </div>
                   <div className="text-[8px] sm:text-[9px] font-bold text-zinc-700 uppercase tracking-[0.18em] sm:tracking-widest sm:text-right">
-                    {playbackDetails || 'AI audio kimenet'}
+                    {playbackDetails || 'AI audio output'}
                   </div>
                 </div>
               </motion.div>
@@ -532,8 +532,8 @@ export default function AudioWorkspace({
                   <Mic className="w-10 h-10" />
                 </div>
                 <div className="text-center">
-                  <h4 className="text-sm font-black uppercase tracking-[0.4em] italic mb-1">Bemenetre vár</h4>
-                  <p className="text-[9px] font-bold uppercase tracking-widest">Állítsd be a paramétereket a kezdéshez</p>
+                  <h4 className="text-sm font-black uppercase tracking-[0.4em] italic mb-1">Waiting for input</h4>
+                  <p className="text-[9px] font-bold uppercase tracking-widest">Set the parameters to begin</p>
                 </div>
               </div>
             )}
@@ -585,7 +585,7 @@ export default function AudioWorkspace({
                   type="button"
                   onClick={closeHistoryModal}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/5 bg-white/[0.03] text-white/40 transition-all hover:border-white/15 hover:bg-white/10 hover:text-white"
-                  title="Bezárás"
+                  title="Close"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -625,7 +625,7 @@ export default function AudioWorkspace({
                         backgroundColor: activeHistoryKind.accent,
                         boxShadow: `0 18px 45px ${activeHistoryKind.accent}24`,
                       }}
-                      title={isHistoryModalPlaying ? "Szünet" : "Lejátszás"}
+                      title={isHistoryModalPlaying ? "Pause" : "Play"}
                     >
                       {isHistoryModalPlaying ? (
                         <Pause className="h-6 w-6 fill-current text-white" />
@@ -656,7 +656,7 @@ export default function AudioWorkspace({
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-4 text-[10px] font-black uppercase tracking-[0.18em] text-white/70 transition-all hover:border-white/20 hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-45"
                   >
                     {isDownloading ? <Activity className="h-4 w-4 animate-pulse" /> : <Download className="h-4 w-4" />}
-                    Letöltés
+                    Download
                   </button>
                 </div>
                 {downloadError ? (

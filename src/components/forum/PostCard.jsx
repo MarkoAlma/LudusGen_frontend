@@ -47,7 +47,6 @@ export default function PostCard({
   const menuRef = useRef(null);
 
   const categoryColors = {
-    chat: "#a78bfa",
     code: "#34d399",
     image: "#f472b6",
     audio: "#fb923c",
@@ -113,7 +112,7 @@ export default function PostCard({
             <div className="flex items-center gap-3 mb-6 flex-wrap">
               {post.pinned && (
                 <span className="flex items-center gap-2 text-[8px] font-black uppercase tracking-[0.2em] px-3 py-1 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-full shadow-[0_0_15px_rgba(234,179,8,0.2)]">
-                  <Pin className="w-3 h-3 fill-current" /> Rögzített
+                  <Pin className="w-3 h-3 fill-current" /> Pinned
                 </span>
               )}
               {post.hot && (
@@ -123,7 +122,7 @@ export default function PostCard({
               )}
               {post.solved && (
                 <span className="flex items-center gap-2 text-[8px] font-black uppercase tracking-[0.2em] px-3 py-1 bg-green-500/10 text-green-500 border border-green-500/20 rounded-full shadow-[0_0_15px_rgba(34,197,94,0.2)]">
-                  <CheckCircle className="w-3 h-3" /> Megoldva
+                  <CheckCircle className="w-3 h-3" /> Solved
                 </span>
               )}
               <span 
@@ -133,9 +132,9 @@ export default function PostCard({
                 {post.category}
               </span>
               <div className="ml-auto flex items-center gap-4 text-gray-700 font-bold uppercase tracking-widest text-[9px]">
-                 <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {post.readTime || 5} PERC</span>
+                 <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> {post.readTime || 5} MIN</span>
                  <div className="h-1 w-1 rounded-full bg-white/10" />
-                 <span>{post.time || 'Nemrég'}</span>
+                 <span>{post.time || 'Recently'}</span>
               </div>
             </div>
 
@@ -163,24 +162,24 @@ export default function PostCard({
                            style={{ background: "rgba(10,10,25,0.98)", backdropFilter: "blur(24px)" }}
                          >
                             <button onClick={(e) => handleAction(e, () => onEdit(post))} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white hover:bg-white/5 transition-all">
-                               <Edit className="w-4 h-4 text-blue-400" /> Szerkesztés
+                               <Edit className="w-4 h-4 text-blue-400" /> Edit
                             </button>
                             {isAdmin && (
                                <>
                                   <button onClick={(e) => handleAction(e, () => onStatusToggle(post.id, 'pinned', !post.pinned))} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white hover:bg-white/5 transition-all">
-                                     <Pin className="w-4 h-4 text-yellow-400" /> {post.pinned ? 'Levétel' : 'Kitűzés'}
+                                     <Pin className="w-4 h-4 text-yellow-400" /> {post.pinned ? 'Remove' : 'Pin'}
                                   </button>
                                   <button onClick={(e) => handleAction(e, () => onStatusToggle(post.id, 'hot', !post.hot))} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white hover:bg-white/5 transition-all">
                                      <Flame className="w-4 h-4 text-orange-400" /> Trending
                                   </button>
                                   <button onClick={(e) => handleAction(e, () => onStatusToggle(post.id, 'locked', !post.locked))} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white hover:bg-white/5 transition-all">
-                                     <Lock className="w-4 h-4 text-gray-400" /> Lezárás
+                                     <Lock className="w-4 h-4 text-gray-400" /> Lock
                                   </button>
                                </>
                             )}
                             <div className="h-px bg-white/5 my-1.5 mx-2" />
                             <button onClick={(e) => handleAction(e, () => onDelete(post.id))} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-red-400 hover:bg-red-500/10 transition-all">
-                               <Trash className="w-4 h-4" /> Törlés
+                               <Trash className="w-4 h-4" /> Delete
                             </button>
                          </motion.div>
                       )}

@@ -25,10 +25,44 @@ import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import PasswordStrength from '../components/auth/PasswordStrength';
 import OAuthButtons from '../components/auth/OAuthButtons';
+import { AnimatePresence, motion } from 'framer-motion';
+
+const AUTH_MODE_ORDER = {
+  forgot: 0,
+  login: 1,
+  signup: 2,
+};
+
+const AUTH_FORM_TRANSITION = {
+  duration: 0.22,
+  ease: [0.4, 0, 0.2, 1],
+};
+
+const authFormVariants = {
+  enter: (direction) => ({
+    opacity: 0,
+    x: direction >= 0 ? 24 : -24,
+    filter: 'blur(8px)',
+  }),
+  center: {
+    opacity: 1,
+    x: 0,
+    filter: 'blur(0px)',
+    transition: AUTH_FORM_TRANSITION,
+  },
+  exit: (direction) => ({
+    opacity: 0,
+    x: direction >= 0 ? -24 : 24,
+    filter: 'blur(8px)',
+    transition: { duration: 0.18, ease: [0.4, 0, 1, 1] },
+  }),
+};
 
 export default function Login({ isOpen, onClose }) {
   const [mode, setMode] = useState('login'); // 'login', 'signup', 'forgot'
   const [isSwitching, setIsSwitching] = useState(false);
+  const modeDirectionRef = useRef(1);
+  const switchTimerRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   const [mouseDownTarget, setMouseDownTarget] = useState(null);
   const [emailKikuldese, setEmailKikuldese] = useState(false);
@@ -64,6 +98,14 @@ export default function Login({ isOpen, onClose }) {
       confirmPassword: "",
     });
   },[mode])
+
+  useEffect(() => {
+    return () => {
+      if (switchTimerRef.current) {
+        clearTimeout(switchTimerRef.current);
+      }
+    };
+  }, []);
 
 
   // ✅ Másolás/Beillesztés megakadályozása a jelszó mezőbe
@@ -173,11 +215,22 @@ export default function Login({ isOpen, onClose }) {
   }, [user, onClose]);
 
   const switchMode = (newMode) => {
-    if (newMode === mode) return;
+    if (newMode === mode || isSwitching) return;
+
+    const direction =
+      (AUTH_MODE_ORDER[newMode] ?? AUTH_MODE_ORDER.login) -
+      (AUTH_MODE_ORDER[mode] ?? AUTH_MODE_ORDER.login);
+
+    modeDirectionRef.current = direction === 0 ? 1 : Math.sign(direction);
     setIsSwitching(true);
     setMode(newMode);
     setEmailSent(false);
-    setTimeout(() => {
+
+    if (switchTimerRef.current) {
+      clearTimeout(switchTimerRef.current);
+    }
+
+    switchTimerRef.current = setTimeout(() => {
       setIsSwitching(false);
     }, 400);
   };
@@ -360,7 +413,7 @@ export default function Login({ isOpen, onClose }) {
   return (
     <>
       <AuthShell isOpen={isOpen || show2FAModal} onClose={() => { if (!show2FAModal) { onClose(); setLoading(false); } }}>
-        <div style={{ width: '100%', maxWidth: '400px', margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: '100%', maxWidth: '400px', margin: '0 auto', display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
           
           <TwoFactorLogin
             isOpen={show2FAModal}
@@ -372,7 +425,16 @@ export default function Login({ isOpen, onClose }) {
           /> 
 
           {!show2FAModal && (
-            <>
+            <AnimatePresence mode="wait" initial={false} custom={modeDirectionRef.current}>
+              <motion.div
+                key={mode}
+                custom={modeDirectionRef.current}
+                variants={authFormVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                style={{ width: '100%', display: 'flex', flexDirection: 'column', willChange: 'transform, opacity, filter' }}
+              >
               {isForgot ? (
                 <>
                   {!emailSent ? (
@@ -417,7 +479,7 @@ export default function Login({ isOpen, onClose }) {
                 </>
               ) : (
                 <>
-                  <AuthTabs activeTab={mode} onTabChange={switchMode} />
+                  <AuthTabs activeTab={mode} onTabChange={switchMode} disabled={isSwitching} />
 
                   <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     
@@ -510,7 +572,8 @@ export default function Login({ isOpen, onClose }) {
                   )}
                 </>
               )}
-            </>
+              </motion.div>
+            </AnimatePresence>
           )}
         </div>
       </AuthShell>

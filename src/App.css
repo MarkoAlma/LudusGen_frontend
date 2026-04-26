@@ -59,3 +59,120 @@
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+/* LudusGen Toastify skin */
+.Toastify__toast-container.ludus-toast-container {
+  top: 86px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 0;
+}
+
+.ludus-toast {
+  --ludus-toast-accent: #10b981;
+  --ludus-toast-accent-soft: rgba(16, 185, 129, 0.16);
+  min-height: 0;
+  padding: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(22, 20, 28, 0.96), rgba(5, 5, 8, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 18px 60px rgba(0, 0, 0, 0.54),
+    0 0 0 1px rgba(138, 43, 226, 0.08),
+    0 0 32px var(--ludus-toast-accent-soft);
+  backdrop-filter: blur(20px);
+}
+
+.ludus-toast--error {
+  --ludus-toast-accent: #ef4444;
+  --ludus-toast-accent-soft: rgba(239, 68, 68, 0.18);
+}
+
+.ludus-toast .Toastify__toast-body,
+.ludus-toast-body {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.ludus-toast .Toastify__toast-body > div:last-child,
+.ludus-toast-body > div:last-child {
+  width: 100%;
+}
+
+.ludus-toast-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px 16px;
+}
+
+.ludus-toast-content::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 0%, var(--ludus-toast-accent-soft), transparent 44%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06), transparent 36%);
+}
+
+.ludus-toast-icon,
+.ludus-toast-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.ludus-toast-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  color: var(--ludus-toast-accent);
+  background: var(--ludus-toast-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--ludus-toast-accent) 42%, transparent);
+  box-shadow: 0 0 24px var(--ludus-toast-accent-soft);
+}
+
+.ludus-toast-copy {
+  min-width: 0;
+}
+
+.ludus-toast-title {
+  margin: 0;
+  color: #f9fafb;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.ludus-toast-detail {
+  margin: 3px 0 0;
+  color: #a1a1aa;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.ludus-toast-progress {
+  height: 2px;
+  background: linear-gradient(90deg, var(--ludus-toast-accent), #ec4899, #8a2be2);
+}
+
+@media (max-width: 480px) {
+  .Toastify__toast-container.ludus-toast-container {
+    top: 16px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    transform: none;
+  }
+}

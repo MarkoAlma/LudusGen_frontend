@@ -38,7 +38,7 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title, message, isLoadi
               <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-start gap-4 text-left">
                 <Info className="w-5 h-5 text-zinc-500 shrink-0 mt-0.5" />
                 <p className="text-[10px] font-medium text-zinc-500 leading-relaxed uppercase tracking-wider">
-                  Minden kapcsolódó üzenet és összefoglaló véglegesen törlődik. Ez a művelet nem vonható vissza.
+                  All related messages and summaries will be permanently deleted. This action cannot be undone.
                 </p>
               </div>
             </div>
@@ -50,14 +50,14 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title, message, isLoadi
                 disabled={isLoading}
                 className="py-4 rounded-2xl text-[10px] font-black text-white/40 uppercase tracking-[0.3em] hover:bg-white/5 hover:text-white transition-all disabled:opacity-50"
               >
-                Mégse
+                Cancel
               </button>
               <button
                 onClick={onConfirm}
                 disabled={isLoading}
                 className="py-4 rounded-2xl bg-red-500 text-[10px] font-black text-white uppercase tracking-[0.3em] hover:bg-red-400 hover:shadow-[0_0_30px_rgba(239,68,68,0.3)] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Törlés'}
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete'}
               </button>
             </div>
           </motion.div>
@@ -150,10 +150,10 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
   );
 
   const groupLabels = [
-    { key: 'today', label: 'Ma' },
-    { key: 'yesterday', label: 'Tegnap' },
-    { key: 'thisWeek', label: 'Ezen a héten' },
-    { key: 'older', label: 'Korábbi' },
+    { key: 'today', label: 'Today' },
+    { key: 'yesterday', label: 'Yesterday' },
+    { key: 'thisWeek', label: 'This week' },
+    { key: 'older', label: 'Older' },
   ];
 
   const handleStartRename = (e, conv) => {
@@ -224,9 +224,9 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
         <div className="px-6 h-20 lg:h-24 flex items-center justify-between">
           <div className="relative">
             <h3 className="text-white text-[12px] font-black uppercase tracking-[0.4em] flex items-center gap-3 italic">
-              <History className="w-4 h-4 text-primary" /> Előzmények
+              <History className="w-4 h-4 text-primary" /> History
             </h3>
-            <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-2 ml-7">Beszélgetések</p>
+            <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-2 ml-7">Conversations</p>
           </div>
         </div>
       </div>
@@ -245,7 +245,7 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
-            placeholder="Keresés..."
+            placeholder="Search..."
             className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-[12px] text-gray-300 placeholder-gray-700 font-bold"
           />
           {searchQuery && (
@@ -261,7 +261,7 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
         {loadingHistory ? (
           <div className="flex flex-col items-center justify-center p-12">
             <div className="w-6 h-6 rounded-full border-2 border-white/5 border-t-primary animate-spin mb-4" />
-            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-600">Betöltés...</span>
+            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-600">Loading...</span>
           </div>
         ) : filteredConversations.length > 0 ? (
           <div className="space-y-8">
@@ -291,7 +291,7 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
                                     if (e.key === 'Escape') setEditingId(null);
                                   }}
                                   className="flex-1 min-w-0 bg-transparent py-0.5 text-[13px] font-black italic text-white focus:outline-none placeholder-white/30 truncate"
-                                  placeholder="Cím..."
+                                  placeholder="Title..."
                                   autoFocus
                                 />
                                 <div className="flex items-center gap-1 shrink-0 px-2 border-l border-white/5 h-6">
@@ -301,7 +301,7 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
                                       handleSaveRename(e, conv.id);
                                     }}
                                     className="p-1 hover:bg-green-500/20 rounded-lg transition-colors text-green-500"
-                                    title="Mentés"
+                                    title="Save"
                                   >
                                     <Check className="w-3.5 h-3.5" />
                                   </button>
@@ -311,7 +311,7 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
                                       setEditingId(null);
                                     }}
                                     className="p-1 hover:bg-red-500/20 rounded-lg transition-colors text-red-500"
-                                    title="Mégse"
+                                    title="Cancel"
                                   >
                                     <X className="w-3.5 h-3.5" />
                                   </button>
@@ -376,7 +376,7 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
                                           }}
                                           className="w-full text-left px-4 py-2 text-[11px] font-bold text-white/70 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-3 uppercase tracking-wider"
                                         >
-                                          <Pencil className="w-3.5 h-3.5" /> Szerkesztés
+                                          <Pencil className="w-3.5 h-3.5" /> Edit
                                         </button>
                                         <div className="h-px bg-white/5 my-1 mx-2" />
                                         <button
@@ -387,7 +387,7 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
                                           }}
                                           className="w-full text-left px-4 py-2 text-[11px] font-bold text-red-500/80 hover:text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-3 uppercase tracking-wider group-hover"
                                         >
-                                          <Trash2 className="w-3.5 h-3.5" /> Törlés
+                                          <Trash2 className="w-3.5 h-3.5" /> Delete
                                         </button>
                                       </motion.div>
                                     )}
@@ -410,7 +410,7 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
                 {isLoadingMore ? (
                   <div className="flex flex-col items-center gap-2">
                     <div className="w-4 h-4 rounded-full border-2 border-white/5 border-t-primary animate-spin" />
-                    <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Betöltés...</span>
+                    <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600">Loading...</span>
                   </div>
                 ) : (
                   <div ref={scrollSentinelRef} className="w-full h-full" />
@@ -424,9 +424,9 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
               <History className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none mb-2">Üres</p>
+              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none mb-2">Empty</p>
               <p className="text-[9px] text-gray-700 font-bold uppercase tracking-tighter">
-                {searchQuery ? 'Nincs találat' : 'Az új beszélgetések itt jelennek meg'}
+                {searchQuery ? 'No results' : 'New conversations will appear here'}
               </p>
             </div>
           </div>
@@ -437,8 +437,8 @@ export default function ChatSidebar({ conversations, loadingHistory, onSelectSes
         isOpen={confirmDeleteId !== null}
         onClose={() => setConfirmDeleteId(null)}
         onConfirm={handleConfirmDelete}
-        title="Beszélgetés törlése"
-        message="Biztosan törölni szeretnéd ezt a beszélgetést?"
+        title="Delete conversation"
+        message="Are you sure you want to delete this conversation?"
         isLoading={isDeleting}
       />
     </div>
