@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   History, Search, Box, ChevronDown, Sparkles, Info, Eraser, Loader2, Download,
-  PersonStanding, Wand2, LayoutGrid, X, Upload, Scissors, Boxes
+  PersonStanding, Wand2, LayoutGrid, X, Upload, Scissors, Boxes, Images
 } from 'lucide-react';
 import { collection, query, where, orderBy, getDocs, limit, startAfter, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseApp';
@@ -10,6 +10,7 @@ import HistoryCard from '../../ai_components/shared/HistoryCard';
 import { getItemTs } from '../../ai_components/trellis/utils';
 import { checkThumbnailCache } from '../../ai_components/trellis/Glbthumbnail';
 import { Tooltip } from '../../ai_components/meshy/ui/Primitives';
+import { getHistoryImageUrls, isImageHistoryItem } from '../../ai_components/tripo/tripoImageHistoryUtils';
 import toast from 'react-hot-toast';
 import './Shared3DHistory.css';
 
@@ -23,6 +24,7 @@ const TYPE_COLORS = {
   rigged: { rail: "#f472b6", glow: "#db2777" },
   animation: { rail: "#22d3ee", glow: "#0891b2" },
   segment: { rail: "#f59e0b", glow: "#d97706" },
+  images: { rail: "#00e5ff", glow: "#0891b2" },
   trellis: { rail: "#34d399", glow: "#059669" },
   upload: { rail: "#94a3b8", glow: "#475569" },
 };
@@ -119,6 +121,7 @@ const TABS = [
 const SUBTABS = [
   { id: 'all', label: 'All', icon: LayoutGrid, from: "#64748b", to: "#475569" },
   { id: 'models', label: 'Models', icon: Box, from: "#64748b", to: "#334155" },
+  { id: 'images', label: 'Images', icon: Images, from: "#00e5ff", to: "#0891b2" },
   { id: 'rigged', label: 'Rig', icon: PersonStanding, from: "#f472b6", to: "#db2777" },
   { id: 'animations', label: 'Anim', icon: Wand2, from: "#22d3ee", to: "#0891b2" },
   { id: 'segment', label: 'Segment', icon: Scissors, from: "#f59e0b", to: "#d97706" },
@@ -132,6 +135,8 @@ export default function Shared3DHistory({
   refreshTrigger = 0, defaultTab = 'tripo', optimisticItems = [],
   firestoreCollection = 'trellis_history',
 }) {
+  const MotionDiv = motion.div;
+  const onHistoryLoadRef = useRef(onHistoryLoad);
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [subTab, setSubTab] = useState('all');
   const [histQ, setHistQ] = useState("");
@@ -148,6 +153,10 @@ export default function Shared3DHistory({
   const historyLoadedRef = useRef(false);
 
   useEffect(() => {
+    onHistoryLoadRef.current = onHistoryLoad;
+  }, [onHistoryLoad]);
+
+  useEffect(() => {
     if (!userId) { setHistLoad(false); return; }
     const q = query(collection(db, firestoreCollection),
       where('userId', '==', userId), orderBy('createdAt', 'desc'), limit(PAGE_SIZE));
@@ -155,7 +164,9 @@ export default function Shared3DHistory({
       const now = Date.now();
       const rawItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const items = rawItems.filter(item => {
-        if (!item.model_url) {
+        const hasModel = !!item.model_url;
+        const hasImages = getHistoryImageUrls(item).length > 0;
+        if (!hasModel && !hasImages) {
           return false;
         }
         if (item.marketplaceLocked || item.marketplaceAssetId || item.mode === 'marketplace') {
@@ -167,7 +178,7 @@ export default function Shared3DHistory({
       lastDocR.current = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
       setHasMore(snap.docs.length === PAGE_SIZE);
       setHistLoad(false);
-      if (!historyLoadedRef.current) { historyLoadedRef.current = true; onHistoryLoad?.(items); }
+      if (!historyLoadedRef.current) { historyLoadedRef.current = true; onHistoryLoadRef.current?.(items); }
     }, err => { console.error("[Shared3DHistory]", err); setHistLoad(false); });
     return () => unsub();
   }, [userId, firestoreCollection, refreshTrigger]);
@@ -183,7 +194,9 @@ export default function Shared3DHistory({
       const now = Date.now();
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         .filter(item => {
-          if (!item.model_url) return false;
+          const hasModel = !!item.model_url;
+          const hasImages = getHistoryImageUrls(item).length > 0;
+          if (!hasModel && !hasImages) return false;
           if (item.marketplaceLocked || item.marketplaceAssetId || item.mode === 'marketplace') return true;
           const ts = getItemTs(item); return ts === 0 || (now - ts) < HISTORY_TTL_MS;
         });
@@ -191,7 +204,7 @@ export default function Shared3DHistory({
       lastDocR.current = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
       setHasMore(snap.docs.length === PAGE_SIZE);
     } catch (e) { console.error(e); } finally { setMoreLoad(false); }
-  }, [userId, hasMore, moreLoad]);
+  }, [userId, hasMore, moreLoad, firestoreCollection]);
 
   const handleAssetUpload = useCallback(async (file) => {
     if (!file) return;
@@ -257,18 +270,21 @@ export default function Shared3DHistory({
   }, [history, optimisticItems]);
 
   const filtHist = useMemo(() => mergedHistory.filter(item => {
-    if (!item.model_url) return false;
+    const hasModel = !!item.model_url;
+    const isImageSet = isImageHistoryItem(item);
+    if (!hasModel && !isImageSet) return false;
     if (histQ && !(item.prompt || "").toLowerCase().includes(histQ.toLowerCase())) return false;
     const src = item.source || "trellis";
     if (activeTab === 'tripo') {
       if (src !== 'tripo') return false;
+      if (subTab === 'images') return isImageSet;
       const isRig = item.mode === 'rig' || item.params?.rigged === true || item.params?.type === 'animate_rig';
       const isAnim = item.mode === 'animate' && !isRig || item.params?.animated === true || item.params?.type === 'animate_retarget';
       const isSeg = item.mode === 'segment';
       const isFill = item.mode === 'fill_parts';
       const isGenerateParts = item.params?.generate_parts === true || item.params?.inParts === true;
       const isSegmentFamily = isSeg || isGenerateParts;
-      if (subTab === 'models') return !isRig && !isAnim && !isSegmentFamily && !isFill;
+      if (subTab === 'models') return !isImageSet && !isRig && !isAnim && !isSegmentFamily && !isFill;
       if (subTab === 'rigged') return isRig;
       if (subTab === 'animations') return isAnim;
       if (subTab === 'segment') return isSegmentFamily;
@@ -296,8 +312,12 @@ export default function Shared3DHistory({
 
   const tripoSections = useMemo(() => {
     if (activeTab !== 'tripo') return null;
-    const generated = [], rigged = [], animations = [], segments = [], fillParts = [];
+    const generated = [], images = [], rigged = [], animations = [], segments = [], fillParts = [];
     for (const item of filtHist) {
+      if (isImageHistoryItem(item)) {
+        images.push(item);
+        continue;
+      }
       const isRig = item.mode === 'rig' || item.params?.rigged === true || item.params?.type === 'animate_rig';
       const isAnim = (item.mode === 'animate' && !isRig) || item.params?.animated === true || item.params?.type === 'animate_retarget';
       const isSeg = item.mode === 'segment';
@@ -309,11 +329,11 @@ export default function Shared3DHistory({
       else if (isFill) fillParts.push(item);
       else generated.push(item);
     }
-    return { generated, rigged, animations, segments, fillParts };
+    return { generated, images, rigged, animations, segments, fillParts };
   }, [filtHist, activeTab]);
 
   const activeTabDef = TABS.find(t => t.id === activeTab) || TABS[0];
-  const accent = activeTabDef.color;
+  const accent = activeTabDef.color || color;
 
   return (
     <div style={{
@@ -435,7 +455,7 @@ export default function Shared3DHistory({
         {/* Tripo sub-filter chips */}
         <AnimatePresence>
           {activeTab === 'tripo' && (
-            <motion.div
+            <MotionDiv
               initial={{ opacity: 0, height: 0, marginBottom: 0 }}
               animate={{ opacity: 1, height: "auto", marginBottom: 10 }}
               exit={{ opacity: 0, height: 0, marginBottom: 0 }}
@@ -472,7 +492,7 @@ export default function Shared3DHistory({
                   );
                 })}
               </div>
-            </motion.div>
+            </MotionDiv>
           )}
         </AnimatePresence>
 
@@ -583,15 +603,16 @@ export default function Shared3DHistory({
         {/* Tripo sections */}
         {!histLoad && activeTab === 'tripo' && tripoSections && (
           <AnimatePresence mode="sync">
-            <motion.div key={`${activeTab}-${subTab}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
+            <MotionDiv key={`${activeTab}-${subTab}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
               {subTab === 'all' ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                   {[...filtHist].sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0)).map(item => {
+                    const isImageSet = isImageHistoryItem(item);
                     const isRig = item.mode === 'rig' || item.params?.rigged === true || item.params?.type === 'animate_rig';
                     const isAnim = (item.mode === 'animate' && !isRig) || item.params?.animated === true || item.params?.type === 'animate_retarget';
                     const isSeg = item.mode === 'segment';
                     const isFill = item.mode === 'fill_parts';
-                    const cardColor = isAnim ? TYPE_COLORS.animation.rail : isRig ? TYPE_COLORS.rigged.rail : isSeg ? TYPE_COLORS.segment.rail : isFill ? "#c084fc" : accent;
+                    const cardColor = isImageSet ? TYPE_COLORS.images.rail : isAnim ? TYPE_COLORS.animation.rail : isRig ? TYPE_COLORS.rigged.rail : isSeg ? TYPE_COLORS.segment.rail : isFill ? "#c084fc" : accent;
                     return (
                 <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color={cardColor} getIdToken={getIdToken} />
                     );
@@ -599,6 +620,16 @@ export default function Shared3DHistory({
                 </div>
               ) : (
                 <>
+                  {tripoSections.images.length > 0 && (
+                    <>
+                      <SectionHeader label="Image Sets" icon={Images} typeColor={TYPE_COLORS.images} count={tripoSections.images.length} />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
+                        {tripoSections.images.map(item => (
+                      <HistoryCard key={item.id} item={{ ...item, name: getDisplayName(item) }} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color={TYPE_COLORS.images.rail} getIdToken={getIdToken} />
+                        ))}
+                      </div>
+                    </>
+                  )}
                   {tripoSections.generated.length > 0 && (
                     <>
                       <SectionHeader label="Generated Models" icon={Sparkles} typeColor={TYPE_COLORS.model} count={tripoSections.generated.length} />
@@ -651,20 +682,20 @@ export default function Shared3DHistory({
                   )}
                 </>
               )}
-            </motion.div>
+            </MotionDiv>
           </AnimatePresence>
         )}
 
         {/* Other tabs */}
         {!histLoad && activeTab !== 'tripo' && filtHist.length > 0 && (
           <AnimatePresence mode="sync">
-            <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
+            <MotionDiv key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {filtHist.map(item => (
                 <HistoryCard key={item.id} item={item} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color={accent} getIdToken={getIdToken} />
                 ))}
               </div>
-            </motion.div>
+            </MotionDiv>
           </AnimatePresence>
         )}
 

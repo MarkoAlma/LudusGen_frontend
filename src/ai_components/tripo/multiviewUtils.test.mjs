@@ -5,6 +5,7 @@ import {
   hasTaskImagePreview,
   isMultiviewUploadReady,
   getReadyMultiviewRefs,
+  getMultiviewFilesPayload,
 } from "./multiviewUtils.js";
 
 const ready = (label) => ({ label, token: `${label}-token` });
@@ -33,6 +34,19 @@ const ready = (label) => ({ label, token: `${label}-token` });
   ]);
 
   assert.deepEqual(refs.map((item) => item.label), ["front", "back", "right"]);
+}
+
+{
+  const files = getMultiviewFilesPayload([
+    ready("front"),
+    undefined,
+    ready("back"),
+    ready("right"),
+  ]);
+
+  assert.equal(files.length, 4);
+  assert.deepEqual(files.map((item) => item?.label ?? null), ["front", null, "back", "right"]);
+  assert.deepEqual(files[1], {});
 }
 
 {

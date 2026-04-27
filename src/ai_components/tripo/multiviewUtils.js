@@ -20,6 +20,13 @@ export function getReadyMultiviewRefs(items = []) {
     .filter(isUploadedMultiviewItemReady);
 }
 
+export function getMultiviewFilesPayload(items = [], mapItem = (item) => item) {
+  return MULTIVIEW_UPLOAD_ORDER.map((_, index) => {
+    const item = items?.[index];
+    return isUploadedMultiviewItemReady(item) ? mapItem(item) : {};
+  });
+}
+
 export function isMultiviewUploadReady(items = []) {
   const frontReady = isUploadedMultiviewItemReady(items?.[0]);
   return frontReady && getReadyMultiviewRefs(items).length >= 2;

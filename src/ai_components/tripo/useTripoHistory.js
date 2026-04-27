@@ -36,7 +36,7 @@ export function useTripoHistory({
   modelVer,
   activeStyle,
   history,
-  histInit,
+  histInit: histInitRef,
   setOptimisticItems,
   setHistory,
 }) {
@@ -96,9 +96,9 @@ export function useTripoHistory({
     const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
     setOptimisticItems(prev => prev.filter(o => o.id !== stableDocId));
     setHistory(h => [ni, ...h]);
-    histInit.current = true;
+    histInitRef.current = true;
     return ni;
-  }, [userId, prompt, negPrompt, mode, modelVer, activeStyle, setOptimisticItems, setHistory, histInit]);
+  }, [userId, prompt, negPrompt, mode, modelVer, activeStyle, setOptimisticItems, setHistory, histInitRef]);
 
   const saveRigHist = useCallback(async (taskId, rawUrl, extra = {}) => {
     const dedupKey = rawUrl + "|" + taskId;
@@ -133,9 +133,57 @@ export function useTripoHistory({
     const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
     setOptimisticItems(prev => prev.filter(o => o.id !== stableDocId));
     setHistory(h => [ni, ...h]);
-    histInit.current = true;
+    histInitRef.current = true;
     return ni;
-  }, [userId, history, activeStyle, setOptimisticItems, setHistory, histInit]);
+  }, [userId, history, activeStyle, setOptimisticItems, setHistory, histInitRef]);
 
-  return { saveHist, saveRigHist };
+  const saveImageHist = useCallback(async (taskId, imageUrls = [], extra = {}) => {
+    const normalizedUrls = Array.isArray(imageUrls) ? imageUrls.filter(Boolean) : [];
+    if (!normalizedUrls.length) return null;
+    const dedupKey = normalizedUrls.join("|") + "|" + taskId;
+    if (_savedUrls.has(dedupKey)) return null;
+    _savedUrls.add(dedupKey);
+
+    const cap2 = s => s ? s.trim().split(/\s+/).slice(0, 2).join(" ") : s;
+    const effectivePrompt = extra.prompt ?? prompt;
+    const effectiveMode = extra.mode ?? mode;
+    const effectiveModelVer = getCanonicalModelVersion(extra.model_version ?? extra.modelVer ?? modelVer);
+    const cleanExtra = omitUndefined(extra);
+    delete cleanExtra.modelVer;
+    delete cleanExtra.modelVersion;
+    const topLevelType = cleanExtra.type ?? null;
+    const resolvedName = cap2(extra.name) || cap2(effectivePrompt.trim()) || "Views";
+    const item = {
+      prompt: effectivePrompt.trim() || extra.label || effectiveMode || "views",
+      name: resolvedName,
+      status: "succeeded",
+      source: extra.source ?? "tripo",
+      mode: effectiveMode,
+      taskId,
+      kind: "images",
+      image_urls: normalizedUrls,
+      previewImageUrl: normalizedUrls[0] ?? null,
+      previewImageUrls: normalizedUrls,
+      ...(topLevelType && { type: topLevelType }),
+      styleId: activeStyle || null,
+      negPrompt: (extra.negPrompt ?? negPrompt) || null,
+      params: omitUndefined({
+        ...cleanExtra,
+        assetKind: "images",
+        model_version: effectiveModelVer,
+        mode: effectiveMode,
+      }),
+      ts: Date.now(),
+    };
+
+    const stableDocId = `tripo_${taskId}`;
+    const { docId } = await saveHistoryToFirestore(userId, item, stableDocId, "tripo_history");
+    const ni = { id: docId ?? stableDocId, ...item, createdAt: { toDate: () => new Date() } };
+    setOptimisticItems(prev => prev.filter(o => o.id !== stableDocId));
+    setHistory(h => [ni, ...h.filter(existing => existing.id !== (docId ?? stableDocId))]);
+    histInitRef.current = true;
+    return ni;
+  }, [userId, prompt, negPrompt, mode, modelVer, activeStyle, setOptimisticItems, setHistory, histInitRef]);
+
+  return { saveHist, saveRigHist, saveImageHist };
 }

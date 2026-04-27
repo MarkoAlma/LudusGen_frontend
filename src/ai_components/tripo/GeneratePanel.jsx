@@ -602,10 +602,7 @@ const GeneratePanel = memo(({
   generationRenderImage, setGenerationRenderImage,
   generationTextureAlignment, setGenerationTextureAlignment,
   imageReference, setImageReference,
-  multiviewReference, setMultiviewReference,
-  multiviewMode, setMultiviewMode,
-  multiviewOrthographic, setMultiviewOrthographic,
-  multiviewOriginalTaskId, setMultiviewOriginalTaskId,
+  multiviewOriginalTaskId,
   activeStyles = [],
   onStyleToggle = () => { },
 }) => {
@@ -626,18 +623,15 @@ const GeneratePanel = memo(({
     0
   );
   const isFrontMultiviewReady = isUploadedItemReady(multiImages?.[0]);
+  const hasGeneratedMultiviewTask = Boolean(multiviewOriginalTaskId?.trim?.());
   const multiviewSourceHelp = {
     upload: {
       title: "Upload views",
-      body: "Best for exact control. Add at least Front plus one more view; full order is Front, Left, Back, Right.",
+      body: "Upload existing view images for model generation. Add at least Front plus one more view; full order is Front, Left, Back, Right.",
     },
-    generate_multiview_image: {
-      title: "Generate views",
-      body: "Tripo creates the guide views first, then LudusGen turns that task into a 3D model automatically.",
-    },
-    edit_multiview_image: {
-      title: "Edit views",
-      body: "Use an existing multiview task ID, a reference image, or uploaded guide views to revise the view set before 3D generation.",
+    generated_views: {
+      title: "From Views",
+      body: "Use the latest view set created in the Views tool as the source for this 3D model.",
     },
   };
   const normalizeUploadedItem = (file, preview, payload) => ({
@@ -661,6 +655,12 @@ const GeneratePanel = memo(({
     const c = getModelCaps(modelVer);
     if (!c.multiview && genTab === "multi") setGenTab("image");
     if (genTab === "batch") setGenTab("image"); // Auto-redirect deprecated tab
+    if (genTab === "multi" && !["upload", "generated_views"].includes(multiviewSourceMode)) {
+      setMultiviewSourceMode("upload");
+    }
+    if (genTab === "multi" && multiviewSourceMode === "generated_views" && !hasGeneratedMultiviewTask) {
+      setMultiviewSourceMode("upload");
+    }
     if (!c.tPose && tPose) setTPose(false);
     if (!c.negPrompt) setNegPrompt("");
     if (!c.inParts && inParts) setInParts(false);
@@ -672,7 +672,7 @@ const GeneratePanel = memo(({
     if (!c.quad && quadMesh) setQuadMesh(false);
     if (!c.autoSize && autoSize) setAutoSize(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelVer]);
+  }, [modelVer, genTab, multiviewSourceMode, setMultiviewSourceMode, hasGeneratedMultiviewTask]);
 
   /* ─── Batch file handler ──────────────────────────────────────────── */
   function handleBatchFiles(files) {
@@ -922,9 +922,8 @@ const GeneratePanel = memo(({
       {genTab === "multi" && (
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
           <div className="tp-source-mode-row" style={sourceModeRowStyle}>
-            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "upload" ? " active" : "")} data-active={multiviewSourceMode === "upload" ? "true" : "false"} aria-pressed={multiviewSourceMode === "upload"} title="Upload existing view images" onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("upload")} style={sourceModeBtnStyle(multiviewSourceMode === "upload", 0, 3)}>Upload</button>
-            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "generate_multiview_image" ? " active" : "")} data-active={multiviewSourceMode === "generate_multiview_image" ? "true" : "false"} aria-pressed={multiviewSourceMode === "generate_multiview_image"} title="Generate Tripo guide views first" onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("generate_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "generate_multiview_image", 1, 3)}>Generate</button>
-            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "edit_multiview_image" ? " active" : "")} data-active={multiviewSourceMode === "edit_multiview_image" ? "true" : "false"} aria-pressed={multiviewSourceMode === "edit_multiview_image"} title="Edit an existing view set" onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("edit_multiview_image")} style={sourceModeBtnStyle(multiviewSourceMode === "edit_multiview_image", 2, 3)}>Edit</button>
+            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "upload" ? " active" : "")} data-active={multiviewSourceMode === "upload" ? "true" : "false"} aria-pressed={multiviewSourceMode === "upload"} title="Upload existing view images" onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("upload")} style={sourceModeBtnStyle(multiviewSourceMode === "upload", 0, 2)}>Upload</button>
+            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "generated_views" ? " active" : "")} data-active={multiviewSourceMode === "generated_views" ? "true" : "false"} aria-pressed={multiviewSourceMode === "generated_views"} disabled={!hasGeneratedMultiviewTask} title={hasGeneratedMultiviewTask ? "Use the latest generated or edited views" : "Generate views in the Views tool first"} onMouseDown={(e) => e.preventDefault()} onClick={() => hasGeneratedMultiviewTask && setMultiviewSourceMode("generated_views")} style={{ ...sourceModeBtnStyle(multiviewSourceMode === "generated_views", 1, 2), opacity: hasGeneratedMultiviewTask ? 1 : 0.42, cursor: hasGeneratedMultiviewTask ? "pointer" : "not-allowed" }}>From Views</button>
           </div>
 
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 16, background: "rgba(0,229,255,0.055)", border: "1px solid rgba(0,229,255,0.14)", boxShadow: "0 0 22px rgba(0,229,255,0.06)" }}>
@@ -939,70 +938,15 @@ const GeneratePanel = memo(({
             </div>
           </div>
 
-          {multiviewSourceMode !== "upload" && (
+          {multiviewSourceMode === "generated_views" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div>
-                <label style={labelStyle}>{multiviewSourceMode === "edit_multiview_image" ? "Edit Prompt" : "Multiview Prompt"}</label>
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  rows={4}
-                  placeholder={multiviewSourceMode === "edit_multiview_image"
-                    ? "Describe how the generated multiview set should be edited…"
-                    : "Describe the subject for Tripo multiview image generation…"}
-                  style={{ ...fieldStyle, resize: "vertical", minHeight: 96 }}
-                />
-              </div>
-              {multiviewSourceMode === "edit_multiview_image" && (
-                <div>
-                  <label style={labelStyle}>Original Task Id</label>
-                  <input value={multiviewOriginalTaskId} onChange={(e) => setMultiviewOriginalTaskId(e.target.value)} placeholder="Optional original multiview task id" style={fieldStyle} />
-                </div>
-              )}
-              <div>
-                <label style={labelStyle}>Reference Image</label>
-                {renderReferenceUploader(multiviewReference, setMultiviewReference, handleMultiImg, "Add multiview reference")}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-                <div>
-                  <label style={labelStyle}>Image Model</label>
-                  <input value={generationModel} onChange={(e) => setGenerationModel(e.target.value)} placeholder="Optional model id" style={fieldStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Template</label>
-                  <input value={generationTemplateId} onChange={(e) => setGenerationTemplateId(e.target.value)} placeholder="Optional template id" style={fieldStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Orientation</label>
-                  <TripoSelect value={generationOrientation} onChange={setGenerationOrientation} options={ORIENTATION_OPTIONS} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Compress</label>
-                  <TripoSelect value={generationCompress} onChange={setGenerationCompress} options={COMPRESS_OPTIONS} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Mode</label>
-                  <TripoSelect value={multiviewMode} onChange={setMultiviewMode} options={MULTIVIEW_MODE_OPTIONS} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Texture Alignment</label>
-                  <input value={generationTextureAlignment} onChange={(e) => setGenerationTextureAlignment(e.target.value)} placeholder="Optional texture alignment hint" style={fieldStyle} />
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                  <div>
-                    <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 700 }}>Render Image</div>
-                    <p style={subtleHintStyle}>Keep preview renders in the task output.</p>
-                  </div>
-                  <div className={"tp-switch" + (generationRenderImage ? " on" : "")} onClick={() => setGenerationRenderImage((v) => !v)} />
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                  <div>
-                    <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 700 }}>Orthographic</div>
-                    <p style={subtleHintStyle}>Enable orthographic projection for cleaner guide views.</p>
-                  </div>
-                  <div className={"tp-switch" + (multiviewOrthographic ? " on" : "")} onClick={() => setMultiviewOrthographic((v) => !v)} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 18, border: hasGeneratedMultiviewTask ? "1px solid rgba(16,185,129,0.26)" : "1px solid rgba(245,158,11,0.22)", background: hasGeneratedMultiviewTask ? "rgba(16,185,129,0.07)" : "rgba(245,158,11,0.055)" }}>
+                <Check style={{ width: 15, height: 15, color: hasGeneratedMultiviewTask ? "#10B981" : "#F59E0B", flex: "0 0 auto" }} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em" }}>Views selected</div>
+                  <p style={subtleHintStyle}>
+                    The latest Views result will be used automatically.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1106,7 +1050,7 @@ const GeneratePanel = memo(({
       </Na>
 
       {/* ── Multi-view tab ── */}
-      {genTab === "multi" && multiviewSourceMode !== "generate_multiview_image" && (
+      {genTab === "multi" && multiviewSourceMode === "upload" && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8, padding: "0 2px" }}>
             <span style={{ color: "#94a3b8", fontSize: 10, fontWeight: 800 }}>
