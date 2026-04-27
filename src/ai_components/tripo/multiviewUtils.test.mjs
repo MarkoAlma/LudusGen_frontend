@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   MULTIVIEW_UPLOAD_ORDER,
+  buildMultiviewPreviewItems,
   hasTaskImagePreview,
   isMultiviewUploadReady,
   getReadyMultiviewRefs,
@@ -34,6 +35,21 @@ const ready = (label) => ({ label, token: `${label}-token` });
   ]);
 
   assert.deepEqual(refs.map((item) => item.label), ["front", "back", "right"]);
+}
+
+{
+  const previewItems = buildMultiviewPreviewItems([
+    "https://example.com/front.png",
+    "https://example.com/left.png",
+    "https://example.com/back.png",
+  ]);
+
+  assert.equal(previewItems.length, 4);
+  assert.equal(previewItems[0]?.slotId, "front");
+  assert.equal(previewItems[1]?.slotId, "left");
+  assert.equal(previewItems[2]?.slotId, "back");
+  assert.equal(previewItems[3], null);
+  assert.equal(previewItems[0]?.preview, "https://example.com/front.png");
 }
 
 {

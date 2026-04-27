@@ -33,6 +33,8 @@ import { DEFAULT_MODEL_VERSION, DEFAULT_TEXTURE_MODEL_VERSION, DETAILED_TEXTURE_
 import { streamTaskStatus, uploadViaTripoSts } from "./tripoTransfers";
 import { resolveTripoModelUrl, resolveTripoUrlNode } from "./utils/modelUrl";
 import {
+  MULTIVIEW_UPLOAD_ORDER,
+  buildMultiviewPreviewItems,
   getMultiviewFilesPayload,
   getReadyMultiviewRefs,
   hasTaskImagePreview,
@@ -165,6 +167,17 @@ const TRIPO_PAINT_MODE_DISABLED = true;
 const TRIPO_PAINT_MODE_DISABLED_MESSAGE = "waiting for tripo patch";
 const TRIPO_MODEL_IMPORT_MAX_BYTES = 150 * 1024 * 1024;
 const TRIPO_MODEL_IMPORT_EXTENSIONS = new Set(["glb", "fbx", "obj", "stl"]);
+
+function normalizeUploadedMultiviewItem(file, preview, payload) {
+  return {
+    file,
+    preview,
+    token: typeof payload === "string"
+      ? payload
+      : payload?.token || payload?.object?.key || "sts",
+    ...(typeof payload === "object" && payload ? { tripoFile: payload } : {}),
+  };
+}
 
 function inferImageTypeFromUrl(url) {
   const cleanUrl = String(url || "").split("?")[0].toLowerCase();
@@ -1457,8 +1470,28 @@ const CSS = `
     box-shadow:0 12px 26px rgba(0,0,0,0.18),0 0 22px rgba(0,229,255,0.10),inset 0 1px 0 rgba(255,255,255,0.09) !important;
     outline:none;
   }
-  .tp-workflow-page .tp-view-choice.active {
-    color:#f8fafc !important;
+  /* Enhanced Active State for VIEW buttons */
+  .tp-workflow-page button.tp-view-choice.active,
+  .tp-workflow-page button.tp-view-choice.active:hover,
+  .tp-workflow-page button.tp-view-choice.active:focus-visible {
+    color: #ffffff !important;
+    border: 2px solid #00e5ff !important;
+    background: linear-gradient(145deg, rgba(0, 229, 255, 0.35), rgba(138, 43, 226, 0.25)) !important;
+    box-shadow: 0 0 30px rgba(0, 229, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+    opacity: 1 !important;
+    transform: scale(1.02) !important;
+    z-index: 10;
+  }
+  .tp-workflow-page button.tp-view-choice.active::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 15px;
+    background: linear-gradient(145deg, #00e5ff, #8a2be2);
+    opacity: 0.15;
+    z-index: -1;
+    filter: blur(8px);
+    animation: pulseGlow 2s infinite;
   }
   .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean .tp-tab-icon {
     width:20px !important;
@@ -1653,6 +1686,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [multiviewEditPrompt, setMultiviewEditPrompt] = useState("");
   const [multiviewEditView, setMultiviewEditView] = useState("front");
   const [multiImages, setMultiImages] = useState([]);
+  const remoteMultiviewLoadSeqRef = useRef(0);
   const [batchImages, setBatchImages] = useState([]);
   const [imgFile, setImgFile] = useState(null);
   const [imgPrev, setImgPrev] = useState(null);
@@ -2192,9 +2226,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           return batchImages?.length > 0 && batchImages.every((item) => isUploadedImageReady(item));
         }
         if (genTab === "multi") {
-          return multiviewSourceMode === "generated_views"
-            ? !!selectedMultiviewImageTaskId
-            : multiviewUploadsReady;
+          return multiviewUploadsReady || !!selectedMultiviewImageTaskId;
         }
         return false;
       case "views":
@@ -2343,6 +2375,56 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   const handleMultiImg = uploadImageStsFile;
   const handleBatchImg = uploadImageStsFile;
+
+  const hydrateMultiviewImagesFromHistory = useCallback(async (item, { preferUpload = false } = {}) => {
+    const previewUrls = getHistoryImageUrls(item).slice(0, 4);
+    if (!previewUrls.length) {
+      setMultiImages([]);
+      return;
+    }
+
+    const requestSeq = ++remoteMultiviewLoadSeqRef.current;
+    const seededItems = buildMultiviewPreviewItems(previewUrls);
+    setMultiImages(seededItems);
+    if (preferUpload) setMultiviewSourceMode("upload");
+
+    const uploadedItems = await Promise.all(
+      previewUrls.map(async (url, index) => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`History image fetch failed (${response.status})`);
+          const blob = await response.blob();
+          const extension = inferImageTypeFromUrl(url);
+          const file = new File(
+            [blob],
+            `tripo_${MULTIVIEW_UPLOAD_ORDER[index]?.id || `view_${index + 1}`}.${extension}`,
+            { type: blob.type || `image/${extension}` }
+          );
+          const payload = await uploadImageStsFile(file);
+          return {
+            index,
+            item: {
+              ...seededItems[index],
+              ...normalizeUploadedMultiviewItem(file, seededItems[index]?.preview || url, payload),
+            },
+          };
+        } catch (error) {
+          console.warn("[hydrateMultiviewImagesFromHistory] upload failed:", error?.message || error);
+          return { index, item: seededItems[index] };
+        }
+      })
+    );
+
+    if (remoteMultiviewLoadSeqRef.current !== requestSeq) return;
+
+    setMultiImages((prev) => {
+      const next = Array.isArray(prev) ? [...prev] : [...seededItems];
+      uploadedItems.forEach(({ index, item: nextItem }) => {
+        next[index] = nextItem;
+      });
+      return next;
+    });
+  }, [uploadImageStsFile]);
 
   const handleImg = useCallback(async (file) => {
     if (!file) {
@@ -3091,6 +3173,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       if (isImageSet) {
         setMultiviewOriginalTaskId(item.taskId);
         setMultiviewSourceMode("generated_views");
+        void hydrateMultiviewImagesFromHistory(item, {
+          preferUpload: mode === "generate" && genTab === "multi",
+        });
       } else {
         setSegId(item.taskId); setFillId(item.taskId); setRetopoId(item.taskId);
         setTexId(item.taskId); setAnimId(item.taskId); setEditId(item.taskId);
@@ -3137,7 +3222,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setDetectedRigType(null);
       setDetectedRigSpec(null);
     }
-  }, [setSearchParams]);
+  }, [genTab, hydrateMultiviewImagesFromHistory, mode, setSearchParams]);
 
   const handleUseOriginalModel = useCallback(async (taskId) => {
     const originalItem = findHistoryItemByTaskKey(taskId);
@@ -3262,56 +3347,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               let originalTaskId = null;
               let files = null;
 
-              if (multiviewSourceMode === "generated_views") {
-                originalTaskId = selectedMultiviewImageTaskId;
-              } else if (multiviewSourceMode === "__legacy_generate_multiview_image") {
-                const preprocessBody = {
-                  type: "generate_multiview_image",
-                  ...(prompt.trim() && { prompt: prompt.trim() }),
-                  ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
-                  ...(generationModel && { model: generationModel }),
-                  ...(generationTemplateId && { template_id: generationTemplateId }),
-                  ...(generationOrientation && { orientation: generationOrientation }),
-                  ...(generationCompress && { compress: generationCompress }),
-                  ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
-                  ...(generationRenderImage && { render_image: true }),
-                  ...(multiviewMode && { mode: multiviewMode }),
-                  ...(multiviewOrthographic && { orthographic_projection: true }),
-                  ...(hasMultiviewReference && { reference_image: toTripoImageRef(multiviewReference) }),
-                };
-                const preprocess = await runPreprocessTask(preprocessBody, "Generating multiview source…");
-                originalTaskId = preprocess.taskId;
-                snapshotExtras = {
-                  ...snapshotExtras,
-                  preprocessTaskId: preprocess.taskId,
-                  preprocessTaskType: preprocessBody.type,
-                };
-              } else if (multiviewSourceMode === "__legacy_edit_multiview_image") {
-                const editFiles = getReadyMultiviewRefs(multiImages).map(toTripoImageRef).filter(Boolean);
-                const preprocessBody = {
-                  type: "edit_multiview_image",
-                  ...(prompt.trim() && { prompt: prompt.trim() }),
-                  ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
-                  ...(generationModel && { model: generationModel }),
-                  ...(generationTemplateId && { template_id: generationTemplateId }),
-                  ...(generationOrientation && { orientation: generationOrientation }),
-                  ...(generationCompress && { compress: generationCompress }),
-                  ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
-                  ...(generationRenderImage && { render_image: true }),
-                  ...(multiviewOrthographic && { orthographic_projection: true }),
-                  ...(multiviewOriginalTaskId.trim() && { original_task_id: multiviewOriginalTaskId.trim() }),
-                  ...(hasMultiviewReference && { reference_image: toTripoImageRef(multiviewReference) }),
-                  ...(editFiles.length > 0 && { files: editFiles }),
-                };
-                const preprocess = await runPreprocessTask(preprocessBody, "Editing multiview source…");
-                originalTaskId = preprocess.taskId;
-                snapshotExtras = {
-                  ...snapshotExtras,
-                  preprocessTaskId: preprocess.taskId,
-                  preprocessTaskType: preprocessBody.type,
-                };
-              } else {
+              if (multiviewUploadsReady) {
                 files = getMultiviewFilesPayload(multiImages, toTripoImageRef);
+              } else if (selectedMultiviewImageTaskId) {
+                originalTaskId = selectedMultiviewImageTaskId;
+              } else {
+                throw new Error("Upload at least Front + 1 view, or select a Views history item first.");
               }
 
               body = {
@@ -4066,6 +4107,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       }
       setMode("generate");
       setGenTab("multi");
+      void hydrateMultiviewImagesFromHistory(item, { preferUpload: true });
       setErrorMsg("");
       return;
     }
@@ -4082,7 +4124,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
     setActiveStyle(item?.styleId || "");
     setErrorMsg("");
-  }, []);
+  }, [hydrateMultiviewImagesFromHistory]);
 
   // Reset rigCompat when srcId changes — restore from cache if present
   useEffect(() => {

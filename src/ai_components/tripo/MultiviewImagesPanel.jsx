@@ -169,28 +169,31 @@ export default function MultiviewImagesPanel({
             <label style={labelStyle}>View</label>
             <div className="tp-view-choice-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
               {VIEW_OPTIONS.map((option) => {
-                const active = editView === option.value;
+                const active = String(editView).toLowerCase() === String(option.value).toLowerCase();
                 return (
                   <button
                     key={option.value}
                     type="button"
-                    className={"tp-view-choice" + (active ? " active" : "")}
+                    className={`tp-view-choice ${active ? "active" : ""}`}
                     data-active={active ? "true" : "false"}
                     aria-pressed={active}
                     onClick={() => setEditView(option.value)}
                     style={{
-                      minHeight: 44,
-                      borderRadius: 14,
-                      border: active ? "1px solid rgba(0,229,255,0.34)" : "1px solid rgba(255,255,255,0.09)",
-                      background: active ? "linear-gradient(145deg, rgba(0,229,255,0.16), rgba(138,43,226,0.12))" : "rgba(255,255,255,0.035)",
-                      color: active ? "#f8fafc" : "rgba(203,213,225,0.76)",
+                      ...fieldStyle,
+                      position: "relative",
+                      height: 52,
                       fontSize: 11,
                       fontWeight: 950,
+                      letterSpacing: "0.1em",
                       textTransform: "uppercase",
-                      letterSpacing: "0.08em",
+                      transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                       cursor: "pointer",
-                      transition: "transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease",
-                      boxShadow: active ? "0 0 22px rgba(0,229,255,0.10), inset 0 1px 0 rgba(255,255,255,0.12)" : "inset 0 1px 0 rgba(255,255,255,0.05)",
+                      border: active ? "2px solid #00e5ff" : "1px solid rgba(255,255,255,0.09)",
+                      background: active ? "linear-gradient(145deg, rgba(0,229,255,0.3), rgba(138,43,226,0.2))" : "rgba(255,255,255,0.04)",
+                      boxShadow: active ? "0 0 25px rgba(0,229,255,0.4), inset 0 1px 0 rgba(255,255,255,0.2)" : "none",
+                      color: active ? "#ffffff" : "rgba(255,255,255,0.4)",
+                      opacity: active ? 1 : 0.7,
+                      transform: active ? "scale(1.02)" : "scale(1)",
                     }}
                   >
                     {option.label}

@@ -151,6 +151,8 @@ const HistoryCard = React.memo(function HistoryCard({
   const containerWidth = useContainerWidth(containerRef);
   const isNarrow = containerWidth < 160;
   const thumbH = isNarrow ? 110 : 155;
+  const imageGridGap = isNarrow ? 4 : 6;
+  const imageGridPadding = isNarrow ? 6 : 8;
   const isImageSet = isImageHistoryItem(item);
   const imageUrls = useMemo(() => getHistoryImageUrls(item).slice(0, 4), [item]);
 
@@ -341,16 +343,25 @@ const HistoryCard = React.memo(function HistoryCard({
               display: "grid",
               gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
               gridTemplateRows: "repeat(2, minmax(0, 1fr))",
-              gap: 6,
+              gap: imageGridGap,
               width: "100%",
               height: "100%",
-              padding: 8,
+              minWidth: 0,
+              minHeight: 0,
+              padding: imageGridPadding,
               boxSizing: "border-box",
+              overflow: "hidden",
+              alignItems: "stretch",
+              justifyItems: "stretch",
             }}>
               {imageUrls.map((url, index) => (
                 <div
                   key={`${url}-${index}`}
                   style={{
+                    width: "100%",
+                    height: "100%",
+                    minWidth: 0,
+                    minHeight: 0,
                     borderRadius: 12,
                     overflow: "hidden",
                     border: "1px solid rgba(255,255,255,0.10)",

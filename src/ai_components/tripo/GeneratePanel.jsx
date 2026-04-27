@@ -624,16 +624,6 @@ const GeneratePanel = memo(({
   );
   const isFrontMultiviewReady = isUploadedItemReady(multiImages?.[0]);
   const hasGeneratedMultiviewTask = Boolean(multiviewOriginalTaskId?.trim?.());
-  const multiviewSourceHelp = {
-    upload: {
-      title: "Upload views",
-      body: "Upload existing view images for model generation. Add at least Front plus one more view; full order is Front, Left, Back, Right.",
-    },
-    generated_views: {
-      title: "From Views",
-      body: "Use the latest view set created in the Views tool as the source for this 3D model.",
-    },
-  };
   const normalizeUploadedItem = (file, preview, payload) => ({
     file,
     preview,
@@ -655,12 +645,6 @@ const GeneratePanel = memo(({
     const c = getModelCaps(modelVer);
     if (!c.multiview && genTab === "multi") setGenTab("image");
     if (genTab === "batch") setGenTab("image"); // Auto-redirect deprecated tab
-    if (genTab === "multi" && !["upload", "generated_views"].includes(multiviewSourceMode)) {
-      setMultiviewSourceMode("upload");
-    }
-    if (genTab === "multi" && multiviewSourceMode === "generated_views" && !hasGeneratedMultiviewTask) {
-      setMultiviewSourceMode("upload");
-    }
     if (!c.tPose && tPose) setTPose(false);
     if (!c.negPrompt) setNegPrompt("");
     if (!c.inParts && inParts) setInParts(false);
@@ -672,7 +656,7 @@ const GeneratePanel = memo(({
     if (!c.quad && quadMesh) setQuadMesh(false);
     if (!c.autoSize && autoSize) setAutoSize(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelVer, genTab, multiviewSourceMode, setMultiviewSourceMode, hasGeneratedMultiviewTask]);
+  }, [modelVer, genTab]);
 
   /* ─── Batch file handler ──────────────────────────────────────────── */
   function handleBatchFiles(files) {
@@ -921,31 +905,26 @@ const GeneratePanel = memo(({
 
       {genTab === "multi" && (
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div className="tp-source-mode-row" style={sourceModeRowStyle}>
-            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "upload" ? " active" : "")} data-active={multiviewSourceMode === "upload" ? "true" : "false"} aria-pressed={multiviewSourceMode === "upload"} title="Upload existing view images" onMouseDown={(e) => e.preventDefault()} onClick={() => setMultiviewSourceMode("upload")} style={sourceModeBtnStyle(multiviewSourceMode === "upload", 0, 2)}>Upload</button>
-            <button type="button" className={"tp-source-mode-btn-clean" + (multiviewSourceMode === "generated_views" ? " active" : "")} data-active={multiviewSourceMode === "generated_views" ? "true" : "false"} aria-pressed={multiviewSourceMode === "generated_views"} disabled={!hasGeneratedMultiviewTask} title={hasGeneratedMultiviewTask ? "Use the latest generated or edited views" : "Generate views in the Views tool first"} onMouseDown={(e) => e.preventDefault()} onClick={() => hasGeneratedMultiviewTask && setMultiviewSourceMode("generated_views")} style={{ ...sourceModeBtnStyle(multiviewSourceMode === "generated_views", 1, 2), opacity: hasGeneratedMultiviewTask ? 1 : 0.42, cursor: hasGeneratedMultiviewTask ? "pointer" : "not-allowed" }}>From Views</button>
-          </div>
-
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 16, background: "rgba(0,229,255,0.055)", border: "1px solid rgba(0,229,255,0.14)", boxShadow: "0 0 22px rgba(0,229,255,0.06)" }}>
             <Info style={{ width: 15, height: 15, color: "#00e5ff", flex: "0 0 auto", marginTop: 1 }} />
             <div style={{ minWidth: 0 }}>
               <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>
-                {multiviewSourceHelp[multiviewSourceMode]?.title}
+                Multi-view source
               </div>
               <p style={{ ...subtleHintStyle, color: "rgba(226,232,240,0.72)" }}>
-                {multiviewSourceHelp[multiviewSourceMode]?.body}
+                Upload existing view images here, or click a Views history item and the four images load into these slots automatically. Required order: Front, Left, Back, Right.
               </p>
             </div>
           </div>
 
-          {multiviewSourceMode === "generated_views" && (
+          {hasGeneratedMultiviewTask && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 18, border: hasGeneratedMultiviewTask ? "1px solid rgba(16,185,129,0.26)" : "1px solid rgba(245,158,11,0.22)", background: hasGeneratedMultiviewTask ? "rgba(16,185,129,0.07)" : "rgba(245,158,11,0.055)" }}>
                 <Check style={{ width: 15, height: 15, color: hasGeneratedMultiviewTask ? "#10B981" : "#F59E0B", flex: "0 0 auto" }} />
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em" }}>Views selected</div>
+                  <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em" }}>Views available</div>
                   <p style={subtleHintStyle}>
-                    The latest Views result will be used automatically.
+                    If the slots are empty, the latest Views result is used automatically. If the slots contain images, those take priority.
                   </p>
                 </div>
               </div>
@@ -1050,7 +1029,7 @@ const GeneratePanel = memo(({
       </Na>
 
       {/* ── Multi-view tab ── */}
-      {genTab === "multi" && multiviewSourceMode === "upload" && (
+      {genTab === "multi" && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8, padding: "0 2px" }}>
             <span style={{ color: "#94a3b8", fontSize: 10, fontWeight: 800 }}>

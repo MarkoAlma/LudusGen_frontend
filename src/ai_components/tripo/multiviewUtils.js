@@ -20,6 +20,22 @@ export function getReadyMultiviewRefs(items = []) {
     .filter(isUploadedMultiviewItemReady);
 }
 
+export function buildMultiviewPreviewItems(previewUrls = []) {
+  return MULTIVIEW_UPLOAD_ORDER.map((slot, index) => {
+    const preview = previewUrls?.[index];
+    if (!preview) return null;
+    return {
+      file: null,
+      preview,
+      sourceUrl: preview,
+      slotId: slot.id,
+      view: slot.id,
+      token: null,
+      tripoFile: null,
+    };
+  });
+}
+
 export function getMultiviewFilesPayload(items = [], mapItem = (item) => item) {
   return MULTIVIEW_UPLOAD_ORDER.map((_, index) => {
     const item = items?.[index];
