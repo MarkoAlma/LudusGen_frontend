@@ -78,6 +78,35 @@ export const defaultParams = {
 
 import { API_BASE } from '../../api/client';
 
+const HISTORY_THUMB_FETCH_LIMIT = 2;
+let activeHistoryThumbFetches = 0;
+const historyThumbFetchQueue = [];
+const historyThumbFetchInFlight = new Map();
+
+function runLimitedHistoryThumbFetch(task) {
+  return new Promise((resolve, reject) => {
+    const start = async () => {
+      activeHistoryThumbFetches += 1;
+      try {
+        resolve(await task());
+      } catch (error) {
+        reject(error);
+      } finally {
+        activeHistoryThumbFetches -= 1;
+        const next = historyThumbFetchQueue.shift();
+        if (next) next();
+      }
+    };
+
+    if (activeHistoryThumbFetches < HISTORY_THUMB_FETCH_LIMIT) {
+      start();
+      return;
+    }
+
+    historyThumbFetchQueue.push(start);
+  });
+}
+
 export async function fetchGlbAsBlob(modelUrl, getIdToken, taskId = null) {
   if (!modelUrl) return null;
   if (modelUrl.startsWith('data:')) return modelUrl;
@@ -133,53 +162,73 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken, taskId = null) {
  * Returns { buffer: ArrayBuffer, blobUrl: string }
  */
 export async function fetchModelData(modelUrl, getIdToken, taskId = null) {
-  if (!modelUrl) return null;
-  if (modelUrl.startsWith('data:')) return null;
+  return runLimitedHistoryThumbFetch(async () => {
+    if (!modelUrl) return null;
+    if (modelUrl.startsWith('data:')) return null;
 
-  let fetchUrl = modelUrl;
-  if (modelUrl.startsWith('/api/')) {
-    fetchUrl = `${API_BASE}${modelUrl}`;
-  } else if (modelUrl.includes('tripo3d.com') || modelUrl.includes('tripo3d.ai')) {
-    fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}${taskId ? `&taskId=${taskId}` : ''}`;
-  } else if (
-    modelUrl.startsWith('https://s3.') ||
-    modelUrl.includes('backblazeb2.com') ||
-    modelUrl.includes('b2cdn.com')
-  ) {
-    fetchUrl = `${API_BASE}/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
-  }
-
-  const tryFetch = async (url) => {
-    let token = '';
-    try {
-      token = getIdToken ? await getIdToken() : '';
-    } catch (e) {
-      console.warn('fetchModelData: getIdToken hiba:', e?.message ?? e);
+    let fetchUrl = modelUrl;
+    if (modelUrl.startsWith('/api/')) {
+      fetchUrl = `${API_BASE}${modelUrl}`;
+    } else if (modelUrl.includes('tripo3d.com') || modelUrl.includes('tripo3d.ai')) {
+      fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}${taskId ? `&taskId=${taskId}` : ''}`;
+    } else if (
+      modelUrl.startsWith('https://s3.') ||
+      modelUrl.includes('backblazeb2.com') ||
+      modelUrl.includes('b2cdn.com')
+    ) {
+      fetchUrl = `${API_BASE}/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
     }
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    return fetch(url, { headers });
-  };
 
-  let r = await tryFetch(fetchUrl);
+    const tryFetch = async (url) => {
+      let token = '';
+      try {
+        token = getIdToken ? await getIdToken() : '';
+      } catch (e) {
+        console.warn('fetchModelData: getIdToken hiba:', e?.message ?? e);
+      }
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return fetch(url, { headers });
+    };
 
-  if (!r.ok && [401, 502].includes(r.status)) {
-    // Retry on auth expiration or transient gateway errors, but SKIP permanent errors like 410 Gone
-    console.warn(`fetchModelData: attempt 1 failed (${r.status}), retrying in 1.2s...`);
-    await new Promise(res => setTimeout(res, 1200));
-    r = await tryFetch(fetchUrl);
-  }
+    const inFlightKey = `${taskId ?? "no-task"}|${fetchUrl}`;
+    let requestPromise = historyThumbFetchInFlight.get(inFlightKey);
 
-  if (!r.ok) {
-    const err = new Error(`Model fetch failed: HTTP ${r.status}`);
-    err.status = r.status;
-    throw err;
-  }
+    if (!requestPromise) {
+      requestPromise = (async () => {
+        let r = await tryFetch(fetchUrl);
 
-  const buffer = await r.arrayBuffer();
-  const blob = new Blob([buffer]);
-  const blobUrl = URL.createObjectURL(blob);
-  return { buffer, blobUrl };
+        if (!r.ok && [401, 502].includes(r.status)) {
+          // Retry on auth expiration or transient gateway errors, but SKIP permanent errors like 410 Gone
+          console.warn(`fetchModelData: attempt 1 failed (${r.status}), retrying in 1.2s...`);
+          await new Promise(res => setTimeout(res, 1200));
+          r = await tryFetch(fetchUrl);
+        }
+
+        if (!r.ok) {
+          const err = new Error(`Model fetch failed: HTTP ${r.status}`);
+          err.status = r.status;
+          throw err;
+        }
+
+        return r.arrayBuffer();
+      })();
+
+      historyThumbFetchInFlight.set(inFlightKey, requestPromise);
+    }
+
+    try {
+      const sharedBuffer = await requestPromise;
+      const buffer = sharedBuffer.slice(0);
+      const blob = new Blob([buffer]);
+      const blobUrl = URL.createObjectURL(blob);
+      return { buffer, blobUrl };
+    } finally {
+      if (historyThumbFetchInFlight.get(inFlightKey) === requestPromise) {
+        historyThumbFetchInFlight.delete(inFlightKey);
+      }
+    }
+  });
 }
 
 // ────────────────────────────────────────────────────────────────────────────

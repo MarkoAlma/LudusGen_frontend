@@ -21,7 +21,7 @@ import ConfirmModal from "../trellis/ConfirmModal";
 import DownloadModal from "../trellis/DownloadModal";
 import Shared3DHistory from "../../components/shared/Shared3DHistory";
 import { getAnimById, ANIMATION_LIBRARY, ANIM_CATEGORIES } from "./animationlibrary";
-import { persistGen, loadPersistedGen, updatePersistedProgress, clearPersistedGen, markHistorySaved, persistActiveTask, removeActiveTask, loadPersistedActiveTasks } from "./useGenerationPersist";
+import { persistGen, loadPersistedGen, updatePersistedProgress, clearPersistedGen, markHistorySaved, persistActiveTask, persistActiveTasks, removeActiveTask, loadPersistedActiveTasks } from "./useGenerationPersist";
 
 import { useActiveTasksPoller } from "./useActiveTasksPoller";
 import { checkThumbnailCache, getCachedThumbnail } from "../trellis/Glbthumbnail";
@@ -1597,7 +1597,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const isMobile = ctxMobile || isMobile640;
   const isTablet = ctxTablet || isTablet1024;
 
-  const { jobs, addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, registerCancelHandler, unregisterCancelHandler } = useJobs();
+  const { jobs, addJob, addJobs, updateJob, markJobDone, markJobDoneAndSeen, markJobError, registerCancelHandler, unregisterCancelHandler } = useJobs();
 
   // Register panels with centralized manager
   useEffect(() => {
@@ -3282,6 +3282,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       const animSlug = animSlugs.length === 1 ? animSlugs[0] : null;
       try {
         let body;
+        let requestPath = "/api/tripo/task";
         let snapshotExtras = {};
 
         const effectiveModel = modelVer;
@@ -3438,11 +3439,17 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 ...(!exportUv && { export_uv: false }),
               };
 
-              // Requirement: 1 -> images: [], >1 -> batch_images: []
               if (inputImages.length === 1) {
-                body.images = inputImages;
+                body.file = inputImages[0];
               } else {
-                body.batch_images = inputImages;
+                requestPath = "/api/tripo/batch";
+                body = {
+                  images: inputImages,
+                  model_version: effectiveModel,
+                  texture: !!texOn,
+                  pbr: !!effectivePbrOn,
+                  texture_quality: tex4K ? "detailed" : "standard",
+                };
               }
             }
             break;
@@ -3685,7 +3692,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               resolved_from_upstream: refineResolvedFromUpstream,
             });
           }
-          const tr = await fetch(BASE_URL + "/api/tripo/task", { method: "POST", headers, body: JSON.stringify(body) });
+          const tr = await fetch(BASE_URL + requestPath, { method: "POST", headers, body: JSON.stringify(body) });
           const td = await tr.json();
           logFrontendDebug("[TripoPanel][submit-debug] backend response:", {
             httpStatus: tr.status,
@@ -3701,47 +3708,47 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             throw new Error(msg);
           }
 
-          const current = activeTasksRef.current.get(instanceId);
+                    const current = activeTasksRef.current.get(instanceId);
           if (current) {
             if (td.taskIds && Array.isArray(td.taskIds)) {
               // Batch response: Multiple task IDs
+              const newTasks = [];
+              const newJobs = [];
+
               td.taskIds.forEach((taskId, idx) => {
                 const subInstanceId = idx === 0 ? instanceId : crypto.randomUUID();
                 const subLabel = `Generate #${genCount + idx + 1}`;
 
-                if (idx === 0) {
-                  // Update primary instance
-                  activeTasksRef.current.set(instanceId, { ...current, taskId, status: "running", label: subLabel });
-                  persistActiveTask({ ...activeTasksRef.current.get(instanceId) });
-                  updateJob(instanceId, { status: "running", progress: 0, taskId, title: subLabel });
-                } else {
-                  // Create extra instances for other batch items
-                  const subTask = {
-                    ...current,
-                    instanceId: subInstanceId,
-                    taskId,
-                    label: subLabel,
-                    status: "running",
-                    progress: 0,
-                    startedAt: Date.now(),
-                  };
-                  activeTasksRef.current.set(subInstanceId, subTask);
-                  persistActiveTask(subTask);
-                  addJob({
-                    id: subInstanceId,
-                    panelType: "tripo",
-                    title: subLabel,
-                    status: "running",
-                    progress: 0,
-                    createdAt: Date.now(),
-                    updatedAt: Date.now()
-                  });
-                }
+                const subTask = {
+                  ...current,
+                  instanceId: subInstanceId,
+                  taskId,
+                  label: subLabel,
+                  status: "running",
+                  progress: 0,
+                  startedAt: Date.now(),
+                };
+                
+                activeTasksRef.current.set(subInstanceId, subTask);
+                newTasks.push(subTask);
+                newJobs.push({
+                  id: subInstanceId,
+                  panelType: "tripo",
+                  title: subLabel,
+                  status: "running",
+                  progress: 0,
+                  createdAt: Date.now(),
+                  updatedAt: Date.now()
+                });
               });
+
+              persistActiveTasks(newTasks);
+              addJobs(newJobs);
             } else {
               // Single task ID response
-              activeTasksRef.current.set(instanceId, { ...current, taskId: td.taskId, status: "running" });
-              persistActiveTask({ ...activeTasksRef.current.get(instanceId) });
+              const updated = { ...current, taskId: td.taskId, status: "running" };
+              activeTasksRef.current.set(instanceId, updated);
+              persistActiveTask(updated);
               updateJob(instanceId, { status: "running", progress: 0, taskId: td.taskId });
             }
           }
@@ -3770,7 +3777,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       submitLockedRef.current = false;
       setSubmitLocked(false);
     }
-  }, [canGen, mode, texSub, refineBlockedBySelectedSource, effectiveRefineDisableReason, refineSourceTaskId, refineSelectedTaskId, refineResolvedFromUpstream, refineDraftDisplayName, refineSourceDisplayName, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, textureModelVer, textureRequestModelVer, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError, textureSourceHasTexture, textureEditSourceTaskId, textureEditSourceItem, textureEditItem, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH, imageSourceMode, multiviewSourceMode, generationModel, generationTemplateId, generationOrientation, generationCompress, generationRenderImage, generationTextureAlignment, imageReference, multiviewReference, multiviewMode, multiviewOrthographic, multiviewOriginalTaskId, selectedMultiviewImageTaskId, multiviewImageMode, multiviewEditPrompt, multiviewEditView, toTripoImageRef, runPreprocessTask, getTaskPreviewRefs, uploadImageFile, hasImageReference, hasMultiviewReference]);
+  }, [canGen, mode, texSub, refineBlockedBySelectedSource, effectiveRefineDisableReason, refineSourceTaskId, refineSelectedTaskId, refineResolvedFromUpstream, refineDraftDisplayName, refineSourceDisplayName, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, textureModelVer, textureRequestModelVer, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getIdToken, history, forceUpdate, persistActiveTask, addJob, addJobs, updateJob, markJobError, textureSourceHasTexture, textureEditSourceTaskId, textureEditSourceItem, textureEditItem, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH, imageSourceMode, multiviewSourceMode, generationModel, generationTemplateId, generationOrientation, generationCompress, generationRenderImage, generationTextureAlignment, imageReference, multiviewReference, multiviewMode, multiviewOrthographic, multiviewOriginalTaskId, selectedMultiviewImageTaskId, multiviewImageMode, multiviewEditPrompt, multiviewEditView, toTripoImageRef, runPreprocessTask, getTaskPreviewRefs, uploadImageFile, hasImageReference, hasMultiviewReference]);
 
   const { rigCompatRef, getCompatibility, handleAutoRig } = useTripoRig({
     activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl,

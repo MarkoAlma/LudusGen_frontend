@@ -69,25 +69,33 @@ const LS_TASKS_KEY = "tripo_active_tasks";
 const TASK_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 export function persistActiveTask(instance) {
+  persistActiveTasks([instance]);
+}
+
+export function persistActiveTasks(instances) {
   try {
     const raw = localStorage.getItem(LS_TASKS_KEY);
     const list = raw ? JSON.parse(raw) : [];
-    const idx = list.findIndex(e => e.instanceId === instance.instanceId);
-    const entry = {
-      instanceId: instance.instanceId,
-      taskId: instance.taskId,
-      status: instance.status ?? "running",
-      mode: instance.mode,
-      originalTaskId: instance.originalTaskId,
-      label: instance.label,
-      progress: instance.progress,
-      startedAt: instance.startedAt,
-      opType: instance.mode,
-      snapshot: instance.snapshot ?? null,
-      savedAt: Date.now(),
-    };
-    if (idx >= 0) list[idx] = entry;
-    else list.push(entry);
+    
+    instances.forEach(instance => {
+      const idx = list.findIndex(e => e.instanceId === instance.instanceId);
+      const entry = {
+        instanceId: instance.instanceId,
+        taskId: instance.taskId,
+        status: instance.status ?? "running",
+        mode: instance.mode,
+        originalTaskId: instance.originalTaskId,
+        label: instance.label,
+        progress: instance.progress,
+        startedAt: instance.startedAt,
+        opType: instance.mode,
+        snapshot: instance.snapshot ?? null,
+        savedAt: Date.now(),
+      };
+      if (idx >= 0) list[idx] = entry;
+      else list.push(entry);
+    });
+    
     localStorage.setItem(LS_TASKS_KEY, JSON.stringify(list));
   } catch { /* quota / private browsing */ }
 }

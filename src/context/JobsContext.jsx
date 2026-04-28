@@ -64,8 +64,26 @@ export function JobsProvider({ children }) {
     setJobs((prev) => normalizeJobs([{ ...job }, ...prev.filter((item) => item.id !== job.id)]));
   }, []);
 
+  const addJobs = useCallback((newJobs) => {
+    setJobs((prev) => {
+      const ids = new Set(newJobs.map(j => j.id));
+      return normalizeJobs([...newJobs, ...prev.filter(j => !ids.has(j.id))]);
+    });
+  }, []);
+
   const updateJob = useCallback((id, patch) => {
     setJobs((prev) => normalizeJobs(prev.map((job) => (job.id === id ? { ...job, ...patch, updatedAt: patch.updatedAt ?? Date.now() } : job))));
+  }, []);
+
+  const updateJobs = useCallback((updates) => {
+    setJobs((prev) => {
+      const updateMap = new Map(updates.map(u => [u.id, u.patch]));
+      return normalizeJobs(prev.map((job) => {
+        const patch = updateMap.get(job.id);
+        if (patch) return { ...job, ...patch, updatedAt: patch.updatedAt ?? Date.now() };
+        return job;
+      }));
+    });
   }, []);
 
   const markJobDone = useCallback((id, patch = {}) => {
@@ -189,7 +207,9 @@ export function JobsProvider({ children }) {
   const value = useMemo(() => ({
     jobs,
     addJob,
+    addJobs,
     updateJob,
+    updateJobs,
     markJobDone,
     markJobDoneAndSeen,
     markJobError,
@@ -198,7 +218,7 @@ export function JobsProvider({ children }) {
     clearSeenCompletedJobs,
     registerCancelHandler,
     unregisterCancelHandler,
-  }), [jobs, addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, removeJob, clearSeenCompletedJobs, registerCancelHandler, unregisterCancelHandler, cancelJob]);
+  }), [jobs, addJob, addJobs, updateJob, updateJobs, markJobDone, markJobDoneAndSeen, markJobError, removeJob, clearSeenCompletedJobs, registerCancelHandler, unregisterCancelHandler, cancelJob]);
 
   return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>;
 }

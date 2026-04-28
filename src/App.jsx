@@ -57,7 +57,7 @@ function App() {
     setShowNavbar(true);
   };
   
-  const getAuthToken = useCallback(() => auth.currentUser?.getIdToken(true), []);
+  const getAuthToken = useCallback((forceRefresh = false) => auth.currentUser?.getIdToken(forceRefresh), []);
 
   return (
     <div className="min-h-screen bg-black text-white relative">

@@ -82,10 +82,20 @@ function useContainerWidth(ref) {
   const [width, setWidth] = useState(200);
   useEffect(() => {
     if (!ref.current) return;
-    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
+    let frameId = null;
+    const ro = new ResizeObserver(([e]) => {
+      const nextWidth = e.contentRect.width;
+      if (frameId) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        setWidth((prev) => (prev === nextWidth ? prev : nextWidth));
+      });
+    });
     ro.observe(ref.current);
     setWidth(ref.current.offsetWidth);
-    return () => ro.disconnect();
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId);
+      ro.disconnect();
+    };
   }, [ref]);
   return width;
 }
@@ -93,6 +103,24 @@ function useContainerWidth(ref) {
 const EXPIRED_URLS = new Set();
 const THUMBNAIL_CACHE_VERSION = "history-thumb-v2";
 const getThumbnailCacheKey = (item) => item?.model_url ? `${item.model_url}#${THUMBNAIL_CACHE_VERSION}` : null;
+const historyCardVisibilityHandlers = new WeakMap();
+let historyCardVisibilityObserver = null;
+
+function getHistoryCardVisibilityObserver() {
+  if (historyCardVisibilityObserver || typeof IntersectionObserver === "undefined") {
+    return historyCardVisibilityObserver;
+  }
+
+  historyCardVisibilityObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const handler = historyCardVisibilityHandlers.get(entry.target);
+      if (!handler) continue;
+      handler(entry);
+    }
+  }, { rootMargin: "200px" });
+
+  return historyCardVisibilityObserver;
+}
 
 /* ─── Type config ────────────────────────────────────────────────────────── */
 const getTypeConfig = (item) => {
@@ -148,6 +176,7 @@ const HistoryCard = React.memo(function HistoryCard({
   getIdToken,
 }) {
   const containerRef = React.useRef(null);
+  const [isVisible, setIsVisible] = useState(false);
   const containerWidth = useContainerWidth(containerRef);
   const isNarrow = containerWidth < 160;
   const thumbH = isNarrow ? 110 : 155;
@@ -161,6 +190,29 @@ const HistoryCard = React.memo(function HistoryCard({
   const [thumbError, setThumbError] = useState(false);
   const [errorCode, setErrorCode] = useState(null);
   const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const node = containerRef.current;
+    const observer = getHistoryCardVisibilityObserver();
+    if (!observer) {
+      setIsVisible(true);
+      return undefined;
+    }
+
+    historyCardVisibilityHandlers.set(node, (entry) => {
+      if (!entry.isIntersecting) return;
+      setIsVisible(true);
+      observer.unobserve(node);
+      historyCardVisibilityHandlers.delete(node);
+    });
+    observer.observe(node);
+
+    return () => {
+      observer.unobserve(node);
+      historyCardVisibilityHandlers.delete(node);
+    };
+  }, []);
   const [timeTooltip, setTimeTooltip] = useState(false);
 
   useEffect(() => {
@@ -207,7 +259,7 @@ const HistoryCard = React.memo(function HistoryCard({
 
   useEffect(() => {
     if (isImageSet) return undefined;
-    if (!item?.model_url) return;
+    if (!item?.model_url || !isVisible) return;
     const thumbnailCacheKey = getThumbnailCacheKey(item);
     if (item?.status === "failed" || EXPIRED_URLS.has(item.model_url)) {
       setThumbError(true);

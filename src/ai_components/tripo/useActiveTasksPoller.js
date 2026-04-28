@@ -1,11 +1,18 @@
-// src/ai_components/tripo/useActiveTasksPoller.js
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { persistActiveTask, removeActiveTask } from "./useGenerationPersist";
 import { streamTaskStatus } from "./tripoTransfers";
 import { resolveTripoModelUrl } from "./utils/modelUrl";
 
 const POLL_MS = 2500;
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
 
 function buildTaskStatusUrl(taskId, snapshot) {
   const params = new URLSearchParams();
@@ -34,9 +41,11 @@ export function useActiveTasksPoller({
 
   // Refs so interval always calls latest versions — prevents stale closure bugs
   const cbRef = useRef({});
+  const debouncedUpdate = useMemo(() => debounce(() => forceUpdate(), 100), [forceUpdate]);
+
   useEffect(() => {
-    cbRef.current = { getIdToken, fetchProxy, revokeBlobUrl, refreshCredits, forceUpdate, onTaskSuccess, onTaskFail, onTaskProgress };
-  }, [getIdToken, fetchProxy, revokeBlobUrl, refreshCredits, forceUpdate, onTaskSuccess, onTaskFail, onTaskProgress]);
+    cbRef.current = { getIdToken, fetchProxy, revokeBlobUrl, refreshCredits, forceUpdate: debouncedUpdate, onTaskSuccess, onTaskFail, onTaskProgress };
+  }, [getIdToken, fetchProxy, revokeBlobUrl, refreshCredits, debouncedUpdate, onTaskSuccess, onTaskFail, onTaskProgress]);
 
   useEffect(() => {
     const controllers = streamControllersRef.current;
