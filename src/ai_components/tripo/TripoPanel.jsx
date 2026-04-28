@@ -28,9 +28,24 @@ import { checkThumbnailCache, getCachedThumbnail } from "../trellis/Glbthumbnail
 import { useTripoHistory } from "./useTripoHistory";
 import { useTripoRig } from "./useTripoRig";
 import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX } from "./GeneratePanel";
+import MultiviewImagesPanel from "./MultiviewImagesPanel";
 import { DEFAULT_MODEL_VERSION, DEFAULT_TEXTURE_MODEL_VERSION, DETAILED_TEXTURE_MODEL_VERSION, TEXTURE_MODEL_VERSIONS } from "./constants";
 import { streamTaskStatus, uploadViaTripoSts } from "./tripoTransfers";
 import { resolveTripoModelUrl, resolveTripoUrlNode } from "./utils/modelUrl";
+import {
+  MULTIVIEW_UPLOAD_ORDER,
+  buildMultiviewPreviewItems,
+  getMultiviewFilesPayload,
+  getReadyMultiviewRefs,
+  hasTaskImagePreview,
+  isMultiviewUploadReady,
+} from "./multiviewUtils";
+import {
+  downloadImageHistoryZip,
+  extractTripoPreviewImageUrls,
+  getHistoryImageUrls,
+  isImageHistoryItem,
+} from "./tripoImageHistoryUtils";
 import Segment from "./Segment";
 import Retopo from "./Retopo";
 import Texture from "./Texture";
@@ -68,6 +83,7 @@ let _selHistId = null;      // string | null
 
 const NAV = [
   { id: "generate", label: "Model", icon: Sparkles, sub: false },
+  { id: "views", label: "Views", icon: Camera, sub: false },
   { id: "segment", label: "Segment", icon: Scissors, sub: true },
   { id: "retopo", label: "Retopo", icon: Grid3x3, sub: false },
   { id: "texture", label: "Texture", icon: PaintBucket, sub: true },
@@ -93,6 +109,12 @@ const MODE_UI = {
     description: "Build a new 3D asset from image, multiview or prompt input.",
     accent: "#8a2be2",
     accent2: "#00e5ff",
+  },
+  views: {
+    eyebrow: "Images",
+    description: "Generate or edit Tripo multiview guide images before model creation.",
+    accent: "#00e5ff",
+    accent2: "#8a2be2",
   },
   segment: {
     eyebrow: "Parts",
@@ -145,6 +167,17 @@ const TRIPO_PAINT_MODE_DISABLED = true;
 const TRIPO_PAINT_MODE_DISABLED_MESSAGE = "waiting for tripo patch";
 const TRIPO_MODEL_IMPORT_MAX_BYTES = 150 * 1024 * 1024;
 const TRIPO_MODEL_IMPORT_EXTENSIONS = new Set(["glb", "fbx", "obj", "stl"]);
+
+function normalizeUploadedMultiviewItem(file, preview, payload) {
+  return {
+    file,
+    preview,
+    token: typeof payload === "string"
+      ? payload
+      : payload?.token || payload?.object?.key || "sts",
+    ...(typeof payload === "object" && payload ? { tripoFile: payload } : {}),
+  };
+}
 
 function inferImageTypeFromUrl(url) {
   const cleanUrl = String(url || "").split("?")[0].toLowerCase();
@@ -240,7 +273,19 @@ const CSS = `
   .tp-mode-kicker::before { content:''; width:8px; height:8px; border-radius:999px; background:linear-gradient(135deg,var(--tp-mode-a),var(--tp-mode-b)); box-shadow:0 0 20px color-mix(in srgb, var(--tp-mode-a) 52%, transparent); }
   .tp-panel-title { position:relative; margin:0; min-height:24px; color:#fff; text-shadow:none; }
   .tp-panel-desc { position:relative; margin:9px 0 0; color:rgba(203,213,225,0.78); font-size:11px; font-weight:800; line-height:1.58; }
-  .tp-sub-tabs { position:relative; display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; padding:5px; border:1px solid rgba(255,255,255,0.09); border-radius:24px; background:rgba(3,0,10,0.32); box-shadow:inset 0 1px 0 rgba(255,255,255,0.06); }
+  .tp-sub-tabs {
+    position:relative;
+    display:flex;
+    flex-wrap:nowrap;
+    gap:0;
+    margin-top:14px;
+    padding:0;
+    border:1px solid rgba(139,220,255,0.13);
+    border-radius:20px;
+    overflow:hidden;
+    background:rgba(5,8,18,0.18);
+    box-shadow:none;
+  }
   .tp-panel-scroll { position:relative; z-index:2; padding:16px 14px 14px; scrollbar-width:thin; scrollbar-color:rgba(0,229,255,0.22) transparent; }
   .tp-panel-scroll::-webkit-scrollbar { width:4px; }
   .tp-panel-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.16); border-radius:999px; }
@@ -265,10 +310,35 @@ const CSS = `
   .tp-ta::placeholder { color:var(--text-muted); }
   .tp-ta:focus { border-color:var(--border-accent);outline:none;box-shadow:0 0 0 3px rgba(47,140,255,0.12),0 0 20px rgba(47,140,255,0.10); }
   .tp-drop:hover { border-color:rgba(47,140,255,0.28) !important;box-shadow:0 12px 32px rgba(0,0,0,0.18),0 0 22px rgba(47,140,255,0.12); }
-  .tp-sub-tab { padding:10px 12px;border-radius:18px;font-size:10px;font-weight:950;cursor:pointer;border:1px solid transparent;transition:background 0.16s, color 0.16s, border-color 0.16s, box-shadow 0.16s, transform 0.16s;font-family:inherit;letter-spacing:0.08em;text-transform:uppercase; }
-  .tp-sub-tab.on { background:linear-gradient(135deg,color-mix(in srgb, var(--tp-mode-a) 34%, rgba(255,255,255,0.08)),color-mix(in srgb, var(--tp-mode-b) 22%, rgba(255,255,255,0.06)));color:#fff;border-color:color-mix(in srgb, var(--tp-mode-b) 46%, rgba(255,255,255,0.12));box-shadow:0 12px 30px rgba(0,0,0,0.26),0 0 26px color-mix(in srgb, var(--tp-mode-a) 22%, transparent),inset 0 1px 0 rgba(255,255,255,0.20); }
-  .tp-sub-tab:not(.on) { background:rgba(255,255,255,0.045);color:rgba(203,213,225,0.60);border-color:rgba(255,255,255,0.08); }
-  .tp-sub-tab:not(.on):hover { color:rgba(255,255,255,0.92);background:rgba(0,229,255,0.070);border-color:rgba(0,229,255,0.18);transform:translateY(-1px); }
+  .tp-sub-tab {
+    flex:1 1 auto;
+    min-height:48px;
+    padding:10px 12px;
+    border:0;
+    border-radius:0;
+    background:transparent;
+    color:rgba(203,213,225,0.72);
+    font-size:10px;
+    font-weight:950;
+    cursor:pointer;
+    transition:background 0.16s, color 0.16s;
+    font-family:inherit;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:none;
+  }
+  .tp-sub-tab + .tp-sub-tab { border-left:1px solid rgba(139,220,255,0.13); }
+  .tp-sub-tab:first-child { border-radius:20px 0 0 20px; }
+  .tp-sub-tab:last-child { border-radius:0 20px 20px 0; }
+  .tp-sub-tab.on {
+    background:linear-gradient(145deg,rgba(138,43,226,0.18),rgba(47,140,255,0.13),rgba(0,229,255,0.06));
+    color:#f8fafc;
+  }
+  .tp-sub-tab:not(.on):hover { color:rgba(255,255,255,0.92); background:rgba(255,255,255,0.035); }
+  .tp-sub-tab:disabled { opacity:0.42; cursor:not-allowed; }
   .tp-workflow-page { --tp-mode-a:#2f8cff; --tp-mode-b:#8bdcff; display:flex; flex-direction:column; gap:12px; min-width:0; }
   .tp-workflow-page > div { margin-bottom:0 !important; }
   .tp-workflow-page > div:empty { display:none !important; }
@@ -380,17 +450,17 @@ const CSS = `
     border-color:color-mix(in srgb, var(--tp-mode-a) 54%, rgba(255,255,255,0.10)) !important;
     box-shadow:0 0 0 3px rgba(47,140,255,0.12),0 0 20px rgba(47,140,255,0.10) !important;
   }
-  .tp-workflow-page button:not(.tp-sub-tab) {
+  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-inp-tab-clean):not(.tp-source-mode-btn):not(.tp-source-mode-btn-clean):not(.tp-qual-btn):not(.tp-topo-btn):not(.tp-style-chip) {
     border-radius:9px !important;
     border:1px solid rgba(255,255,255,0.08) !important;
     font-weight:900 !important;
     transition:background 0.18s, border-color 0.18s, color 0.18s, opacity 0.18s, box-shadow 0.18s !important;
   }
-  .tp-workflow-page button:not(.tp-sub-tab):hover {
+  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-inp-tab-clean):not(.tp-source-mode-btn):not(.tp-source-mode-btn-clean):not(.tp-qual-btn):not(.tp-topo-btn):not(.tp-style-chip):hover {
     border-color:rgba(47,140,255,0.28) !important;
     box-shadow:0 10px 26px rgba(0,0,0,0.17),0 0 22px rgba(47,140,255,0.12) !important;
   }
-  .tp-inp-tab { min-height:38px; flex:1;padding:8px 8px !important;border:1px solid transparent !important;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:9px !important;transition:background 0.18s, color 0.18s,border-color 0.18s,box-shadow 0.18s;font-family:inherit;background:transparent !important;color:rgba(148,163,184,0.72) !important; }
+  .tp-inp-tab { min-height:38px; flex:1;padding:8px 8px !important;border:1px solid transparent !important;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:0 !important;transition:background 0.18s, color 0.18s,border-color 0.18s,box-shadow 0.18s;font-family:inherit;background:transparent !important;color:rgba(148,163,184,0.72) !important; }
   .tp-inp-tab.active { background:linear-gradient(135deg,rgba(255,255,255,0.085),rgba(47,140,255,0.10)) !important;color:#f8fafc !important;border-color:rgba(47,140,255,0.30) !important;box-shadow:0 10px 22px rgba(0,0,0,0.16),0 0 20px rgba(47,140,255,0.12) !important; }
   .tp-model-card,
   .anim-card,
@@ -418,7 +488,7 @@ const CSS = `
     color:rgba(226,232,240,0.82) !important;
   }
   .tp-topo-btn.sel,
-  .tp-qual-btn[style*="rgba(108,99,255"],
+  .tp-qual-btn.sel,
   .auto-rig-btn.ready {
     background:linear-gradient(135deg,rgba(255,255,255,0.082),rgba(47,140,255,0.10)) !important;
     border-color:rgba(47,140,255,0.30) !important;
@@ -511,7 +581,7 @@ const CSS = `
   }
   .tp-inp-tab {
     min-height:74px !important;
-    border-radius:18px !important;
+    border-radius:0 !important;
     gap:8px !important;
     background:linear-gradient(145deg,rgba(255,255,255,0.040),rgba(255,255,255,0.014)) !important;
     border:1px solid rgba(255,255,255,0.065) !important;
@@ -559,9 +629,8 @@ const CSS = `
   .tp-model-dd-menu { padding:6px !important; background:rgba(9,8,13,0.96) !important; }
   .tp-model-dd-option { border-radius:14px !important; border-bottom:0 !important; }
   .tp-model-dd-option:hover { background:rgba(139,220,255,0.10) !important; }
-  .tp-source-mode-row { gap:12px !important; margin-top:2px; }
-  .tp-source-mode-row > button,
-  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-rail-btn):not(.tp-gen-btn):not(.tp-inp-tab) {
+  .tp-source-mode-row { gap:0 !important; margin-top:2px; }
+  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-rail-btn):not(.tp-gen-btn):not(.tp-inp-tab):not(.tp-inp-tab-clean):not(.tp-source-mode-btn):not(.tp-source-mode-btn-clean):not(.tp-qual-btn):not(.tp-topo-btn):not(.tp-style-chip) {
     min-height:44px;
     border-radius:18px !important;
     border:1px solid rgba(255,255,255,0.095) !important;
@@ -570,8 +639,7 @@ const CSS = `
     box-shadow:inset 0 1px 0 rgba(255,255,255,0.052) !important;
     backdrop-filter:blur(18px);
   }
-  .tp-source-mode-row > button:hover,
-  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-rail-btn):not(.tp-gen-btn):not(.tp-inp-tab):hover {
+  .tp-workflow-page button:not(.tp-sub-tab):not(.tp-rail-btn):not(.tp-gen-btn):not(.tp-inp-tab):not(.tp-inp-tab-clean):not(.tp-source-mode-btn):not(.tp-source-mode-btn-clean):not(.tp-qual-btn):not(.tp-topo-btn):not(.tp-style-chip):hover {
     transform:translateY(-1px);
     color:#fff !important;
     border-color:rgba(139,220,255,0.30) !important;
@@ -618,21 +686,21 @@ const CSS = `
   .tp-qual-btn,
   .tp-topo-btn {
     min-height:56px !important;
-    border-radius:18px !important;
+    border-radius:0 !important;
     font-size:13px !important;
     font-weight:950 !important;
-    background:linear-gradient(145deg,rgba(255,255,255,0.050),rgba(255,255,255,0.018)) !important;
-    outline:1px solid rgba(255,255,255,0.08) !important;
+    background:transparent !important;
+    outline:none !important;
     color:rgba(226,232,240,0.78) !important;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05) !important;
+    box-shadow:none !important;
+    border:0 !important;
   }
-  .tp-qual-btn[style*="rgba(255, 255, 255, 0.075)"],
-  .tp-qual-btn[style*="rgba(255,255,255,0.075)"],
+  .tp-qual-btn.sel,
   .tp-topo-btn.sel {
     background:linear-gradient(145deg,rgba(139,220,255,0.18),rgba(47,140,255,0.11),rgba(255,255,255,0.045)) !important;
     color:#f8fafc !important;
-    outline:1.5px solid rgba(47,140,255,0.46) !important;
-    box-shadow:0 16px 36px rgba(0,0,0,0.24),0 0 30px rgba(47,140,255,0.16),inset 0 1px 0 rgba(255,255,255,0.14) !important;
+    outline:none !important;
+    box-shadow:none !important;
   }
   .sec-row {
     padding:14px 12px !important;
@@ -729,39 +797,49 @@ const CSS = `
 
   .tp-workflow-page .tp-gen-tabs {
     min-height:54px !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
     padding:0 !important;
     gap:0 !important;
     border:0 !important;
-    background:transparent !important;
-    box-shadow:none !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.058),rgba(255,255,255,0.018)) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.075),0 12px 30px rgba(0,0,0,0.16) !important;
     overflow:hidden !important;
-    border-radius:22px !important;
+    border-radius:20px !important;
     margin-bottom:12px !important;
+    isolation:isolate !important;
   }
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab,
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab:hover,
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab:focus,
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active {
     min-height:54px !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
     border:0 !important;
     border-radius:0 !important;
     box-shadow:none !important;
     outline:0 !important;
-    background:rgba(255,255,255,0.014) !important;
+    background:transparent !important;
     transform:none !important;
-  }
-  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:first-child {
-    border-radius:22px 0 0 22px !important;
-  }
-  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:last-child {
-    border-radius:0 22px 22px 0 !important;
-  }
-  .tp-workflow-page .tp-gen-tabs .tp-inp-tab + .tp-inp-tab {
-    border-left:1px solid rgba(139,220,255,0.13) !important;
+    margin:0 !important;
+    backdrop-filter:none !important;
   }
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active {
-    background:linear-gradient(145deg,rgba(138,43,226,0.20),rgba(47,140,255,0.16),rgba(0,229,255,0.08)) !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.16),rgba(139,220,255,0.075)) !important;
     color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.14) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:first-child {
+    border-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:nth-child(2) {
+    border-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:last-child {
+    border-radius:0 !important;
   }
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab span { display:none !important; }
   .tp-workflow-page .tp-gen-tabs .tp-inp-tab svg { width:21px !important; height:21px !important; }
@@ -769,10 +847,15 @@ const CSS = `
   .tp-workflow-page .tp-source-mode-row,
   .tp-workflow-page .tp-flat-segment-row {
     gap:0 !important;
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
     border-radius:20px !important;
     overflow:hidden !important;
-    background:rgba(5,8,18,0.18) !important;
-    box-shadow:none !important;
+    border:1px solid rgba(255,255,255,0.075) !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.050),rgba(255,255,255,0.016)) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.070),0 12px 30px rgba(0,0,0,0.16) !important;
   }
   .tp-workflow-page .tp-source-mode-row > button,
   .tp-workflow-page .tp-source-mode-row > button:hover,
@@ -785,6 +868,8 @@ const CSS = `
   .tp-workflow-page .tp-flat-segment-row > .model-na > button:hover,
   .tp-workflow-page .tp-flat-segment-row > .model-na > button:focus {
     min-height:48px !important;
+    min-width:0 !important;
+    box-sizing:border-box !important;
     border:0 !important;
     outline:0 !important;
     box-shadow:none !important;
@@ -801,15 +886,13 @@ const CSS = `
     flex:1 !important;
     width:100% !important;
   }
-  .tp-workflow-page .tp-source-mode-row > button:first-child,
   .tp-workflow-page .tp-flat-segment-row > button:first-child,
   .tp-workflow-page .tp-flat-segment-row > .model-na:first-child > button {
-    border-radius:20px 0 0 20px !important;
+    border-radius:0 !important;
   }
-  .tp-workflow-page .tp-source-mode-row > button:last-child,
   .tp-workflow-page .tp-flat-segment-row > button:last-child,
   .tp-workflow-page .tp-flat-segment-row > .model-na:last-child > button {
-    border-radius:0 20px 20px 0 !important;
+    border-radius:0 !important;
   }
   .tp-workflow-page .tp-source-mode-row > button + button,
   .tp-workflow-page .tp-flat-segment-row > button + button,
@@ -817,7 +900,12 @@ const CSS = `
   .tp-workflow-page .tp-flat-segment-row > button + .model-na > button {
     border-left:1px solid rgba(139,220,255,0.13) !important;
   }
-  .tp-workflow-page .tp-source-mode-btn.active,
+  .tp-workflow-page .tp-source-mode-btn.active {
+    background:linear-gradient(145deg,rgba(255,255,255,0.17),rgba(139,220,255,0.075)) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.16) !important;
+    text-shadow:none !important;
+  }
   .tp-workflow-page .tp-flat-segment-row > .sel,
   .tp-workflow-page .tp-flat-segment-row > .model-na > .sel {
     background:linear-gradient(145deg,rgba(138,43,226,0.18),rgba(47,140,255,0.13),rgba(0,229,255,0.06)) !important;
@@ -826,11 +914,125 @@ const CSS = `
   .tp-workflow-page .tp-source-mode-row > button,
   .tp-workflow-page .tp-flat-segment-row > button,
   .tp-workflow-page .tp-flat-segment-row > .model-na > button {
-    font-size:10px !important;
+    font-size:9.5px !important;
     font-weight:950 !important;
-    letter-spacing:0.14em !important;
+    letter-spacing:0.08em !important;
+    line-height:1 !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
     text-transform:uppercase !important;
     color:rgba(203,213,225,0.72) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:focus {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:active {
+    border-top-left-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2),
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):active {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:active {
+    border-top-left-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child {
+    border-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:not(:first-child):not(:last-child) {
+    border-radius:0 !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"] {
+    background:linear-gradient(145deg,rgba(255,255,255,0.17),rgba(139,220,255,0.075)) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.16) !important;
+    text-shadow:none !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"] {
+    background:transparent !important;
+    color:rgba(203,213,225,0.72) !important;
+    box-shadow:none !important;
+  }
+  .tp-workflow-page .tp-style-grid {
+    display:grid !important;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:8px !important;
+  }
+  .tp-workflow-page .tp-style-chip,
+  .tp-workflow-page .tp-style-chip:hover,
+  .tp-workflow-page .tp-style-chip:focus {
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    gap:0 !important;
+    width:100% !important;
+    min-height:42px !important;
+    padding:0 12px !important;
+    border-radius:999px !important;
+    border:1px solid rgba(139,220,255,0.13) !important;
+    background:rgba(255,255,255,0.035) !important;
+    color:rgba(203,213,225,0.82) !important;
+    box-shadow:none !important;
+    transform:none !important;
+    overflow:hidden !important;
+  }
+  .tp-workflow-page .tp-style-chip[data-active="true"] {
+    background:linear-gradient(145deg,rgba(138,43,226,0.20),rgba(47,140,255,0.16),rgba(0,229,255,0.08)) !important;
+    border-color:rgba(139,220,255,0.36) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.16),0 0 24px rgba(47,140,255,0.16) !important;
+  }
+  .tp-workflow-page .tp-style-chip-icon {
+    font-size:14px !important;
+    line-height:1 !important;
+    flex:0 0 auto !important;
+    opacity:0.92;
+  }
+  .tp-workflow-page .tp-style-chip-label {
+    width:100% !important;
+    min-width:0 !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+    text-align:center !important;
+    font-size:12px !important;
+    font-weight:900 !important;
+    letter-spacing:0.01em !important;
   }
 
   .tp-custom-select { position:relative; z-index:20; }
@@ -946,6 +1148,407 @@ const CSS = `
     background:rgba(5,8,18,0.18) !important;
     box-shadow:none !important;
     color:rgba(203,213,225,0.52) !important;
+  }
+
+  /* UX stability patch: segmented controls (source mode + quality/topology) */
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn {
+    padding:9px 6px !important;
+    font-size:clamp(9px, 0.95vw, 10.5px) !important;
+    font-weight:850 !important;
+    letter-spacing:0.02em !important;
+    line-height:1.05 !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:clip !important;
+    text-align:center !important;
+    transition:background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.12s !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"]:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"]:focus-visible {
+    background:linear-gradient(145deg,rgba(255,255,255,0.09),rgba(139,220,255,0.06)) !important;
+    color:#e2e8f0 !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 0 18px rgba(47,140,255,0.09) !important;
+  }
+  .tp-workflow-page .tp-flat-segment-row > button,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button {
+    transition:background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.12s !important;
+  }
+  .tp-workflow-page .tp-flat-segment-row > button:not(.sel):not(:disabled):hover,
+  .tp-workflow-page .tp-flat-segment-row > button:not(.sel):not(:disabled):focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(.sel):not(:disabled):hover,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(.sel):not(:disabled):focus-visible {
+    background:linear-gradient(145deg,rgba(255,255,255,0.09),rgba(139,220,255,0.06)) !important;
+    color:#e2e8f0 !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 0 18px rgba(47,140,255,0.09) !important;
+  }
+  .tp-workflow-page .tp-flat-segment-row > .sel,
+  .tp-workflow-page .tp-flat-segment-row > .sel:hover,
+  .tp-workflow-page .tp-flat-segment-row > .sel:focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel:hover,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel:focus-visible {
+    background:linear-gradient(145deg,rgba(138,43,226,0.24),rgba(47,140,255,0.16),rgba(0,229,255,0.08)) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.14),0 0 22px rgba(47,140,255,0.12) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:not(:disabled):active,
+  .tp-workflow-page .tp-flat-segment-row > button:not(:disabled):active,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(:disabled):active {
+    transform:scale(0.985) !important;
+  }
+
+  /* Final segmented-control pass: single-plane rows, divider lines, stable active state */
+  .tp-workflow-page .tp-gen-tabs,
+  .tp-workflow-page .tp-source-mode-row,
+  .tp-workflow-page .tp-flat-segment-row {
+    gap:0 !important;
+    padding:0 !important;
+    overflow:hidden !important;
+    border-radius:20px !important;
+    border:1px solid rgba(139,220,255,0.16) !important;
+    background:linear-gradient(145deg,rgba(255,255,255,0.058),rgba(255,255,255,0.02)) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.08) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs {
+    min-height:56px !important;
+  }
+  .tp-workflow-page .tp-source-mode-row,
+  .tp-workflow-page .tp-flat-segment-row {
+    min-height:52px !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > button,
+  .tp-workflow-page .tp-flat-segment-row > button:hover,
+  .tp-workflow-page .tp-flat-segment-row > button:focus,
+  .tp-workflow-page .tp-flat-segment-row > button:focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:hover,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:focus,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:focus-visible {
+    margin:0 !important;
+    border:0 !important;
+    border-radius:0 !important;
+    outline:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+    transform:none !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab + .tp-inp-tab,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn + .tp-source-mode-btn,
+  .tp-workflow-page .tp-flat-segment-row > button + button,
+  .tp-workflow-page .tp-flat-segment-row > .model-na + button,
+  .tp-workflow-page .tp-flat-segment-row > button + .model-na > button {
+    border-left:1px solid rgba(139,220,255,0.2) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn,
+  .tp-workflow-page .tp-flat-segment-row > button,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button {
+    min-height:52px !important;
+    padding:0 14px !important;
+    font-size:clamp(10px, 0.95vw, 11.5px) !important;
+    font-weight:900 !important;
+    letter-spacing:0.04em !important;
+    line-height:1.15 !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    text-align:center !important;
+    color:rgba(203,213,225,0.8) !important;
+    transition:background 0.16s, color 0.16s, box-shadow 0.16s !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab {
+    min-height:56px !important;
+    padding:0 10px !important;
+    color:rgba(203,213,225,0.8) !important;
+    transition:background 0.16s, color 0.16s, box-shadow 0.16s !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"],
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .sel,
+  .tp-workflow-page .tp-flat-segment-row > .sel:hover,
+  .tp-workflow-page .tp-flat-segment-row > .sel:focus,
+  .tp-workflow-page .tp-flat-segment-row > .sel:focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel:hover,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel:focus,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > .sel:focus-visible {
+    background:linear-gradient(145deg,rgba(255,255,255,0.16),rgba(139,220,255,0.09)) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.14) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"]:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"]:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="false"]:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:not(.active):hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:not(.active):focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:not(.active):focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > button:not(.sel):not(:disabled):hover,
+  .tp-workflow-page .tp-flat-segment-row > button:not(.sel):not(:disabled):focus,
+  .tp-workflow-page .tp-flat-segment-row > button:not(.sel):not(:disabled):focus-visible,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(.sel):not(:disabled):hover,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(.sel):not(:disabled):focus,
+  .tp-workflow-page .tp-flat-segment-row > .model-na > button:not(.sel):not(:disabled):focus-visible {
+    background:rgba(255,255,255,0.06) !important;
+    color:#e2e8f0 !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.11) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:not(:first-child):not(:last-child),
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"] {
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.14) !important;
+  }
+  /* Hard stop: never allow inner rounding on segmented controls */
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:hover,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:focus,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:focus-visible,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab:active,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active:hover,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active:focus,
+  .tp-workflow-page .tp-gen-tabs .tp-inp-tab.active:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:first-child:active,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2),
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:nth-child(2):active,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:focus-visible,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab:last-child:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:focus-visible,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"],
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"]:focus-visible,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child:focus-visible,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:first-child:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child:focus-visible,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn:last-child:active {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+    box-shadow:none !important;
+    clip-path:inset(0) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs *,
+  .tp-workflow-page .tp-gen-tabs *::before,
+  .tp-workflow-page .tp-gen-tabs *::after,
+  .tp-workflow-page .tp-source-mode-row *,
+  .tp-workflow-page .tp-source-mode-row *::before,
+  .tp-workflow-page .tp-source-mode-row *::after {
+    border-radius:0 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab.active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn[data-active="true"] {
+    box-shadow:none !important;
+    background-clip:padding-box !important;
+  }
+  /* Clean segmented controls used by GeneratePanel to avoid legacy radius conflicts */
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:active,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean:active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean.active {
+    border-radius:0 !important;
+    border-top-left-radius:0 !important;
+    border-top-right-radius:0 !important;
+    border-bottom-left-radius:0 !important;
+    border-bottom-right-radius:0 !important;
+    border:0 !important;
+    outline:0 !important;
+    box-shadow:none !important;
+    text-shadow:none !important;
+    transform:none !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean + .tp-inp-tab-clean,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean + .tp-source-mode-btn-clean {
+    border-left:1px solid rgba(139,220,255,0.2) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.model-na {
+    pointer-events:none !important;
+    opacity:0.35 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean {
+    position:relative !important;
+    color:rgba(203,213,225,0.82) !important;
+    gap:0 !important;
+    overflow:visible !important;
+  }
+  .tp-workflow-page .tp-gen-tabs {
+    overflow:visible !important;
+    position:relative !important;
+    z-index:5 !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:not(.active):hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:not(.active):focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:not(.active):focus-visible {
+    background:rgba(255,255,255,0.06) !important;
+    color:#e2e8f0 !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.10) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.active,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.active:hover,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.active:focus,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean.active:focus-visible {
+    background:linear-gradient(145deg,rgba(255,255,255,0.16),rgba(139,220,255,0.09)) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.14) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean {
+    position:relative !important;
+    color:rgba(203,213,225,0.76) !important;
+    transition:background 0.16s ease,color 0.16s ease,box-shadow 0.16s ease,transform 0.16s ease !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean:not(.active):hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean:not(.active):focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean:not(.active):focus-visible {
+    background:rgba(255,255,255,0.062) !important;
+    color:#e2e8f0 !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.09) !important;
+  }
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean.active,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean.active:hover,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean.active:focus,
+  .tp-workflow-page .tp-source-mode-row > .tp-source-mode-btn-clean.active:focus-visible {
+    background:linear-gradient(145deg,rgba(0,229,255,0.13),rgba(138,43,226,0.12)) !important;
+    color:#f8fafc !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.14),0 0 24px rgba(0,229,255,0.08) !important;
+  }
+  .tp-workflow-page .tp-view-choice:hover,
+  .tp-workflow-page .tp-view-choice:focus-visible {
+    transform:translateY(-1px);
+    border-color:rgba(0,229,255,0.28) !important;
+    color:#f8fafc !important;
+    box-shadow:0 12px 26px rgba(0,0,0,0.18),0 0 22px rgba(0,229,255,0.10),inset 0 1px 0 rgba(255,255,255,0.09) !important;
+    outline:none;
+  }
+  /* Enhanced Active State for VIEW buttons */
+  .tp-workflow-page button.tp-view-choice.active,
+  .tp-workflow-page button.tp-view-choice.active:hover,
+  .tp-workflow-page button.tp-view-choice.active:focus-visible {
+    color: #ffffff !important;
+    border: 2px solid #00e5ff !important;
+    background: linear-gradient(145deg, rgba(0, 229, 255, 0.35), rgba(138, 43, 226, 0.25)) !important;
+    box-shadow: 0 0 30px rgba(0, 229, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+    opacity: 1 !important;
+    transform: scale(1.02) !important;
+    z-index: 10;
+  }
+  .tp-workflow-page button.tp-view-choice.active::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 15px;
+    background: linear-gradient(145deg, #00e5ff, #8a2be2);
+    opacity: 0.15;
+    z-index: -1;
+    filter: blur(8px);
+    animation: pulseGlow 2s infinite;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean .tp-tab-icon {
+    width:20px !important;
+    height:20px !important;
+    flex:0 0 auto !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean .tp-tab-label {
+    display:none !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean::after {
+    content:attr(data-tooltip);
+    position:absolute;
+    left:50%;
+    top:calc(100% + 8px);
+    transform:translateX(-50%) translateY(-4px);
+    padding:5px 8px;
+    border-radius:8px;
+    background:rgba(3,7,18,0.96);
+    border:1px solid rgba(139,220,255,0.24);
+    color:#e2e8f0;
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:0.03em;
+    white-space:nowrap;
+    opacity:0;
+    pointer-events:none;
+    z-index:30;
+    transition:opacity 0.14s ease, transform 0.14s ease !important;
+    box-shadow:0 8px 18px rgba(0,0,0,0.35);
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean::before {
+    content:"";
+    position:absolute;
+    left:50%;
+    top:calc(100% + 3px);
+    transform:translateX(-50%) translateY(-4px) rotate(45deg);
+    width:8px;
+    height:8px;
+    border-left:1px solid rgba(139,220,255,0.24);
+    border-top:1px solid rgba(139,220,255,0.24);
+    background:rgba(3,7,18,0.96);
+    opacity:0;
+    pointer-events:none;
+    z-index:29;
+    transition:opacity 0.14s ease, transform 0.14s ease !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:hover::after,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:focus::after,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:focus-visible::after {
+    opacity:1 !important;
+    transform:translateX(-50%) translateY(0) !important;
+  }
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:hover::before,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:focus::before,
+  .tp-workflow-page .tp-gen-tabs > .tp-inp-tab-clean:focus-visible::before {
+    opacity:1 !important;
+    transform:translateX(-50%) translateY(0) rotate(45deg) !important;
   }
 `;
 
@@ -1079,7 +1682,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [multiviewMode, setMultiviewMode] = useState("");
   const [multiviewOrthographic, setMultiviewOrthographic] = useState(false);
   const [multiviewOriginalTaskId, setMultiviewOriginalTaskId] = useState("");
+  const [multiviewImageMode, setMultiviewImageMode] = useState("generate_multiview_image");
+  const [multiviewEditPrompt, setMultiviewEditPrompt] = useState("");
+  const [multiviewEditView, setMultiviewEditView] = useState("front");
   const [multiImages, setMultiImages] = useState([]);
+  const remoteMultiviewLoadSeqRef = useRef(0);
   const [batchImages, setBatchImages] = useState([]);
   const [imgFile, setImgFile] = useState(null);
   const [imgPrev, setImgPrev] = useState(null);
@@ -1280,12 +1887,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
     const modeRaw = String(item?.mode || item?.params?.mode || item?.params?.type || "").toLowerCase();
     const source = item?.source || "tripo";
+    const isImageSet = isImageHistoryItem(item);
     const isSegment = modeRaw === "segment" || modeRaw.includes("segment");
     const isFillParts = modeRaw === "fill_parts" || modeRaw.includes("fill_parts");
     const isRig = modeRaw === "rig" || modeRaw.includes("animate_rig") || item?.params?.rigged === true;
     const isAnim = (modeRaw === "animate" || modeRaw.includes("retarget") || modeRaw.includes("animation")) && !isRig
       || item?.params?.animated === true;
 
+    if (isImageSet) return "#00e5ff";
     if (isSegment) return "#f59e0b";
     if (isFillParts) return "#2f8cff";
     if (isAnim) return "#2f8cff";
@@ -1294,7 +1903,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (source === "upload") return "#94a3b8";
     return "#64748b";
   }, [selectedPreviewItem, color]);
-  const activeTaskId = activeH?.taskId || activeH?.task_id || activeH?.id || "";
+  const activeModelHistoryItem = isImageHistoryItem(activeH) ? viewerH : activeH;
+  const activeTaskId = activeModelHistoryItem?.taskId || activeModelHistoryItem?.task_id || activeModelHistoryItem?.id || "";
+  const activeTaskType = getHistoryTaskType(activeH);
+  const activeMultiviewImageTaskId = ["generate_multiview_image", "edit_multiview_image"].includes(activeTaskType)
+    ? activeTaskId
+    : "";
+  const selectedMultiviewImageTaskId = (activeMultiviewImageTaskId || multiviewOriginalTaskId || "").trim();
   const activeTaskIdRef = useRef(activeTaskId);
   activeTaskIdRef.current = activeTaskId;
   const historyRef = useRef(history);
@@ -1590,6 +2205,10 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     () => [0, 1, 2, 3].every((index) => isUploadedImageReady(multiImages?.[index])),
     [multiImages, isUploadedImageReady]
   );
+  const multiviewUploadsReady = useMemo(
+    () => isMultiviewUploadReady(multiImages),
+    [multiImages]
+  );
 
   const canGen = useMemo(() => {
     if (submitLocked) return false;
@@ -1607,15 +2226,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           return batchImages?.length > 0 && batchImages.every((item) => isUploadedImageReady(item));
         }
         if (genTab === "multi") {
-          if (multiviewSourceMode === "generate_multiview_image") {
-            return !!prompt.trim() || hasMultiviewReference;
-          }
-          if (multiviewSourceMode === "edit_multiview_image") {
-            return !!multiviewOriginalTaskId.trim() || multiImages.some((item) => isUploadedImageReady(item)) || hasMultiviewReference;
-          }
-          return multiImages.length > 0 && multiImages.every((item) => isUploadedImageReady(item));
+          return multiviewUploadsReady || !!selectedMultiviewImageTaskId;
         }
         return false;
+      case "views":
+        if (multiviewImageMode === "generate_multiview_image") return hasMultiviewReference;
+        return !!selectedMultiviewImageTaskId && !!multiviewEditPrompt.trim();
       case "segment":
         if (!isSegmentModelVersionSupported) return false;
         if (segSub === "fill_parts") {
@@ -1665,7 +2281,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     textureSourceHasTexture, textureEditSourceTaskId, refineBlockedBySelectedSource, focusedInstanceId,
     _taskTick, submitLocked, isSegmentModelVersionSupported, isRetopoModelVersionSupported,
     segmentActionTaskId, retopoActionTaskId, imageSourceMode, multiviewSourceMode, imageReference,
-    multiviewReference, multiviewOriginalTaskId, isUploadedImageReady, hasMultiviewReference, textureMultiViewsReady]);
+    multiviewReference, multiviewOriginalTaskId, isUploadedImageReady, hasMultiviewReference, textureMultiViewsReady,
+    multiviewUploadsReady, multiviewImageMode, multiviewEditPrompt, selectedMultiviewImageTaskId]);
 
 
 
@@ -1758,6 +2375,56 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   const handleMultiImg = uploadImageStsFile;
   const handleBatchImg = uploadImageStsFile;
+
+  const hydrateMultiviewImagesFromHistory = useCallback(async (item, { preferUpload = false } = {}) => {
+    const previewUrls = getHistoryImageUrls(item).slice(0, 4);
+    if (!previewUrls.length) {
+      setMultiImages([]);
+      return;
+    }
+
+    const requestSeq = ++remoteMultiviewLoadSeqRef.current;
+    const seededItems = buildMultiviewPreviewItems(previewUrls);
+    setMultiImages(seededItems);
+    if (preferUpload) setMultiviewSourceMode("upload");
+
+    const uploadedItems = await Promise.all(
+      previewUrls.map(async (url, index) => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`History image fetch failed (${response.status})`);
+          const blob = await response.blob();
+          const extension = inferImageTypeFromUrl(url);
+          const file = new File(
+            [blob],
+            `tripo_${MULTIVIEW_UPLOAD_ORDER[index]?.id || `view_${index + 1}`}.${extension}`,
+            { type: blob.type || `image/${extension}` }
+          );
+          const payload = await uploadImageStsFile(file);
+          return {
+            index,
+            item: {
+              ...seededItems[index],
+              ...normalizeUploadedMultiviewItem(file, seededItems[index]?.preview || url, payload),
+            },
+          };
+        } catch (error) {
+          console.warn("[hydrateMultiviewImagesFromHistory] upload failed:", error?.message || error);
+          return { index, item: seededItems[index] };
+        }
+      })
+    );
+
+    if (remoteMultiviewLoadSeqRef.current !== requestSeq) return;
+
+    setMultiImages((prev) => {
+      const next = Array.isArray(prev) ? [...prev] : [...seededItems];
+      uploadedItems.forEach(({ index, item: nextItem }) => {
+        next[index] = nextItem;
+      });
+      return next;
+    });
+  }, [uploadImageStsFile]);
 
   const handleImg = useCallback(async (file) => {
     if (!file) {
@@ -1902,7 +2569,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       }
 
       if (d.status === "success") {
-        const hasImagePreview = Boolean(d.previewImageUrl) || (Array.isArray(d.previewImageUrls) && d.previewImageUrls.length > 0);
+        const hasImagePreview = extractTripoPreviewImageUrls(d).length > 0;
         if (!d.modelUrl && d.rigCheckResult === null && !hasImagePreview) {
           throw Object.assign(new Error("Content blocked by Tripo. Credits were not charged."), { type: "nsfw" });
         }
@@ -1985,7 +2652,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       }
       if (d.status === "success") {
         // prerigcheck tasks don't return a model — they only set rigCheckResult
-        if (!d.modelUrl && d.rigCheckResult === null) {
+        if (!d.modelUrl && d.rigCheckResult === null && !hasTaskImagePreview(d)) {
           throw Object.assign(new Error("Content blocked by Tripo. Credits were not charged."), { type: "nsfw" });
         }
         await onSuccess(d); return;
@@ -2015,11 +2682,19 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         const t = await getIdToken();
         const proxyUrl = BASE_URL + "/api/tripo/model-proxy?url=" + encodeURIComponent(rawUrl) + (taskId ? `&taskId=${taskId}` : "");
         const res = await fetch(proxyUrl, { headers: { Authorization: "Bearer " + t }, signal: AbortSignal.timeout(45_000) });
-        if (!res.ok) throw new Error("Model load HTTP " + res.status);
+        if (!res.ok) {
+          const err = new Error("Model load HTTP " + res.status);
+          err.status = res.status;
+          throw err;
+        }
         const blob = await res.blob();
         if (!blob || blob.size === 0) throw new Error("Empty model response");
         return URL.createObjectURL(blob);
-      } catch (err) { lastErr = err; console.warn(`[fetchProxy] attempt ${attempt + 1}/${retries} failed:`, err.message); }
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[fetchProxy] attempt ${attempt + 1}/${retries} failed:`, err.message);
+        if (err?.status === 410 || err?.status === 404) break;
+      }
     }
     throw lastErr ?? new Error("fetchProxy: all retries exhausted");
   }, [getIdToken]);
@@ -2027,6 +2702,32 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const revokeBlobUrl = useCallback((url) => {
     if (url && url.startsWith("blob:")) URL.revokeObjectURL(url);
   }, []);
+
+  const purgeExpiredHistoryItem = useCallback(async (item) => {
+    if (!item?.id) return;
+    setHistory((prev) => prev.filter((entry) => entry.id !== item.id));
+    setOptimisticItems((prev) => prev.filter((entry) => entry.id !== item.id));
+    if (selHistId === item.id) {
+      setSelHistId(null);
+      setManualSelectedItem(null);
+      setSelectedPreviewThumb(null);
+    }
+    if (viewerHistId === item.id) {
+      setViewerHistId(null);
+    }
+    try {
+      const token = await getIdToken?.();
+      const response = await fetch(`${BASE_URL}/api/tripo/history/${item.id}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok && response.status !== 404) {
+        console.warn("[purgeExpiredHistoryItem] delete failed:", response.status);
+      }
+    } catch (err) {
+      console.warn("[purgeExpiredHistoryItem] cleanup request failed:", err?.message ?? err);
+    }
+  }, [getIdToken, selHistId, viewerHistId]);
 
   useEffect(() => { return () => { revokeBlobUrl(prevUrl.current); }; }, []); // eslint-disable-line
 
@@ -2080,7 +2781,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               try {
                 const buf = await fetch(blob).then(r => r.arrayBuffer());
                 await getCachedThumbnail(buf, { width: 280, height: 280 }, sd.modelUrl);
-              } catch { }
+              } catch (_thumbErr) {
+                // Thumbnail warmup is optional here.
+              }
             }
 
             if (!persisted.savedToHistory && sd.modelUrl) {
@@ -2111,7 +2814,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               try {
                 const buf = await fetch(blob).then(r => r.arrayBuffer());
                 await getCachedThumbnail(buf, { width: 280, height: 280 }, rawUrl);
-              } catch { }
+              } catch (_thumbErr) {
+                // Thumbnail warmup is optional here.
+              }
             }
 
             if (!persisted.savedToHistory) {
@@ -2163,7 +2868,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               try {
                 const buf = await fetch(blob).then(r => r.arrayBuffer());
                 await getCachedThumbnail(buf, { width: 280, height: 280 }, rawUrl);
-              } catch { }
+              } catch (_thumbErr) {
+                // Thumbnail warmup is optional here.
+              }
             }
 
             if (!persisted.savedToHistory && rawUrl) {
@@ -2234,7 +2941,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { saveHist, saveRigHist } = useTripoHistory({
+  const { saveHist, saveRigHist, saveImageHist } = useTripoHistory({
     userId, prompt, negPrompt, mode, modelVer, activeStyle, history, histInit,
     setOptimisticItems, setHistory,
   });
@@ -2280,13 +2987,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (mode === "refine") return 30;
     if (mode === "stylize") return 20;
     if (mode === "segment") return MODE_COST[segSub] ?? MODE_COST.segment;
+    if (mode === "views") return MODE_COST[multiviewImageMode] ?? 10;
     if (mode !== "generate") return MODE_COST[mode] ?? 10;
     const type = genTab === "text" ? "text_to_model" : genTab === "multi" ? "multiview_to_model" : "image_to_model";
     const effectiveVer = modelVer;
     let preprocessCost = 0;
     if (genTab === "image" && imageSourceMode === "generate_image") preprocessCost += MODE_COST.generate_image;
-    if (genTab === "multi" && multiviewSourceMode === "generate_multiview_image") preprocessCost += MODE_COST.generate_multiview_image;
-    if (genTab === "multi" && multiviewSourceMode === "edit_multiview_image") preprocessCost += MODE_COST.edit_multiview_image;
     if (effectiveVer === "v1.4-20240625") return (type === "text_to_model" ? 20 : 30) + preprocessCost;
     const isP1 = effectiveVer === "P1-20260311";
     const isText = type === "text_to_model";
@@ -2301,7 +3007,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const partsCost = inParts ? 20 : 0;
     const quadCost = quadMesh ? 5 : 0;
     return base + texAddon + ultraAddon + slpCost + partsCost + quadCost + preprocessCost;
-  }, [mode, texSub, brushMode, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh, smartLowPoly, modelVer, imageSourceMode, multiviewSourceMode]);
+  }, [mode, texSub, brushMode, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh, smartLowPoly, modelVer, imageSourceMode, multiviewImageMode]);
 
   const createTripoTaskRequest = useCallback(async (body, headersOverride = null) => {
     const headers = headersOverride ?? await authH();
@@ -2337,11 +3043,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   }, [authH]);
 
   const getTaskPreviewRefs = useCallback((taskData) => {
-    const urls = Array.isArray(taskData?.previewImageUrls) && taskData.previewImageUrls.length > 0
-      ? taskData.previewImageUrls
-      : taskData?.previewImageUrl
-        ? [taskData.previewImageUrl]
-        : [];
+    const urls = extractTripoPreviewImageUrls(taskData);
 
     return urls.filter(Boolean).map((url) => ({
       type: inferImageTypeFromUrl(url),
@@ -2390,6 +3092,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (histAbort.current) histAbort.current.cancelled = true;
     const t = { cancelled: false };
     histAbort.current = t;
+    if (isImageHistoryItem(item)) {
+      setGenStatus(item.status);
+      setSegmentProcessing(false);
+      if (showLoading) setLoadingId(null);
+      return;
+    }
 
     if (showLoading) {
       setLoadingId(item.id);
@@ -2418,10 +3126,21 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           revokeBlobUrl(b);
         }
       } catch (loadErr) {
-        console.warn("[loadHistoryIntoViewer] fetchProxy failed, using direct URL:", loadErr.message);
-        if (!t.cancelled) {
-          setModelUrl(item.model_url);
-          prevUrl.current = item.model_url;
+        if (loadErr?.status === 410 || loadErr?.status === 404) {
+          console.warn("[loadHistoryIntoViewer] expiring history item after proxy failure:", loadErr.message);
+          if (!t.cancelled) {
+            toast.error("Ez a Tripo asset mar nem elerheto, eltavolitottam a historybol.");
+            await purgeExpiredHistoryItem(item);
+            revokeBlobUrl(prevUrl.current);
+            prevUrl.current = null;
+            setModelUrl(null);
+          }
+        } else {
+          console.warn("[loadHistoryIntoViewer] fetchProxy failed, using direct URL:", loadErr.message);
+          if (!t.cancelled) {
+            setModelUrl(item.model_url);
+            prevUrl.current = item.model_url;
+          }
         }
       }
     }
@@ -2433,24 +3152,35 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       }
       if (showLoading) setLoadingId(null);
     }
-  }, [fetchProxy, revokeBlobUrl, setViewMode]);
+  }, [fetchProxy, purgeExpiredHistoryItem, revokeBlobUrl, setViewMode]);
 
   const applyHistorySelection = useCallback((item) => {
     if (!item) return;
+    const isImageSet = isImageHistoryItem(item);
     setManualSelectedItem(item);
-    setSelectedPreviewThumb(item?.previewThumbnail || item?.thumbnail || item?.thumbnail_url || checkThumbnailCache(item?.model_url) || null);
+    setSelectedPreviewThumb(item?.previewThumbnail || item?.thumbnail || item?.thumbnail_url || checkThumbnailCache(item?.model_url) || item?.previewImageUrl || null);
     setSelHistId(item.id);
     setGenStatus(item.status);
     programmaticUrlRef.current = item?.taskId || null;
     if (item?.taskId) setSearchParams(prev => { const n = new URLSearchParams(prev); n.set("tripoTaskId", item.taskId); return n; }, { replace: true });
     else setSearchParams(prev => { const n = new URLSearchParams(prev); n.delete("tripoTaskId"); return n; }, { replace: true });
     setSegmentHighlight(false);
-    setViewMode(item?.mode === "segment" ? "segment" : "uv");
+    if (!isImageSet) {
+      setViewMode(item?.mode === "segment" ? "segment" : "uv");
+    }
 
     if (item?.taskId) {
-      setSegId(item.taskId); setFillId(item.taskId); setRetopoId(item.taskId);
-      setTexId(item.taskId); setAnimId(item.taskId); setEditId(item.taskId);
-      setRefineId(item.taskId); setRefineManualOverride(false); setStylizeId(item.taskId);
+      if (isImageSet) {
+        setMultiviewOriginalTaskId(item.taskId);
+        setMultiviewSourceMode("generated_views");
+        void hydrateMultiviewImagesFromHistory(item, {
+          preferUpload: mode === "generate" && genTab === "multi",
+        });
+      } else {
+        setSegId(item.taskId); setFillId(item.taskId); setRetopoId(item.taskId);
+        setTexId(item.taskId); setAnimId(item.taskId); setEditId(item.taskId);
+        setRefineId(item.taskId); setRefineManualOverride(false); setStylizeId(item.taskId);
+      }
     }
     logFrontendDebug("[TripoPanel][history-select]", {
       taskId: item?.taskId || null,
@@ -2460,7 +3190,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       pbr: item?.params?.pbr ?? null,
     });
 
-    const isRigItem = item?.mode === "rig" || item?.params?.rigged === true || item?.params?.type === "animate_rig";
+    const isRigItem = !isImageSet && (item?.mode === "rig" || item?.params?.rigged === true || item?.params?.type === "animate_rig");
     const isAnimItem = item?.params?.animated === true || item?.params?.type === "animate_retarget";
     if (isRigItem || isAnimItem) {
       const rigId = isAnimItem
@@ -2492,7 +3222,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       setDetectedRigType(null);
       setDetectedRigSpec(null);
     }
-  }, [setSearchParams]);
+  }, [genTab, hydrateMultiviewImagesFromHistory, mode, setSearchParams]);
 
   const handleUseOriginalModel = useCallback(async (taskId) => {
     const originalItem = findHistoryItemByTaskKey(taskId);
@@ -2508,7 +3238,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const focusGeneratedHistoryItem = useCallback((item) => {
     if (!item) return;
     applyHistorySelection(item);
-    setViewerHistId(item.id);
+    if (!isImageHistoryItem(item)) {
+      setViewerHistId(item.id);
+    }
   }, [applyHistorySelection]);
 
   const handleGen = useCallback(async () => {
@@ -2559,6 +3291,31 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         const stylePrefix = (genTab === "text" && styleObj) ? styleObj.prefix : "";
         const effectivePbrOn = texOn && pbrOn;
         switch (mode) {
+          case "views": {
+            if (multiviewImageMode === "generate_multiview_image") {
+              const sourceFile = toTripoImageRef(multiviewReference);
+              if (!sourceFile) throw new Error("Upload a source image before generating multiview images.");
+              body = {
+                type: "generate_multiview_image",
+                file: sourceFile,
+              };
+            } else {
+              const editPrompt = multiviewEditPrompt.trim();
+              const originalTaskId = selectedMultiviewImageTaskId;
+              if (!originalTaskId || !editPrompt) {
+                throw new Error("Generate or select multiview images before editing views.");
+              }
+              body = {
+                type: "edit_multiview_image",
+                original_task_id: originalTaskId,
+                prompts: [{
+                  prompt: editPrompt,
+                  view: multiviewEditView || "front",
+                }],
+              };
+            }
+            break;
+          }
           case "generate":
             if (genTab === "text") {
               const isUltra = meshQ === "ultra" && _isModern;
@@ -2588,56 +3345,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
               const isUltra = meshQ === "ultra" && _isModern;
               const isP1 = effectiveModel === "P1-20260311";
               let originalTaskId = null;
-              let files = [];
+              let files = null;
 
-              if (multiviewSourceMode === "generate_multiview_image") {
-                const preprocessBody = {
-                  type: "generate_multiview_image",
-                  ...(prompt.trim() && { prompt: prompt.trim() }),
-                  ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
-                  ...(generationModel && { model: generationModel }),
-                  ...(generationTemplateId && { template_id: generationTemplateId }),
-                  ...(generationOrientation && { orientation: generationOrientation }),
-                  ...(generationCompress && { compress: generationCompress }),
-                  ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
-                  ...(generationRenderImage && { render_image: true }),
-                  ...(multiviewMode && { mode: multiviewMode }),
-                  ...(multiviewOrthographic && { orthographic_projection: true }),
-                  ...(hasMultiviewReference && { reference_image: toTripoImageRef(multiviewReference) }),
-                };
-                const preprocess = await runPreprocessTask(preprocessBody, "Generating multiview source…");
-                originalTaskId = preprocess.taskId;
-                snapshotExtras = {
-                  ...snapshotExtras,
-                  preprocessTaskId: preprocess.taskId,
-                  preprocessTaskType: preprocessBody.type,
-                };
-              } else if (multiviewSourceMode === "edit_multiview_image") {
-                const editFiles = (multiImages ?? []).map(toTripoImageRef).filter(Boolean);
-                const preprocessBody = {
-                  type: "edit_multiview_image",
-                  ...(prompt.trim() && { prompt: prompt.trim() }),
-                  ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
-                  ...(generationModel && { model: generationModel }),
-                  ...(generationTemplateId && { template_id: generationTemplateId }),
-                  ...(generationOrientation && { orientation: generationOrientation }),
-                  ...(generationCompress && { compress: generationCompress }),
-                  ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
-                  ...(generationRenderImage && { render_image: true }),
-                  ...(multiviewOrthographic && { orthographic_projection: true }),
-                  ...(multiviewOriginalTaskId.trim() && { original_task_id: multiviewOriginalTaskId.trim() }),
-                  ...(hasMultiviewReference && { reference_image: toTripoImageRef(multiviewReference) }),
-                  ...(editFiles.length > 0 && { files: editFiles }),
-                };
-                const preprocess = await runPreprocessTask(preprocessBody, "Editing multiview source…");
-                originalTaskId = preprocess.taskId;
-                snapshotExtras = {
-                  ...snapshotExtras,
-                  preprocessTaskId: preprocess.taskId,
-                  preprocessTaskType: preprocessBody.type,
-                };
+              if (multiviewUploadsReady) {
+                files = getMultiviewFilesPayload(multiImages, toTripoImageRef);
+              } else if (selectedMultiviewImageTaskId) {
+                originalTaskId = selectedMultiviewImageTaskId;
               } else {
-                files = multiImages.map(toTripoImageRef).filter(Boolean);
+                throw new Error("Upload at least Front + 1 view, or select a Views history item first.");
               }
 
               body = {
@@ -3055,7 +3770,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       submitLockedRef.current = false;
       setSubmitLocked(false);
     }
-  }, [canGen, mode, texSub, refineBlockedBySelectedSource, effectiveRefineDisableReason, refineSourceTaskId, refineSelectedTaskId, refineResolvedFromUpstream, refineDraftDisplayName, refineSourceDisplayName, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, textureModelVer, textureRequestModelVer, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError, textureSourceHasTexture, textureEditSourceTaskId, textureEditSourceItem, textureEditItem, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH, imageSourceMode, multiviewSourceMode, generationModel, generationTemplateId, generationOrientation, generationCompress, generationRenderImage, generationTextureAlignment, imageReference, multiviewReference, multiviewMode, multiviewOrthographic, multiviewOriginalTaskId, toTripoImageRef, runPreprocessTask, getTaskPreviewRefs, uploadImageFile, hasImageReference, hasMultiviewReference]);
+  }, [canGen, mode, texSub, refineBlockedBySelectedSource, effectiveRefineDisableReason, refineSourceTaskId, refineSelectedTaskId, refineResolvedFromUpstream, refineDraftDisplayName, refineSourceDisplayName, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, textureModelVer, textureRequestModelVer, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getIdToken, history, forceUpdate, persistActiveTask, addJob, updateJob, markJobError, textureSourceHasTexture, textureEditSourceTaskId, textureEditSourceItem, textureEditItem, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH, imageSourceMode, multiviewSourceMode, generationModel, generationTemplateId, generationOrientation, generationCompress, generationRenderImage, generationTextureAlignment, imageReference, multiviewReference, multiviewMode, multiviewOrthographic, multiviewOriginalTaskId, selectedMultiviewImageTaskId, multiviewImageMode, multiviewEditPrompt, multiviewEditView, toTripoImageRef, runPreprocessTask, getTaskPreviewRefs, uploadImageFile, hasImageReference, hasMultiviewReference]);
 
   const { rigCompatRef, getCompatibility, handleAutoRig } = useTripoRig({
     activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl,
@@ -3118,8 +3833,9 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const onParallelTaskSuccess = useCallback(async (inst, d, blobUrl) => {
     const thisOptimisticId = inst.taskId ? `tripo_${inst.taskId}` : null;
     const resolvedModelUrl = resolveTripoModelUrl(d);
+    const previewUrls = extractTripoPreviewImageUrls(d);
 
-    if (thisOptimisticId) {
+    if (thisOptimisticId && inst.mode !== "views") {
       setViewerHistId(thisOptimisticId);
     }
 
@@ -3144,6 +3860,59 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       }
     }
     markJobDone(inst.instanceId, { title: inst.label, progress: 100, taskId: inst.taskId, modelUrl: resolvedModelUrl ?? null });
+
+    if (inst.mode === "views") {
+      setMultiviewOriginalTaskId(inst.taskId || "");
+      setMultiviewSourceMode("generated_views");
+      if (inst.taskId && previewUrls.length > 0) {
+        const stableDocId = `tripo_${inst.taskId}`;
+        const optimisticItem = {
+          id: stableDocId,
+          taskId: inst.taskId,
+          status: "succeeded",
+          source: "tripo",
+          mode: inst.mode,
+          kind: "images",
+          type: inst.snapshot?.type ?? multiviewImageMode,
+          image_urls: previewUrls,
+          previewImageUrl: previewUrls[0] ?? null,
+          previewImageUrls: previewUrls,
+          ts: Date.now(),
+          prompt: inst.snapshot?.prompt || inst.label || "Views",
+          name: inst.snapshot?._sourceName || inst.label || "Views",
+          params: {
+            type: inst.snapshot?.type ?? multiviewImageMode,
+            mode: inst.mode,
+            assetKind: "images",
+            ...(inst.snapshot?.original_task_id && { originalTaskId: inst.snapshot.original_task_id }),
+            ...(d.consumedCredit != null && { consumedCredit: d.consumedCredit }),
+          },
+          createdAt: { toDate: () => new Date() },
+        };
+        setOptimisticItems(prev => [
+          optimisticItem,
+          ...prev.filter(o => o.id !== stableDocId),
+        ]);
+        focusGeneratedHistoryItem(optimisticItem);
+        try {
+          const ni = await saveImageHist(inst.taskId, previewUrls, {
+            prompt: inst.snapshot?.prompt || inst.label || "Views",
+            name: inst.snapshot?._sourceName || inst.label || "Views",
+            label: inst.label,
+            mode: inst.mode,
+            type: inst.snapshot?.type ?? multiviewImageMode,
+            originalTaskId: inst.snapshot?.original_task_id ?? undefined,
+            consumedCredit: d.consumedCredit ?? undefined,
+          });
+          if (ni) focusGeneratedHistoryItem(ni);
+        } catch (e) {
+          console.error("[onParallelTaskSuccess] saveImageHist failed:", e?.message ?? e);
+        }
+      }
+      toast.success("Multiview image task ready. Model > Multi-view will use it automatically.");
+      refreshCredits?.();
+      return;
+    }
 
     // Persist the durable Firestore URL so TripoPanel can load it on next mount.
     // Blob URLs are revoked on unmount and must not be stored here.
@@ -3273,7 +4042,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     } catch (e) {
       console.error("[onParallelTaskSuccess] saveHist failed:", e?.message ?? e);
     }
-  }, [saveHist, getIdToken, refreshCredits, revokeBlobUrl, markJobDone, setOptimisticItems, history, setViewMode, focusGeneratedHistoryItem]);
+  }, [saveHist, saveImageHist, getIdToken, refreshCredits, revokeBlobUrl, markJobDone, setOptimisticItems, history, setViewMode, focusGeneratedHistoryItem, multiviewImageMode]);
 
   const onParallelTaskFail = useCallback((inst, reason) => {
     markJobError(inst.instanceId, reason);
@@ -3331,6 +4100,17 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   }, [history, optimisticItems, selHist]);
 
   const reuse = useCallback((item) => {
+    if (isImageHistoryItem(item)) {
+      if (item?.taskId) {
+        setMultiviewOriginalTaskId(item.taskId);
+        setMultiviewSourceMode("generated_views");
+      }
+      setMode("generate");
+      setGenTab("multi");
+      void hydrateMultiviewImagesFromHistory(item, { preferUpload: true });
+      setErrorMsg("");
+      return;
+    }
     const styleObj = STYLE_PREFIX.find(s => s.id === item?.styleId);
     const rawPrompt = styleObj?.prefix && item?.prompt?.startsWith(styleObj.prefix)
       ? item.prompt.slice(styleObj.prefix.length)
@@ -3344,7 +4124,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     }
     setActiveStyle(item?.styleId || "");
     setErrorMsg("");
-  }, []);
+  }, [hydrateMultiviewImagesFromHistory]);
 
   // Reset rigCompat when srcId changes — restore from cache if present
   useEffect(() => {
@@ -3381,6 +4161,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   const genLabel = useMemo(() => {
     if (mode === "segment") return segSub === "fill_parts" ? "Part Completion" : "Start Segmenting";
+    if (mode === "views") return multiviewImageMode === "edit_multiview_image" ? "Edit Views" : "Generate Views";
     if (mode === "texture") {
       if (texSub === "paint" && TRIPO_PAINT_MODE_DISABLED) return "Waiting for Tripo Patch";
       if (texSub === "paint") return brushMode === "Paint Mode" ? "Apply Paint Texture" : "Apply Texture Prompt";
@@ -3392,13 +4173,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       refine: "Refine Model", stylize: "Apply Style",
       animate: "Apply Animation",
     })[mode] ?? "Generate";
-  }, [mode, segSub, texSub, brushMode]);
+  }, [mode, segSub, texSub, brushMode, multiviewImageMode]);
 
   const modeTitle = useMemo(() => {
     if (mode === "segment") return segSub === "fill_parts" ? "Fill Parts" : "Segmentation";
     if (mode === "texture") return texSub === "paint" ? "Paint Mode Paused" : "3D Model Texture Generator";
     return ({
       generate: "Generate Model",
+      views: "Multiview Images",
       retopo: "Retopology",
       refine: "Model Refinement", stylize: "Style Transfer",
       animate: "3D Rigging & Animation",
@@ -3621,10 +4403,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   generationRenderImage={generationRenderImage} setGenerationRenderImage={setGenerationRenderImage}
                   generationTextureAlignment={generationTextureAlignment} setGenerationTextureAlignment={setGenerationTextureAlignment}
                   imageReference={imageReference} setImageReference={setImageReference}
-                  multiviewReference={multiviewReference} setMultiviewReference={setMultiviewReference}
-                  multiviewMode={multiviewMode} setMultiviewMode={setMultiviewMode}
-                  multiviewOrthographic={multiviewOrthographic} setMultiviewOrthographic={setMultiviewOrthographic}
-                  multiviewOriginalTaskId={multiviewOriginalTaskId} setMultiviewOriginalTaskId={setMultiviewOriginalTaskId}
+                  multiviewOriginalTaskId={selectedMultiviewImageTaskId}
                   multiImages={multiImages} setMultiImages={setMultiImages}
                   canGen={canGen}
                   getIdToken={getIdToken}
@@ -3634,6 +4413,20 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   setErrorMsg={setErrorMsg} activeStyles={activeStyle}
                   onStyleToggle={handleStyleToggle}
                   aiSuggestedNeg={aiSuggestedNeg} setAiSuggestedNeg={setAiSuggestedNeg}
+                />
+              </div>
+              <div className="tp-workflow-page" style={mode !== "views" ? { display: "none" } : undefined}>
+                <MultiviewImagesPanel
+                  mode={multiviewImageMode}
+                  setMode={setMultiviewImageMode}
+                  sourceImage={multiviewReference}
+                  setSourceImage={setMultiviewReference}
+                  uploadImage={handleMultiImg}
+                  hasSelectedTask={Boolean(selectedMultiviewImageTaskId)}
+                  editPrompt={multiviewEditPrompt}
+                  setEditPrompt={setMultiviewEditPrompt}
+                  editView={multiviewEditView}
+                  setEditView={setMultiviewEditView}
                 />
               </div>
               <div className="tp-workflow-page" style={mode !== "segment" ? { display: "none" } : undefined}>
@@ -3995,6 +4788,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             onReuse={reuse}
             onHistoryLoad={onHistoryLoad}
             onDownload={async (i) => {
+              if (isImageHistoryItem(i)) {
+                try {
+                  await downloadImageHistoryZip(i, i.name || i.prompt || `tripo_views_${i.taskId || Date.now()}`);
+                } catch (e) {
+                  alert(e.message);
+                }
+                return;
+              }
               try { const b = await fetchProxy(i.model_url, i.taskId); setDlItem({ blobUrl: b, item: i }); setDlOpen(true); }
               catch (e) { alert(e.message); }
             }}

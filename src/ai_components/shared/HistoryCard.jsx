@@ -1,8 +1,14 @@
 // shared/HistoryCard.jsx  — DAW / Game Asset Browser aesthetic
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Download, RotateCcw, Trash2, Box, Sparkles, AlertCircle, PersonStanding, Wand2, Scissors, Boxes } from "lucide-react";
+import { Download, RotateCcw, Trash2, Box, Sparkles, AlertCircle, PersonStanding, Wand2, Scissors, Boxes, Images } from "lucide-react";
 import { getCachedThumbnail, checkThumbnailCache, isThumbnailUnsupported } from "../trellis/Glbthumbnail";
 import { fetchModelData } from "../trellis/utils";
+import {
+  ensureImageHistoryThumb,
+  getCachedImageHistoryThumb,
+  getHistoryImageUrls,
+  isImageHistoryItem,
+} from "../tripo/tripoImageHistoryUtils";
 
 /* ─── CSS injection ──────────────────────────────────────────────────────── */
 const CARD_STYLE_ID = "__hcard-styles__";
@@ -92,9 +98,11 @@ const getThumbnailCacheKey = (item) => item?.model_url ? `${item.model_url}#${TH
 const getTypeConfig = (item) => {
   const mode = item?.mode;
   const params = item?.params || {};
+  const isImageSet = isImageHistoryItem(item);
   const isRig = mode === 'rig' || params.rigged === true || params.type === 'animate_rig';
   const isAnim = (mode === 'animate' && !isRig) || params.animated === true || params.type === 'animate_retarget';
 
+  if (isImageSet) return { rail: "#00e5ff", glow: "#0891b2", label: "IMAGES", Icon: Images };
   if (isAnim) return { rail: "#22d3ee", glow: "#0891b2", label: "ANIM", Icon: Wand2 };
   if (isRig) return { rail: "#f472b6", glow: "#db2777", label: "RIG", Icon: PersonStanding };
   if (mode === "segment") return { rail: "#f59e0b", glow: "#d97706", label: "SEGMENT", Icon: Scissors };
@@ -137,12 +145,16 @@ function ShimmerThumb({ height }) {
 /* ─── HistoryCard ────────────────────────────────────────────────────────── */
 const HistoryCard = React.memo(function HistoryCard({
   item, isActive, onSelect, onReuse, onDownload, onDelete, onExpired,
-  color = "#64748b", getIdToken,
+  getIdToken,
 }) {
   const containerRef = React.useRef(null);
   const containerWidth = useContainerWidth(containerRef);
   const isNarrow = containerWidth < 160;
   const thumbH = isNarrow ? 110 : 155;
+  const imageGridGap = isNarrow ? 4 : 6;
+  const imageGridPadding = isNarrow ? 6 : 8;
+  const isImageSet = isImageHistoryItem(item);
+  const imageUrls = useMemo(() => getHistoryImageUrls(item).slice(0, 4), [item]);
 
   const [thumbnail, setThumbnail] = useState(null);
   const [thumbLoading, setThumbLoading] = useState(false);
@@ -152,6 +164,49 @@ const HistoryCard = React.memo(function HistoryCard({
   const [timeTooltip, setTimeTooltip] = useState(false);
 
   useEffect(() => {
+    setThumbnail(null);
+    setThumbLoading(false);
+    setThumbError(false);
+    setErrorCode(null);
+  }, [item?.id, isImageSet]);
+
+  useEffect(() => {
+    if (!isImageSet) return undefined;
+    const cached = getCachedImageHistoryThumb(item);
+    if (cached) {
+      setThumbnail(cached);
+      setThumbError(false);
+      setThumbLoading(false);
+      return undefined;
+    }
+
+    if (!imageUrls.length) {
+      setThumbError(true);
+      setThumbLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setThumbLoading(true);
+    setThumbError(false);
+    ensureImageHistoryThumb(item)
+      .then((thumb) => {
+        if (cancelled) return;
+        if (thumb) setThumbnail(thumb);
+        else setThumbError(true);
+      })
+      .catch(() => {
+        if (!cancelled) setThumbError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setThumbLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [isImageSet, imageUrls, item]);
+
+  useEffect(() => {
+    if (isImageSet) return undefined;
     if (!item?.model_url) return;
     const thumbnailCacheKey = getThumbnailCacheKey(item);
     if (item?.status === "failed" || EXPIRED_URLS.has(item.model_url)) {
@@ -198,7 +253,7 @@ const HistoryCard = React.memo(function HistoryCard({
       } finally { if (!cancelled) setThumbLoading(false); }
     })();
     return () => { cancelled = true; clearTimeout(loadingTimer); };
-  }, [item?.id, item?.model_url, item?.taskId, item?.status, getIdToken, onExpired]);
+  }, [isImageSet, item, item?.id, item?.model_url, item?.taskId, item?.status, getIdToken, onExpired]);
 
   const handleSelect = useCallback(() => onSelect?.(item), [onSelect, item]);
   const handleReuse = useCallback((e) => { e.stopPropagation(); onReuse?.(item); }, [onReuse, item]);
@@ -213,6 +268,7 @@ const HistoryCard = React.memo(function HistoryCard({
   const displayName = useMemo(() => item?.name || promptFallbackName(prompt), [item?.name, prompt]);
   const timeRel = relativeTime(item?.createdAt ?? item?.ts);
   const timeAbs = absTime(item?.createdAt ?? item?.ts);
+  const imageCountLabel = imageUrls.length > 0 ? `${imageUrls.length} views` : "";
 
   return (
     <div
@@ -263,7 +319,7 @@ const HistoryCard = React.memo(function HistoryCard({
                 src={thumbnail}
                 alt={displayName}
                 style={{
-                  width: "100%", height: "100%", objectFit: "contain", display: "block",
+                  width: "100%", height: "100%", objectFit: isImageSet ? "cover" : "contain", display: "block",
                   background: "#0c0820",
                   transition: "transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
                   transform: hovered ? "scale(1.05)" : "scale(1)",
@@ -282,6 +338,53 @@ const HistoryCard = React.memo(function HistoryCard({
                 background: "radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%)",
               }} />
             </>
+          ) : isImageSet && imageUrls.length > 0 ? (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gridTemplateRows: "repeat(2, minmax(0, 1fr))",
+              gap: imageGridGap,
+              width: "100%",
+              height: "100%",
+              minWidth: 0,
+              minHeight: 0,
+              padding: imageGridPadding,
+              boxSizing: "border-box",
+              overflow: "hidden",
+              alignItems: "stretch",
+              justifyItems: "stretch",
+            }}>
+              {imageUrls.map((url, index) => (
+                <div
+                  key={`${url}-${index}`}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    minWidth: 0,
+                    minHeight: 0,
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    background: "rgba(255,255,255,0.04)",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
+                    position: "relative",
+                  }}
+                >
+                  <img
+                    src={url}
+                    alt={`${displayName} ${index + 1}`}
+                    loading="lazy"
+                    decoding="async"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
               <div style={{
@@ -459,6 +562,17 @@ const HistoryCard = React.memo(function HistoryCard({
                 </div>
               )}
             </div>
+          )}
+          {isImageSet && imageCountLabel && (
+            <span style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "rgba(255,255,255,0.18)", fontSize: 7.5,
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 3, padding: "1px 5px",
+            }}>
+              {imageCountLabel}
+            </span>
           )}
           {item?.params?.seed != null && !item?.params?.randomSeed && (
             <span style={{

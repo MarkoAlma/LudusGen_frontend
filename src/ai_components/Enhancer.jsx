@@ -363,29 +363,6 @@ function Enhancer({
           }} />
         )}
 
-        {stylePrefix && (
-          <div style={{
-            padding: '10px 14px 0',
-            position: 'relative', zIndex: 2,
-          }}>
-            <span style={{
-              display: 'inline-block',
-              padding: '3px 8px',
-              borderRadius: 6,
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              color: 'rgba(255,255,255,0.3)',
-              fontSize: 11,
-              fontFamily: "'SF Pro Text', system-ui, -apple-system, sans-serif",
-              letterSpacing: '0.01em',
-              userSelect: 'none',
-              pointerEvents: 'none',
-              whiteSpace: 'pre',
-            }}>
-              {stylePrefix}
-            </span>
-          </div>
-        )}
         <textarea
           ref={textareaRef}
           value={value}
@@ -398,7 +375,7 @@ function Enhancer({
           rows={5}
           style={{
             width: '100%', boxSizing: 'border-box',
-            padding: stylePrefix ? '8px 14px 36px 14px' : '13px 14px 36px 14px',
+            padding: '13px 14px 36px 14px',
             resize: 'none', minHeight: 108, maxHeight: 220,
             fontSize: 12, lineHeight: 1.8,
             color: disabled ? 'rgba(229,231,235,0.3)' : '#e5e7eb',
