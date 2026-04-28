@@ -1,10 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Play, Pause, Download, Mic, Music, Layout, 
+import {
+  Download, Mic, Music, Layout,
   Sparkles, History, Activity, Share2, Trash2, X, AlertCircle
 } from 'lucide-react';
 import { API_BASE } from '../../api/client';
+import LudusAudioPlayer from './LudusAudioPlayer';
 
 const MiniWaveform = ({ color, isPlaying }) => (
   <div className="flex items-center justify-center gap-[2px] sm:gap-1 md:gap-1.5 h-20 sm:h-24 md:h-32 px-4 sm:px-8 md:px-16 relative overflow-hidden">
@@ -130,8 +131,6 @@ export default function AudioWorkspace({
   audioUrl, 
   audioInfo,
   error,
-  isPlaying, 
-  togglePlay, 
   color, 
   history,
   onHistorySelect,
@@ -145,8 +144,6 @@ export default function AudioWorkspace({
   const [activeHistoryAudioInfo, setActiveHistoryAudioInfo] = useState(null);
   const [isHistoryAudioLoading, setIsHistoryAudioLoading] = useState(false);
   const [historyModalError, setHistoryModalError] = useState("");
-  const [isHistoryModalPlaying, setIsHistoryModalPlaying] = useState(false);
-  const historyAudioRef = useRef(null);
 
   const downloadAudio = async ({ sourceUrl, info, filenamePrefix = "neural_audio" }) => {
     if (!sourceUrl) return;
@@ -203,31 +200,21 @@ export default function AudioWorkspace({
   });
 
   const closeHistoryModal = () => {
-    if (historyAudioRef.current) {
-      historyAudioRef.current.pause();
-      historyAudioRef.current.currentTime = 0;
-    }
     setActiveHistoryItem(null);
     setActiveHistoryAudioUrl("");
     setActiveHistoryAudioInfo(null);
     setIsHistoryAudioLoading(false);
     setHistoryModalError("");
     setDownloadError("");
-    setIsHistoryModalPlaying(false);
   };
 
   const openHistoryModal = async (item) => {
-    if (historyAudioRef.current) {
-      historyAudioRef.current.pause();
-      historyAudioRef.current.currentTime = 0;
-    }
     setActiveHistoryItem(item);
     setActiveHistoryAudioUrl("");
     setActiveHistoryAudioInfo(buildHistoryAudioInfo(item));
     setIsHistoryAudioLoading(true);
     setHistoryModalError("");
     setDownloadError("");
-    setIsHistoryModalPlaying(false);
 
     try {
       const result = await onHistorySelect?.(item, { keepHistory: true });
@@ -251,24 +238,6 @@ export default function AudioWorkspace({
       info: activeHistoryAudioInfo,
       filenamePrefix: kind.id === "music" ? "ludusgen_zene" : "ludusgen_hang",
     });
-  };
-
-  const toggleHistoryPlayback = async () => {
-    const audio = historyAudioRef.current;
-    if (!audio || !activeHistoryAudioUrl || isHistoryAudioLoading) return;
-
-    if (isHistoryModalPlaying) {
-      audio.pause();
-      return;
-    }
-
-    try {
-      await audio.play();
-      setIsHistoryModalPlaying(true);
-    } catch (err) {
-      console.warn("Archive modal playback error:", err.message);
-      setHistoryModalError("Playback could not be started.");
-    }
   };
 
   const playbackDetails = [
@@ -472,44 +441,40 @@ export default function AudioWorkspace({
                     </h3>
                   </div>
 
-                  <div className="w-full relative group">
-                    <div className="absolute inset-0 bg-white/5 blur-3xl opacity-0 group-hover:opacity-20 transition-opacity" />
-                    <MiniWaveform color={color} isPlaying={isPlaying} />
+                  <div className="w-full max-w-2xl">
+                    <LudusAudioPlayer
+                      src={audioUrl}
+                      title="Neural Master v1"
+                      eyebrow="Audio created successfully"
+                      accent={color}
+                      details={playbackDetails || 'AI audio output'}
+                      className="max-w-none"
+                    />
                   </div>
 
-                  <div className="mt-6 md:mt-12 flex items-center gap-4 sm:gap-6">
-                    <button 
-                      onClick={togglePlay} 
-                      className="w-16 h-16 sm:w-20 sm:h-20 rounded-[1.4rem] sm:rounded-[1.8rem] flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-2xl shadow-primary/25"
-                      style={{ backgroundColor: color }}
-                    >
-                      {isPlaying ? <Pause className="w-6 h-6 sm:w-8 sm:h-8 text-white fill-current" /> : <Play className="w-6 h-6 sm:w-8 sm:h-8 text-white fill-current ml-0.5 sm:ml-1" />}
-                    </button>
-
-                    <div className="flex flex-col gap-2">
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={handleDownload}
-                          disabled={isDownloading}
-                          className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all disabled:cursor-wait disabled:opacity-50"
-                          title={isDownloading ? "Downloading..." : "Download"}
-                        >
-                          {isDownloading ? (
-                            <Activity className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
-                          ) : (
-                            <Download className="w-4 h-4 sm:w-5 sm:h-5" />
-                          )}
-                        </button>
-                        <button className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all">
-                          <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
-                        </button>
-                      </div>
-                      {downloadError ? (
-                        <p className="max-w-[8rem] break-words text-center text-[8px] font-bold uppercase tracking-[0.12em] text-rose-300">
-                          {downloadError}
-                        </p>
-                      ) : null}
+                  <div className="mt-6 flex flex-col items-center gap-2">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleDownload}
+                        disabled={isDownloading}
+                        className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all disabled:cursor-wait disabled:opacity-50"
+                        title={isDownloading ? "Downloading..." : "Download"}
+                      >
+                        {isDownloading ? (
+                          <Activity className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
+                        ) : (
+                          <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+                        )}
+                      </button>
+                      <button className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                        <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                      </button>
                     </div>
+                    {downloadError ? (
+                      <p className="max-w-[16rem] break-words text-center text-[8px] font-bold uppercase tracking-[0.12em] text-rose-300">
+                        {downloadError}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -592,10 +557,6 @@ export default function AudioWorkspace({
               </div>
 
               <div className="px-5 py-5 sm:px-6">
-                <div className="mb-5 overflow-hidden rounded-[1.5rem] border border-white/5 bg-white/[0.025]">
-                  <MiniWaveform color={activeHistoryKind.accent} isPlaying={isHistoryModalPlaying} />
-                </div>
-
                 <div className="mb-4 flex flex-wrap items-center gap-2 text-[8px] font-black uppercase tracking-[0.16em] text-white/30">
                   {[...activeHistoryMeta, activeHistoryDetails, formatHistoryDate(activeHistoryItem)]
                     .filter(Boolean)
@@ -616,33 +577,14 @@ export default function AudioWorkspace({
                     {historyModalError}
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center">
-                    <button
-                      type="button"
-                      onClick={toggleHistoryPlayback}
-                      className="flex h-16 w-16 items-center justify-center rounded-[1.35rem] shadow-2xl transition-all hover:scale-105 active:scale-95"
-                      style={{
-                        backgroundColor: activeHistoryKind.accent,
-                        boxShadow: `0 18px 45px ${activeHistoryKind.accent}24`,
-                      }}
-                      title={isHistoryModalPlaying ? "Pause" : "Play"}
-                    >
-                      {isHistoryModalPlaying ? (
-                        <Pause className="h-6 w-6 fill-current text-white" />
-                      ) : (
-                        <Play className="ml-0.5 h-6 w-6 fill-current text-white" />
-                      )}
-                    </button>
-                    <audio
-                      ref={historyAudioRef}
-                      className="hidden"
-                      src={activeHistoryAudioUrl}
-                      preload="metadata"
-                      onPlay={() => setIsHistoryModalPlaying(true)}
-                      onPause={() => setIsHistoryModalPlaying(false)}
-                      onEnded={() => setIsHistoryModalPlaying(false)}
-                    />
-                  </div>
+                  <LudusAudioPlayer
+                    src={activeHistoryAudioUrl}
+                    title={activeHistoryTitle}
+                    eyebrow="Archive playback"
+                    accent={activeHistoryKind.accent}
+                    details={activeHistoryDetails || "AI audio"}
+                    className="max-w-none"
+                  />
                 )}
 
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

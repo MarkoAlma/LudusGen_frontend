@@ -10,6 +10,7 @@ import { useJobs } from '../../context/JobsContext';
 // ── Panel-type → icon & palette ──────────────────────────────────
 const PANEL_META = {
   chat: { icon: MessageSquare, label: 'Chat', color: '#8b5cf6', glow: 'rgba(139,92,246,0.35)' },
+  code: { icon: Cpu, label: 'Code', color: '#3b82f6', glow: 'rgba(59,130,246,0.35)' },
   image: { icon: Image, label: 'Image', color: '#f59e0b', glow: 'rgba(245,158,11,0.35)' },
   audio: { icon: Volume2, label: 'Audio', color: '#10b981', glow: 'rgba(16,185,129,0.35)' },
   music: { icon: Music2, label: 'Music', color: '#06b6d4', glow: 'rgba(6,182,212,0.35)' },
@@ -25,6 +26,98 @@ const STATUS_META = {
   done: { label: 'Done', ring: false },
   error: { label: 'Error', ring: false },
 };
+
+const mojibakeDecoder = typeof TextDecoder !== 'undefined'
+  ? new TextDecoder('utf-8', { fatal: true })
+  : null;
+
+const MOJIBAKE_BYTE_BY_CODEPOINT = new Map([
+  [0x20ac, 0x80], [0x201a, 0x82], [0x0192, 0x83], [0x201e, 0x84],
+  [0x2026, 0x85], [0x2020, 0x86], [0x2021, 0x87], [0x02c6, 0x88],
+  [0x2030, 0x89], [0x0160, 0x8a], [0x2039, 0x8b], [0x0152, 0x8c],
+  [0x015a, 0x8c], [0x0164, 0x8d], [0x017d, 0x8e], [0x0179, 0x8f],
+  [0x2018, 0x91], [0x2019, 0x92], [0x201c, 0x93], [0x201d, 0x94],
+  [0x2022, 0x95], [0x2013, 0x96], [0x2014, 0x97], [0x02dc, 0x98],
+  [0x2122, 0x99], [0x0161, 0x9a], [0x203a, 0x9b], [0x0153, 0x9c],
+  [0x015b, 0x9c], [0x0165, 0x9d], [0x017e, 0x9e], [0x017a, 0x9f],
+  [0x02c7, 0xa1], [0x02d8, 0xa2], [0x0141, 0xa3], [0x0104, 0xa5],
+  [0x015e, 0xaa], [0x017b, 0xaf], [0x02db, 0xb2], [0x0142, 0xb3],
+  [0x0105, 0xb9], [0x015f, 0xba], [0x013d, 0xbc], [0x02dd, 0xbd],
+  [0x013e, 0xbe], [0x017c, 0xbf], [0x0154, 0xc0], [0x0102, 0xc3],
+  [0x0139, 0xc5], [0x0106, 0xc6], [0x010c, 0xc8], [0x0118, 0xca],
+  [0x011a, 0xcc], [0x010e, 0xcf], [0x0110, 0xd0], [0x0143, 0xd1],
+  [0x0147, 0xd2], [0x0150, 0xd5], [0x0158, 0xd8], [0x016e, 0xd9],
+  [0x0170, 0xdb], [0x0162, 0xde], [0x0155, 0xe0], [0x0103, 0xe3],
+  [0x013a, 0xe5], [0x0107, 0xe6], [0x010d, 0xe8], [0x0119, 0xea],
+  [0x011b, 0xec], [0x010f, 0xef], [0x0111, 0xf0], [0x0144, 0xf1],
+  [0x0148, 0xf2], [0x0151, 0xf5], [0x0159, 0xf8], [0x016f, 0xf9],
+  [0x0171, 0xfb], [0x0163, 0xfe], [0x02d9, 0xff],
+]);
+
+const MOJIBAKE_START_BYTES = new Set([0xc2, 0xc3, 0xc4, 0xc5, 0xe2]);
+const MOJIBAKE_PATTERN = /[ÃÂĂĹÅâ][\s\S]?/;
+
+function mojibakeByteForChar(char) {
+  const codePoint = char?.codePointAt(0);
+  if (codePoint == null) return null;
+  if (codePoint <= 0xff) return codePoint;
+  return MOJIBAKE_BYTE_BY_CODEPOINT.get(codePoint) ?? null;
+}
+
+function utf8SequenceLength(firstByte) {
+  if (firstByte >= 0xc2 && firstByte <= 0xdf) return 2;
+  if (firstByte >= 0xe0 && firstByte <= 0xef) return 3;
+  if (firstByte >= 0xf0 && firstByte <= 0xf4) return 4;
+  return 1;
+}
+
+function repairMojibakeText(value) {
+  const text = String(value ?? '');
+  if (!mojibakeDecoder || text.length === 0) return text;
+  if (!MOJIBAKE_PATTERN.test(text)) return text;
+
+  let repaired = '';
+  let changed = false;
+
+  for (let i = 0; i < text.length;) {
+    const firstByte = mojibakeByteForChar(text[i]);
+    if (!MOJIBAKE_START_BYTES.has(firstByte)) {
+      repaired += text[i];
+      i += 1;
+      continue;
+    }
+
+    const sequenceLength = utf8SequenceLength(firstByte);
+    const bytes = [];
+    let canDecode = true;
+
+    for (let offset = 0; offset < sequenceLength; offset += 1) {
+      const nextByte = mojibakeByteForChar(text[i + offset]);
+      if (nextByte == null) {
+        canDecode = false;
+        break;
+      }
+      bytes.push(nextByte);
+    }
+
+    if (canDecode && bytes.length === sequenceLength) {
+      try {
+        const decoded = mojibakeDecoder.decode(new Uint8Array(bytes));
+        repaired += decoded;
+        changed = true;
+        i += sequenceLength;
+        continue;
+      } catch {
+        // Keep the original text if the byte sequence was not valid UTF-8.
+      }
+    }
+
+    repaired += text[i];
+    i += 1;
+  }
+
+  return changed ? repaired.normalize('NFC') : text;
+}
 
 // Animated spinning ring for running jobs
 function SpinningRing({ color }) {
@@ -52,6 +145,7 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
   const statusMeta = STATUS_META[job.status] || STATUS_META.queued;
   const PanelIcon = panelMeta.icon;
   const progress = Math.max(0, Math.min(job.progress ?? 0, 100));
+  const displayTitle = repairMojibakeText(job.title || panelMeta.label);
 
   const isRunning = job.status === 'running';
   const isDone = job.status === 'done';
@@ -119,8 +213,8 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
       {/* Text + progress */}
       <div className="min-w-0 flex-1 relative z-10">
         <div className="flex items-center justify-between gap-2 mb-1.5">
-          <p className="text-[11px] font-black uppercase tracking-wide text-white/90 truncate leading-none">
-            {job.title}
+          <p className="text-[11px] font-black uppercase text-white/90 truncate leading-[1.35] py-px">
+            {displayTitle}
           </p>
 
           {/* Status badge / countdown cancel */}
@@ -183,10 +277,16 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
             </span>
           )}
           {isDone && (
-            <span className="text-[8px] font-bold text-emerald-400">✓ Done</span>
+            <span className="inline-flex items-center gap-1 text-[8px] font-bold text-emerald-400">
+              <CheckCircle2 className="h-2.5 w-2.5" />
+              Done
+            </span>
           )}
           {isError && (
-            <span className="text-[8px] font-bold text-rose-400">✕ Error</span>
+            <span className="inline-flex items-center gap-1 text-[8px] font-bold text-rose-400">
+              <XCircle className="h-2.5 w-2.5" />
+              Error
+            </span>
           )}
         </div>
       </div>
@@ -208,10 +308,40 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
   );
 }
 
-export default function JobQueueWidget({ onOpenJob }) {
+export default function JobQueueWidget({ onOpenJob, activeChatSessionId, activeMediaJob, activePanelType }) {
   const { jobs, cancelJob, updateJob } = useJobs();
+  React.useEffect(() => {
+    if (activePanelType !== 'image' && activePanelType !== 'audio') return;
+
+    jobs.forEach((job) => {
+      if (
+        job.panelType === activePanelType &&
+        (job.status === 'done' || job.status === 'error') &&
+        !job.seenAt
+      ) {
+        updateJob(job.id, { seenAt: Date.now() });
+      }
+    });
+  }, [activePanelType, jobs, updateJob]);
+
   const visibleJobs = [...jobs]
-    .filter((job) => job.status === 'running' || job.status === 'queued' || !job.seenAt)
+    .filter((job) => {
+      const isForegroundChatJob =
+        (job.panelType === 'chat' || job.panelType === 'code') &&
+        job.sessionId &&
+        activeChatSessionId === job.sessionId;
+      const isForegroundMediaJob =
+        (job.panelType === 'image' || job.panelType === 'audio') &&
+        activeMediaJob?.panelType === job.panelType &&
+        activeMediaJob?.jobId === job.id;
+      const isActiveMediaPanelCompletedJob =
+        (job.panelType === 'image' || job.panelType === 'audio') &&
+        activePanelType === job.panelType &&
+        (job.status === 'done' || job.status === 'error');
+
+      if (isForegroundChatJob || isForegroundMediaJob || isActiveMediaPanelCompletedJob) return false;
+      return job.status === 'running' || job.status === 'queued' || !job.seenAt;
+    })
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   const activeCount = visibleJobs.filter(j => j.status === 'running' || j.status === 'queued').length;

@@ -21,7 +21,7 @@ const CONTENT_MAX_W = 'max-w-3xl';
 const HISTORY_SIDEBAR_W = 288; // px, matches w-72
 const SIDEBAR_W = 320; // AiStudioSidebar width
 
-export default function ChatPanel({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar, onModelChange, initialDropdownOpen = false, onNewChatWithPicker }) {
+export default function ChatPanel({ selectedModel, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar, onModelChange, initialDropdownOpen = false, onNewChatWithPicker, openChatSessionRequest, onActiveChatSessionChange, isJobForeground }) {
   const { registerPanel, unregisterPanel } = useStudioPanels();
 
   // Register panels (Chat has L1 + R, no L2)
@@ -76,7 +76,18 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, isGlobalO
     loadConversationList,
     hasMore,
     isLoadingMore,
-  } = useChatLogic(selectedModel, userId, getIdToken, onModelChange);
+    sessionId,
+  } = useChatLogic(selectedModel, userId, getIdToken, onModelChange, isJobForeground);
+
+  useEffect(() => {
+    if (!openChatSessionRequest?.sessionId) return;
+    switchSession(openChatSessionRequest.sessionId);
+  }, [openChatSessionRequest?.requestId]);
+
+  useEffect(() => {
+    onActiveChatSessionChange?.(sessionId);
+    return () => onActiveChatSessionChange?.(null);
+  }, [sessionId, onActiveChatSessionChange]);
 
   const [historySidebarOpen, setHistorySidebarOpen] = useState(true);
   const [configOpen, setConfigOpen] = useState(false);

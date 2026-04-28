@@ -5,7 +5,7 @@ import { MessageSquare, Sparkles, PenTool, Code2, Globe, Lightbulb } from 'lucid
 const SUGGESTION_CHIPS = [
   { icon: PenTool, text: 'Write a short story about an elderly traveler', color: '#a78bfa' },
   { icon: Code2, text: 'Explain React hooks simply', color: '#60a5fa' },
-  { icon: Globe, text: ' What is the difference between REST and GraphQL?', color: '#34d399' },
+  { icon: Globe, text: 'What is the difference between REST and GraphQL?', color: '#34d399' },
   { icon: Lightbulb, text: 'Suggest an AI startup idea', color: '#fbbf24' },
 ];
 
@@ -73,10 +73,12 @@ export default function WelcomeScreen({ themeColor, selectedModel, onSuggestionC
                   whileHover={{ y: -1, scale: 1.01, backgroundColor: 'rgba(255,255,255,0.04)' }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => onSuggestionClick?.(chip.text)}
-                  className="w-full flex items-center justify-start px-5 py-3 rounded-2xl border border-white/[0.04] bg-white/[0.015] transition-all duration-300 group/chip overflow-hidden relative shadow-sm"
+                  className="w-full flex items-center justify-start gap-4 px-5 py-3 rounded-2xl border border-white/[0.04] bg-white/[0.015] transition-all duration-300 group/chip overflow-hidden relative shadow-sm"
                 >
-                  <Icon className="w-4 h-4 text-gray-500 group-hover/chip:text-white transition-colors flex-shrink-0" />
-                  <span className="text-[12px] sm:text-[13px] text-gray-400 group-hover/chip:text-gray-100 transition-colors font-semibold ml-4 line-clamp-1">
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                    <Icon className="w-4 h-4 text-gray-500 group-hover/chip:text-white transition-colors" />
+                  </span>
+                  <span className="min-w-0 text-left text-[12px] sm:text-[13px] text-gray-400 group-hover/chip:text-gray-100 transition-colors font-semibold line-clamp-1">
                     {chip.text}
                   </span>
                 </motion.button>

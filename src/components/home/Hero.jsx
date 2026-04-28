@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import Container from '../ui/Container';
 import { ArrowRight, Play, Sparkles } from 'lucide-react';
 import FloatingCore from '../ui/FloatingCore';
-import HeroRender from '../../assets/hero_cinematic_render_1775575904860.png';
+import HeroRender from '../../assets/ludusgen_WqbSkeD7zYPnJkdmdmtR.avif';
 
 export default function Hero() {
   const itemVariants = {

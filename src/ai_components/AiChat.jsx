@@ -17,6 +17,8 @@ import toast from "react-hot-toast";
 import { API_BASE } from "../api/client";
 
 const PANEL_TYPE_TO_TAB = {
+  chat: 'chat',
+  code: 'chat',
   tripo: '3d',
   threed: '3d',
   trellis: '3d',
@@ -71,6 +73,12 @@ export default function AIChat({ user, getIdToken }) {
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [forceViewGenSignal, setForceViewGenSignal] = useState(0);
+  const [openChatSessionRequest, setOpenChatSessionRequest] = useState(null);
+  const [activeChatSessionId, setActiveChatSessionId] = useState(null);
+  const [activeMediaJob, setActiveMediaJobState] = useState(null);
+  const activeChatSessionIdRef = useRef(null);
+  const activeMediaJobRef = useRef(null);
+  const activePanelTypeRef = useRef(null);
 
   // Desktop Sidebar Persistence & Motion
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(() => {
@@ -112,6 +120,34 @@ export default function AIChat({ user, getIdToken }) {
   }, [searchParams, resolveTargetModel, selectedAI]);
 
   const selectedModel = getModel(selectedAI) || ALL_MODELS[0];
+  activeChatSessionIdRef.current = activeChatSessionId;
+  activePanelTypeRef.current = selectedModel?.panelType || null;
+
+  const handleActiveMediaJobChange = useCallback((job) => {
+    activeMediaJobRef.current = job || null;
+    setActiveMediaJobState(job || null);
+  }, []);
+
+  const isJobForeground = useCallback((job) => {
+    if (!job) return false;
+
+    if ((job.panelType === 'chat' || job.panelType === 'code') && job.sessionId) {
+      return activePanelTypeRef.current === 'chat' && activeChatSessionIdRef.current === job.sessionId;
+    }
+
+    if (job.panelType === 'image' || job.panelType === 'audio') {
+      const activeJob = activeMediaJobRef.current;
+      return activePanelTypeRef.current === job.panelType &&
+        activeJob?.panelType === job.panelType &&
+        activeJob?.jobId === job.id;
+    }
+
+    return false;
+  }, []);
+
+  const visibleActiveMediaJob = activeMediaJob?.panelType === selectedModel?.panelType
+    ? activeMediaJob
+    : null;
 
   // 2. State -> SessionStorage Persistence
   useEffect(() => {
@@ -203,6 +239,47 @@ export default function AIChat({ user, getIdToken }) {
     });
   }, []);
 
+  const handleOpenJob = useCallback((job) => {
+    if ((job?.panelType === 'chat' || job?.panelType === 'code') && job.sessionId) {
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', 'chat');
+      if (job.modelId) next.set('model', job.modelId);
+      else next.delete('model');
+
+      sessionStorage.setItem('chat_session_current', job.sessionId);
+      if (job.modelId) sessionStorage.setItem('ludusgen_last_model:chat', job.modelId);
+
+      setSearchParams(next);
+      setOpenChatSessionRequest({
+        sessionId: job.sessionId,
+        modelId: job.modelId || null,
+        requestId: Date.now(),
+      });
+      setSidebarOpen(false);
+      return;
+    }
+
+    const targetTab = job?.targetTab || PANEL_TYPE_TO_TAB[job?.panelType];
+    if (targetTab) {
+      const next = new URLSearchParams(searchParams);
+      const targetModelId = job?.modelId
+        || ALL_MODELS.find(m => m.panelType === job?.panelType)?.id
+        || resolveTargetModel(targetTab, null);
+      next.set('tab', targetTab);
+      if (targetModelId) next.set('model', targetModelId);
+      else next.delete('model');
+      if (job?.panelType === 'tripo' && job.taskId) {
+        next.set('tripoTaskId', job.taskId);
+      }
+      if (targetModelId) {
+        sessionStorage.setItem(`ludusgen_last_model:${targetTab}`, targetModelId);
+      }
+      setSearchParams(next);
+      sessionStorage.setItem(`ludusgen_open_job:${user?.uid || 'guest'}`, job.id);
+    }
+    setSidebarOpen(false);
+  }, [resolveTargetModel, searchParams, setSearchParams, user?.uid]);
+
   const renderPanel = () => {
     const props = {
       selectedModel,
@@ -220,33 +297,21 @@ export default function AIChat({ user, getIdToken }) {
           toggleCat={toggleCat}
           handleSelectModel={handleSelectModel}
           setSidebarOpen={setSidebarOpen}
-          onOpenJob={(job) => {
-            const targetTab = job?.targetTab || PANEL_TYPE_TO_TAB[job?.panelType];
-            if (targetTab) {
-              const next = new URLSearchParams(searchParams);
-              const targetModelId = job?.modelId
-                || ALL_MODELS.find(m => m.panelType === job?.panelType)?.id
-                || resolveTargetModel(targetTab, null);
-              next.set('tab', targetTab);
-              if (targetModelId) next.set('model', targetModelId);
-              else next.delete('model');
-              if (job?.panelType === 'tripo' && job.taskId) {
-                next.set('tripoTaskId', job.taskId);
-              }
-              if (targetModelId) {
-                sessionStorage.setItem(`ludusgen_last_model:${targetTab}`, targetModelId);
-              }
-              setSearchParams(next);
-              sessionStorage.setItem(`ludusgen_open_job:${user?.uid || 'guest'}`, job.id);
-            }
-          }}
+          onOpenJob={handleOpenJob}
           isImageGallery={imageGalleryActive}
+          activeChatSessionId={activeChatSessionId}
+          activeMediaJob={visibleActiveMediaJob}
+          activePanelType={selectedModel?.panelType}
         />
       ),
       onModelChange: (newModel) => handleSelectModel(newModel.id),
       onGalleryChange: (active) => setImageGalleryActive(active),
       forceViewGenSignal,
       initialDropdownOpen: modelDropdownOpen,
+      openChatSessionRequest,
+      onActiveChatSessionChange: setActiveChatSessionId,
+      onActiveJobChange: handleActiveMediaJobChange,
+      isJobForeground,
       onNewChatWithPicker: () => {
         // model picker is intentionally disabled
       },
@@ -302,6 +367,10 @@ export default function AIChat({ user, getIdToken }) {
                 toggleCat={toggleCat}
                 handleSelectModel={handleSelectModel}
                 setSidebarOpen={setSidebarOpen}
+                onOpenJob={handleOpenJob}
+                activeChatSessionId={activeChatSessionId}
+                activeMediaJob={visibleActiveMediaJob}
+                activePanelType={selectedModel?.panelType}
               />
             </motion.aside>
           </>

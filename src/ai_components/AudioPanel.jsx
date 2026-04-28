@@ -394,13 +394,34 @@ const normalizeEnhancerTimeSignature = (value) => {
 };
 
 
-export default function AudioPanel({ selectedModel, onModelChange, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
-  const { jobs, addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError } = useJobs();
+export default function AudioPanel({ selectedModel, onModelChange, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar, onActiveJobChange, isJobForeground }) {
+  const { jobs, addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, registerCancelHandler, unregisterCancelHandler } = useJobs();
   const [currentJobId, setCurrentJobId] = useState(null);
+  const [selectedJobId, setSelectedJobId] = useState(null);
   const startJob = (kind, title, targetTab) => {
     const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     addJob({ id, kind, panelType: 'audio', modelId: selectedModel.id, title, status: 'running', progress: 0, createdAt: Date.now(), updatedAt: Date.now(), errorMessage: null, completedAt: null, seenAt: null, targetTab });
     return id;
+  };
+
+  const isAudioJobForeground = (jobId) => (
+    isJobForeground?.({ id: jobId, panelType: 'audio' }) ?? true
+  );
+
+  const finishAudioJob = (jobId, patch = {}) => {
+    const donePatch = { progress: 100, updatedAt: Date.now(), completedAt: Date.now(), ...patch };
+    if (isAudioJobForeground(jobId)) {
+      markJobDoneAndSeen(jobId, donePatch);
+      return;
+    }
+    markJobDone(jobId, donePatch);
+  };
+
+  const failAudioJob = (jobId, message) => {
+    markJobError(jobId, message);
+    if (isAudioJobForeground(jobId)) {
+      updateJob(jobId, { seenAt: Date.now() });
+    }
   };
 
   const { registerPanel, unregisterPanel, isMobile, isTablet, setPanelOpen, setPanelsOpen, mobileActive, panelState } = useStudioPanels();
@@ -422,6 +443,17 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
 
   const [activeTab, setActiveTab] = useState("generate");
   const [view, setView] = useState("forge");
+
+  useEffect(() => {
+    const jobId = view === 'history' ? null : currentJobId || selectedJobId;
+    if (jobId) {
+      onActiveJobChange?.({ panelType: 'audio', jobId });
+    } else {
+      onActiveJobChange?.(null);
+    }
+
+    return () => onActiveJobChange?.(null);
+  }, [currentJobId, selectedJobId, view, onActiveJobChange]);
 
   const closeMobileStudioPanel = () => {
     if (isMobile) {
@@ -1116,6 +1148,62 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
     return objectUrl;
   };
 
+  useEffect(() => {
+    const jobId = sessionStorage.getItem(`ludusgen_open_job:${userId || 'guest'}`);
+    if (!jobId) return;
+    const job = jobs.find((item) => item.id === jobId && item.panelType === 'audio');
+    if (!job) return;
+
+    setSelectedJobId(jobId);
+
+    if (job.status === 'running' || job.status === 'queued') {
+      setCurrentJobId(jobId);
+      setIsGenerating(true);
+      setGenerationProgress(job.progress ?? 0);
+      setGenerationStatus(job.status === 'queued' ? 'QUEUED' : 'PROCESSING');
+      setGenerationElapsed(Math.max(0, Math.floor((Date.now() - (job.createdAt || Date.now())) / 1000)));
+      return;
+    }
+
+    setCurrentJobId(null);
+    setIsGenerating(false);
+    setGenerationProgress(job.progress ?? 0);
+    setGenerationStatus(job.status === 'done' ? 'DONE' : '');
+    setGenerationElapsed(0);
+
+    if ((job.status === 'done' || job.status === 'error') && !job.seenAt) {
+      updateJob(jobId, { seenAt: Date.now() });
+    }
+
+    if (job.status === 'error') {
+      setError(job.errorMessage || "Generation error");
+      return;
+    }
+
+    if (job.resultAudio?.audioInfo) {
+      setAudioInfo(job.resultAudio.audioInfo);
+    }
+
+    if (job.resultAudio?.audioUrl) {
+      setExternalAudioUrl(job.resultAudio.audioUrl);
+      return;
+    }
+
+    if (job.resultAudio?.audioId) {
+      let cancelled = false;
+      fetchArchivedAudioBlobUrl(job.resultAudio.audioId)
+        .then((nextAudioUrl) => {
+          if (!cancelled) setAudioUrl(nextAudioUrl);
+        })
+        .catch((err) => {
+          if (!cancelled) setError(err.message || "Archived audio could not be loaded.");
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [jobs, userId]);
+
   useEffect(() => () => clearAudioObjectUrl(), []);
 
   useEffect(() => { loadHistory(); }, [userId]);
@@ -1252,8 +1340,13 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
     setGenerationElapsed(0);
     closeMobileStudioPanel();
     const jobId = startJob(isTTS ? 'audio' : 'music', (content || 'Audio generation').slice(0, 48), 'audio');
+    sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
+    setSelectedJobId(jobId);
     setCurrentJobId(jobId);
-    generationController.current = new AbortController();
+    onActiveJobChange?.({ panelType: 'audio', jobId });
+    const controller = new AbortController();
+    generationController.current = controller;
+    registerCancelHandler(jobId, () => controller.abort());
     updateJob(jobId, { progress: 0, updatedAt: Date.now() });
 
     try {
@@ -1395,7 +1488,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         method: "POST",
         headers,
         body: (isDeapiMusic || isDeapiTTS) ? body : JSON.stringify(body),
-        signal: generationController.current?.signal,
+        signal: controller.signal,
       });
       if (!res.ok) {
         let errMsg = `HTTP ${res.status}`;
@@ -1406,7 +1499,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
       const data = (isDeapiMusic || isDeapiTTS) && contentType.includes("text/event-stream")
         ? await readAudioEventStream(res, jobId)
         : await res.json();
-      if (generationController.current?.signal.aborted) return;
+      if (controller.signal.aborted) return;
       if (!data.success) throw new Error(data.message);
 
       const playbackAudioUrl = data.audioId
@@ -1414,34 +1507,41 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         : data.audioUrl;
       if (!playbackAudioUrl) throw new Error("No playable audio was returned.");
       setAudioUrl(playbackAudioUrl);
-      setAudioInfo(
-        isTTS
-          ? {
-              fileFormat: data.fileFormat || (isDeapiTTS ? deapiTtsFormat : isNvidiaRiva ? "wav" : audioFormat),
-              sampleRate: data.sampleRate || (isDeapiTTS ? deapiTtsSampleRate : isNvidiaRiva ? 22050 : null),
-              bitrate: null,
-              outputFormat: data.outputFormat || (isDeapiTTS ? "url" : "data"),
-              stream: false,
-              audioId: data.audioId || null,
-            }
-          : {
-              fileFormat: data.fileFormat || (isDeapiMusic ? deapiFormat : musicFileFormat),
-              sampleRate: data.sampleRate || (isDeapiMusic ? null : musicSampleRate),
-              bitrate: data.bitrate || (isDeapiMusic ? null : musicBitrate),
-              outputFormat: data.outputFormat || (isDeapiMusic ? "url" : (musicStream ? "hex" : musicOutputFormat)),
-              stream: Boolean(data.stream ?? (isDeapiMusic ? false : musicStream)),
-              audioId: data.audioId || null,
-            }
-      );
-      markJobDoneAndSeen(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now() });
+      const nextAudioInfo = isTTS
+        ? {
+            fileFormat: data.fileFormat || (isDeapiTTS ? deapiTtsFormat : isNvidiaRiva ? "wav" : audioFormat),
+            sampleRate: data.sampleRate || (isDeapiTTS ? deapiTtsSampleRate : isNvidiaRiva ? 22050 : null),
+            bitrate: null,
+            outputFormat: data.outputFormat || (isDeapiTTS ? "url" : "data"),
+            stream: false,
+            audioId: data.audioId || null,
+          }
+        : {
+            fileFormat: data.fileFormat || (isDeapiMusic ? deapiFormat : musicFileFormat),
+            sampleRate: data.sampleRate || (isDeapiMusic ? null : musicSampleRate),
+            bitrate: data.bitrate || (isDeapiMusic ? null : musicBitrate),
+            outputFormat: data.outputFormat || (isDeapiMusic ? "url" : (musicStream ? "hex" : musicOutputFormat)),
+            stream: Boolean(data.stream ?? (isDeapiMusic ? false : musicStream)),
+            audioId: data.audioId || null,
+          };
+      setAudioInfo(nextAudioInfo);
+      const safeAudioUrl = data.audioUrl && !String(data.audioUrl).startsWith("data:") ? data.audioUrl : null;
+      finishAudioJob(jobId, {
+        resultAudio: {
+          audioUrl: safeAudioUrl,
+          audioId: data.audioId || null,
+          audioInfo: nextAudioInfo,
+        },
+      });
 
       if (userId) {
         await loadHistory();
       }
     } catch (err) {
       setError(err.message || "Generation error");
-      markJobError(jobId, err.message || 'Generation error');
+      failAudioJob(jobId, err.message || 'Generation error');
     } finally {
+      unregisterCancelHandler(jobId);
       setIsGenerating(false);
     }
   };
