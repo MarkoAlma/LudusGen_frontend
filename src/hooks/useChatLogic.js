@@ -5,16 +5,26 @@ import {
   collection, addDoc, query, orderBy, limit, limitToLast, getDocs,
   serverTimestamp, doc, setDoc, getDoc, writeBatch, startAfter,
 } from "firebase/firestore";
-import { DEFAULT_PRESETS, ALL_MODELS } from "../ai_components/models";
+import { DEFAULT_PRESETS, ALL_MODELS, findModelGroup } from "../ai_components/models";
 import { API_BASE } from "../api/client";
+import { useJobs } from "../context/JobsContext";
 
 // Legacy model IDs for migration
 const CHAT_MODEL_IDS = ALL_MODELS.filter(m => m.panelType === 'chat').map(m => m.id);
 
-export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
+export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, isJobForeground) {
+  const {
+    addJob,
+    updateJob,
+    markJobDone,
+    markJobDoneAndSeen,
+    markJobError,
+    registerCancelHandler,
+    unregisterCancelHandler,
+  } = useJobs();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
+  const [runningSessionIds, setRunningSessionIds] = useState(() => new Set());
   const [systemPrompt, setSystemPrompt] = useState(selectedModel.defaultSystemPrompt || "");
   const [temperature, setTemperature] = useState(selectedModel.defaultTemperature ?? 0.7);
   const [maxTokens, setMaxTokens] = useState(selectedModel.defaultMaxTokens ?? 2048);
@@ -44,7 +54,8 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
 
   const chatScrollRef = useRef(null);
   const textareaRef = useRef(null);
-  const abortControllerRef = useRef(null);
+  const activeChatRequestsRef = useRef(new Map());
+  const runningSessionIdsRef = useRef(new Set());
   const userScrolledUp = useRef(false);
   const selectedModelRef = useRef(selectedModel);
   selectedModelRef.current = selectedModel;
@@ -52,10 +63,34 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
   sessionIdRef.current = sessionId;
   const onModelChangeRef = useRef(onModelChange);
   onModelChangeRef.current = onModelChange;
+  const isJobForegroundRef = useRef(isJobForeground);
+  isJobForegroundRef.current = isJobForeground;
   const isFetchingRef = useRef(false);
   const lastVisibleDocRef = useRef(null);
   const hasMoreRef = useRef(true);
   const legacyLoadedRef = useRef(false);
+  const liveChatRunsRef = useRef(new Map());
+  const isTyping = runningSessionIds.has(sessionId);
+
+  const setSessionRunning = useCallback((sid, isRunning) => {
+    if (!sid) return;
+    const next = new Set(runningSessionIdsRef.current);
+    if (isRunning) {
+      next.add(sid);
+    } else {
+      next.delete(sid);
+    }
+    runningSessionIdsRef.current = next;
+    setRunningSessionIds(next);
+  }, []);
+
+  const getActiveRequestForSession = useCallback((sid) => {
+    if (!sid) return null;
+    for (const request of activeChatRequestsRef.current.values()) {
+      if (request.sessionId === sid) return request;
+    }
+    return null;
+  }, []);
 
   // ── Firestore refs — model-independent ────────────────────────────
   const getSessionRef = useCallback((sessionId) =>
@@ -65,6 +100,41 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
   const getMessagesRef = useCallback((sessionId) =>
     collection(db, "conversations", userId, "sessions", sessionId, "messages"),
     [userId]);
+
+  const mergeLiveMessages = useCallback((sid, baseMessages) => {
+    const liveRuns = [...liveChatRunsRef.current.values()].filter((run) => run.sid === sid);
+    if (liveRuns.length === 0) return baseMessages;
+
+    const merged = [...baseMessages];
+    for (const run of liveRuns) {
+      for (const liveMsg of [run.userMsg, run.assistantMsg]) {
+        if (!liveMsg?.id) continue;
+        const index = merged.findIndex((msg) => msg.id === liveMsg.id);
+        if (index >= 0) {
+          merged[index] = { ...merged[index], ...liveMsg };
+        } else {
+          merged.push(liveMsg);
+        }
+      }
+    }
+    return merged;
+  }, []);
+
+  const updateLiveAssistant = useCallback((runId, patch) => {
+    const run = liveChatRunsRef.current.get(runId);
+    if (!run) return;
+
+    run.assistantMsg = { ...run.assistantMsg, ...patch };
+    liveChatRunsRef.current.set(runId, run);
+
+    if (sessionIdRef.current !== run.sid) return;
+
+    setMessages((prev) => {
+      const hasMessage = prev.some((msg) => msg.id === run.assistantMsg.id);
+      if (!hasMessage) return mergeLiveMessages(run.sid, prev);
+      return prev.map((msg) => (msg.id === run.assistantMsg.id ? { ...msg, ...run.assistantMsg } : msg));
+    });
+  }, [mergeLiveMessages]);
 
   // ── Load History — model-independent with legacy fallback ─────────
   const loadConversationList = useCallback(async (isLoadMore = false) => {
@@ -262,10 +332,10 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         }
       }
 
-      setMessages(msgs);
+      setMessages(mergeLiveMessages(sid, msgs));
     } catch (e) { console.error('[History] Failed to load session:', e); }
     setLoadingHistory(false);
-  }, [userId, sessionId, getMessagesRef, getSessionRef]);
+  }, [userId, sessionId, getMessagesRef, getSessionRef, mergeLiveMessages]);
 
   useEffect(() => {
     if (userId) {
@@ -310,10 +380,10 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     // User scrolled up (>10px) → do NOT auto-scroll, let them read
   }, [messages]);
 
-  const saveMessage = async (msg) => {
+  const saveMessage = async (msg, targetSessionId = sessionIdRef.current) => {
     if (!userId) return;
     try {
-      const sessionId = sessionIdRef.current;
+      const sessionId = targetSessionId;
       newSessionIdsRef.current.delete(sessionId);
       const contentToSave = Array.isArray(msg.content)
         ? msg.content.find((p) => p.type === "text")?.text || ""
@@ -381,7 +451,6 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     setMessages([]);
     setInput("");
     setAttachedImage(null);
-    setIsTyping(false);
     setShouldRestoreModel(false);
     setSessionId(newSid);
   }, []);
@@ -496,10 +565,11 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
 
   const handleSend = async (overrideText = null) => {
     const textToSend = typeof overrideText === 'string' ? overrideText : input;
-    if ((!textToSend.trim() && !attachedImage) || isTyping) return;
+    if ((!textToSend.trim() && !attachedImage) || runningSessionIdsRef.current.has(sessionIdRef.current)) return;
 
     const isFirstMessage = messages.length === 0;
     const model = selectedModelRef.current;
+    const sessionId = sessionIdRef.current;
 
     const userMsg = {
       role: "user",
@@ -513,23 +583,69 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     };
 
     const aiMsgId = `ai_${Date.now()}`;
-    setMessages(prev => [...prev, userMsg, { role: "assistant", content: "", model: model.id, id: aiMsgId, isStreaming: true }]);
+    const chatJobId = `chat_${sessionId}_${aiMsgId}`;
+    const jobTitle = textToSend.trim().slice(0, 80) || 'Chat response';
+    const jobPanelType = findModelGroup(model.id) === 'code' ? 'code' : 'chat';
+    const assistantMsg = { role: "assistant", content: "", model: model.id, id: aiMsgId, isStreaming: true };
+    const isChatJobForeground = () => {
+      if (typeof isJobForegroundRef.current === 'function') {
+        return isJobForegroundRef.current({ id: chatJobId, panelType: jobPanelType, sessionId });
+      }
+      return sessionIdRef.current === sessionId;
+    };
+    const finishChatJob = (patch = {}) => {
+      const donePatch = { progress: 100, sessionId, messageId: aiMsgId, ...patch };
+      if (isChatJobForeground()) {
+        markJobDoneAndSeen(chatJobId, donePatch);
+      } else {
+        markJobDone(chatJobId, donePatch);
+      }
+    };
+
+    liveChatRunsRef.current.set(chatJobId, { sid: sessionId, userMsg, assistantMsg });
+    addJob({
+      id: chatJobId,
+      panelType: jobPanelType,
+      modelId: model.id,
+      modelName: model.name,
+      title: jobTitle,
+      status: 'running',
+      progress: 3,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      sessionId,
+      messageId: aiMsgId,
+      targetTab: 'chat',
+    });
+
+    setMessages(prev => [...prev, userMsg, assistantMsg]);
     setInput("");
     setAttachedImage(null);
-    setIsTyping(true);
+    setSessionRunning(sessionId, true);
 
     // Save user message to Firestore
-    await saveMessage(userMsg);
-
-    const sessionId = sessionIdRef.current;
+    await saveMessage(userMsg, sessionId);
 
     let token;
 
     try {
-      token = await getIdToken();
       const controller = new AbortController();
       let summaryRefreshed = false;
-      abortControllerRef.current = { controller, accumulated: "" };
+      activeChatRequestsRef.current.set(chatJobId, { controller, accumulated: "", sessionId, jobId: chatJobId });
+      registerCancelHandler(chatJobId, () => {
+        controller.abort();
+        getIdToken()
+          .then((stopToken) => fetch(`${API_BASE}/api/chat/stop`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${stopToken}` },
+            body: JSON.stringify({ sessionId }),
+          }))
+          .catch(() => {});
+      });
+      updateJob(chatJobId, { progress: 8 });
+
+      token = await getIdToken();
+      updateJob(chatJobId, { progress: 12 });
 
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
@@ -557,6 +673,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let accumulated = "";
+        let lastJobProgress = 12;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -579,8 +696,15 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
                   continue;
                 }
                 accumulated += parsed.delta || "";
-                if (abortControllerRef.current) abortControllerRef.current.accumulated = accumulated;
-                setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: accumulated } : m));
+                const activeRequest = activeChatRequestsRef.current.get(chatJobId);
+                if (activeRequest) activeRequest.accumulated = accumulated;
+                updateLiveAssistant(chatJobId, { content: accumulated });
+
+                const nextProgress = Math.min(92, 12 + Math.floor(accumulated.length / 80));
+                if (nextProgress > lastJobProgress) {
+                  lastJobProgress = nextProgress;
+                  updateJob(chatJobId, { progress: nextProgress });
+                }
               } catch {
                 continue;
               }
@@ -589,10 +713,12 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         }
 
         const finalMsg = { role: "assistant", content: accumulated, model: model.id, id: aiMsgId, isStreaming: false };
-        setMessages(prev => prev.map(m => m.id === aiMsgId ? finalMsg : m));
+        updateLiveAssistant(chatJobId, finalMsg);
         
         // Ensure the partial or complete content is saved to DB
         await syncFinalMessage(sessionId, aiMsgId, accumulated, isFirstMessage);
+        liveChatRunsRef.current.delete(chatJobId);
+        finishChatJob();
 
         if (summaryRefreshed) {
           setIsSummarizing(false);
@@ -600,14 +726,17 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
         }
       } else {
         // JSON response (Anthropic, OpenAI)
+        updateJob(chatJobId, { progress: 70 });
         const data = await res.json();
         if (data.success) {
           summaryRefreshed = Boolean(data.summaryRefreshed);
           const finalMsg = { role: "assistant", content: data.content, model: model.id, id: aiMsgId, isStreaming: false };
-          setMessages(prev => prev.map(m => m.id === aiMsgId ? finalMsg : m));
+          updateLiveAssistant(chatJobId, finalMsg);
           
           // Ensure the answer is saved to DB
           await syncFinalMessage(sessionId, aiMsgId, data.content, isFirstMessage);
+          liveChatRunsRef.current.delete(chatJobId);
+          finishChatJob();
 
           if (summaryRefreshed) {
             setIsSummarizing(false);
@@ -619,29 +748,38 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
       }
     } catch (e) {
       if (e.name === 'AbortError') {
-        const accumulated = abortControllerRef.current?.accumulated || "";
+        const accumulated = activeChatRequestsRef.current.get(chatJobId)?.accumulated || "";
         const finalMsg = { role: "assistant", content: accumulated, model: model.id, id: aiMsgId, isStreaming: false };
 
         // Update local UI immediately
-        setMessages(prev => prev.map(m => m.id === aiMsgId ? finalMsg : m));
+        updateLiveAssistant(chatJobId, finalMsg);
 
         // Sync with DB
         await syncFinalMessage(sessionId, aiMsgId, accumulated, isFirstMessage);
+        liveChatRunsRef.current.delete(chatJobId);
+        finishChatJob();
       } else {
         console.error(e);
-        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: `Hiba: ${e.message}`, isStreaming: false } : m));
+        updateLiveAssistant(chatJobId, { content: `Hiba: ${e.message}`, isStreaming: false });
+        liveChatRunsRef.current.delete(chatJobId);
+        markJobError(chatJobId, e.message);
+        if (isChatJobForeground()) updateJob(chatJobId, { seenAt: Date.now() });
       }
     } finally {
-      setIsTyping(false);
+      unregisterCancelHandler(chatJobId);
+      activeChatRequestsRef.current.delete(chatJobId);
+      setSessionRunning(sessionId, false);
       setIsSummarizing(false);
-      abortControllerRef.current = null;
     }
   };
 
   // Stop streaming (called from UI)
   const handleStop = useCallback(async () => {
     const sessionId = sessionIdRef.current;
-    if (!sessionId) return;
+    const activeRequest = getActiveRequestForSession(sessionId);
+    if (!sessionId || !activeRequest) return;
+
+    activeRequest?.controller?.abort();
 
     try {
       const token = await getIdToken();
@@ -653,11 +791,8 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
       console.log(`[Chat] Safe stop signal sent for session ${sessionId}`);
     } catch (e) {
       console.error('[Chat] Stop signal failed:', e);
-      if (abortControllerRef.current?.controller) {
-        abortControllerRef.current.controller.abort();
-      }
     }
-  }, [getIdToken]);
+  }, [getActiveRequestForSession, getIdToken]);
 
   // ── Model switching ───────────────────────────────────────────────
   const switchModel = useCallback((newModel) => {
@@ -676,6 +811,6 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange) {
     presets, activePresetId, applyPreset, onEnhance, onDechant,
     switchModel, createNewSession, handleStop, isSummarizing,
     switchSession, deleteSession, renameSession,
-    loadConversationList, hasMore, isLoadingMore,
+    loadConversationList, hasMore, isLoadingMore, sessionId,
   };
 }

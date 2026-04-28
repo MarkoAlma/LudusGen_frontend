@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Cpu, Zap, Shield, Globe, Layers, BarChart, Sparkles } from 'lucide-react';
 import Container from '../ui/Container';
 import FloatingCore from '../ui/FloatingCore';
-import FeaturesBG from '../../assets/features_cinematic_bg_1775576380271.png';
+import FeaturesBG from '../../assets/ludusgen_YZ6MbnvSCX5w1GewEIga.avif';
 
 export default function FeaturesGrid() {
   const features = [

@@ -428,8 +428,8 @@ const getNvidiaType = (apiId = "") => {
   return "other";
 };
 
-export default function ImageGenerator({ selectedModel, onModelChange, onGalleryChange, forceViewGenSignal, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
-  const { addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, removeJob, jobs, clearSeenCompletedJobs } = useJobs();
+export default function ImageGenerator({ selectedModel, onModelChange, onGalleryChange, forceViewGenSignal, userId, getIdToken, isGlobalOpen, toggleGlobalSidebar, globalSidebar, onActiveJobChange, isJobForeground }) {
+  const { addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, removeJob, jobs, clearSeenCompletedJobs, registerCancelHandler, unregisterCancelHandler } = useJobs();
   const { isMobile, isTablet, setPanelOpen, setPanelsOpen, mobileActive, panelState } = useStudioPanels();
   const startJob = (kind, title, targetTab) => {
     const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -471,6 +471,37 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
   const [view, setView] = useState('gen'); // gen | upscale | gallery
   const [currentJobId, setCurrentJobId] = useState(null);
   const abortControllerRef = useRef(null);
+
+  const isImageJobForeground = (jobId) => (
+    isJobForeground?.({ id: jobId, panelType: 'image' }) ?? true
+  );
+
+  const finishImageJob = (jobId, patch = {}) => {
+    const donePatch = { progress: 100, updatedAt: Date.now(), completedAt: Date.now(), ...patch };
+    if (isImageJobForeground(jobId)) {
+      markJobDoneAndSeen(jobId, donePatch);
+      return;
+    }
+    markJobDone(jobId, donePatch);
+  };
+
+  const failImageJob = (jobId, message) => {
+    markJobError(jobId, message);
+    if (isImageJobForeground(jobId)) {
+      updateJob(jobId, { seenAt: Date.now() });
+    }
+  };
+
+  useEffect(() => {
+    const jobId = view === 'gallery' ? null : currentJobId || selectedJobId;
+    if (jobId) {
+      onActiveJobChange?.({ panelType: 'image', jobId });
+    } else {
+      onActiveJobChange?.(null);
+    }
+
+    return () => onActiveJobChange?.(null);
+  }, [currentJobId, selectedJobId, view, onActiveJobChange]);
 
   const closeMobileStudioPanel = () => {
     if (isMobile) {
@@ -565,6 +596,9 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
 
     // Kész/hibás job: mutasd meg a képet
     setIsGenerating(false);
+    if ((job.status === 'done' || job.status === 'error') && !job.seenAt) {
+      updateJob(jobId, { seenAt: Date.now() });
+    }
     if (job.resultImages?.length) {
       setGeneratedImages(job.resultImages);
       setGenProgress(100);
@@ -641,8 +675,11 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
     sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
     setSelectedJobId(jobId);
     setCurrentJobId(jobId);
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
+    onActiveJobChange?.({ panelType: 'image', jobId });
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const signal = controller.signal;
+    registerCancelHandler(jobId, () => controller.abort());
 
     updateJob(jobId, { progress: 0, updatedAt: Date.now() });
 
@@ -705,7 +742,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
             const images = (event.images || []).map(normalizeGeneratedImage).filter(Boolean);
             setGeneratedImages(images);
             setGenProgress(100);
-            markJobDoneAndSeen(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now(), resultImages: images });
+            finishImageJob(jobId, { resultImages: images });
             setSelectedJobId(jobId);
             sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
           } else if (event.type === 'error') {
@@ -719,8 +756,9 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
         return;
       }
       setError(err.message);
-      markJobError(jobId, err.message || 'Something went wrong');
+      failImageJob(jobId, err.message || 'Something went wrong');
     } finally {
+      unregisterCancelHandler(jobId);
       setIsGenerating(false);
       setGenStatus('');
       setGenProgress(0);
@@ -743,8 +781,11 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
     sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
     setSelectedJobId(jobId);
     setCurrentJobId(jobId);
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
+    onActiveJobChange?.({ panelType: 'image', jobId });
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const signal = controller.signal;
+    registerCancelHandler(jobId, () => controller.abort());
 
     updateJob(jobId, { progress: 0, updatedAt: Date.now() });
 
@@ -791,7 +832,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
             const images = (event.images || []).map(normalizeGeneratedImage).filter(Boolean);
             setGeneratedImages(images);
             setGenProgress(100);
-            markJobDoneAndSeen(jobId, { progress: 100, updatedAt: Date.now(), completedAt: Date.now(), resultImages: images });
+            finishImageJob(jobId, { resultImages: images });
             setSelectedJobId(jobId);
             sessionStorage.setItem(`ludusgen_open_job:${userId || 'guest'}`, jobId);
           } else if (event.type === 'error') {
@@ -805,8 +846,9 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
         return;
       }
       setError(err.message);
-      markJobError(jobId, err.message || 'Something went wrong');
+      failImageJob(jobId, err.message || 'Something went wrong');
     } finally {
+      unregisterCancelHandler(jobId);
       setIsGenerating(false);
       setGenStatus('');
       setGenProgress(0);

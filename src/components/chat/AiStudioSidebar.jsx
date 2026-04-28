@@ -61,7 +61,10 @@ export default function AiStudioSidebar({
   setSidebarOpen,
   isMobile,
   onOpenJob,
-  isImageGallery
+  isImageGallery,
+  activeChatSessionId,
+  activeMediaJob,
+  activePanelType
 }) {
   const selectedModel = getModel(selectedAI);
   const { user, setShowCreditTopup } = useContext(MyUserContext);
@@ -517,7 +520,12 @@ export default function AiStudioSidebar({
         })}
       </div>
 
-      <JobQueueWidget onOpenJob={handleJobOpen} />
+      <JobQueueWidget
+        onOpenJob={handleJobOpen}
+        activeChatSessionId={activeChatSessionId}
+        activeMediaJob={activeMediaJob}
+        activePanelType={activePanelType}
+      />
     </div>
   );
 }

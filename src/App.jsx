@@ -19,6 +19,8 @@ import AIChat from './ai_components/AiChat';
 import { auth } from './firebase/firebaseApp';
 import Forum from './pages/Forum';
 import Marketplace from './pages/Marketplace';
+import NotFound from './pages/NotFound';
+import Legal from './pages/Legal';
 import { AnimatePresence } from 'framer-motion';
 import CreditTopup from './components/CreditTopup';
 
@@ -77,6 +79,7 @@ function App() {
             <Route path="/verify-email" element={<PageTransition><VerifyEmail /></PageTransition>} />
             <Route path="/forum/*" element={<PageTransition><Forum /></PageTransition>} />
             <Route path="/marketplace" element={<PageTransition><Marketplace /></PageTransition>} />
+            <Route path="/legal/:slug" element={<PageTransition><Legal /></PageTransition>} />
             <Route path="/profile" element={
               <PageTransition>
                 <ProtectedRoute><Settings /></ProtectedRoute>
@@ -87,6 +90,7 @@ function App() {
                 <Navigate to="/profile" replace />
               </ProtectedRoute>
             } />
+            <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
           </Routes>
         </AnimatePresence>
       </AppLayout>

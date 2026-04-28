@@ -8,7 +8,7 @@ import ImageImg from '../../assets/ai_studio_preview_image_gen_1775575925675.png
 import AudioImg from '../../assets/ai_studio_preview_audio_engine_1775576030938.png';
 import ForgeImg from '../../assets/ai_studio_preview_3d_forge_1775576011580.png';
 
-import ChatStudioBG from '../../assets/chat_studio_bg.png';
+import ChatStudioBG from '../../assets/ludusgen_jvubFciJtA0Fw42FoJ0N.avif';
 import FloatingCore from '../ui/FloatingCore';
 
 export default function ToolsPreview() {
