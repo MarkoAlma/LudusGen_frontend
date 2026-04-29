@@ -3,10 +3,13 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Download, RotateCcw, Trash2, Box, Sparkles, AlertCircle, PersonStanding, Wand2, Scissors, Boxes, Images } from "lucide-react";
 import { getCachedThumbnail, checkThumbnailCache, isThumbnailUnsupported } from "../trellis/Glbthumbnail";
 import { fetchModelData } from "../trellis/utils";
+import { getHistoryThumbnailCacheKey } from "./historyThumbnailCache";
 import {
   ensureImageHistoryThumb,
+  extractTripoPreviewImageUrls,
   getCachedImageHistoryThumb,
   getHistoryImageUrls,
+  getModelPreviewImageUrl,
   isImageHistoryItem,
 } from "../tripo/tripoImageHistoryUtils";
 
@@ -101,10 +104,38 @@ function useContainerWidth(ref) {
 }
 
 const EXPIRED_URLS = new Set();
-const THUMBNAIL_CACHE_VERSION = "history-thumb-v2";
-const getThumbnailCacheKey = (item) => item?.model_url ? `${item.model_url}#${THUMBNAIL_CACHE_VERSION}` : null;
+const TASK_PREVIEW_CACHE = new Map();
+const TASK_PREVIEW_MISSES = new Set();
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const historyCardVisibilityHandlers = new WeakMap();
 let historyCardVisibilityObserver = null;
+
+async function fetchTaskPreviewImageUrl(taskId, getIdToken) {
+  if (!taskId || TASK_PREVIEW_MISSES.has(taskId)) return null;
+  if (TASK_PREVIEW_CACHE.has(taskId)) return TASK_PREVIEW_CACHE.get(taskId);
+
+  try {
+    const token = getIdToken ? await getIdToken() : "";
+    const response = await fetch(`${BASE_URL}/api/tripo/task/${encodeURIComponent(taskId)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      if (response.status === 404 || response.status === 410) TASK_PREVIEW_MISSES.add(taskId);
+      return null;
+    }
+
+    const payload = await response.json();
+    const previewUrl = extractTripoPreviewImageUrls(payload)[0] ?? null;
+    if (previewUrl) {
+      TASK_PREVIEW_CACHE.set(taskId, previewUrl);
+    } else {
+      TASK_PREVIEW_MISSES.add(taskId);
+    }
+    return previewUrl;
+  } catch {
+    return null;
+  }
+}
 
 function getHistoryCardVisibilityObserver() {
   if (historyCardVisibilityObserver || typeof IntersectionObserver === "undefined") {
@@ -184,12 +215,21 @@ const HistoryCard = React.memo(function HistoryCard({
   const imageGridPadding = isNarrow ? 6 : 8;
   const isImageSet = isImageHistoryItem(item);
   const imageUrls = useMemo(() => getHistoryImageUrls(item).slice(0, 4), [item]);
+  const modelPreviewUrl = useMemo(
+    () => (isImageSet ? null : getModelPreviewImageUrl(item)),
+    [isImageSet, item]
+  );
 
   const [thumbnail, setThumbnail] = useState(null);
   const [thumbLoading, setThumbLoading] = useState(false);
   const [thumbError, setThumbError] = useState(false);
   const [errorCode, setErrorCode] = useState(null);
+  const [blockedPreviewUrl, setBlockedPreviewUrl] = useState(null);
   const [hovered, setHovered] = useState(false);
+  const shouldLoadModelThumbnail = isVisible || isActive;
+  const usableModelPreviewUrl = modelPreviewUrl && modelPreviewUrl !== blockedPreviewUrl
+    ? modelPreviewUrl
+    : null;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -220,6 +260,7 @@ const HistoryCard = React.memo(function HistoryCard({
     setThumbLoading(false);
     setThumbError(false);
     setErrorCode(null);
+    setBlockedPreviewUrl(null);
   }, [item?.id, isImageSet]);
 
   useEffect(() => {
@@ -259,23 +300,18 @@ const HistoryCard = React.memo(function HistoryCard({
 
   useEffect(() => {
     if (isImageSet) return undefined;
-    if (!item?.model_url || !isVisible) return;
-    const thumbnailCacheKey = getThumbnailCacheKey(item);
+    if (usableModelPreviewUrl) {
+      setThumbnail(usableModelPreviewUrl);
+      setThumbError(false);
+      setThumbLoading(false);
+      setErrorCode(null);
+      return undefined;
+    }
+    if (!item?.model_url || !shouldLoadModelThumbnail) return;
+    const thumbnailCacheKey = getHistoryThumbnailCacheKey(item);
     if (item?.status === "failed" || EXPIRED_URLS.has(item.model_url)) {
       setThumbError(true);
       if (EXPIRED_URLS.has(item.model_url)) setErrorCode(410);
-      return;
-    }
-    if (isThumbnailUnsupported(thumbnailCacheKey)) {
-      setThumbError(true);
-      setThumbLoading(false);
-      return;
-    }
-    const cached = checkThumbnailCache(thumbnailCacheKey);
-    if (cached) {
-      setThumbnail(cached);
-      setThumbError(false);
-      setThumbLoading(false);
       return;
     }
     let cancelled = false;
@@ -284,11 +320,37 @@ const HistoryCard = React.memo(function HistoryCard({
     (async () => {
       setErrorCode(null);
       try {
+        const taskPreviewUrl = await fetchTaskPreviewImageUrl(item.taskId, getIdToken);
+        if (cancelled) return;
+        if (taskPreviewUrl) {
+          setThumbnail(taskPreviewUrl);
+          setThumbError(false);
+          setThumbLoading(false);
+          return;
+        }
+
+        if (isThumbnailUnsupported(thumbnailCacheKey)) {
+          setThumbError(true);
+          setThumbLoading(false);
+          return;
+        }
+        const cached = checkThumbnailCache(thumbnailCacheKey);
+        if (cached) {
+          setThumbnail(cached);
+          setThumbError(false);
+          setThumbLoading(false);
+          return;
+        }
+
         const data = await fetchModelData(item.model_url, getIdToken, item.taskId);
         if (cancelled || !data) return;
         // Show shimmer only if not already resolved (prevents flicker for cache hits)
         if (!cancelled) { loadingTimer = setTimeout(() => { if (!cancelled) setThumbLoading(true); }, 150); }
-        const thumb = await getCachedThumbnail(data.buffer, { width: 280, height: 280 }, thumbnailCacheKey);
+        const thumb = await getCachedThumbnail(
+          data.buffer,
+          { width: 280, height: 280, resourcePath: item.model_url },
+          thumbnailCacheKey
+        );
         if (data.blobUrl) URL.revokeObjectURL(data.blobUrl);
         clearTimeout(loadingTimer);
         if (!cancelled) { if (thumb) setThumbnail(thumb); else setThumbError(true); }
@@ -305,7 +367,7 @@ const HistoryCard = React.memo(function HistoryCard({
       } finally { if (!cancelled) setThumbLoading(false); }
     })();
     return () => { cancelled = true; clearTimeout(loadingTimer); };
-  }, [isImageSet, item, item?.id, item?.model_url, item?.taskId, item?.status, getIdToken, onExpired]);
+  }, [isImageSet, item, isVisible, isActive, shouldLoadModelThumbnail, usableModelPreviewUrl, item?.id, item?.model_url, item?.taskId, item?.status, getIdToken, onExpired]);
 
   const handleSelect = useCallback(() => onSelect?.(item), [onSelect, item]);
   const handleReuse = useCallback((e) => { e.stopPropagation(); onReuse?.(item); }, [onReuse, item]);
@@ -370,6 +432,18 @@ const HistoryCard = React.memo(function HistoryCard({
               <img
                 src={thumbnail}
                 alt={displayName}
+                onError={() => {
+                  if (thumbnail && thumbnail === modelPreviewUrl) {
+                    setBlockedPreviewUrl(thumbnail);
+                    setThumbnail(null);
+                    return;
+                  }
+                  if (thumbnail && item?.taskId && TASK_PREVIEW_CACHE.get(item.taskId) === thumbnail) {
+                    TASK_PREVIEW_CACHE.delete(item.taskId);
+                    TASK_PREVIEW_MISSES.add(item.taskId);
+                    setThumbnail(null);
+                  }
+                }}
                 style={{
                   width: "100%", height: "100%", objectFit: isImageSet ? "cover" : "contain", display: "block",
                   background: "#0c0820",

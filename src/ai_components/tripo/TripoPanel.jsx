@@ -25,6 +25,8 @@ import { persistGen, loadPersistedGen, updatePersistedProgress, clearPersistedGe
 
 import { useActiveTasksPoller } from "./useActiveTasksPoller";
 import { checkThumbnailCache, getCachedThumbnail } from "../trellis/Glbthumbnail";
+import { fetchModelData } from "../trellis/utils";
+import { getHistoryThumbnailCacheKey } from "../shared/historyThumbnailCache";
 import { useTripoHistory } from "./useTripoHistory";
 import { useTripoRig } from "./useTripoRig";
 import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX } from "./GeneratePanel";
@@ -32,6 +34,7 @@ import MultiviewImagesPanel from "./MultiviewImagesPanel";
 import { DEFAULT_MODEL_VERSION, DEFAULT_TEXTURE_MODEL_VERSION, DETAILED_TEXTURE_MODEL_VERSION, TEXTURE_MODEL_VERSIONS } from "./constants";
 import { streamTaskStatus, uploadViaTripoSts } from "./tripoTransfers";
 import { resolveTripoModelUrl, resolveTripoUrlNode } from "./utils/modelUrl";
+import { buildImageToModelSubmission } from "./tripoGenerationRequest";
 import {
   MULTIVIEW_UPLOAD_ORDER,
   buildMultiviewPreviewItems,
@@ -44,6 +47,7 @@ import {
   downloadImageHistoryZip,
   extractTripoPreviewImageUrls,
   getHistoryImageUrls,
+  getModelPreviewImageUrl,
   isImageHistoryItem,
 } from "./tripoImageHistoryUtils";
 import Segment from "./Segment";
@@ -75,6 +79,19 @@ const POLL_MAX = 500;
 
 const PROGRESS_JUMP_LIMIT = 30;
 const STUCK_THRESHOLD_MS = 300_000;
+
+function getModelHistoryThumbnailCacheKey(modelUrl) {
+  return getHistoryThumbnailCacheKey({ model_url: modelUrl }) || modelUrl || null;
+}
+
+function buildPreviewHistoryFields(previewUrls) {
+  const normalized = Array.isArray(previewUrls)
+    ? [...new Set(previewUrls.filter(Boolean))]
+    : [];
+  return normalized.length > 0
+    ? { previewImageUrl: normalized[0], previewImageUrls: normalized }
+    : {};
+}
 
 // Module-level store: survives TripoPanel unmount/remount within the same session tab.
 // Replaces sessionStorage — avoids stale URLs on tab duplication and is invisible to React lifecycle.
@@ -1875,10 +1892,19 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const selectedPreviewItem = useMemo(() => {
     const baseItem = manualSelectedItem || activeH;
     if (!baseItem) return null;
+    const thumbnailCacheKey = getHistoryThumbnailCacheKey(baseItem);
+    const previewImageUrl = getModelPreviewImageUrl(baseItem);
     return {
       ...baseItem,
       displayName: resolveHistoryDisplayName(baseItem),
-      thumbnail: selectedPreviewThumb || baseItem?.thumbnail || baseItem?.thumbnail_url || checkThumbnailCache(baseItem?.model_url) || null,
+      thumbnail:
+        previewImageUrl
+        || selectedPreviewThumb
+        || baseItem?.thumbnail
+        || baseItem?.thumbnail_url
+        || checkThumbnailCache(thumbnailCacheKey)
+        || checkThumbnailCache(baseItem?.model_url)
+        || null,
     };
   }, [manualSelectedItem, activeH, selectedPreviewThumb, resolveHistoryDisplayName]);
   const selectedPreviewColor = useMemo(() => {
@@ -2770,6 +2796,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         // Inline success handler for resume — handles all opTypes
         const onSuccess = async (sd) => {
           if (pt.cancelled) return;
+          const previewHistoryFields = buildPreviewHistoryFields(extractTripoPreviewImageUrls(sd));
           if (opType === "rig") {
             const blob = sd.modelUrl ? await fetchProxy(sd.modelUrl, persisted.taskId) : null;
             if (pt.cancelled) { revokeBlobUrl(blob); return; }
@@ -2780,15 +2807,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             if (sd.modelUrl && blob) {
               try {
                 const buf = await fetch(blob).then(r => r.arrayBuffer());
-                await getCachedThumbnail(buf, { width: 280, height: 280 }, sd.modelUrl);
-              } catch (_thumbErr) {
+                await getCachedThumbnail(buf, { width: 280, height: 280, resourcePath: sd.modelUrl }, getModelHistoryThumbnailCacheKey(sd.modelUrl));
+              } catch {
                 // Thumbnail warmup is optional here.
               }
             }
 
             if (!persisted.savedToHistory && sd.modelUrl) {
               markHistorySaved();
-              const _ni = await saveRigHist(persisted.taskId, sd.modelUrl, { prompt: "auto-rig", originalModelTaskId: persisted.mode === "animate" ? persisted.taskId : undefined, rigModelVer: persisted.rigModelVer, rigType: persisted.rigType, rigSpec: persisted.rigSpec });
+              const _ni = await saveRigHist(persisted.taskId, sd.modelUrl, { prompt: "auto-rig", originalModelTaskId: persisted.mode === "animate" ? persisted.taskId : undefined, rigModelVer: persisted.rigModelVer, rigType: persisted.rigType, rigSpec: persisted.rigSpec, ...previewHistoryFields });
               if (_ni) {
                 setViewerHistId(_ni.id);
                 setSelHistId(_ni.id);
@@ -2813,15 +2840,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             if (rawUrl && blob) {
               try {
                 const buf = await fetch(blob).then(r => r.arrayBuffer());
-                await getCachedThumbnail(buf, { width: 280, height: 280 }, rawUrl);
-              } catch (_thumbErr) {
+                await getCachedThumbnail(buf, { width: 280, height: 280, resourcePath: rawUrl }, getModelHistoryThumbnailCacheKey(rawUrl));
+              } catch {
                 // Thumbnail warmup is optional here.
               }
             }
 
             if (!persisted.savedToHistory) {
               markHistorySaved();
-              const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "animation", animated: true });
+              const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "animation", animated: true, ...previewHistoryFields });
               if (_ni) {
                 setViewerHistId(_ni.id);
                 setSelHistId(_ni.id);
@@ -2842,7 +2869,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             setGenStatus("succeeded"); setProgress(100); setStatusMsg(""); setIsRunning(false);
             if (!persisted.savedToHistory && rawUrl) {
               markHistorySaved();
-              const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? (opType === "fill_parts" ? "part completion" : "segmentation"), mode: opType });
+              const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? (opType === "fill_parts" ? "part completion" : "segmentation"), mode: opType, ...previewHistoryFields });
               if (_ni) {
                 setViewerHistId(_ni.id);
                 setSelHistId(_ni.id);
@@ -2867,15 +2894,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             if (rawUrl && blob) {
               try {
                 const buf = await fetch(blob).then(r => r.arrayBuffer());
-                await getCachedThumbnail(buf, { width: 280, height: 280 }, rawUrl);
-              } catch (_thumbErr) {
+                await getCachedThumbnail(buf, { width: 280, height: 280, resourcePath: rawUrl }, getModelHistoryThumbnailCacheKey(rawUrl));
+              } catch {
                 // Thumbnail warmup is optional here.
               }
             }
 
             if (!persisted.savedToHistory && rawUrl) {
               markHistorySaved();
-              const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "" });
+              const _ni = await saveHist(persisted.taskId, rawUrl, { prompt: persisted.prompt ?? "", ...previewHistoryFields });
               if (_ni) {
                 setViewerHistId(_ni.id);
                 setSelHistId(_ni.id);
@@ -3158,7 +3185,15 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     if (!item) return;
     const isImageSet = isImageHistoryItem(item);
     setManualSelectedItem(item);
-    setSelectedPreviewThumb(item?.previewThumbnail || item?.thumbnail || item?.thumbnail_url || checkThumbnailCache(item?.model_url) || item?.previewImageUrl || null);
+    setSelectedPreviewThumb(
+      getModelPreviewImageUrl(item)
+      || item?.previewThumbnail
+      || item?.thumbnail
+      || item?.thumbnail_url
+      || checkThumbnailCache(getHistoryThumbnailCacheKey(item))
+      || checkThumbnailCache(item?.model_url)
+      || null
+    );
     setSelHistId(item.id);
     setGenStatus(item.status);
     programmaticUrlRef.current = item?.taskId || null;
@@ -3439,16 +3474,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                 ...(!exportUv && { export_uv: false }),
               };
 
-              if (inputImages.length === 1) {
-                body.file = inputImages[0];
-              } else {
-                requestPath = "/api/tripo/batch";
-                body = {
-                  images: inputImages,
-                  model_version: effectiveModel,
-                  texture: !!texOn,
-                  pbr: !!effectivePbrOn,
-                  texture_quality: tex4K ? "detailed" : "standard",
+              const submission = buildImageToModelSubmission(body, inputImages);
+              requestPath = submission.requestPath;
+              body = submission.body;
+              if (submission.taskCount > 1) {
+                snapshotExtras = {
+                  ...snapshotExtras,
+                  batchSize: submission.taskCount,
                 };
               }
             }
@@ -3841,6 +3873,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     const thisOptimisticId = inst.taskId ? `tripo_${inst.taskId}` : null;
     const resolvedModelUrl = resolveTripoModelUrl(d);
     const previewUrls = extractTripoPreviewImageUrls(d);
+    const previewHistoryFields = buildPreviewHistoryFields(previewUrls);
 
     if (thisOptimisticId && inst.mode !== "views") {
       setViewerHistId(thisOptimisticId);
@@ -3862,7 +3895,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       if (resolvedModelUrl) {
         try {
           const buf = await fetch(blobUrl).then(r => r.arrayBuffer());
-          await getCachedThumbnail(buf, { width: 280, height: 280 }, resolvedModelUrl);
+          await getCachedThumbnail(buf, { width: 280, height: 280, resourcePath: resolvedModelUrl }, getModelHistoryThumbnailCacheKey(resolvedModelUrl));
         } catch { /* non-critical — HistoryCard will regenerate on miss */ }
       }
     }
@@ -3948,6 +3981,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         taskId: inst.taskId,
         status: "succeeded",
         model_url: resolvedModelUrl,
+        ...previewHistoryFields,
         source: "tripo",
         mode: inst.mode,
         ...(inst.snapshot?.type && { type: inst.snapshot.type }),
@@ -4006,6 +4040,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             animationIndex: animSlugs.length > 1 ? i : undefined,
             originalModelTaskId: inst.riggedId || inst.originalTaskId || null,
             consumedCredit: d.consumedCredit ?? undefined,
+            ...previewHistoryFields,
           });
           if (ni) {
             focusGeneratedHistoryItem(ni);
@@ -4031,6 +4066,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
           preprocessTaskId: inst.snapshot?.preprocessTaskId ?? undefined,
           preprocessTaskType: inst.snapshot?.preprocessTaskType ?? undefined,
           consumedCredit: d.consumedCredit ?? undefined,
+          ...previewHistoryFields,
           ...(inst.snapshot?.generate_parts === true && { generate_parts: true, inParts: true }),
           ...((inst.mode === "texture" || inst.snapshot?.type === "texture_model" || inst.snapshot?.texture === true) && { texture: true }),
           ...(inst.snapshot?.pbr === true && { pbr: true }),
@@ -4879,6 +4915,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         segmentProcessing={segmentProcessing}
         setSegmentProcessing={setSegmentProcessing}
         segmentHighlight={segmentHighlight}
+        setSegmentHighlight={setSegmentHighlight}
       />
     </StudioLayout>
   );
@@ -4903,7 +4940,7 @@ function TripoWorkspaceWrapper({
   // 3D Paint
   paintMode, paintColor, paintSize, paintOpacity, paintHardness, paintCanvasRef,
   segmentProcessing, setSegmentProcessing,
-  segmentHighlight
+  segmentHighlight, setSegmentHighlight
 }) {
   const { smoothL, smoothR } = useContext(StudioLayoutContext);
 
@@ -5060,7 +5097,7 @@ function TripoWorkspaceWrapper({
         )}
 
         {selectedItem && (
-          <SelectedHistoryPreview item={selectedItem} color={selectedPreviewColor || color} viewerItemId={viewerH?.id} selectedItemId={activeH?.id} />
+          <SelectedHistoryPreview item={selectedItem} color={selectedPreviewColor || color} viewerItemId={viewerH?.id} selectedItemId={activeH?.id} getIdToken={getIdToken} />
         )}
       </div>
 
@@ -5125,17 +5162,61 @@ function TripoWorkspaceWrapper({
   );
 }
 
-function SelectedHistoryPreview({ item, color, viewerItemId, selectedItemId }) {
-  const [thumbnail, setThumbnail] = useState(() => checkThumbnailCache(item?.model_url) || item?.thumbnail || item?.thumbnail_url || null);
+function SelectedHistoryPreview({ item, color, viewerItemId, selectedItemId, getIdToken }) {
+  const thumbnailCacheKey = getHistoryThumbnailCacheKey(item);
+  const previewImageUrl = getModelPreviewImageUrl(item);
+  const [blockedPreviewUrl, setBlockedPreviewUrl] = useState(null);
+  const usablePreviewImageUrl = previewImageUrl && previewImageUrl !== blockedPreviewUrl
+    ? previewImageUrl
+    : null;
+  const [thumbnail, setThumbnail] = useState(() =>
+    usablePreviewImageUrl
+    || item?.thumbnail
+    || item?.thumbnail_url
+    || checkThumbnailCache(thumbnailCacheKey)
+    || checkThumbnailCache(item?.model_url)
+    || null
+  );
+
+  useEffect(() => {
+    setBlockedPreviewUrl(null);
+  }, [item?.id]);
 
   useEffect(() => {
     if (!item?.model_url) {
-      setThumbnail(item?.thumbnail || item?.thumbnail_url || null);
+      setThumbnail(usablePreviewImageUrl || item?.thumbnail || item?.thumbnail_url || null);
       return;
     }
-    const cached = checkThumbnailCache(item.model_url) || item?.thumbnail || item?.thumbnail_url || null;
+    const cached =
+      usablePreviewImageUrl
+      || item?.thumbnail
+      || item?.thumbnail_url
+      || checkThumbnailCache(thumbnailCacheKey)
+      || checkThumbnailCache(item.model_url)
+      || null;
     setThumbnail(cached);
-  }, [item?.id, item?.model_url, item?.thumbnail, item?.thumbnail_url]);
+    if (cached) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      const data = await fetchModelData(item.model_url, getIdToken, item.taskId);
+      if (cancelled || !data?.buffer) return;
+      try {
+        const thumb = await getCachedThumbnail(
+          data.buffer,
+          { width: 280, height: 280, resourcePath: item.model_url },
+          thumbnailCacheKey || item.model_url
+        );
+        if (!cancelled) setThumbnail(thumb || null);
+      } finally {
+        if (data.blobUrl) URL.revokeObjectURL(data.blobUrl);
+      }
+    })().catch((err) => {
+      if (!cancelled) console.warn("[SelectedHistoryPreview] thumbnail load failed:", err?.message || err);
+    });
+
+    return () => { cancelled = true; };
+  }, [getIdToken, item?.id, item?.model_url, item?.taskId, item?.thumbnail, item?.thumbnail_url, usablePreviewImageUrl, thumbnailCacheKey]);
 
   if (!item) return null;
 
@@ -5162,7 +5243,19 @@ function SelectedHistoryPreview({ item, color, viewerItemId, selectedItemId }) {
     >
       <div className="absolute inset-0 overflow-hidden" style={{ background: `radial-gradient(circle at 50% -5%, ${panelBg}, transparent 60%), #04040b` }}>
         {thumbnail ? (
-          <img src={thumbnail} alt={displayName} className="h-full w-full object-cover" loading="eager" decoding="async" />
+          <img
+            src={thumbnail}
+            alt={displayName}
+            className="h-full w-full object-cover"
+            loading="eager"
+            decoding="async"
+            onError={() => {
+              if (thumbnail && thumbnail === previewImageUrl) {
+                setBlockedPreviewUrl(thumbnail);
+                setThumbnail(null);
+              }
+            }}
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <Box className="h-8 w-8 text-white/30" />

@@ -1,4 +1,4 @@
-import { MULTIVIEW_UPLOAD_ORDER } from "./multiviewUtils";
+import { MULTIVIEW_UPLOAD_ORDER } from "./multiviewUtils.js";
 
 const IMAGE_THUMB_CACHE_VERSION = "tripo-image-thumb-v1";
 const IMAGE_THUMB_SIZE = 280;
@@ -160,6 +160,15 @@ function buildStoreZip(entries) {
 }
 
 export function isImageHistoryItem(item) {
+  const hasOnlyImagePreview =
+    !item?.model_url &&
+    (
+      Array.isArray(item?.previewImageUrls) ||
+      Array.isArray(item?.preview_image_urls) ||
+      Boolean(item?.previewImageUrl) ||
+      Boolean(item?.preview_image_url)
+    );
+
   return Boolean(
     item?.kind === "images" ||
     item?.params?.assetKind === "images" ||
@@ -168,7 +177,7 @@ export function isImageHistoryItem(item) {
     item?.type === "generate_multiview_image" ||
     item?.type === "edit_multiview_image" ||
     Array.isArray(item?.image_urls) ||
-    Array.isArray(item?.previewImageUrls)
+    hasOnlyImagePreview
   );
 }
 
@@ -178,9 +187,13 @@ export function getHistoryImageUrls(item) {
     ? item.image_urls
     : Array.isArray(item.previewImageUrls) && item.previewImageUrls.length > 0
       ? item.previewImageUrls
+      : Array.isArray(item.preview_image_urls) && item.preview_image_urls.length > 0
+        ? item.preview_image_urls
       : item.previewImageUrl
         ? [item.previewImageUrl]
-        : [];
+        : item.preview_image_url
+          ? [item.preview_image_url]
+          : [];
   return candidates.filter(Boolean);
 }
 
@@ -213,7 +226,13 @@ export function extractTripoPreviewImageUrls(payload) {
   const directUrls = [
     ...(Array.isArray(payload.image_urls) ? payload.image_urls : []),
     ...(Array.isArray(payload.previewImageUrls) ? payload.previewImageUrls : []),
+    ...(Array.isArray(payload.preview_image_urls) ? payload.preview_image_urls : []),
     ...(payload.previewImageUrl ? [payload.previewImageUrl] : []),
+    ...(payload.preview_image_url ? [payload.preview_image_url] : []),
+    ...(payload.rendered_image ? [extractUrlFromNode(payload.rendered_image)].filter(Boolean) : []),
+    ...(payload.rendered_images ? [extractUrlFromNode(payload.rendered_images)].filter(Boolean) : []),
+    ...(payload.preview_image ? [extractUrlFromNode(payload.preview_image)].filter(Boolean) : []),
+    ...(payload.preview_images ? [extractUrlFromNode(payload.preview_images)].filter(Boolean) : []),
   ].filter(Boolean);
 
   const out = payload.output ?? payload.rawOutput ?? {};
@@ -245,6 +264,12 @@ export function extractTripoPreviewImageUrls(payload) {
   }
 
   return [...new Set([...directUrls, ...derivedUrls])];
+}
+
+export function getModelPreviewImageUrl(item) {
+  if (!item) return null;
+  const urls = extractTripoPreviewImageUrls(item);
+  return urls[0] ?? null;
 }
 
 export function getImageHistoryThumbCacheKey(item) {

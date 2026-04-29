@@ -14,6 +14,24 @@ const omitUndefined = (obj) => Object.fromEntries(
 
 const getCanonicalModelVersion = (value) => value ?? null;
 
+const normalizePreviewImageUrls = (extra = {}) => {
+  const urls = [
+    ...(Array.isArray(extra.previewImageUrls) ? extra.previewImageUrls : []),
+    ...(Array.isArray(extra.preview_image_urls) ? extra.preview_image_urls : []),
+    ...(extra.previewImageUrl ? [extra.previewImageUrl] : []),
+    ...(extra.preview_image_url ? [extra.preview_image_url] : []),
+  ].filter(Boolean);
+
+  return [...new Set(urls)];
+};
+
+const removePreviewFields = (obj) => {
+  delete obj.previewImageUrl;
+  delete obj.previewImageUrls;
+  delete obj.preview_image_url;
+  delete obj.preview_image_urls;
+};
+
 /**
  * @param {{
  *   userId: string,
@@ -49,8 +67,10 @@ export function useTripoHistory({
     const effectiveMode = extra.mode ?? mode;
     const effectiveModelVer = getCanonicalModelVersion(extra.model_version ?? extra.modelVer ?? modelVer);
     const cleanExtra = omitUndefined(extra);
+    const previewImageUrls = normalizePreviewImageUrls(cleanExtra);
     delete cleanExtra.modelVer;
     delete cleanExtra.modelVersion;
+    removePreviewFields(cleanExtra);
     const topLevelType = cleanExtra.type ?? null;
     const marksTexturedOutput =
       cleanExtra.texture === true ||
@@ -66,6 +86,10 @@ export function useTripoHistory({
       name: resolvedName,
       status: "succeeded",
       model_url: rawUrl,
+      ...(previewImageUrls.length > 0 && {
+        previewImageUrl: previewImageUrls[0],
+        previewImageUrls,
+      }),
       source: extra.source ?? "tripo",
       mode: effectiveMode,
       taskId,
@@ -108,6 +132,7 @@ export function useTripoHistory({
     const srcPrompt = srcItem?.name || srcItem?.prompt || extra.prompt || "model";
     const srcShort = srcPrompt.trim().split(/\s+/).slice(0, 2).join(" ");
     const rigName = extra.aiName || `Rig:${srcShort}`;
+    const previewImageUrls = normalizePreviewImageUrls(extra);
     const params = omitUndefined({
       rigModelVer: extra.rigModelVer,
       rigType: extra.rigType,
@@ -121,6 +146,10 @@ export function useTripoHistory({
       name: rigName,
       status: "succeeded",
       model_url: rawUrl,
+      ...(previewImageUrls.length > 0 && {
+        previewImageUrl: previewImageUrls[0],
+        previewImageUrls,
+      }),
       source: "tripo",
       mode: "rig",
       taskId,

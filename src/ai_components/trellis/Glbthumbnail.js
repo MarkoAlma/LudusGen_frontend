@@ -100,6 +100,16 @@ const _TIMEOUT_MS = 45000;
 const _UNSUPPORTED_THUMBNAIL = Symbol('unsupported-thumbnail');
 const _pending = new Map();
 
+export function getModelResourcePath(source) {
+  if (typeof source !== 'string') return '';
+  if (!source || source.startsWith('blob:') || source.startsWith('data:')) return '';
+
+  const clean = source.split('#')[0].split('?')[0];
+  const slashIndex = clean.lastIndexOf('/');
+  if (slashIndex < 0) return '';
+  return clean.slice(0, slashIndex + 1);
+}
+
 function readAscii(bytes, length = bytes.length) {
   return String.fromCharCode(...bytes.slice(0, length));
 }
@@ -176,6 +186,8 @@ export function generateGlbThumbnail(source, options = {}) {
     height = 280,
     bgColor = '#1a1528',
     timeoutMs = _TIMEOUT_MS,
+    resourcePath,
+    textureTimeoutMs = 3200,
   } = options;
 
   return _enqueue(async (resolve, reject) => {
@@ -183,7 +195,7 @@ export function generateGlbThumbnail(source, options = {}) {
 
     function cleanup() {
       if (renderer) {
-        try { renderer.forceContextLoss(); } catch (_) { }
+        try { renderer.forceContextLoss(); } catch { /* renderer cleanup is best effort */ }
         renderer.dispose();
       }
       if (scene) {
@@ -265,19 +277,20 @@ export function generateGlbThumbnail(source, options = {}) {
       scene.add(bounce);
 
       // ── Parse model ─────────────────────────────────────────────────
+      const modelResourcePath = getModelResourcePath(resourcePath || source);
       let model;
       if (format === 'fbx') {
         // Suppress FBXLoader's console.warn about unsupported material maps
         const _origWarn = console.warn;
         console.warn = () => { };
         try {
-          model = new FBXLoader().parse(buffer, '');
+          model = new FBXLoader().parse(buffer, modelResourcePath);
         } finally {
           console.warn = _origWarn;
         }
       } else {
         const gltf = await new Promise((res, rej) => {
-          new GLTFLoader().parse(buffer, '', res, rej);
+          new GLTFLoader().parse(buffer, modelResourcePath, res, rej);
         });
         model = gltf.scene;
       }
@@ -366,7 +379,7 @@ export function generateGlbThumbnail(source, options = {}) {
       keyLight.target.updateMatrixWorld();
 
       // ── Render ───────────────────────────────────────────────────────
-      await waitForThumbnailTextures(model);
+      await waitForThumbnailTextures(model, textureTimeoutMs);
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       renderer.render(scene, camera);
       const dataUrl = canvas.toDataURL('image/webp', 0.85);

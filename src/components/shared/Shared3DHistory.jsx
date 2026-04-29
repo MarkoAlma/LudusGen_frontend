@@ -9,8 +9,9 @@ import { db } from '../../firebase/firebaseApp';
 import HistoryCard from '../../ai_components/shared/HistoryCard';
 import { getItemTs } from '../../ai_components/trellis/utils';
 import { checkThumbnailCache } from '../../ai_components/trellis/Glbthumbnail';
+import { getHistoryThumbnailCacheKey } from '../../ai_components/shared/historyThumbnailCache';
 import { Tooltip } from '../../ai_components/meshy/ui/Primitives';
-import { getHistoryImageUrls, isImageHistoryItem } from '../../ai_components/tripo/tripoImageHistoryUtils';
+import { getHistoryImageUrls, getModelPreviewImageUrl, isImageHistoryItem } from '../../ai_components/tripo/tripoImageHistoryUtils';
 import toast from 'react-hot-toast';
 import './Shared3DHistory.css';
 
@@ -330,7 +331,13 @@ export default function Shared3DHistory({
 
   const handleSelect = useCallback((item) => {
     if (!onSelect) return;
-    const previewThumbnail = checkThumbnailCache(item?.model_url) || item?.thumbnail || item?.thumbnail_url || null;
+    const previewThumbnail =
+      getModelPreviewImageUrl(item)
+      || checkThumbnailCache(getHistoryThumbnailCacheKey(item))
+      || checkThumbnailCache(item?.model_url)
+      || item?.thumbnail
+      || item?.thumbnail_url
+      || null;
     onSelect({ ...item, previewThumbnail });
   }, [onSelect]);
 
