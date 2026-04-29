@@ -31,26 +31,6 @@ export const MODEL_VERSIONS = [
   { id: "v1.4-20240625", label: "V1.4 (Fastest Model)" },
 ];
 
-const ORIENTATION_OPTIONS = [
-  { value: "", label: "Default" },
-  { value: "portrait", label: "Portrait" },
-  { value: "landscape", label: "Landscape" },
-  { value: "square", label: "Square" },
-];
-
-const COMPRESS_OPTIONS = [
-  { value: "", label: "Off" },
-  { value: "geometry", label: "Geometry" },
-];
-
-const MULTIVIEW_MODE_OPTIONS = [
-  { value: "", label: "Default" },
-  { value: "concept", label: "Concept" },
-  { value: "orthographic", label: "Orthographic" },
-  { value: "character", label: "Character" },
-  { value: "product", label: "Product" },
-];
-
 /* ─── Per-model capability map ───────────────────────────────────────────
  *  Defines which API parameters each model version actually accepts.
  *  UI elements receive the .model-na class (dimmed, blocked) when the
@@ -162,48 +142,6 @@ function SeedSpinner({ value, onChange, disabled = false }) {
           <ChevronDown style={{ width: 9, height: 9 }} />
         </button>
       </div>
-    </div>
-  );
-}
-
-function TripoSelect({ value, onChange, options }) {
-  const [open, setOpen] = useState(false);
-  const selected = options.find(option => option.value === value) || options[0];
-
-  return (
-    <div
-      className="tp-custom-select"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-      }}
-      style={{ position: "relative" }}
-    >
-      <button
-        type="button"
-        className="tp-custom-select-trigger"
-        onClick={() => setOpen(v => !v)}
-      >
-        <span>{selected?.label || "Default"}</span>
-        <ChevronDown style={{ width: 15, height: 15, opacity: 0.78, transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.16s ease" }} />
-      </button>
-      {open && (
-        <div className="tp-custom-select-menu">
-          {options.map(option => (
-            <button
-              key={option.value || "default"}
-              type="button"
-              className={"tp-custom-select-option" + (option.value === value ? " selected" : "")}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                onChange(option.value);
-                setOpen(false);
-              }}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -593,15 +531,6 @@ const GeneratePanel = memo(({
   imageSeed, setImageSeed,
   autoSize, setAutoSize,
   exportUv, setExportUv,
-  imageSourceMode, setImageSourceMode,
-  multiviewSourceMode, setMultiviewSourceMode,
-  generationModel, setGenerationModel,
-  generationTemplateId, setGenerationTemplateId,
-  generationOrientation, setGenerationOrientation,
-  generationCompress, setGenerationCompress,
-  generationRenderImage, setGenerationRenderImage,
-  generationTextureAlignment, setGenerationTextureAlignment,
-  imageReference, setImageReference,
   multiviewOriginalTaskId,
   activeStyles = [],
   onStyleToggle = () => { },
@@ -624,6 +553,10 @@ const GeneratePanel = memo(({
   );
   const isFrontMultiviewReady = isUploadedItemReady(multiImages?.[0]);
   const hasGeneratedMultiviewTask = Boolean(multiviewOriginalTaskId?.trim?.());
+  const batchImageCount = batchImages?.length ?? 0;
+  const hasBatchImages = batchImageCount > 0;
+  const isMultiBatchUpload = batchImageCount > 1;
+  const isManyBatchUpload = batchImageCount > 3;
   const normalizeUploadedItem = (file, preview, payload) => ({
     file,
     preview,
@@ -689,38 +622,6 @@ const GeneratePanel = memo(({
   const partsRequirement = partsBlockers.length > 2
     ? `${partsBlockers.slice(0, -1).join(", ")}, and ${partsBlockers[partsBlockers.length - 1]}`
     : partsBlockers.join(" and ");
-  const sourceModeRowStyle = {
-    display: "flex",
-    gap: 0,
-    width: "100%",
-    maxWidth: "100%",
-    minWidth: 0,
-    boxSizing: "border-box",
-    borderRadius: 20,
-    overflow: "hidden",
-    background: "rgba(3,7,18,0.28)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.045)",
-  };
-  const sourceModeBtnStyle = (_active, index = 0, count = 1) => ({
-    flex: 1,
-    minWidth: 0,
-    minHeight: 48,
-    padding: "9px 6px",
-    border: 0,
-    borderLeft: index > 0 ? "1px solid rgba(139,220,255,0.12)" : 0,
-    borderRadius: 0,
-    background: "transparent",
-    color: "#94a3b8",
-    fontSize: count >= 3 ? 9.5 : 10.25,
-    fontWeight: 900,
-    letterSpacing: "0.02em",
-    lineHeight: 1.05,
-    whiteSpace: "nowrap",
-    textAlign: "center",
-    textTransform: "uppercase",
-    cursor: "pointer",
-    boxShadow: "none",
-  });
   const fieldStyle = {
     width: "100%",
     padding: "12px 14px",
@@ -743,61 +644,6 @@ const GeneratePanel = memo(({
     marginBottom: 6,
   };
   const subtleHintStyle = { color: "rgba(148,163,184,0.78)", fontSize: 10, lineHeight: 1.5, margin: 0 };
-  const renderReferenceUploader = (value, setter, uploadHandler, emptyLabel) => {
-    const openPicker = () => {
-      const inp = document.createElement("input");
-      inp.type = "file";
-      inp.accept = "image/jpeg,image/png,image/webp,image/avif";
-      inp.onchange = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          setter({ file, preview: ev.target.result, token: null });
-          uploadHandler?.(file).then((payload) => {
-            setter(normalizeUploadedItem(file, ev.target.result, payload));
-          }).catch(() => { });
-        };
-        reader.readAsDataURL(file);
-      };
-      inp.click();
-    };
-
-    return (
-      <div
-        onClick={openPicker}
-        style={{
-          border: "1.5px dashed rgba(139,220,255,0.28)",
-          background: "linear-gradient(145deg, rgba(15,23,42,0.32), rgba(3,7,18,0.24))",
-          borderRadius: 20,
-          minHeight: 124,
-          cursor: "pointer",
-          overflow: "hidden",
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {value?.preview ? (
-          <>
-            <img src={value.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            {!isUploadedItemReady(value) && (
-              <div style={{ position: "absolute", inset: 0, background: "rgba(3,0,10,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Loader2 style={{ width: 18, height: 18, color: "#2f8cff" }} className="anim-spin" />
-              </div>
-            )}
-          </>
-        ) : (
-          <div style={{ textAlign: "center", padding: 16 }}>
-            <Upload style={{ width: 18, height: 18, color: "#2f8cff", margin: "0 auto 8px" }} />
-            <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 700 }}>{emptyLabel}</div>
-            <p style={{ ...subtleHintStyle, marginTop: 6 }}>Optional reference via STS upload</p>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   /* ─── Render ──────────────────────────────────────────────────────── */
   return (
@@ -846,63 +692,6 @@ const GeneratePanel = memo(({
       {/* ── AI Model ── */}
       <ModelDropdown modelVer={modelVer} setModelVer={setModelVer} />
 
-      {genTab === "image" && (
-        <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-          <div className="tp-source-mode-row" style={sourceModeRowStyle}>
-            <button type="button" className={"tp-source-mode-btn-clean" + (imageSourceMode === "upload" ? " active" : "")} data-active={imageSourceMode === "upload" ? "true" : "false"} aria-pressed={imageSourceMode === "upload"} onMouseDown={(e) => e.preventDefault()} onClick={() => setImageSourceMode("upload")} style={sourceModeBtnStyle(imageSourceMode === "upload", 0, 2)}>Upload Source</button>
-            <button type="button" className={"tp-source-mode-btn-clean" + (imageSourceMode === "generate_image" ? " active" : "")} data-active={imageSourceMode === "generate_image" ? "true" : "false"} aria-pressed={imageSourceMode === "generate_image"} onMouseDown={(e) => e.preventDefault()} onClick={() => setImageSourceMode("generate_image")} style={sourceModeBtnStyle(imageSourceMode === "generate_image", 1, 2)}>Generate Image</button>
-          </div>
-
-          {imageSourceMode === "generate_image" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div>
-                <label style={labelStyle}>Image Prompt</label>
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  rows={4}
-                  placeholder="Describe the source image you want Tripo to generate before converting it to 3D…"
-                  style={{ ...fieldStyle, resize: "vertical", minHeight: 96 }}
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Reference Image</label>
-                {renderReferenceUploader(imageReference, setImageReference, handleBatchImg, "Add reference image")}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-                <div>
-                  <label style={labelStyle}>Image Model</label>
-                  <input value={generationModel} onChange={(e) => setGenerationModel(e.target.value)} placeholder="Optional model id" style={fieldStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Template</label>
-                  <input value={generationTemplateId} onChange={(e) => setGenerationTemplateId(e.target.value)} placeholder="Optional template id" style={fieldStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Orientation</label>
-                  <TripoSelect value={generationOrientation} onChange={setGenerationOrientation} options={ORIENTATION_OPTIONS} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Compress</label>
-                  <TripoSelect value={generationCompress} onChange={setGenerationCompress} options={COMPRESS_OPTIONS} />
-                </div>
-              </div>
-              <div>
-                <label style={labelStyle}>Texture Alignment</label>
-                <input value={generationTextureAlignment} onChange={(e) => setGenerationTextureAlignment(e.target.value)} placeholder="Optional texture alignment hint" style={fieldStyle} />
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                <div>
-                  <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 700 }}>Render Image</div>
-                  <p style={subtleHintStyle}>Keep a preview render in the Tripo task output.</p>
-                </div>
-                <div className={"tp-switch" + (generationRenderImage ? " on" : "")} onClick={() => setGenerationRenderImage((v) => !v)} />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {genTab === "multi" && (
         <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 16, background: "rgba(0,229,255,0.055)", border: "1px solid rgba(0,229,255,0.14)", boxShadow: "0 0 22px rgba(0,229,255,0.06)" }}>
@@ -912,7 +701,7 @@ const GeneratePanel = memo(({
                 Multi-view source
               </div>
               <p style={{ ...subtleHintStyle, color: "rgba(226,232,240,0.72)" }}>
-                Upload existing view images here, or click a Views history item and the four images load into these slots automatically. Required order: Front, Left, Back, Right.
+                Upload existing view images here, or click an Images history item and the four images load into these slots automatically. Required order: Front, Left, Back, Right.
               </p>
             </div>
           </div>
@@ -922,9 +711,9 @@ const GeneratePanel = memo(({
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 18, border: hasGeneratedMultiviewTask ? "1px solid rgba(16,185,129,0.26)" : "1px solid rgba(245,158,11,0.22)", background: hasGeneratedMultiviewTask ? "rgba(16,185,129,0.07)" : "rgba(245,158,11,0.055)" }}>
                 <Check style={{ width: 15, height: 15, color: hasGeneratedMultiviewTask ? "#10B981" : "#F59E0B", flex: "0 0 auto" }} />
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em" }}>Views available</div>
+                  <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em" }}>Image set available</div>
                   <p style={subtleHintStyle}>
-                    If the slots are empty, the latest Views result is used automatically. If the slots contain images, those take priority.
+                    If the slots are empty, the latest generated view set is used automatically. If the slots contain images, those take priority.
                   </p>
                 </div>
               </div>
@@ -1045,7 +834,7 @@ const GeneratePanel = memo(({
                 onClick={() => setMultiImages([])}
                 style={{ background: "none", border: "none", color: "#ef4444", fontSize: 10, fontWeight: 700, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.05em", padding: "2px 6px" }}
               >
-                Clear all views
+                  Clear all slots
               </button>
             </div>
           )}
@@ -1109,13 +898,13 @@ const GeneratePanel = memo(({
         </div>
       )}
 
-      {/* ── Image tab (Unified Single/Batch) ── */}
-      {genTab === "image" && imageSourceMode === "upload" && (
+      {/* ── Image tab (upload-only source) ── */}
+      {genTab === "image" && (
         <div style={{ marginBottom: 14 }}>
           <div
-            className="tp-drop tp-upload-zone checker"
+            className={`tp-drop tp-upload-zone tp-responsive-image-upload-zone checker${hasBatchImages ? " has-images" : ""}${isMultiBatchUpload ? " is-multi-image" : ""}${isManyBatchUpload ? " is-many-images" : ""}`}
             style={{
-              width: "100%", aspectRatio: (batchImages?.length > 3) ? "1/1" : "1.6/1", borderRadius: 14,
+              width: "100%", aspectRatio: isManyBatchUpload ? "1/1" : "1.6/1", borderRadius: 14,
               border: "1.5px dashed rgba(255,255,255,0.08)",
               background: "rgba(255,255,255,0.02)",
               cursor: "pointer", overflow: "hidden", position: "relative",
@@ -1127,9 +916,9 @@ const GeneratePanel = memo(({
             onDrop={e => { e.preventDefault(); handleBatchFiles(e.dataTransfer.files); }}
           >
             {batchImages && batchImages.length > 0 ? (
-              <div style={{
+              <div className="tp-responsive-image-grid" style={{
                 display: "grid",
-                gridTemplateColumns: batchImages.length === 1 ? "1fr" : "repeat(auto-fill, minmax(80px, 1fr))",
+                gridTemplateColumns: batchImageCount === 1 ? "1fr" : "repeat(auto-fill, minmax(80px, 1fr))",
                 gap: 6, width: "100%", height: "100%", padding: 8, boxSizing: "border-box",
                 overflowY: "auto"
               }}>
@@ -1142,8 +931,10 @@ const GeneratePanel = memo(({
                   }}>
                     <img src={img.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     <button
+                      type="button"
+                      className="tp-thumb-remove-btn"
                       onClick={e => { e.stopPropagation(); setBatchImages(prev => prev.filter((_, idx) => idx !== i)); }}
-                      style={{ position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.7)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", backdropFilter: "blur(4px)" }}>
+                      style={{ position: "absolute", top: 4, right: 4, width: 34, height: 34, borderRadius: "50%", background: "rgba(0,0,0,0.7)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", backdropFilter: "blur(4px)" }}>
                       <X style={{ width: 10, height: 10 }} />
                     </button>
                     {!isUploadedItemReady(img) && (

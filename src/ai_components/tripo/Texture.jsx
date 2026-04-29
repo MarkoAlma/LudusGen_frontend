@@ -532,9 +532,11 @@ export function TexInputBox({
                 </div>
               )}
               <motion.button
+                type="button"
+                className="tp-thumb-remove-btn"
                 onClick={e => { e.stopPropagation(); handleImg(null); }}
                 whileTap={{ scale: 0.9 }}
-                style={{ position: "absolute", top: 8, right: 8, width: 26, height: 26, borderRadius: "50%", background: "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                style={{ position: "absolute", top: 8, right: 8, width: 34, height: 34, borderRadius: "50%", background: "rgba(0,0,0,0.7)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
               >
                 <X style={{ width: 11, height: 11, color: "#fff" }} />
               </motion.button>
@@ -577,7 +579,7 @@ export function TexInputBox({
               </motion.button>
             </div>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          <div className="tp-responsive-view-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6 }}>
           {VIEW_SLOTS.map((slot, i) => {
             const item = multiImages?.[i];
             const prev = item?.preview;
@@ -586,6 +588,7 @@ export function TexInputBox({
             return (
               <motion.div
                 key={slot}
+                className="tp-responsive-view-card"
                 whileTap={{ scale: 0.97 }}
                 onClick={() => {
                   const inp = document.createElement("input");
@@ -662,6 +665,7 @@ export function TexInputBox({
                     )}
                     <motion.button
                       type="button"
+                      className="tp-thumb-remove-btn"
                       whileTap={{ scale: 0.9 }}
                       onClick={e => {
                         e.stopPropagation();
@@ -671,7 +675,7 @@ export function TexInputBox({
                           return updated;
                         });
                       }}
-                      style={{ position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.72)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      style={{ position: "absolute", top: 5, right: 5, width: 34, height: 34, borderRadius: "50%", background: "rgba(0,0,0,0.72)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                     >
                       <X style={{ width: 10, height: 10, color: "#fff" }} />
                     </motion.button>
