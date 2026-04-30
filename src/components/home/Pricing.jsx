@@ -4,12 +4,8 @@ import { Check, Zap } from 'lucide-react';
 import Container from '../ui/Container';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { packages as creditPackages } from '../../data/packages';
-<<<<<<< HEAD
-import PricingBG from '../../assets/ludusgen_YZ6MbnvSCX5w1GewEIga.avif';
-=======
 import HomeBackdrop from './HomeBackdrop';
 import PricingBG from '../../assets/ludusgen_YyFNLFHgAq7XHYJrtMXZ.avif';
->>>>>>> 946a854dc804346fde6d3d4b8686910db85a9f33
 
 export default function Pricing() {
   const { user, setIsAuthOpen, setShowCreditTopup } = useContext(MyUserContext);

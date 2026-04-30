@@ -4,12 +4,8 @@ import { ArrowRight, Sparkles, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Container from '../ui/Container';
 import { MyUserContext } from '../../context/MyUserProvider';
-<<<<<<< HEAD
-import CTABG from '../../assets/ludusgen_WqbSkeD7zYPnJkdmdmtR.avif';
-=======
 import HomeBackdrop from './HomeBackdrop';
 import CTABG from '../../assets/ludusgen_XVCGbiWdME0qkh5OzkEb.avif';
->>>>>>> 946a854dc804346fde6d3d4b8686910db85a9f33
 
 export default function CTABanner() {
   const navigate = useNavigate();
