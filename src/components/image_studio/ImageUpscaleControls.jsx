@@ -86,7 +86,7 @@ export default function ImageUpscaleControls({
               <Maximize2 className="w-3.5 h-3.5" />
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.25em] leading-none mb-0.5">
+              <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.25em] leading-none mb-1">
                 Image upscale
               </p>
               <p className="text-[12px] font-black text-white truncate leading-none">

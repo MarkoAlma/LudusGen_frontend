@@ -21,7 +21,8 @@ const VOICE_WARMUP_MS = 4200;
 
 export default function ChatInput({
   input, setInput, isTyping, handleSend, handleStop,
-  attachedImage, setAttachedImage, textareaRef
+  attachedImage, setAttachedImage, textareaRef,
+  supportsImageInput = false
 }) {
   const fileInputRef = useRef(null);
   const inputRef = useRef(input);
@@ -49,6 +50,9 @@ export default function ChatInput({
   const isVoiceConnecting = voiceStatus === 'connecting';
   const isListening = voiceStatus === 'listening';
   const showVoiceLoader = isVoiceConnecting || isVoicePreparing;
+  const imageUploadTitle = supportsImageInput
+    ? 'Attach image'
+    : 'Images are not available for this model';
 
   const resizeTextarea = useCallback((target = textareaRef?.current) => {
     if (!target) return;
@@ -273,6 +277,10 @@ export default function ChatInput({
   };
 
   const handleImageSelect = (e) => {
+    if (!supportsImageInput) {
+      e.target.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -296,6 +304,7 @@ export default function ChatInput({
   };
 
   const processFile = (file) => {
+    if (!supportsImageInput) return;
     if (!file || !file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -307,6 +316,7 @@ export default function ChatInput({
   const handleDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!supportsImageInput) return;
     dragCounterRef.current++;
     if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
       setIsDragOver(true);
@@ -316,6 +326,7 @@ export default function ChatInput({
   const handleDragLeave = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!supportsImageInput) return;
     dragCounterRef.current--;
     if (dragCounterRef.current === 0) {
       setIsDragOver(false);
@@ -332,6 +343,7 @@ export default function ChatInput({
     e.stopPropagation();
     setIsDragOver(false);
     dragCounterRef.current = 0;
+    if (!supportsImageInput) return;
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
       processFile(files[0]);
@@ -419,11 +431,20 @@ export default function ChatInput({
 
           <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2 sm:p-2.5 rounded-2xl hover:bg-white/5 text-gray-500 hover:text-primary transition-all duration-500 group/icon"
-              title="Attach image"
+              type="button"
+              onClick={() => {
+                if (supportsImageInput) fileInputRef.current?.click();
+              }}
+              disabled={!supportsImageInput}
+              className={`p-2 sm:p-2.5 rounded-2xl transition-all duration-500 group/icon ${
+                supportsImageInput
+                  ? 'hover:bg-white/5 text-gray-500 hover:text-primary'
+                  : 'text-gray-700 opacity-45 cursor-not-allowed'
+              }`}
+              title={imageUploadTitle}
+              aria-label={imageUploadTitle}
             >
-              <ImagePlus className="w-4 h-4 sm:w-4.5 sm:h-4.5 group-hover/icon:scale-110 transition-transform" />
+              <ImagePlus className={`w-4 h-4 sm:w-4.5 sm:h-4.5 transition-transform ${supportsImageInput ? 'group-hover/icon:scale-110' : ''}`} />
             </button>
             <button
               type="button"
@@ -467,6 +488,7 @@ export default function ChatInput({
             onChange={handleImageSelect}
             className="hidden"
             accept="image/*"
+            disabled={!supportsImageInput}
           />
 
           <textarea

@@ -16,6 +16,12 @@ export default function Background() {
   const isProfile = location.pathname.startsWith('/profile');
   const isAccountPage = isSettings || isProfile;
   const isHome = location.pathname === '/';
+  const isMarketplace = location.pathname.startsWith('/marketplace');
+  const isLegal = location.pathname.startsWith('/legal');
+  const isAuthUtility =
+    location.pathname.startsWith('/reset-password') ||
+    location.pathname.startsWith('/verify-email');
+  const hasRouteImage = isHome || isForum || isAccountPage || isMarketplace || isLegal || isAuthUtility;
 
   const orbs = [
     { left: '10%', top: '20%', size: '40vw', color: 'rgba(124, 58, 237, 0.12)', duration: '20s', delay: '0s' },
@@ -59,7 +65,7 @@ export default function Background() {
         ))}
 
         {/* Route-specific background images */}
-        {!isWorkspace && (
+        {!isWorkspace && hasRouteImage && (
           <div
             className="absolute inset-0 transition-all duration-1000 ease-in-out"
             style={{

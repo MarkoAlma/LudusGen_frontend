@@ -6,6 +6,8 @@ import { ALL_MODELS } from '../../ai_components/models';
 import { createPortal } from 'react-dom';
 import { API_BASE } from '../../api/client';
 
+const MODEL_LIMIT_LABEL = "Global limit";
+
 export function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slotsAvailable }) {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -289,7 +291,7 @@ export default function ImageControls({
 
             {/* Model name */}
             <div className="flex-1 min-w-0 text-left">
-              <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.25em] leading-none mb-0.5">
+              <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.25em] leading-none mb-1">
                 {isEditMode ? 'Image editing' : 'Image generation'}
               </p>
               <p className="text-[12px] font-black text-white truncate leading-none">
@@ -342,13 +344,12 @@ export default function ImageControls({
                             boxShadow: isActive ? `0 0 8px ${model.color}80` : 'none',
                           }}
                         />
-                        {/* Name + provider */}
+                        {/* Name */}
                         <div className="flex-1 min-w-0">
                           <span className="text-[12px] font-bold text-white truncate block">{model.name}</span>
-                          <span className="text-[9px] text-zinc-600 font-medium">{model.provider}</span>
                         </div>
                         {/* Badge */}
-                        {model.badge && (
+                        {MODEL_LIMIT_LABEL && (
                           <span
                             className="text-[8px] font-bold px-2 py-0.5 rounded-md flex-shrink-0 border"
                             style={{
@@ -357,7 +358,7 @@ export default function ImageControls({
                               backgroundColor: isActive ? `${model.color}12` : 'rgba(255,255,255,0.02)',
                             }}
                           >
-                            {model.badge}
+                            {MODEL_LIMIT_LABEL}
                           </span>
                         )}
                         {isActive && (
@@ -411,8 +412,8 @@ export default function ImageControls({
                 value={negativePrompt}
                 onChange={(e) => setNegativePrompt(e.target.value)}
                 placeholder="What should the image avoid? (e.g. distorted limbs, text...)"
-                rows={1}
-                className="w-full bg-white/[0.01] border border-white/5 rounded-2xl p-4 text-[13px] text-zinc-500 placeholder-zinc-800 focus:outline-none focus:border-white/10 transition-all resize-none leading-relaxed"
+                rows={2}
+                className="w-full bg-white/[0.01] border border-white/5 rounded-2xl p-4 text-[13px] text-zinc-500 placeholder-zinc-800 focus:outline-none focus:border-white/10 transition-all resize-none leading-relaxed overflow-y-auto"
               />
             </div>
           )}

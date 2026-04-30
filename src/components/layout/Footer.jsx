@@ -9,10 +9,10 @@ const columns = [
   {
     title: 'Platform',
     links: [
-      { label: 'AI Chat Studio', to: '/chat' },
-      { label: 'Neural Images', to: '/chat?tab=image' },
-      { label: 'Audio Engine', to: '/chat?tab=audio' },
-      { label: '3D Forge Foundry', to: '/chat?tab=3d' },
+      { label: 'AI Code', to: '/chat' },
+      { label: 'AI Images', to: '/chat?tab=image' },
+      { label: 'AI Audio', to: '/chat?tab=audio' },
+      { label: 'AI 3D', to: '/chat?tab=3d' },
     ],
   },
   {
@@ -128,8 +128,8 @@ export default function Footer() {
             © {new Date().getFullYear()} LUDUSGEN. ALL RIGHTS RESERVED.
           </p>
           <div className="flex items-center gap-2">
-             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-             <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Legal updated {LEGAL_UPDATED}</span>
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Legal updated {LEGAL_UPDATED}</span>
           </div>
         </div>
       </Container>

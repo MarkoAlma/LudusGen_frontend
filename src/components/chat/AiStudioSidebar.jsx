@@ -2,7 +2,7 @@ import React, { useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wand2, ChevronDown, Zap, Sparkles, Home, ImageIcon, Pencil, User, Mic, Music } from 'lucide-react';
-import { MODEL_GROUPS, ALL_MODELS, getModel, findModelGroup } from '../../ai_components/models';
+import { MODEL_GROUPS, ALL_MODELS, getModel, findModelGroup, getAudioSpeechModels } from '../../ai_components/models';
 import bgChat from '../../assets/bg-chat.png';
 import bgCode from '../../assets/bg-code.png';
 import bgAudio from '../../assets/bg-audio.png';
@@ -18,13 +18,7 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 const IMAGE_GEN_MODELS = ALL_MODELS.filter(m => m.panelType === 'image' && !m.needsInputImage);
 // Kép szerkesztő modellek (needsInputImage: true)
 const IMAGE_EDIT_MODELS = ALL_MODELS.filter(m => m.panelType === 'image' && m.needsInputImage);
-const AUDIO_SPEECH_MODELS = ALL_MODELS
-  .filter(m => m.panelType === 'audio' && m.audioType === 'tts')
-  .sort((a, b) => {
-    if (a.id === 'nvidia_magpie_tts') return -1;
-    if (b.id === 'nvidia_magpie_tts') return 1;
-    return 0;
-  });
+const AUDIO_SPEECH_MODELS = getAudioSpeechModels();
 const AUDIO_MUSIC_MODELS = ALL_MODELS.filter(m => m.panelType === 'audio' && m.audioType === 'music');
 
 const CATEGORY_BGS = {
@@ -69,8 +63,8 @@ export default function AiStudioSidebar({
   const selectedModel = getModel(selectedAI);
   const { user, setShowCreditTopup } = useContext(MyUserContext);
   const { clearSeenCompletedJobs } = useJobs();
-  const isMobileViewport = useMediaQuery('(max-width: 767px)');
-  const useMobileHeader = Boolean(isMobile || isMobileViewport);
+  const isCompactHeaderViewport = useMediaQuery('(max-width: 1279px)');
+  const useMobileHeader = Boolean(isMobile || isCompactHeaderViewport);
   const activeColor = selectedModel?.color || '#8b5cf6';
   const currentGroupId = findModelGroup(selectedAI) || 'chat';
   const currentBg = CATEGORY_BGS[currentGroupId] || bgChat;

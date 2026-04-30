@@ -20,8 +20,31 @@ import { API_BASE } from '../../api/client';
 import toast from 'react-hot-toast';
 import { createPortal } from 'react-dom';
 
+function getGalleryDownloadUrl(img) {
+  return img?.downloadUrl || img?.download_url || img?.fullUrl || img?.full_url || img?.url || '';
+}
+
+function getGalleryFilename(img) {
+  return `ludusgen_${img?.id || Date.now()}.png`;
+}
+
+function triggerHrefDownload(href, filename) {
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function triggerBlobDownload(blob, filename) {
+  const objectUrl = URL.createObjectURL(blob);
+  triggerHrefDownload(objectUrl, filename);
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
 // ── Lightbox Modal ──────────────────────────────────────────────────────────────
-function Lightbox({ images, startIndex, onClose }) {
+function Lightbox({ images, startIndex, onClose, onDownload, downloadingId }) {
   const [current, setCurrent] = useState(startIndex);
   const [imgLoading, setImgLoading] = useState(true);
 
@@ -41,6 +64,8 @@ function Lightbox({ images, startIndex, onClose }) {
   }, [current]);
 
   const img = images[current];
+  const isDownloading = downloadingId === (img?.id || getGalleryDownloadUrl(img));
+  const downloadDisabled = Boolean(downloadingId);
   const [activePrompt, setActivePrompt] = useState(img.prompt);
 
   // Sync prompt only when loading is finished
@@ -112,7 +137,7 @@ function Lightbox({ images, startIndex, onClose }) {
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="absolute top-8 left-1/2 -translate-x-1/2 max-w-xl w-[90%] p-4 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 text-center shadow-2xl pointer-events-none z-30"
+            className="absolute left-3 right-[4.5rem] top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-30 rounded-2xl border border-white/10 bg-black/40 p-3 text-left shadow-2xl backdrop-blur-xl pointer-events-none sm:left-1/2 sm:right-auto sm:top-8 sm:w-[90%] sm:max-w-xl sm:-translate-x-1/2 sm:p-4 sm:text-center"
           >
             <p className="text-white text-[10px] font-medium leading-relaxed uppercase tracking-[0.15em] italic opacity-80 line-clamp-2">
               {activePrompt}
@@ -121,7 +146,7 @@ function Lightbox({ images, startIndex, onClose }) {
         )}
 
         {/* Controls Overlay Bottom */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 px-6 py-4 rounded-[2rem] bg-black/60 backdrop-blur-2xl border border-white/10 shadow-2xl z-40">
+        <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+1rem)] left-1/2 z-40 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 flex-nowrap items-center gap-2 rounded-[2rem] border border-white/10 bg-black/60 px-3 py-2 shadow-2xl backdrop-blur-2xl sm:bottom-8 sm:gap-4 sm:px-6 sm:py-4">
           {images.length > 1 && (
             <button
               onClick={() => setCurrent((c) => (c - 1 + images.length) % images.length)}
@@ -133,23 +158,19 @@ function Lightbox({ images, startIndex, onClose }) {
 
           <button
             onClick={() => {
-              const a = document.createElement('a');
-              a.href = img.downloadUrl;
-              a.download = `ludusgen_${img.id}.png`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
+              if (!downloadDisabled) onDownload(img);
             }}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 transition-all"
-            title="Download full image"
+            disabled={downloadDisabled}
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-white hover:bg-white/10 transition-all disabled:cursor-wait disabled:opacity-60"
+            title={isDownloading ? 'Downloading...' : 'Download full image'}
           >
-            <Download className="w-5 h-5" />
+            {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
           </button>
 
           {images.length > 1 && (
             <>
-              <span className="text-white/40 text-[11px] font-black tracking-[0.3em]">
-                {current + 1} / {images.length}
+              <span className="min-w-[3rem] whitespace-nowrap text-center text-[11px] font-black tracking-[0.18em] text-white/40 tabular-nums">
+                {current + 1}/{images.length}
               </span>
               <button
                 onClick={() => setCurrent((c) => (c + 1) % images.length)}
@@ -163,10 +184,10 @@ function Lightbox({ images, startIndex, onClose }) {
       </motion.div>
 
       <button
-        className="absolute top-6 right-6 w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 transition-all"
+        className="absolute right-3 top-[calc(env(safe-area-inset-top,0px)+0.75rem)] z-50 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition-all hover:bg-white/10 sm:right-6 sm:top-6 sm:h-12 sm:w-12 sm:rounded-2xl"
         onClick={onClose}
       >
-        <X className="w-6 h-6" />
+        <X className="h-5 w-5 sm:h-6 sm:w-6" />
       </button>
     </motion.div>,
     document.body
@@ -246,6 +267,7 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
   const [deletingAll, setDeletingAll] = useState(false);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, targetId: null });
   const [lightboxIdx, setLightboxIdx] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
 
   const fetchGallery = async () => {
     try {
@@ -270,6 +292,55 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
   const handleDeleteStart = (e, id) => {
     e.stopPropagation();
     setConfirmModal({ isOpen: true, type: 'single', targetId: id });
+  };
+
+  const handleDownloadImage = async (img) => {
+    const url = getGalleryDownloadUrl(img);
+    const nextDownloadingId = img?.id || url;
+    if (!url || downloadingId) return;
+
+    setDownloadingId(nextDownloadingId);
+
+    try {
+      const filename = getGalleryFilename(img);
+
+      try {
+        if (url.startsWith('data:') || url.startsWith('blob:')) {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          triggerBlobDownload(blob, filename);
+          return;
+        }
+
+        if (typeof getIdToken === 'function') {
+          const token = await getIdToken();
+          const response = await fetch(`${API_BASE}/api/image/download`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              imageUrl: url,
+              imageKey: img?.fullKey || img?.full_key || null,
+              filename,
+            }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const blob = await response.blob();
+          triggerBlobDownload(blob, filename);
+          return;
+        }
+      } catch (err) {
+        console.warn('Gallery image download proxy failed, falling back to direct download:', err);
+      }
+
+      triggerHrefDownload(url, filename);
+    } catch (err) {
+      toast.error(err.message || 'Download failed');
+    } finally {
+      setDownloadingId((current) => (current === nextDownloadingId ? null : current));
+    }
   };
 
   const handleDelete = async () => {
@@ -437,6 +508,8 @@ export default function ImageGallery({ getIdToken, onUsePrompt }) {
           images={images}
           startIndex={lightboxIdx}
           onClose={() => setLightboxIdx(null)}
+          onDownload={handleDownloadImage}
+          downloadingId={downloadingId}
         />
       )}
 

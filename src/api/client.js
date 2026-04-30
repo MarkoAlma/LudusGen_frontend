@@ -118,6 +118,12 @@ export const ENDPOINTS = {
   MARKETPLACE_DOWNLOAD: (id) => `/api/marketplace/assets/${id}/download`,
   MARKETPLACE_LIBRARY: '/api/marketplace/me/library',
 
+  // Reports / Admin
+  REPORTS: '/api/reports',
+  ADMIN_REPORTS: '/api/admin/reports',
+  ADMIN_REPORT: (id) => `/api/admin/reports/${id}`,
+  ADMIN_REPORT_ACTION: (id) => `/api/admin/reports/${id}/action`,
+
   // Meshy
   MESHY_TASK: (type, id) => `/api/meshy/task/${type}/${id}`,
   MESHY_TEXT_TO_3D: '/api/meshy/text-to-3d',

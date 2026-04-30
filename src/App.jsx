@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
 import PageTransition from './components/layout/PageTransition';
@@ -23,6 +23,34 @@ import NotFound from './pages/NotFound';
 import Legal from './pages/Legal';
 import { AnimatePresence } from 'framer-motion';
 import CreditTopup from './components/CreditTopup';
+
+function ScrollToTopOnRouteChange() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const originalScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+
+    return () => {
+      window.history.scrollRestoration = originalScrollRestoration;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    scrollToTop();
+    const frameId = window.requestAnimationFrame(scrollToTop);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [location.key, location.pathname, location.search]);
+
+  return null;
+}
 
 function App() {
   const { showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled, showCreditTopup, setShowCreditTopup } = useContext(MyUserContext);
@@ -63,6 +91,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-black text-white relative">
+      <ScrollToTopOnRouteChange />
       <AppLayout>
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname.split('/')[1] || '/'}>
@@ -79,6 +108,11 @@ function App() {
             <Route path="/verify-email" element={<PageTransition><VerifyEmail /></PageTransition>} />
             <Route path="/forum/*" element={<PageTransition><Forum /></PageTransition>} />
             <Route path="/marketplace" element={<PageTransition><Marketplace /></PageTransition>} />
+            <Route path="/admin" element={
+              <PageTransition>
+                <ProtectedRoute><LudusGenAdmin /></ProtectedRoute>
+              </PageTransition>
+            } />
             <Route path="/legal/:slug" element={<PageTransition><Legal /></PageTransition>} />
             <Route path="/profile" element={
               <PageTransition>
@@ -95,9 +129,9 @@ function App() {
         </AnimatePresence>
       </AppLayout>
 
-      <LudusGenAdmin />
       <AuthModal isOpen={isAuthOpen} onClose={closeAuth} />
       <CreditTopup isOpen={showCreditTopup} onClose={() => setShowCreditTopup(false)} />
+      <Toaster position="top-center" toastOptions={{ style: { background: '#15121f', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' } }} />
 
       {msg && <MyToastify {...msg} />}
     </div>

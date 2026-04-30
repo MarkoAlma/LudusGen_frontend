@@ -230,15 +230,19 @@ Output rules:
 - Do not reference copyrighted songs or reuse famous lyrics.
 `.trim();
 const DEAPI_MUSIC_MODEL_OPTIONS = [
-  { slug: "AceStep_1_5_Base", name: "Ace Step 1.5 Base" },
+  { slug: "AceStep_1_5_XL_Turbo_INT8", name: "ACE-Step 1.5 XL Turbo INT8" },
+  { slug: "AceStep_1_5_Base", name: "ACE-Step 1.5 Base" },
 ];
 const normalizeDeapiModelSlug = (slug) => String(slug || "").trim().toLowerCase();
 const findSupportedDeapiModelOption = (slug) => {
   const normalizedSlug = normalizeDeapiModelSlug(slug);
   return DEAPI_MUSIC_MODEL_OPTIONS.find((model) => normalizeDeapiModelSlug(model.slug) === normalizedSlug) || null;
 };
-const DEAPI_TURBO_INT8_MODEL_SLUG = "acestep_1_5_xl_turbo_int8";
-const isDeapiTurboInt8ModelSlug = (slug) => normalizeDeapiModelSlug(slug) === DEAPI_TURBO_INT8_MODEL_SLUG;
+const DEAPI_TURBO_MODEL_SLUGS = new Set(["acestep_1_5_xl_turbo_int8"]);
+const isDeapiTurboInt8ModelSlug = (slug) => {
+  const normalizedSlug = normalizeDeapiModelSlug(slug);
+  return DEAPI_TURBO_MODEL_SLUGS.has(normalizedSlug) || normalizedSlug.includes("turbo");
+};
 const getDeapiLimitNumber = (limits, key, fallback) => {
   const value = Number(limits?.[key]);
   return Number.isFinite(value) ? value : fallback;
@@ -297,7 +301,7 @@ const DEAPI_MUSIC_DEFAULTS = {
   bpm: "",
   keyscale: "",
   timesignature: "",
-  vocalLanguage: "unknown",
+  vocalLanguage: "",
 };
 
 const getFileExtension = (filename = "") => {
@@ -894,7 +898,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         bpm: deapiBpm === "" ? null : Number(deapiBpm),
         keyscale: deapiKeyscale.trim() || null,
         timesignature: deapiTimesignature || null,
-        vocal_language: "unknown",
+        vocal_language: deapiVocalLanguage.trim() || null,
         model_slug: deapiModelSlug,
       }, null, 2),
       temperature: 0.7,
@@ -1449,7 +1453,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
             bpm: safeBpm === "" ? null : Number(safeBpm),
             keyscale: deapiKeyscale.trim() || null,
             timesignature: deapiTimesignature ? Number(deapiTimesignature) : null,
-            vocal_language: "unknown",
+            vocal_language: deapiVocalLanguage.trim() || null,
             jobId,
           };
           Object.entries(deapiPayload).forEach(([key, value]) => {

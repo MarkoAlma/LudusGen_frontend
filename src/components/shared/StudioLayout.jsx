@@ -126,6 +126,10 @@ export default function StudioLayout({
     leftSecondarySidebar ? 'L2' : null,
     rightSidebar ? 'R' : null,
   ].filter(Boolean);
+  const hasVisibleOverlayPanel =
+    (mobileL1Open && leftSidebar) ||
+    (mobileL2Open && leftSecondarySidebar) ||
+    (mobileROpen && rightSidebar);
 
   // ── Transform hooks (Must be top-level for React) ────────────────────────
   const desktopLX = useTransform(smoothL, v => (v <= 0.5 ? -1000 : 0));
@@ -202,7 +206,7 @@ export default function StudioLayout({
 
         {/* ── Overlay backdrops (mobile/tablet) ────────────────────────── */}
         <AnimatePresence>
-          {activeOverlay && (mobileL1Open || mobileL2Open || mobileROpen) && (
+          {activeOverlay && hasVisibleOverlayPanel && (
             <motion.div
               className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm"
               initial={{ opacity: 0 }}

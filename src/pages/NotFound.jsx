@@ -8,7 +8,7 @@ export default function NotFound() {
   const navigate = useNavigate();
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#03000a] px-6 py-32 text-white">
+    <main className="relative -mt-20 flex min-h-screen items-center justify-center overflow-hidden bg-[#03000a] px-6 py-32 text-white md:-mt-24">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(138,43,226,0.22),transparent_48%),radial-gradient(circle_at_72%_68%,rgba(34,211,238,0.12),transparent_34%)]" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-[#03000a]/30 to-[#03000a]" />

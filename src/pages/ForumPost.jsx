@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { MyUserContext } from "../context/MyUserProvider";
 import { auth, db } from "../firebase/firebaseApp";
 import { motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 import {
   collection, addDoc, getDocs, deleteDoc, doc, updateDoc,
   query, orderBy, serverTimestamp, getDoc, onSnapshot, where, limit, Timestamp, writeBatch,
@@ -27,6 +28,7 @@ import {
   getProfileDisplayName,
   getProfileInitial,
 } from "../utils/communityProfiles";
+import { REPORT_REASONS, submitContentReport } from "../utils/reports";
 
 const CATEGORIES = {
   code: { label: "Code AI", color: "#34d399", icon: Code },
@@ -50,6 +52,11 @@ const CategoryLabel = ({ category, className = "" }) => (
 const ADMIN_UIDS = ["T7fU9Zp3N5M9wz2G8xQ4L1rV6bY2"];
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const HIDDEN_CONTENT_STATUSES = new Set(["hidden", "deleted", "removed"]);
+const isVisibleComment = (comment) => {
+  if (!comment || comment.isHidden === true || comment.deletedAt) return false;
+  return !HIDDEN_CONTENT_STATUSES.has(String(comment.status || "").toLowerCase());
+};
 
 // ─── Related topics fallback ─────────────────────────────────
 const RELATED_MOCK = [
@@ -384,22 +391,44 @@ const CommentEditor = ({ placeholder, onSubmit, onCancel, color, isReply = false
 };
 
 // ─── Report Modal ─────────────────────────────────────────────────
-const ReportModal = ({ isOpen, onClose }) => {
+const ReportModal = ({ isOpen, onClose, onSubmit, title = "Report" }) => {
   const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setReason("");
+      setDetails("");
+      setSubmitting(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
-  const reasons = ["Spam or advertising", "Abusive or harassing content", "Misleading information", "Copyright violation", "Other"];
+
+  const handleSubmit = async () => {
+    if (!reason || submitting) return;
+    setSubmitting(true);
+    try {
+      await onSubmit?.({ reason, details });
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70" onClick={submitting ? undefined : onClose} />
       <div className="relative w-full max-w-sm rounded-2xl overflow-hidden"
         style={{ background: "#13111c", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-          <h3 className="text-white font-bold text-sm flex items-center gap-2"><Flag className="w-4 h-4 text-red-400" /> Report</h3>
-          <button onClick={onClose} className="cursor-pointer text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all"><X className="w-4 h-4" /></button>
+          <h3 className="text-white font-bold text-sm flex items-center gap-2"><Flag className="w-4 h-4 text-red-400" /> {title}</h3>
+          <button onClick={onClose} disabled={submitting} className="cursor-pointer text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-all disabled:opacity-40"><X className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4 space-y-2">
           <p className="text-gray-400 text-xs mb-3">Why do you want to report this content?</p>
-          {reasons.map(r => (
+          {REPORT_REASONS.map(r => (
             <label key={r} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all"
               style={{ background: reason === r ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.03)", border: `1px solid ${reason === r ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.06)"}` }}>
               <div className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
@@ -410,14 +439,21 @@ const ReportModal = ({ isOpen, onClose }) => {
               <span className="text-xs" style={{ color: reason === r ? "#fca5a5" : "#9ca3af" }}>{r}</span>
             </label>
           ))}
+          <textarea
+            value={details}
+            onChange={(event) => setDetails(event.target.value)}
+            rows={3}
+            className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm font-medium text-white outline-none focus:border-red-400/40"
+            placeholder="Optional context"
+          />
         </div>
         <div className="px-5 py-4 border-t border-white/5 flex gap-2">
-          <button onClick={onClose} className="cursor-pointer flex-1 py-2 rounded-xl text-sm text-gray-400 hover:text-white transition-all"
+          <button onClick={onClose} disabled={submitting} className="cursor-pointer flex-1 py-2 rounded-xl text-sm text-gray-400 hover:text-white transition-all disabled:opacity-40"
             style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>Cancel</button>
-          <button disabled={!reason} onClick={onClose}
+          <button disabled={!reason || submitting} onClick={handleSubmit}
             className="cursor-pointer flex-1 py-2 rounded-xl text-sm text-white font-semibold transition-all disabled:opacity-30"
-            style={{ background: "linear-gradient(135deg,#dc2626,#4c1d95)" }}>
-            Send report
+          style={{ background: "linear-gradient(135deg,#dc2626,#4c1d95)" }}>
+            {submitting ? "Sending..." : "Send report"}
           </button>
         </div>
       </div>
@@ -426,7 +462,7 @@ const ReportModal = ({ isOpen, onClose }) => {
 };
 
 // ─── Comment card ─────────────────────────────────────────────────
-const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeComment, currentUserId }) => {
+const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeComment, onReportComment, currentUserId }) => {
   const [showReplies, setShowReplies] = useState(true);
   const [replyOpen, setReplyOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -596,13 +632,19 @@ const CommentCard = ({ comment, color, isReply = false, onAddReply, onLikeCommen
               color={color}
               isReply
               onLikeComment={onLikeComment}
+              onReportComment={onReportComment}
               currentUserId={currentUserId}
             />
           ))}
         </div>
       )}
 
-      <ReportModal isOpen={showReport} onClose={() => setShowReport(false)} />
+      <ReportModal
+        isOpen={showReport}
+        onClose={() => setShowReport(false)}
+        title="Report comment"
+        onSubmit={(payload) => onReportComment?.(comment, payload)}
+      />
     </div>
   );
 };
@@ -917,6 +959,7 @@ export default function ForumPost({
   const [authorUserDoc, setAuthorUserDoc] = useState(null);
   const [commentAuthorProfiles, setCommentAuthorProfiles] = useState({});
   const [mobilePostSidebarOpen, setMobilePostSidebarOpen] = useState(false);
+  const [showPostReport, setShowPostReport] = useState(false);
 
 
   const { user: globalUser, setIsAuthOpen } = useContext(MyUserContext);
@@ -1062,6 +1105,56 @@ export default function ForumPost({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleReportPost = async ({ reason, details }) => {
+    if (!requireCommunityAuth()) throw new Error("Sign in to submit a report");
+    try {
+      await submitContentReport({
+        sourceType: "forum_post",
+        targetId: String(post.id),
+        targetPath: post.slug && post.category ? `/forum/${post.category}/${post.slug}` : window.location.pathname,
+        targetTitle: post.title,
+        targetOwnerId: post.authorId || "",
+        reason,
+        details,
+        metadata: {
+          category: post.category,
+          author: displayPost.author,
+          preview: String(post.content || post.preview || "").slice(0, 600),
+        },
+      });
+      toast.success("Report sent");
+    } catch (err) {
+      toast.error(err.message || "Failed to send report");
+      throw err;
+    }
+  };
+
+  const handleReportComment = async (comment, { reason, details }) => {
+    if (!requireCommunityAuth()) throw new Error("Sign in to submit a report");
+    try {
+      await submitContentReport({
+        sourceType: "forum_comment",
+        targetId: String(comment.id),
+        targetPath: `${post.slug && post.category ? `/forum/${post.category}/${post.slug}` : window.location.pathname}#comment-${comment.id}`,
+        targetTitle: `${post.title} - comment by ${comment.author}`,
+        targetOwnerId: comment.authorId || "",
+        reason,
+        details,
+        metadata: {
+          postId: String(post.id),
+          postTitle: post.title,
+          category: post.category,
+          parentId: comment.parentId || "",
+          comment: String(comment.content || "").slice(0, 600),
+        },
+      });
+      toast.success("Report sent");
+    } catch (err) {
+      toast.error(err.message || "Failed to send report");
+      throw err;
+    }
+  };
+
   // ── Értesítés létrehozása ──────────────────────────────────────────
   const createNotification = useCallback(async (recipientId, type, text, extraData = {}) => {
     if (!recipientId || recipientId === currentUserId) return; // ne értesítsd magad
@@ -1145,7 +1238,7 @@ export default function ForumPost({
         ...d.data(),
         id: d.id,
         time: formatFirebaseTime(d.data().createdAt)
-      }));
+      })).filter(isVisibleComment);
 
       // Csoportosítás parentId alapján
       const rootComments = allComms.filter(c => !c.parentId);
@@ -1459,6 +1552,13 @@ export default function ForumPost({
           onCancel={() => setShowDeleteConfirm(false)}
         />
 
+        <ReportModal
+          isOpen={showPostReport}
+          onClose={() => setShowPostReport(false)}
+          title="Report post"
+          onSubmit={handleReportPost}
+        />
+
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }} className="relative z-10 max-w-[1200px] mx-auto px-3 sm:px-4 pt-4 sm:pt-6 pb-10 overflow-x-hidden">
           {/* ── Breadcrumb ── */}
           <GlassCard className="mb-3 sm:mb-4" style={{ background: "rgba(20, 18, 32, 0.7)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.12)" }}>
@@ -1537,6 +1637,11 @@ export default function ForumPost({
                         style={{ color: copied ? "#4ade80" : "#6b7280" }}>
                         {copied ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
                         <span className="hidden sm:inline">{copied ? "Copied!" : "Share"}</span>
+                      </button>
+                      <button onClick={() => { if (!requireCommunityAuth()) return; setShowPostReport(true); }} className="cursor-pointer flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs transition-all hover:bg-red-400/10"
+                        style={{ color: "#f87171" }}>
+                        <Flag className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Report</span>
                       </button>
                     </div>
                   </div>
@@ -1655,6 +1760,7 @@ export default function ForumPost({
                         color={color}
                         onAddReply={handleAddReply}
                         onLikeComment={handleLikeComment}
+                        onReportComment={handleReportComment}
                         currentUserId={currentUserId}
                       />
                     ))

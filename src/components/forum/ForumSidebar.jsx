@@ -6,7 +6,7 @@ const CATEGORIES = [
   { id: "code", label: "Code AI", color: "#34d399", threads: 893, online: 31, description: "GitHub Copilot, Cursor...", icon: Code },
   { id: "image", label: "Image AI", color: "#f472b6", threads: 2156, online: 89, description: "Midjourney, DALL-E...", icon: Image },
   { id: "audio", label: "Audio AI", color: "#fb923c", threads: 612, online: 24, description: "Suno, Udio, ElevenLabs...", icon: Music },
-  { id: "threed", label: "3D AI", color: "#38bdf8", threads: 296, online: 12, description: "Meshy, Tripo3D...", icon: Box },
+  { id: "threed", label: "3D AI", color: "#38bdf8", threads: 296, online: 12, description: "Tripo3D, Trellis...", icon: Box },
 ];
 
 const GlassPanel = ({ children, className = "" }) => (

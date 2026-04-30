@@ -31,6 +31,7 @@ export default function Navbar() {
   const { setIsAuthOpen, showNavbar, user, logoutUser, setShowCreditTopup } = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
+  const isLudusgenAdmin = typeof user?.email === 'string' && user.email.trim().toLowerCase() === 'ludusgen@gmail.com';
   const previousUserIdRef = useRef(user?.uid ?? null);
   const suppressUserMenuUntilRef = useRef(0);
 
@@ -112,7 +113,7 @@ export default function Navbar() {
   // Close mobile menu on resize to desktop
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768) {
+      if (window.innerWidth >= 1024) {
         setMobileMenuOpen(false);
       }
     };
@@ -148,7 +149,7 @@ export default function Navbar() {
             </Link>
 
             {/* Desktop Nav */}
-            <div className="hidden md:flex items-center gap-1">
+            <div className="hidden lg:flex items-center gap-1">
               <NavLink to="/" active={location.pathname === '/'}>Home</NavLink>
 
               <div
@@ -251,7 +252,7 @@ export default function Navbar() {
                           initial={{ opacity: 0, y: -8, scale: 0.97 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                          className="absolute right-0 top-[calc(100%+12px)] w-64 rounded-2xl bg-[#16141c] border border-white/10 shadow-2xl overflow-hidden"
+                          className="fixed left-3 right-3 top-[4.75rem] rounded-2xl bg-[#16141c] border border-white/10 shadow-2xl overflow-hidden sm:absolute sm:left-auto sm:right-0 sm:top-[calc(100%+12px)] sm:w-64"
                           style={{ zIndex: 9999 }}
                         >
                           <div className="p-4 border-b border-white/5">
@@ -273,6 +274,14 @@ export default function Navbar() {
                             </div>
                           </div>
                           <div className="p-2">
+                            {isLudusgenAdmin && (
+                              <button
+                                onClick={() => { setUserDropdownOpen(false); navigate("/admin"); }}
+                                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all text-xs font-bold"
+                              >
+                                <LayoutDashboard className="w-4 h-4" /> Admin Reports
+                              </button>
+                            )}
                             <button
                               onClick={() => { setUserDropdownOpen(false); navigate("/profile"); }}
                               className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all text-xs font-bold"
@@ -303,7 +312,7 @@ export default function Navbar() {
               {/* Mobile Menu Toggle */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 text-white hover:bg-white/5 rounded-xl transition-all"
+                className="lg:hidden p-2 text-white hover:bg-white/5 rounded-xl transition-all"
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
@@ -352,6 +361,9 @@ export default function Navbar() {
                   <MobileNavItem to="/chat" icon={Sparkles} label="AI Studio" onClick={() => setMobileMenuOpen(false)} />
                   <MobileNavItem to="/marketplace" icon={ShoppingBag} label="Marketplace" onClick={() => setMobileMenuOpen(false)} />
                   <MobileNavItem to="/forum" icon={Users} label="Community" onClick={() => setMobileMenuOpen(false)} />
+                  {isLudusgenAdmin && (
+                    <MobileNavItem to="/admin" icon={LayoutDashboard} label="Admin Reports" onClick={() => setMobileMenuOpen(false)} />
+                  )}
                 </div>
 
                 {user ? (

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useContext, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence, useSpring } from "framer-motion";
-import { ALL_MODELS, getModel, findModelGroup, findModelCat } from "./models";
+import { ALL_MODELS, getModel, findModelGroup, findModelCat, getAudioSpeechModels } from "./models";
 import ChatPanel from "./ChatPanel";
 import ImagePanel from "./ImagePanel";
 import AudioPanel from "./AudioPanel";
@@ -10,6 +10,7 @@ import AudioPanel from "./AudioPanel";
 import TrellisPanel from "./trellis/TrellisPanel";
 import TripoPanel from "./tripo/TripoPanel";
 import { MyUserContext } from "../context/MyUserProvider";
+import { useStudioPanels } from "../context/StudioPanelContext";
 import AiStudioSidebar from "../components/chat/AiStudioSidebar";
 import BackgroundFilters from "../components/chat/BackgroundFilters";
 
@@ -21,9 +22,9 @@ const PANEL_TYPE_TO_TAB = {
   chat: 'chat',
   code: 'chat',
   tripo: '3d',
-  threed: '3d',
   trellis: '3d',
-  meshy: '3d',
+  // threed: '3d',
+  // meshy: '3d',
   image: 'image',
   audio: 'audio',
   music: 'music',
@@ -31,19 +32,20 @@ const PANEL_TYPE_TO_TAB = {
 
 export default function AIChat({ user, getIdToken }) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isMobile: isStudioMobile, setPanelOpen: setStudioPanelOpen, setPanelsOpen: setStudioPanelsOpen } = useStudioPanels();
   const getTabForModel = useCallback((model) => {
     if (!model) return "chat";
     if (model.panelType === "image") return "image";
     if (model.panelType === "audio") return "audio";
-    if (["threed", "trellis", "tripo", "meshy"].includes(model.panelType)) return "3d";
+    if (["trellis", "tripo"].includes(model.panelType)) return "3d";
     return "chat";
   }, []);
 
   const getFirstModelForTab = useCallback((tab) => {
+    if (tab === "audio") return getAudioSpeechModels()[0] || ALL_MODELS.find(m => m.panelType === "audio") || ALL_MODELS[0];
     return ALL_MODELS.find(m => {
       if (tab === "image") return m.panelType === "image";
-      if (tab === "audio") return m.panelType === "audio";
-      if (tab === "3d") return ["threed", "trellis", "tripo", "meshy"].includes(m.panelType);
+      if (tab === "3d") return ["trellis", "tripo"].includes(m.panelType);
       return m.panelType === "chat";
     }) || ALL_MODELS[0];
   }, []);
@@ -113,12 +115,18 @@ export default function AIChat({ user, getIdToken }) {
 
     if (targetModelId !== selectedAI) {
       setSelectedAI(targetModelId);
+      const targetModel = getModel(targetModelId);
+      if (isStudioMobile && (targetModel?.panelType === "image" || targetModel?.panelType === "audio")) {
+        setStudioPanelOpen("L2", true);
+      } else if (isStudioMobile && targetModel?.panelType === "chat") {
+        setStudioPanelsOpen({ L1: false, L2: false, R: false });
+      }
       const gId = findModelGroup(targetModelId);
       const cId = findModelCat(targetModelId);
       if (gId) setOpenGroups(prev => new Set([...prev, gId]));
       if (cId) setOpenCats(prev => new Set([...prev, cId]));
     }
-  }, [searchParams, resolveTargetModel, selectedAI]);
+  }, [searchParams, resolveTargetModel, selectedAI, isStudioMobile, setStudioPanelOpen, setStudioPanelsOpen]);
 
   const selectedModel = getModel(selectedAI) || ALL_MODELS[0];
   activeChatSessionIdRef.current = activeChatSessionId;
@@ -206,6 +214,11 @@ export default function AIChat({ user, getIdToken }) {
 
     // Update state
     setSelectedAI(modelId);
+    if (isStudioMobile && (newModel?.panelType === "image" || newModel?.panelType === "audio")) {
+      setStudioPanelOpen("L2", true);
+    } else if (isStudioMobile && newModel?.panelType === "chat") {
+      setStudioPanelsOpen({ L1: false, L2: false, R: false });
+    }
 
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
@@ -222,7 +235,7 @@ export default function AIChat({ user, getIdToken }) {
     if (cId) setOpenCats((p) => new Set([...p, cId]));
     setSidebarOpen(false);
     setModelDropdownOpen(false);
-  }, [getIdToken, setSearchParams, selectedAI]);
+  }, [getIdToken, isStudioMobile, setSearchParams, selectedAI, setStudioPanelOpen, setStudioPanelsOpen]);
 
   const toggleGroup = useCallback((id) => {
     setOpenGroups((p) => {
@@ -335,7 +348,7 @@ export default function AIChat({ user, getIdToken }) {
     }
   };
 
-  const is3D = ["threed", "trellis", "tripo"].includes(selectedModel?.panelType);
+  const is3D = ["trellis", "tripo"].includes(selectedModel?.panelType);
 
   return (
     <div className="flex w-full h-full bg-[#0a0a0f] overflow-hidden relative z-10 flex-1">
