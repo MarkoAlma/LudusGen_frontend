@@ -1,8 +1,4 @@
-# LudusGen vizsgaremek dokumentáció
-
-Ez a dokumentáció a LudusGen projekt technikusi vizsgaremekhez készült részletes leírása. A célja, hogy a javító tanár egy helyen lássa az alkalmazás célját, funkcióit, reszponzív működését, adattárolását, backend API-jait és a tesztelés bizonyítékait.
-
-Biztonsági okból a dokumentáció nem tartalmaz valós belépési adatokat, jelszavakat, API kulcsokat vagy személyes felhasználói előzményeket. A képernyőképeken az érzékeny részek szükség esetén maszkolva vannak.
+# LudusGen dokumentáció
 
 A képernyőképek tényleges fájlokként a `docs/screenshots` mappában vannak. A README Markdown képbeágyazást használ, ezért GitHubon, VS Code Markdown Preview-ban vagy Markdownból készített PDF exportban a képek nem csak linkként, hanem látható képként jelennek meg.
 
@@ -849,7 +845,3 @@ npm run test:run
 | `docs/screenshots/frontend-build.png` | Sikeres frontend build bizonyítéka. |
 | `docs/screenshots/tests-frontend.png` | Sikeres frontend tesztek bizonyítéka. |
 | `docs/screenshots/tests-backend.png` | Sikeres backend tesztek bizonyítéka. |
-
-## Összegzés
-
-A LudusGen egy teljes értékű, vizsgaremekként bemutatható webalkalmazás: saját frontenddel, backenddel, adattárolással, hitelesítéssel, kreditlogikával, AI szolgáltató integrációkkal, piactérrel, fórummal, reszponzív felülettel és dokumentált teszteléssel. A dokumentáció a megadott a)-f) követelményeket külön fejezetekben teljesíti, képernyőképekkel, mobil nézetekkel, adattárolási ábrával, konkrét API válaszpéldákkal és backend repository linkkel együtt.
