@@ -16,12 +16,12 @@ for (const [label, source] of [
     `${label} should reuse the image studio gallery picker for Tripo image uploads`,
   );
   assert(
-    source.includes("ImageSourceChoiceModal"),
-    `${label} should ask whether the upload comes from device or gallery`,
+    source.includes("TripoImageSourceChoiceModal"),
+    `${label} should render the shared Tripo upload-source chooser`,
   );
   assert(
-    source.includes("dataUrlToFile"),
-    `${label} should convert gallery data URLs back to Files before Tripo upload`,
+    source.includes("galleryItemsToFiles"),
+    `${label} should convert gallery data URLs back into Files through the shared helper`,
   );
 }
 

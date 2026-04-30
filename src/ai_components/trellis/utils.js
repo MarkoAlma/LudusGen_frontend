@@ -147,10 +147,10 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken, taskId = null) {
 
   if (!r.ok) {
     if (r.status === 410) {
-      throw new Error("A modell lejárt vagy törölve lett a forrás szerverről (Tripo).");
+        throw new Error("The model has expired or was removed from the source server (Tripo).");
     }
     const body = await r.text().catch(() => '');
-    throw new Error(`GLB letöltés sikertelen: HTTP ${r.status}${body ? ` — ${body.slice(0, 100)}` : ""}`);
+      throw new Error(`GLB download failed: HTTP ${r.status}${body ? ` - ${body.slice(0, 100)}` : ""}`);
   }
 
   const blob = await r.blob();

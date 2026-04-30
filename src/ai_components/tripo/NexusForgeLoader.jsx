@@ -184,7 +184,7 @@ export default function NexusForgeLoader({ progress = 0, statusMsg = "", onStop 
                 cursor: "pointer", letterSpacing: "0.1em", textTransform: "uppercase",
               }}
             >
-              Terminálás
+              Terminate
             </button>
           </div>
         )}

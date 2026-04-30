@@ -6,12 +6,27 @@ import { ALL_MODELS } from '../../ai_components/models';
 import { createPortal } from 'react-dom';
 import { API_BASE } from '../../api/client';
 
-export function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slotsAvailable }) {
+export function GalleryPickerModal({
+  onClose,
+  onSelectMultiple,
+  getIdToken,
+  slotsAvailable,
+  variant = 'default',
+  title,
+  subtitle,
+  confirmLabel,
+}) {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState([]);
   const [adding, setAdding] = useState(false);
   const abortRef = useRef(null);
+  const isTripo = variant === 'tripo';
+  const resolvedTitle = title || (isTripo ? 'Gallery Vault' : 'Gallery');
+  const resolvedSubtitle = subtitle || (selected.length > 0
+    ? `${selected.length} / ${slotsAvailable} selected`
+    : `Maximum ${slotsAvailable} images`);
+  const resolvedConfirmLabel = confirmLabel || (isTripo ? 'Load selected' : 'Add');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -92,23 +107,35 @@ export function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slot
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-2xl max-h-[80vh] flex flex-col rounded-[2rem] bg-[#0a0a14] border border-white/10 shadow-2xl overflow-hidden"
+        className={`relative w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden ${
+          isTripo
+            ? 'rounded-[2rem] border border-white/10 bg-[#05010e]/95 shadow-[0_0_40px_rgba(138,43,226,0.18)]'
+            : 'rounded-[2rem] bg-[#0a0a14] border border-white/10 shadow-2xl'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-5 border-b border-white/5">
+        <div className={`flex items-center justify-between px-8 py-5 ${isTripo ? 'border-b border-white/10 bg-white/[0.02]' : 'border-b border-white/5'}`}>
           <div>
-            <h3 className="text-sm font-black text-white italic uppercase tracking-[0.2em]">Gallery</h3>
-            <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1">
-              {selected.length > 0 ? `${selected.length} / ${slotsAvailable} selected` : `Maximum ${slotsAvailable} images`}
+            {isTripo && (
+              <p className="text-[10px] font-black uppercase tracking-[0.35em] text-cyan-300/70">Shared Image Gallery</p>
+            )}
+            <h3 className={`text-sm font-black text-white uppercase tracking-[0.2em] ${isTripo ? 'mt-2 text-xl italic tracking-tighter normal-case' : 'italic'}`}>{resolvedTitle}</h3>
+            <p className={`mt-1 font-bold uppercase tracking-widest ${isTripo ? 'text-[10px] text-zinc-400 normal-case tracking-normal' : 'text-[9px] text-white/20'}`}>
+              {resolvedSubtitle}
             </p>
           </div>
-          <button
+          <motion.button
+            whileTap={{ scale: 0.97 }}
             onClick={handleClose}
-            className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 transition-all"
+            className={`w-9 h-9 rounded-xl border flex items-center justify-center text-white transition-all ${
+              isTripo
+                ? 'bg-white/[0.03] border-white/10 hover:bg-white/[0.08]'
+                : 'bg-white/5 border-white/10 hover:bg-white/10'
+            }`}
           >
             <X className="w-4 h-4" />
-          </button>
+          </motion.button>
         </div>
 
         {/* Content */}
@@ -119,8 +146,8 @@ export function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slot
             </div>
           ) : images.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 gap-3 text-center">
-              <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">Empty gallery</p>
-              <p className="text-[9px] font-bold text-white/10 uppercase tracking-widest">Generate images first</p>
+              <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">{isTripo ? 'Gallery empty' : 'Empty gallery'}</p>
+              <p className="text-[9px] font-bold text-white/10 uppercase tracking-widest">{isTripo ? 'Generate or save images first' : 'Generate images first'}</p>
             </div>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
@@ -161,15 +188,20 @@ export function GalleryPickerModal({ onClose, onSelectMultiple, getIdToken, slot
 
         {/* Footer */}
         {selected.length > 0 && (
-          <div className="p-4 border-t border-white/5 bg-white/[0.02]">
-            <button
+          <div className={`p-4 ${isTripo ? 'border-t border-white/10 bg-white/[0.03]' : 'border-t border-white/5 bg-white/[0.02]'}`}>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
               onClick={handleAdd}
               disabled={adding}
-              className="w-full py-3 rounded-2xl bg-violet-600 text-white text-[11px] font-black uppercase tracking-[0.2em] hover:bg-violet-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className={`w-full py-3 rounded-2xl text-white text-[11px] font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
+                isTripo
+                  ? 'bg-gradient-to-r from-[#8a2be2] via-[#7c3aed] to-[#00e5ff] shadow-[0_0_30px_rgba(138,43,226,0.3)] hover:brightness-110'
+                  : 'bg-violet-600 hover:bg-violet-500'
+              }`}
             >
               {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {adding ? 'Loading...' : `Add ${selected.length} images`}
-            </button>
+              {adding ? 'Loading...' : `${resolvedConfirmLabel} (${selected.length})`}
+            </motion.button>
           </div>
         )}
       </motion.div>

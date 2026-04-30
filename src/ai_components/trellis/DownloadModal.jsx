@@ -14,7 +14,7 @@ const FORMATS = [
     label: "GLB",
     ext:   ".glb",
     icon:  Box,
-    desc:  "Binary GLTF — legkisebb méret",
+    desc:  "Binary GLTF - smallest size",
     tags:  ["Blender", "Unity", "Unreal", "Web"],
     color: "#a78bfa",
     recommended: true,
@@ -24,7 +24,7 @@ const FORMATS = [
     label: "GLTF",
     ext:   ".gltf",
     icon:  Layers,
-    desc:  "JSON GLTF — szerkeszthető formátum",
+    desc:  "JSON GLTF - editable format",
     tags:  ["Blender", "Three.js", "Babylon.js"],
     color: "#60a5fa",
   },
@@ -33,7 +33,7 @@ const FORMATS = [
     label: "OBJ",
     ext:   ".obj",
     icon:  Triangle,
-    desc:  "Wavefront OBJ — széles kompatibilitás",
+    desc:  "Wavefront OBJ - broad compatibility",
     tags:  ["Maya", "3ds Max", "Cinema 4D", "ZBrush"],
     color: "#34d399",
   },
@@ -42,7 +42,7 @@ const FORMATS = [
     label: "STL",
     ext:   ".stl",
     icon:  Printer,
-    desc:  "STL — 3D nyomtatáshoz",
+    desc:  "STL - for 3D printing",
     tags:  ["Cura", "PrusaSlicer", "Bambu Studio"],
     color: "#fb923c",
   },
@@ -211,7 +211,7 @@ export default function DownloadModal({ isOpen, onClose, glbBlobUrl, scene, file
       setTimeout(() => setDone(null), 2000);
     } catch (err) {
       console.error("Export hiba:", err);
-      alert(`Export sikertelen (${fmt.label}): ${err?.message ?? err}`);
+      alert(`Export failed (${fmt.label}): ${err?.message ?? err}`);
     } finally {
       setDownloading(null);
     }
@@ -241,7 +241,7 @@ export default function DownloadModal({ isOpen, onClose, glbBlobUrl, scene, file
             </div>
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, color: "#e5e7eb", fontSize: 13, fontWeight: 700, letterSpacing: "-0.02em" }}>
-                Letöltés formátuma
+                Download format
               </p>
               <p style={{ margin: "1px 0 0", color: "#272745", fontSize: 9, fontFamily: "'SF Mono', monospace" }}>
                 {filename ?? "3D model"}
@@ -316,12 +316,12 @@ export default function DownloadModal({ isOpen, onClose, glbBlobUrl, scene, file
                           color: accent, border: `1px solid ${accent}30`,
                           fontFamily: "'SF Mono', monospace", letterSpacing: "0.04em",
                         }}>
-                          AJÁNLOTT
+                          RECOMMENDED
                         </span>
                       )}
                     </div>
                     <p style={{ margin: "0 0 5px", color: "#3d3d5a", fontSize: 9, lineHeight: 1.4 }}>
-                      {isDone ? "✓ Letöltés elindult" : isActive ? "Konvertálás…" : fmt.desc}
+                      {isDone ? "✓ Download started" : isActive ? "Converting..." : fmt.desc}
                     </p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                       {fmt.tags.map((tag) => (
@@ -343,7 +343,7 @@ export default function DownloadModal({ isOpen, onClose, glbBlobUrl, scene, file
             color: "#161625", fontSize: 8.5,
             fontFamily: "'SF Mono', monospace", textAlign: "center",
           }}>
-            GLB → natív letöltés · GLTF / OBJ / STL → GLB újraparsing
+            GLB -> native download · GLTF / OBJ / STL -> GLB reparsing
           </div>
 
         </div>

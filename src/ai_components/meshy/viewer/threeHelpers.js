@@ -7,12 +7,199 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 export const hexToInt = (h) => (h ? parseInt(h.replace("#", ""), 16) : null);
 
 function textureHasImageData(texture) {
-  const image = texture?.image;
+  const image = getTextureImage(texture);
   if (!image) return false;
   if (typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) return image.width > 0 && image.height > 0;
   if (typeof HTMLCanvasElement !== 'undefined' && image instanceof HTMLCanvasElement) return image.width > 0 && image.height > 0;
   if (typeof HTMLVideoElement !== 'undefined' && image instanceof HTMLVideoElement) return image.readyState >= 2;
   return Boolean(image.width || image.videoWidth || image.data);
+}
+
+const MATERIAL_TEXTURE_SLOTS = [
+  'map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap',
+  'alphaMap', 'lightMap', 'bumpMap', 'displacementMap',
+];
+
+function getTextureImage(texture) {
+  return texture?.image || texture?.source?.data || null;
+}
+
+function setTextureNeedsUpload(texture) {
+  if (texture?.isTexture) texture.needsUpdate = true;
+}
+
+function cleanupTextureReadyListeners(s) {
+  if (!Array.isArray(s?._textureReadyUnsubs)) return;
+  s._textureReadyUnsubs.forEach((unsubscribe) => unsubscribe?.());
+  s._textureReadyUnsubs.length = 0;
+}
+
+function watchTextureReadiness(texture, onReady) {
+  if (!texture?.isTexture) return () => { };
+  if (textureHasImageData(texture)) return () => { };
+
+  let settled = false;
+  let scheduledFrame = null;
+  let scheduledTimeout = null;
+  let observedImage = null;
+
+  const clearScheduledCheck = () => {
+    if (scheduledFrame != null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(scheduledFrame);
+    }
+    if (scheduledTimeout != null) {
+      clearTimeout(scheduledTimeout);
+    }
+    scheduledFrame = null;
+    scheduledTimeout = null;
+  };
+
+  const clearImageListeners = () => {
+    if (typeof observedImage?.removeEventListener === 'function') {
+      observedImage.removeEventListener('load', finish);
+      observedImage.removeEventListener('error', scheduleCheck);
+    }
+    observedImage = null;
+  };
+
+  const finish = () => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    if (!textureHasImageData(texture)) return;
+    setTextureNeedsUpload(texture);
+    onReady?.(texture);
+  };
+
+  function scheduleCheck() {
+    if (settled || scheduledFrame != null || scheduledTimeout != null) return;
+    const run = () => {
+      scheduledFrame = null;
+      scheduledTimeout = null;
+      if (settled) return;
+      bindCurrentImage();
+      if (textureHasImageData(texture)) {
+        finish();
+        return;
+      }
+      scheduleCheck();
+    };
+
+    if (typeof requestAnimationFrame === 'function') {
+      scheduledFrame = requestAnimationFrame(run);
+      return;
+    }
+
+    scheduledTimeout = setTimeout(run, 16);
+  }
+
+  function bindCurrentImage() {
+    const image = getTextureImage(texture);
+    if (!image || image === observedImage) return;
+
+    clearImageListeners();
+    observedImage = image;
+
+    if (typeof observedImage.addEventListener === 'function') {
+      observedImage.addEventListener('load', finish, { once: true });
+      observedImage.addEventListener('error', scheduleCheck, { once: true });
+    }
+
+    if (typeof observedImage.decode === 'function') {
+      observedImage.decode().then(finish).catch(scheduleCheck);
+    }
+  }
+
+  const cleanup = () => {
+    clearScheduledCheck();
+    clearImageListeners();
+  };
+
+  bindCurrentImage();
+  if (textureHasImageData(texture)) {
+    finish();
+    return cleanup;
+  }
+  scheduleCheck();
+  return cleanup;
+}
+
+export function watchMaterialTexturesForReadiness(material, onReady) {
+  const mats = Array.isArray(material) ? material : [material];
+  const seen = new Set();
+  const cleanups = [];
+
+  mats.forEach((mat) => {
+    if (!mat) return;
+    MATERIAL_TEXTURE_SLOTS.forEach((slot) => {
+      const texture = mat[slot];
+      if (!texture?.isTexture || seen.has(texture.uuid)) return;
+      seen.add(texture.uuid);
+      cleanups.push(watchTextureReadiness(texture, onReady));
+    });
+  });
+
+  return () => {
+    cleanups.forEach((cleanup) => cleanup?.());
+  };
+}
+
+function registerPendingTextureRefreshes(s, material, token) {
+  if (!s || !material) return;
+  const unsubscribe = watchMaterialTexturesForReadiness(material, () => {
+    if (token?.cancelled) return;
+    const mats = Array.isArray(material) ? material : [material];
+    mats.forEach((mat) => {
+      if (mat) mat.needsUpdate = true;
+    });
+    s.markDirty?.();
+  });
+
+  if (!Array.isArray(s._textureReadyUnsubs)) s._textureReadyUnsubs = [];
+  s._textureReadyUnsubs.push(unsubscribe);
+}
+
+export function armPostLoadWakeWindow(s, token, { frames = 45 } = {}) {
+  if (!s?.markDirty || token?.cancelled) return;
+
+  let remainingFrames = Math.max(0, Number.isFinite(frames) ? frames : 45);
+  let rafId = null;
+  let timeoutId = null;
+
+  const cleanup = () => {
+    if (rafId != null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(rafId);
+    }
+    if (timeoutId != null) {
+      clearTimeout(timeoutId);
+    }
+    rafId = null;
+    timeoutId = null;
+    if (token?.cancelWakeWindow === cleanup) token.cancelWakeWindow = null;
+  };
+
+  const step = () => {
+    rafId = null;
+    timeoutId = null;
+    if (token?.cancelled) {
+      cleanup();
+      return;
+    }
+    s.markDirty?.();
+    if (remainingFrames <= 0) {
+      cleanup();
+      return;
+    }
+    remainingFrames -= 1;
+    if (typeof requestAnimationFrame === 'function') {
+      rafId = requestAnimationFrame(step);
+    } else {
+      timeoutId = setTimeout(step, 16);
+    }
+  };
+
+  if (typeof token === 'object' && token) token.cancelWakeWindow = cleanup;
+  step();
 }
 
 export function syncCamera(camera, c) {
@@ -484,6 +671,7 @@ export function disposeModel(scene, model, origMaterials, wireCache, clayMats, u
 
 function clearCurrentModel(s) {
   if (!s?.scene) return;
+  cleanupTextureReadyListeners(s);
   if (s.model) {
     disposeModel(s.scene, s.model, s.origMaterials, s._wireCache, s._clayMats, s._uvMats, s._segmentMats, s._segEdgeCache);
     s.model = null;
@@ -552,9 +740,13 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
   const { THREE, scene, placeholder } = s;
   if (!THREE) return;
   if (placeholder) placeholder.visible = !s.model;
+  cleanupTextureReadyListeners(s);
 
   // Cancel any in-flight load — stale handleSuccess will no-op
-  if (s._loadToken) s._loadToken.cancelled = true;
+  if (s._loadToken) {
+    s._loadToken.cancelled = true;
+    s._loadToken.cancelWakeWindow?.();
+  }
   const token = { cancelled: false };
   s._loadToken = token;
 
@@ -650,6 +842,7 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
         } else {
           n.material = sanitizeMat(n.material);
         }
+        registerPendingTextureRefreshes(s, n.material, token);
         nextOrigMaterials.set(n.uuid, n.material);
       }
     });
@@ -701,6 +894,7 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     const _segEC = segmentEdgeColor ?? s._segmentEdgeColor ?? 0x00ff88;
     if (_segHL) applySegmentHighlight(s, true, _segEC, { async: true, batchSize: 2, edgeBatchSize: 1, frameBudget: 5 });
     s.autoSpin = autoSpin;
+    armPostLoadWakeWindow(s, token);
     onModelLoaded?.(model);
     s.markDirty?.();
   };

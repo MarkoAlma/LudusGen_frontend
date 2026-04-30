@@ -11,7 +11,7 @@ export default function ConfirmModal({
   onConfirm, 
   title, 
   message, 
-  confirmText = 'Törlés',
+  confirmText = 'Delete',
   confirmColor = '#ef4444',
   isDeleting = false,
 }) {
@@ -171,7 +171,7 @@ export default function ConfirmModal({
               e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
             }}
           >
-            Mégse
+            Cancel
           </button>
           <button
             onClick={onConfirm}
@@ -193,7 +193,7 @@ export default function ConfirmModal({
               boxShadow: isDeleting ? 'none' : `0 2px 12px ${confirmColor}40`,
             }}
           >
-            {isDeleting ? 'Törlés...' : confirmText}
+            {isDeleting ? 'Deleting...' : confirmText}
           </button>
         </div>
       </div>

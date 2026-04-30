@@ -1,6 +1,5 @@
 // trellis/GeneratePanel.jsx
 import React, { useState, useRef, useEffect, memo } from "react";
-import { createPortal } from "react-dom";
 import {
   Image, Boxes, Grid3x3, Pencil, HelpCircle, Upload, Check, X, Plus,
   Loader2, ChevronDown, ChevronUp, PersonStanding, Zap, Images, Lightbulb,
@@ -11,6 +10,8 @@ import Enhancer from "../Enhancer";
 import { Tooltip } from "../meshy/ui/Primitives";
 import { MULTIVIEW_UPLOAD_ORDER } from "./multiviewUtils";
 import { GalleryPickerModal } from "../../components/image_studio/ImageControls";
+import TripoImageSourceChoiceModal from "./TripoImageSourceChoiceModal";
+import { galleryItemsToFiles } from "./tripoGalleryFileUtils";
 
 /* ─── Tab definitions ─────────────────────────────────────────────────── */
 export const GEN_TABS = [
@@ -64,59 +65,6 @@ export function getFaceLimitConfig(smartLowPoly, quad) {
  * ─────────────────────────────────────────────────────────────────────── */
 function Na({ children }) {
   return <>{children}</>;
-}
-
-function dataUrlToFile(dataUrl, name = "gallery-image.png") {
-  const [header = "", base64 = ""] = String(dataUrl || "").split(",");
-  const mime = header.match(/data:([^;]+)/)?.[1] || "image/png";
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return new File([bytes], name, { type: mime });
-}
-
-function ImageSourceChoiceModal({ title = "Add image", onClose, onDevice, onGallery }) {
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 backdrop-blur-xl"
-      onClick={onClose}
-    >
-      <div
-        className="w-[min(92vw,360px)] rounded-2xl border border-white/10 bg-[#0a0a14] p-3 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="px-2 py-2">
-          <h3 className="text-[11px] font-black text-white uppercase tracking-[0.22em]">{title}</h3>
-          <p className="mt-1 text-[9px] font-bold text-white/30 uppercase tracking-[0.18em]">
-            Choose image source
-          </p>
-        </div>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={onDevice}
-            className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.035] text-zinc-300 transition-all hover:border-cyan-300/30 hover:bg-cyan-300/[0.06]"
-          >
-            <Upload className="h-5 w-5 text-cyan-200" />
-            <span className="text-[10px] font-black uppercase tracking-[0.16em]">Device</span>
-          </button>
-          <button
-            type="button"
-            onClick={onGallery}
-            className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.035] text-zinc-300 transition-all hover:border-violet-300/30 hover:bg-violet-300/[0.06]"
-          >
-            <Images className="h-5 w-5 text-violet-200" />
-            <span className="text-[10px] font-black uppercase tracking-[0.16em]">Gallery</span>
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
 }
 
 /* ─── helpers ─────────────────────────────────────────────────────────── */
@@ -708,18 +656,21 @@ const GeneratePanel = memo(({
 
   const handleBatchGallerySelect = (imgs) => {
     const slotsLeft = Math.max(0, 10 - (batchImages?.length ?? 0));
-    imgs.slice(0, slotsLeft).forEach((img, index) => {
-      if (!img?.dataUrl) return;
-      const file = dataUrlToFile(img.dataUrl, img.name || `gallery-image-${index + 1}.png`);
-      addBatchFile(file, img.dataUrl);
+    galleryItemsToFiles(
+      imgs?.slice(0, slotsLeft),
+      (img, index) => img?.name || `gallery-image-${index + 1}.png`,
+    ).forEach(({ file, preview }) => {
+      addBatchFile(file, preview);
     });
   };
 
   const handleMultiviewGallerySelect = (imgs) => {
-    const first = imgs?.[0];
-    if (!first?.dataUrl || multiviewGallerySlotIndex == null) return;
-    const file = dataUrlToFile(first.dataUrl, first.name || `gallery-view-${multiviewGallerySlotIndex + 1}.png`);
-    setMultiviewSlot(multiviewGallerySlotIndex, file, first.dataUrl);
+    const first = galleryItemsToFiles(
+      imgs?.slice(0, 1),
+      (img) => img?.name || `gallery-view-${multiviewGallerySlotIndex + 1}.png`,
+    )[0];
+    if (!first || multiviewGallerySlotIndex == null) return;
+    setMultiviewSlot(multiviewGallerySlotIndex, first.file, first.preview);
   };
 
   const handleSourceChoiceDevice = () => {
@@ -1328,8 +1279,9 @@ const GeneratePanel = memo(({
 
 
       {sourceChoice && (
-        <ImageSourceChoiceModal
+        <TripoImageSourceChoiceModal
           title={sourceChoice.kind === "multi" ? "Add view image" : "Add source images"}
+          subtitle="Choose whether the Tripo multi-view input should come from your device or the shared gallery."
           onClose={() => setSourceChoice(null)}
           onDevice={handleSourceChoiceDevice}
           onGallery={handleSourceChoiceGallery}
@@ -1342,6 +1294,10 @@ const GeneratePanel = memo(({
           onSelectMultiple={handleBatchGallerySelect}
           getIdToken={getIdToken}
           slotsAvailable={Math.max(0, 10 - (batchImages?.length ?? 0))}
+          variant="tripo"
+          title="Gallery Vault"
+          subtitle="Reuse saved gallery images for Tripo source sets and multi-view prep."
+          confirmLabel="Load selected"
         />
       )}
 
@@ -1351,6 +1307,10 @@ const GeneratePanel = memo(({
           onSelectMultiple={handleMultiviewGallerySelect}
           getIdToken={getIdToken}
           slotsAvailable={1}
+          variant="tripo"
+          title="Gallery Vault"
+          subtitle="Pick one saved gallery image for this Tripo view slot."
+          confirmLabel="Load selected"
         />
       )}
 

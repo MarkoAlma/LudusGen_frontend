@@ -309,7 +309,7 @@ export default function TrellisControls({
                       <Zap className="w-3.5 h-3.5" />
                     </div>
                     <div className="text-left">
-                      <span className="text-[9px] font-black uppercase italic leading-none text-white">Saját Preset</span>
+                      <span className="text-[9px] font-black uppercase italic leading-none text-white">Custom Preset</span>
                       <p className="text-[7px] text-cyan-500/60 font-bold uppercase tracking-widest mt-0.5">Spatial Archive</p>
                     </div>
                   </div>

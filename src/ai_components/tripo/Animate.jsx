@@ -251,9 +251,9 @@ export default function Animate({
         {rigBtnLocked
           ? <><Loader2 style={{ width: 14, height: 14 }} className="anim-spin" />Rigging…</>
           : rigCompat === "checking"
-            ? <><Loader2 style={{ width: 14, height: 14 }} className="anim-spin" />Ellenőrzés…</>
+            ? <><Loader2 style={{ width: 14, height: 14 }} className="anim-spin" />Checking...</>
             : rigCompat === false
-              ? <><AlertCircle style={{ width: 14, height: 14, color: "#ef4444" }} />Nem kompatibilis</>
+              ? <><AlertCircle style={{ width: 14, height: 14, color: "#ef4444" }} />Incompatible</>
               : <><CoinIcon size={16} />Auto Rig<span style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 400, marginLeft: 2 }}>25</span></>}
       </button>
 
