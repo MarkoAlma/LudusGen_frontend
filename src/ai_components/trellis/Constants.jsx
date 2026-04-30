@@ -1,9 +1,9 @@
 
 export const VIEW_MODES = [
-  { id: 'clay', label: 'Clay', tip: 'Clay — semleges szürke agyag' },
-  { id: 'uv', label: 'Base Color', tip: 'Base Color — textúra árnyék nélkül' },
-  { id: 'normal', label: 'RGB', tip: 'RGB — textúra + árnyék' },
-  { id: 'segment', label: 'Segment', tip: 'Segment — modell részek véletlenszerű színezése' },
+  { id: 'clay', label: 'Clay', tip: 'Clay - neutral gray clay' },
+  { id: 'uv', label: 'Base Color', tip: 'Base Color - texture without shadows' },
+  { id: 'normal', label: 'RGB', tip: 'RGB - texture + shadows' },
+  { id: 'segment', label: 'Segment', tip: 'Segment - random coloring for model parts' },
 ];
 
 export const BG_OPTIONS = [
@@ -22,19 +22,19 @@ export const BG_OPTIONS = [
     render: () => <div style={{ width: 14, height: 14, borderRadius: 3, background: '#000', border: '1px solid rgba(255,255,255,0.15)' }} />,
   },
   {
-    id: 'darkgray', label: 'Sötétszürke',
+    id: 'darkgray', label: 'Dark Gray',
     render: () => <div style={{ width: 14, height: 14, borderRadius: 3, background: '#111118', border: '1px solid rgba(255,255,255,0.1)' }} />,
   },
   {
-    id: 'deep', label: 'Mély sötét',
+    id: 'deep', label: 'Deep Dark',
     render: () => <div style={{ width: 14, height: 14, borderRadius: 3, background: '#0a0a12', border: '1px solid rgba(255,255,255,0.1)' }} />,
   },
   {
-    id: 'grayish', label: 'Szürkés',
+    id: 'grayish', label: 'Grayish',
     render: () => <div style={{ width: 14, height: 14, borderRadius: 3, background: '#24242e', border: '1px solid rgba(255,255,255,0.1)' }} />,
   },
   {
-    id: 'white', label: 'Fehér',
+    id: 'white', label: 'White',
     render: () => <div style={{ width: 14, height: 14, borderRadius: 3, background: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} />,
   },
 ];
@@ -54,7 +54,7 @@ export const STYLE_OPTIONS = [
     label: 'No Style', 
     emoji: '🎯', 
     prefix: '', 
-    tip: 'Semleges — nem ad hozzá stílus prefixet' 
+    tip: 'Neutral - adds no style prefix' 
   },
 
   { 
@@ -62,7 +62,7 @@ export const STYLE_OPTIONS = [
     label: 'Realistic',
     emoji: '📷',
     prefix: 'Realistic 3D model, physically based material definition, natural anatomical proportions, layered surface detail, subtle texture variation, ',
-    tip: 'Realistic — fizikai anyagviselkedés, természetes arányok'
+    tip: 'Realistic - physically based materials, natural proportions'
   },
 
   { 
@@ -70,7 +70,7 @@ export const STYLE_OPTIONS = [
     label: 'Semi-Realistic',
     emoji: '🧍',
     prefix: 'Semi-realistic 3D model, balanced anatomical proportions, slightly simplified forms, clean edge transitions, controlled surface detailing, ',
-    tip: 'Félig realisztikus — kiegyensúlyozott forma, enyhén stilizált arányok'
+    tip: 'Semi-realistic - balanced form, lightly stylized proportions'
   },
 
   { 
@@ -78,7 +78,7 @@ export const STYLE_OPTIONS = [
     label: 'Stylized',
     emoji: '🎨',
     prefix: 'Stylized 3D model, simplified primary shapes, defined silhouette, smooth surface transitions, reduced micro-detail, ',
-    tip: 'Stilizált — leegyszerűsített fő formák, jól olvasható sziluett'
+    tip: 'Stylized - simplified primary shapes, readable silhouette'
   },
 
   { 
@@ -86,7 +86,7 @@ export const STYLE_OPTIONS = [
     label: 'Cartoon',
     emoji: '🎪',
     prefix: 'Cartoon 3D model, exaggerated anatomical proportions, rounded geometry, smooth continuous surfaces, bold primary shape hierarchy, ',
-    tip: 'Cartoon — eltúlzott arányok, kerekített formák'
+    tip: 'Cartoon - exaggerated proportions, rounded forms'
   },
 
   { 
@@ -94,7 +94,7 @@ export const STYLE_OPTIONS = [
     label: 'Voxel',
     emoji: '🟫',
     prefix: 'Voxel-based 3D model, high-density cubic voxel grid, visible stepped pixel structure, discrete block geometry, axis-aligned construction, ',
-    tip: 'Voxel — sűrűbb pixelrács, lépcsőzetes blokkforma'
+    tip: 'Voxel - denser pixel grid, stepped block shapes'
   },
 
 
@@ -103,7 +103,7 @@ export const STYLE_OPTIONS = [
     label: 'Hard Surface',
     emoji: '⚙️',
     prefix: 'Hard-surface 3D model, sharp edge definition, mechanical panel segmentation, precise beveled edges, structured layered components, ',
-    tip: 'Hard Surface — precíz élek, panel tagolás, mechanikus részletek'
+    tip: 'Hard Surface - precise edges, panel segmentation, mechanical details'
   },
 
   { 
@@ -111,42 +111,42 @@ export const STYLE_OPTIONS = [
     label: 'Clay',
     emoji: '🗿',
     prefix: 'Clay sculpt 3D model, uniform matte surface material, smooth continuous topology, hand-sculpted form transitions, minimal surface variation, ',
-    tip: 'Clay — egységes matt felület, sculpt jelleg'
+    tip: 'Clay - uniform matte surface, sculpted look'
   }
 ];
 export const TRELLIS_PRESETS = [
   {
-    label: 'Ultra gyors',
+    label: 'Ultra Fast',
     emoji: '⚡',
-    tip: 'Ultra gyors — alacsony minőség, ~15 mp',
+    tip: 'Ultra Fast - low quality, ~15 sec',
     slat_cfg: 4.0, ss_cfg: 4.0,
     slat_steps: 20, ss_steps: 20,
   },
   {
-    label: 'Gyors',
+    label: 'Fast',
     emoji: '🚀',
-    tip: 'Gyors — közepes minőség, ~20 mp',
+    tip: 'Fast - medium quality, ~20 sec',
     slat_cfg: 5.0, ss_cfg: 4.0,
     slat_steps: 20, ss_steps: 25,
   },
   {
-    label: 'Normál',
+    label: 'Normal',
     emoji: '⚖️',
-    tip: 'Normál — jó minőség, ~30 mp',
+    tip: 'Normal - good quality, ~30 sec',
     slat_cfg: 6.0, ss_cfg: 5.0,
     slat_steps: 30, ss_steps: 25,
   },
   {
-    label: 'Minőség',
+    label: 'Quality',
     emoji: '✨',
-    tip: 'Magas minőség — ~50 mp',
+    tip: 'High quality - ~50 sec',
     slat_cfg: 7.5, ss_cfg: 5.0,
     slat_steps: 25, ss_steps: 18,
   },
   {
     label: 'Max',
     emoji: '💎',
-    tip: 'Maximum minőség — ~70 mp',
+    tip: 'Maximum quality - ~70 sec',
     slat_cfg: 7.6, ss_cfg: 5.5,
     slat_steps: 25, ss_steps: 24,
   },

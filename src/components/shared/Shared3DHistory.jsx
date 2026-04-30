@@ -123,12 +123,57 @@ const TABS = [
 const SUBTABS = [
   { id: 'all', label: 'All', icon: LayoutGrid, from: "#64748b", to: "#475569" },
   { id: 'models', label: 'Models', icon: Box, from: "#64748b", to: "#334155" },
-  { id: 'images', label: 'Images', icon: Images, from: "#00e5ff", to: "#0891b2" },
   { id: 'rigged', label: 'Rig', icon: PersonStanding, from: "#f472b6", to: "#db2777" },
   { id: 'animations', label: 'Anim', icon: Wand2, from: "#22d3ee", to: "#0891b2" },
   { id: 'segment', label: 'Segment', icon: Scissors, from: "#f59e0b", to: "#d97706" },
   { id: 'fill_parts', label: 'Fill Parts', icon: Boxes, from: "#c084fc", to: "#9333ea" },
 ];
+
+function TripoGalleryBridge() {
+  return (
+    <div style={{
+      border: "1px solid rgba(255,255,255,0.08)",
+      background: "linear-gradient(135deg, rgba(138,43,226,0.10), rgba(0,229,255,0.06))",
+      borderRadius: 14,
+      padding: "12px 14px",
+      marginBottom: 10,
+      boxShadow: "0 0 24px rgba(138,43,226,0.08)",
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: 10, flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(255,255,255,0.05)",
+          border: "1px solid rgba(255,255,255,0.10)",
+        }}>
+          <Images style={{ width: 13, height: 13, color: "#00e5ff" }} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <p style={{
+            margin: 0,
+            color: "#ffffff",
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            fontFamily: "'Rajdhani', sans-serif",
+          }}>
+            Saved to Gallery
+          </p>
+          <p style={{
+            margin: "6px 0 0",
+            color: "rgba(255,255,255,0.55)",
+            fontSize: 10,
+            fontWeight: 700,
+            lineHeight: 1.5,
+          }}>
+            Tripo image outputs now live in the shared Gallery instead of this 3D archive.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 
 export default function Shared3DHistory({
@@ -319,7 +364,7 @@ export default function Shared3DHistory({
     const src = item.source || "trellis";
     if (activeTab === 'tripo') {
       if (src !== 'tripo') return false;
-      if (subTab === 'images') return isImageSet;
+      if (isImageSet) return false;
       const isRig = item.mode === 'rig' || item.params?.rigged === true || item.params?.type === 'animate_rig';
       const isAnim = item.mode === 'animate' && !isRig || item.params?.animated === true || item.params?.type === 'animate_retarget';
       const isSeg = item.mode === 'segment';
@@ -352,12 +397,8 @@ export default function Shared3DHistory({
 
   const tripoSections = useMemo(() => {
     if (activeTab !== 'tripo') return null;
-    const generated = [], images = [], rigged = [], animations = [], segments = [], fillParts = [];
+    const generated = [], rigged = [], animations = [], segments = [], fillParts = [];
     for (const item of filtHist) {
-      if (isImageHistoryItem(item)) {
-        images.push(item);
-        continue;
-      }
       const isRig = item.mode === 'rig' || item.params?.rigged === true || item.params?.type === 'animate_rig';
       const isAnim = (item.mode === 'animate' && !isRig) || item.params?.animated === true || item.params?.type === 'animate_retarget';
       const isSeg = item.mode === 'segment';
@@ -369,7 +410,7 @@ export default function Shared3DHistory({
       else if (isFill) fillParts.push(item);
       else generated.push(item);
     }
-    return { generated, images, rigged, animations, segments, fillParts };
+    return { generated, rigged, animations, segments, fillParts };
   }, [filtHist, activeTab]);
 
   const activeTabDef = TABS.find(t => t.id === activeTab) || TABS[0];
@@ -636,6 +677,10 @@ export default function Shared3DHistory({
           </div>
         )}
 
+        {!histLoad && activeTab === 'tripo' && filtHist.length === 0 && (
+          <TripoGalleryBridge />
+        )}
+
         {!histLoad && filtHist.length === 0 && (
           <EmptyState accent={accent} message={histQ ? "No matches found" : activeTab === 'upload' ? "No uploads yet" : "Archive empty"} />
         )}
@@ -644,15 +689,15 @@ export default function Shared3DHistory({
         {!histLoad && activeTab === 'tripo' && tripoSections && (
           <AnimatePresence mode="sync">
             <MotionDiv key={`${activeTab}-${subTab}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
+              {filtHist.length > 0 && <TripoGalleryBridge />}
               {subTab === 'all' ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                   {[...filtHist].sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0)).map(item => {
-                    const isImageSet = isImageHistoryItem(item);
                     const isRig = item.mode === 'rig' || item.params?.rigged === true || item.params?.type === 'animate_rig';
                     const isAnim = (item.mode === 'animate' && !isRig) || item.params?.animated === true || item.params?.type === 'animate_retarget';
                     const isSeg = item.mode === 'segment';
                     const isFill = item.mode === 'fill_parts';
-                    const cardColor = isImageSet ? TYPE_COLORS.images.rail : isAnim ? TYPE_COLORS.animation.rail : isRig ? TYPE_COLORS.rigged.rail : isSeg ? TYPE_COLORS.segment.rail : isFill ? "#c084fc" : accent;
+                    const cardColor = isAnim ? TYPE_COLORS.animation.rail : isRig ? TYPE_COLORS.rigged.rail : isSeg ? TYPE_COLORS.segment.rail : isFill ? "#c084fc" : accent;
                     return (
                 <HistoryCard key={item.id} item={item} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color={cardColor} getIdToken={getIdToken} />
                     );
@@ -660,16 +705,6 @@ export default function Shared3DHistory({
                 </div>
               ) : (
                 <>
-                  {tripoSections.images.length > 0 && (
-                    <>
-                      <SectionHeader label="Image Sets" icon={Images} typeColor={TYPE_COLORS.images} count={tripoSections.images.length} />
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 4 }}>
-                        {tripoSections.images.map(item => (
-                      <HistoryCard key={item.id} item={item} isActive={activeItemId === item.id} isLoading={loadingId === item.id} disabled={loadingId !== null} onSelect={handleSelect} onReuse={onReuse} onDownload={onDownload} onDelete={handleDeleteLocally} onExpired={handleExpiredLocally} color={TYPE_COLORS.images.rail} getIdToken={getIdToken} />
-                        ))}
-                      </div>
-                    </>
-                  )}
                   {tripoSections.generated.length > 0 && (
                     <>
                       <SectionHeader label="Generated Models" icon={Sparkles} typeColor={TYPE_COLORS.model} count={tripoSections.generated.length} />

@@ -75,7 +75,7 @@ function StylePicker({ selected, onSelect, color, disabled }) {
             letterSpacing: '0.07em',
             textTransform: 'uppercase',
           }}>
-            Stílus
+            Style
           </span>
         </div>
 

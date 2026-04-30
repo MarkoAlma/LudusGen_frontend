@@ -12,6 +12,7 @@ export default function StudioLayout({
   children,
   leftSidebar,
   leftSecondarySidebar,
+  hideLeftSecondaryToggle = false,
   rightSidebar,
   topHUD,
   bottomHUD,
@@ -356,7 +357,7 @@ export default function StudioLayout({
             </motion.button>
 
             {/* Secondary Toggle L2 */}
-            {leftSecondarySidebar && (
+            {leftSecondarySidebar && !hideLeftSecondaryToggle && (
               <motion.button
                 whileHover={{ x: 2, backgroundColor: 'rgba(255,255,255,0.06)' }}
                 whileTap={{ scale: 0.95 }}

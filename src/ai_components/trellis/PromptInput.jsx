@@ -184,7 +184,7 @@ function PromptInput({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           disabled={disabled}
-          placeholder={'Írj le egy 3D objektumot angolul…\npl. a rustic log cabin with a stone chimney'}
+          placeholder={'Describe a 3D object in English...\nfor example: a rustic log cabin with a stone chimney'}
           rows={5}
           style={{
             width: '100%',
@@ -236,7 +236,7 @@ function PromptInput({
               fontFamily: "'SF Mono', 'JetBrains Mono', monospace",
             }}
           >
-            ⌘↵ generálás
+            ⌘↵ generate
           </span>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -295,7 +295,7 @@ function PromptInput({
         }}
       >
         <Tooltip
-          text={!hasContent ? 'Írj be egy promptot először' : 'Prompt egyszerűsítése'}
+          text={!hasContent ? 'Enter a prompt first' : 'Simplify prompt'}
           side="top"
         >
           <ActionButton
@@ -310,7 +310,7 @@ function PromptInput({
         </Tooltip>
 
         <Tooltip
-          text={!hasContent ? 'Írj be egy promptot először' : 'AI prompt fejlesztés'}
+          text={!hasContent ? 'Enter a prompt first' : 'Enhance prompt with AI'}
           side="top"
         >
           <ActionButton

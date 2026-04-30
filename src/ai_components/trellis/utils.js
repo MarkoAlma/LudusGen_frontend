@@ -82,6 +82,7 @@ const HISTORY_THUMB_FETCH_LIMIT = 2;
 let activeHistoryThumbFetches = 0;
 const historyThumbFetchQueue = [];
 const historyThumbFetchInFlight = new Map();
+const historyThumbTerminalFailures = new Map();
 
 function runLimitedHistoryThumbFetch(task) {
   return new Promise((resolve, reject) => {
@@ -147,10 +148,10 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken, taskId = null) {
 
   if (!r.ok) {
     if (r.status === 410) {
-      throw new Error("A modell lejárt vagy törölve lett a forrás szerverről (Tripo).");
+        throw new Error("The model has expired or was removed from the source server (Tripo).");
     }
     const body = await r.text().catch(() => '');
-    throw new Error(`GLB letöltés sikertelen: HTTP ${r.status}${body ? ` — ${body.slice(0, 100)}` : ""}`);
+      throw new Error(`GLB download failed: HTTP ${r.status}${body ? ` - ${body.slice(0, 100)}` : ""}`);
   }
 
   const blob = await r.blob();
@@ -192,6 +193,12 @@ export async function fetchModelData(modelUrl, getIdToken, taskId = null) {
     };
 
     const inFlightKey = `${taskId ?? "no-task"}|${fetchUrl}`;
+    const terminalStatus = historyThumbTerminalFailures.get(inFlightKey);
+    if (terminalStatus) {
+      const err = new Error(`Model fetch failed: HTTP ${terminalStatus}`);
+      err.status = terminalStatus;
+      throw err;
+    }
     let requestPromise = historyThumbFetchInFlight.get(inFlightKey);
 
     if (!requestPromise) {
@@ -206,11 +213,15 @@ export async function fetchModelData(modelUrl, getIdToken, taskId = null) {
         }
 
         if (!r.ok) {
+          if ([404, 410].includes(r.status)) {
+            historyThumbTerminalFailures.set(inFlightKey, r.status);
+          }
           const err = new Error(`Model fetch failed: HTTP ${r.status}`);
           err.status = r.status;
           throw err;
         }
 
+        historyThumbTerminalFailures.delete(inFlightKey);
         return r.arrayBuffer();
       })();
 

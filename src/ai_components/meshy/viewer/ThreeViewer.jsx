@@ -905,17 +905,22 @@ const ThreeViewer = memo(forwardRef(({
     })().catch(console.error);
 
     return () => {
+      const state = S.current;
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeObs?.disconnect();
-      if (S.current?.frame) cancelAnimationFrame(S.current.frame);
-      if (S.current?._mixer) { S.current._mixer.stopAllAction(); S.current._mixer = null; }
-      if (S.current?.pmremGenerator) S.current.pmremGenerator.dispose();
-      if (S.current?.envTexture) S.current.envTexture.dispose();
-      disposePaintResources(S.current);
-      if (S.current?.renderer) {
-        S.current.renderer.dispose();
-        if (el.contains(S.current.renderer.domElement)) el.removeChild(S.current.renderer.domElement);
+      if (!state) return;
+      if (state.frame) cancelAnimationFrame(state.frame);
+      if (state._mixer) { state._mixer.stopAllAction(); state._mixer = null; }
+      disposeModel(state.scene, state.model, state.origMaterials, state._wireCache, state._clayMats, state._uvMats, state._segmentMats, state._segEdgeCache);
+      if (state.pmremGenerator) state.pmremGenerator.dispose();
+      if (state.envTexture) state.envTexture.dispose();
+      disposePaintResources(state);
+      if (state.renderer) {
+        try { state.renderer.forceContextLoss(); } catch { /* renderer cleanup is best effort */ }
+        state.renderer.dispose();
+        if (el.contains(state.renderer.domElement)) el.removeChild(state.renderer.domElement);
       }
+      S.current = null;
     };
   }, []); // eslint-disable-line
 

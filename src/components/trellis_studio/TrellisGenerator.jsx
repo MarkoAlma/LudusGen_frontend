@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Box, Settings, Sparkles, Layers, Paintbrush2, Wand2, RefreshCw, PersonStanding } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTrellisLogic } from '../../hooks/useTrellisLogic';
+import { fetchGlbAsBlob } from '../../ai_components/trellis/utils';
 import TrellisControls from './TrellisControls';
 import TrellisWorkspace from './TrellisWorkspace';
 import Shared3DHistory from '../shared/Shared3DHistory';
@@ -10,7 +10,8 @@ import { useStudioPanels } from '../../context/StudioPanelContext';
 
 export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
   const { registerPanel, unregisterPanel } = useStudioPanels();
-  const MotionSpan = motion.span;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tripoTaskIdParam = searchParams.get("tripoTaskId");
 
   // Register panels with centralized manager
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
     prompt, setPrompt,
     genStatus, setGenStatus,
     modelUrl, setModelUrl,
+    setErrorMsg,
     params, setParams,
     selectedStyle, setSelectedStyle,
     activeItem, setActiveItem,
@@ -39,8 +41,6 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
     handleSaveCustomPreset
   } = useTrellisLogic(userId, getIdToken);
 
-  const color = '#8b5cf6';
-
   const [leftOpen, setLeftOpen] = useState(true);
   useEffect(() => { setLeftOpen(isGlobalOpen); }, [isGlobalOpen]);
 
@@ -48,8 +48,76 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
   const [rightOpen, setRightOpen] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [offsets, setOffsets] = useState({ left: 320, right: 280 });
+  const [historyItems, setHistoryItems] = useState([]);
+  const selectedHistoryBlobRef = useRef(null);
+
+  const defaultHistoryTab = useMemo(() => tripoTaskIdParam ? 'tripo' : 'trellis', [tripoTaskIdParam]);
+
+  const revokeSelectedHistoryBlob = useCallback(() => {
+    if (!selectedHistoryBlobRef.current) return;
+    URL.revokeObjectURL(selectedHistoryBlobRef.current);
+    selectedHistoryBlobRef.current = null;
+  }, []);
+
+  useEffect(() => () => {
+    revokeSelectedHistoryBlob();
+  }, [revokeSelectedHistoryBlob]);
+
+  const syncHistoryTaskInUrl = useCallback((item) => {
+    setSearchParams(prev => {
+      const n = new URLSearchParams(prev);
+      if (item?.source === 'tripo' && item?.taskId) {
+        n.set("tripoTaskId", item.taskId);
+      } else {
+        n.delete("tripoTaskId");
+      }
+      return n;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleHistorySelect = useCallback(async (item) => {
+    setActiveItem(item);
+    setGenStatus(item?.status || 'succeeded');
+    setErrorMsg("");
+    syncHistoryTaskInUrl(item);
+
+    if (!item?.model_url) {
+      revokeSelectedHistoryBlob();
+      setModelUrl(null);
+      return;
+    }
+
+    try {
+      const nextModelUrl = await fetchGlbAsBlob(item.model_url, getIdToken, item.taskId);
+      revokeSelectedHistoryBlob();
+      selectedHistoryBlobRef.current = nextModelUrl?.startsWith?.('blob:') ? nextModelUrl : null;
+      setModelUrl(nextModelUrl);
+    } catch (error) {
+      revokeSelectedHistoryBlob();
+      setModelUrl(null);
+      setGenStatus('failed');
+      setErrorMsg(error?.message || "Model loading failed");
+    }
+  }, [
+    getIdToken,
+    revokeSelectedHistoryBlob,
+    setActiveItem,
+    setErrorMsg,
+    setGenStatus,
+    setModelUrl,
+    syncHistoryTaskInUrl,
+  ]);
+
+  useEffect(() => {
+    if (!tripoTaskIdParam) return;
+    if (activeItem?.taskId === tripoTaskIdParam) return;
+    const item = historyItems.find((entry) => entry.taskId === tripoTaskIdParam || entry.id === tripoTaskIdParam);
+    if (!item) return;
+    void handleHistorySelect(item);
+  }, [activeItem?.taskId, handleHistorySelect, historyItems, tripoTaskIdParam]);
 
   const handleGenerateWrap = async () => {
+    revokeSelectedHistoryBlob();
     await handleGenerate();
     setRefreshTrigger(p => p + 1);
   };
@@ -66,65 +134,12 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
       leftSecondaryWidth={392}
       leftSecondaryClosedWidth={0}
       rightWidth={280}
+      hideLeftSecondaryToggle
       onOffsetChange={setOffsets}
       leftSidebar={globalSidebar}
       leftSecondarySidebar={
-        <div className="h-full flex flex-row overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
-          {/* Tool Strip (72px) - Now persistent when collapsed */}
-          <div className="w-[72px] h-full flex flex-col items-center pt-6 space-y-4 border-r border-white/5 bg-[#030308]">
-            {[
-              { id: 'model', label: 'MODEL', icon: <Sparkles className="w-5 h-5" />, color },
-              { id: 'segment', label: 'SEGMENT', icon: <Box className="w-5 h-5" />, color: '#94a3b8' },
-              { id: 'retopo', label: 'RETOPO', icon: <Layers className="w-5 h-5" />, color: '#94a3b8' },
-              { id: 'texture', label: 'TEXTURE', icon: <Paintbrush2 className="w-5 h-5" />, color: '#94a3b8' },
-              { id: 'edit', label: 'EDIT', icon: <Wand2 className="w-5 h-5" />, color: '#94a3b8' },
-              { id: 'refine', label: 'REFINE', icon: <RefreshCw className="w-5 h-5" />, color: '#94a3b8' },
-              { id: 'stylize', label: 'STYLIZE', icon: <Sparkles className="w-5 h-5" />, color: '#94a3b8' },
-              { id: 'animate', label: 'ANIMATE', icon: <PersonStanding className="w-5 h-5" />, color: '#94a3b8' },
-            ].map((tool, idx) => (
-              <button
-                key={tool.id}
-                className={`group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer ${idx === 0 ? 'mb-4' : ''}`}
-              >
-                <div
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${idx === 0
-                    ? "bg-white/5 border-white/10 shadow-xl"
-                    : "bg-transparent border-transparent"
-                    }`}
-                  style={idx === 0 ? { borderColor: `${tool.color}40`, color: tool.color } : { color: '#52525b' }}
-                >
-                  {tool.icon}
-                </div>
-                <AnimatePresence mode="wait">
-                  {leftSecondaryOpen && (
-                    <MotionSpan
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 overflow-hidden ${idx === 0 ? 'text-white' : 'text-zinc-700'}`}
-                    >
-                      {tool.label}
-                    </MotionSpan>
-                  )}
-                </AnimatePresence>
-              </button>
-            ))}
-
-            <div className="flex-1" />
-
-            <button
-              onClick={() => setLeftSecondaryOpen(!leftSecondaryOpen)}
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${leftSecondaryOpen
-                ? "bg-white/10 border-white/20 text-white shadow-lg"
-                : "bg-transparent border-transparent text-zinc-600 hover:text-zinc-400"
-                }`}
-              title="Toggle Panel"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-hidden">
+        <div className="h-full overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
+          <div className="h-full overflow-hidden">
             <TrellisControls
               prompt={prompt}
               setPrompt={setPrompt}
@@ -146,10 +161,11 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
       }
       rightSidebar={
         <Shared3DHistory
+          key={defaultHistoryTab}
           userId={userId}
           getIdToken={getIdToken}
           color="#60a5fa"
-          defaultTab="trellis"
+          defaultTab={defaultHistoryTab}
           firestoreCollectionsByTab={{
             tripo: 'tripo_history',
             trellis: 'trellis_history',
@@ -157,11 +173,8 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
           }}
           activeItemId={activeItem?.id}
           refreshTrigger={refreshTrigger}
-          onSelect={(item) => {
-            setActiveItem(item);
-            setModelUrl(item.model_url);
-            setGenStatus('succeeded');
-          }}
+          onSelect={handleHistorySelect}
+          onHistoryLoad={setHistoryItems}
           onReuse={(item) => {
             setPrompt(item.prompt);
           }}

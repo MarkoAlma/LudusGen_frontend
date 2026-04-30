@@ -11,14 +11,8 @@ const importsMotion = source.includes("import { motion, AnimatePresence } from '
   || source.includes('import { motion, AnimatePresence } from "framer-motion";');
 
 assert.equal(
-  usesMotionComponent,
-  true,
-  "TrellisGenerator should render its animated tool label through a framer-motion component",
-);
-
-assert.equal(
-  importsMotion,
-  true,
+  usesMotionComponent && !importsMotion,
+  false,
   "TrellisGenerator should import motion whenever it renders motion.* elements",
 );
 

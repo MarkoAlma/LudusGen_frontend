@@ -22,7 +22,7 @@ export function BgColorPicker({ value, onChange }) {
   
   return (
     <div style={{ position: 'relative', display: 'inline-flex' }} ref={ref}>
-      <Tooltip text="Háttér szín" side="bottom">
+      <Tooltip text="Background color" side="bottom">
         <button onClick={() => setOpen(v => !v)} style={{
           display: 'flex', alignItems: 'center', gap: 5,
           padding: '3px 8px', borderRadius: T.radius.sm, fontSize: 10, fontWeight: 700,

@@ -102,6 +102,7 @@ export const ENDPOINTS = {
 
   // Tripo
   TRIPO_TASK: '/api/tripo/task',
+  TRIPO_ASSET_NAME: '/api/tripo/asset-name',
   TRIPO_TASK_STATUS: (taskId) => `/api/tripo/task/${taskId}`,
   TRIPO_TASK_CANCEL: (taskId) => `/api/tripo/task/${taskId}/cancel`,
   TRIPO_UPLOAD: '/api/tripo/upload',

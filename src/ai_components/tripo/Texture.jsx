@@ -1408,8 +1408,8 @@ export default function Texture({
             badgeBg={pbrAvailable ? "rgba(0,229,255,0.12)" : "rgba(139,92,246,0.10)"}
             hint={
               pbrAvailable
-                ? "Ez a kijelolt asset mar texturazott modell, ezert uj texture pass vagy PBR is indithato ra."
-                : "Adj meg kepet vagy promptot, es ezen a modellen fog lefutni az elso texture generalas."
+                ? "This selected asset is already a textured model, so you can launch another texture pass or PBR on it."
+                : "Add an image or prompt, and the first texture generation will run on this model."
             }
           />
           <SelectedModelBadge
@@ -1422,9 +1422,9 @@ export default function Texture({
             hint={
               pbrAvailable
                 ? (pbrTargetResolved
-                  ? "A PBR az original/upstream modellen fog futni, nem a nyers downstream exporton."
-                  : "Ez mar egy texturazott modell, ugyhogy a PBR kozvetlenul kapcsolhato.")
-                : "Kapcsold be a PBR-t a texture passhez; draft modellen is egyutt generalodik a material map keszlet."
+                  ? "PBR will run on the original/upstream model, not the raw downstream export."
+                  : "This is already a textured model, so PBR can be enabled directly.")
+                : "Enable PBR for the texture pass; on draft models the material map set is generated together."
             }
             actionLabel={pbrTargetResolved ? "Use original model" : ""}
             onAction={pbrTargetResolved ? onUseOriginalModel : null}
@@ -1450,7 +1450,7 @@ export default function Texture({
           }}>
             <Info style={{ width: 14, height: 14, color: "#67e8f9", flexShrink: 0, marginTop: 1 }} />
             <p style={{ color: "#b8ecf5", fontSize: 10, fontWeight: 700, margin: 0, lineHeight: 1.6 }}>
-              A Tripo textúrázás egy futásban egy vezérlést használ: szöveget, egy referencia képet vagy többnézetes referenciát. A feltöltött kép irányadó referencia, nem pixelesen pontos texture-másolat.
+              Tripo texturing uses one control input per run: text, a reference image, or a multiview reference. The uploaded image acts as guidance, not a pixel-perfect texture copy.
             </p>
           </div>
 

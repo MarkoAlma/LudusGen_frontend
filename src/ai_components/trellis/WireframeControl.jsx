@@ -21,7 +21,7 @@ export function WireframeControl({ active, onToggle, opacity, onOpacityChange, c
   
   return (
     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 0 }} ref={ref}>
-      <Tooltip text={active ? 'Wire overlay kikapcsolása' : 'Wire overlay bekapcsolása'} side="bottom">
+      <Tooltip text={active ? 'Disable wire overlay' : 'Enable wire overlay'} side="bottom">
         <button onClick={onToggle} style={{
           padding: '3px 8px', borderRadius: open ? '6px 0 0 6px' : T.radius.sm,
           fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', transition: 'all 0.15s',
@@ -30,7 +30,7 @@ export function WireframeControl({ active, onToggle, opacity, onOpacityChange, c
           outline: active ? `1px solid ${accentColor}40` : '1px solid rgba(255,255,255,0.07)',
         }}>Wire</button>
       </Tooltip>
-      <Tooltip text="Wire beállítások" side="bottom">
+      <Tooltip text="Wire settings" side="bottom">
         <button onClick={() => setOpen(v => !v)} style={{
           padding: '3px 5px', borderRadius: open ? '0 6px 6px 0' : T.radius.sm,
           fontSize: 9, cursor: 'pointer', border: 'none', transition: 'all 0.15s',
@@ -50,7 +50,7 @@ export function WireframeControl({ active, onToggle, opacity, onOpacityChange, c
           <p style={{ color: '#e5e7eb', fontSize: 11, fontWeight: 800, margin: '0 0 12px', letterSpacing: '-0.01em' }}>Wire overlay</p>
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-              <span style={{ color: '#4b5563', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'SF Mono', monospace" }}>Átlátszóság</span>
+              <span style={{ color: '#4b5563', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'SF Mono', monospace" }}>Opacity</span>
               <span style={{ color: accentColor, fontSize: 10, fontWeight: 800, fontFamily: "'SF Mono', monospace" }}>{Math.round(opacity * 100)}%</span>
             </div>
             <div style={{ position: 'relative', height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
@@ -67,7 +67,7 @@ export function WireframeControl({ active, onToggle, opacity, onOpacityChange, c
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ color: '#4b5563', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'SF Mono', monospace" }}>Szín</span>
+            <span style={{ color: '#4b5563', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'SF Mono', monospace" }}>Color</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {['#ffffff', '#84cc16', '#60a5fa', '#f87171'].map(c => (
                 <button key={c} onClick={() => onColorChange(c)} style={{

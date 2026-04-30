@@ -4,6 +4,8 @@ import { ChevronDown, Camera, Check, Edit3, ImagePlus, Images, Layers3, Loader2,
 import { motion as Motion } from "framer-motion";
 import { enhancePrompt } from "../../api/client";
 import { GalleryPickerModal } from "../../components/image_studio/ImageControls";
+import TripoImageSourceChoiceModal from "./TripoImageSourceChoiceModal";
+import { galleryItemsToFiles } from "./tripoGalleryFileUtils";
 import {
   getTripoGenerateImageInputPolicy,
   getTripoGenerateImageModel,
@@ -37,59 +39,6 @@ function createLocalReferenceId(file, index = 0) {
     file?.size || 0,
     file?.lastModified || 0,
   ].join("-");
-}
-
-function dataUrlToFile(dataUrl, name = "gallery-image.png") {
-  const [header = "", base64 = ""] = String(dataUrl || "").split(",");
-  const mime = header.match(/data:([^;]+)/)?.[1] || "image/png";
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return new File([bytes], name, { type: mime });
-}
-
-function ImageSourceChoiceModal({ title = "Add image", onClose, onDevice, onGallery }) {
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 backdrop-blur-xl"
-      onClick={onClose}
-    >
-      <div
-        className="w-[min(92vw,360px)] rounded-2xl border border-white/10 bg-[#0a0a14] p-3 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="px-2 py-2">
-          <h3 className="text-[11px] font-black text-white uppercase tracking-[0.22em]">{title}</h3>
-          <p className="mt-1 text-[9px] font-bold text-white/30 uppercase tracking-[0.18em]">
-            Choose image source
-          </p>
-        </div>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={onDevice}
-            className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.035] text-zinc-300 transition-all hover:border-cyan-300/30 hover:bg-cyan-300/[0.06]"
-          >
-            <Upload className="h-5 w-5 text-cyan-200" />
-            <span className="text-[10px] font-black uppercase tracking-[0.16em]">Device</span>
-          </button>
-          <button
-            type="button"
-            onClick={onGallery}
-            className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.035] text-zinc-300 transition-all hover:border-violet-300/30 hover:bg-violet-300/[0.06]"
-          >
-            <Images className="h-5 w-5 text-violet-200" />
-            <span className="text-[10px] font-black uppercase tracking-[0.16em]">Gallery</span>
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
 }
 
 function cleanEnhancedPrompt(raw) {
@@ -183,7 +132,7 @@ function TripoSelect({ value, onChange, options }) {
   );
 }
 
-function TripoOverlaySelect({ value, onChange, options }) {
+function TripoOverlaySelect({ value, onChange, options, className = "", menuClassName = "" }) {
   const [open, setOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState(null);
   const rootRef = useRef(null);
@@ -235,7 +184,11 @@ function TripoOverlaySelect({ value, onChange, options }) {
   }, [open]);
 
   const menu = open && typeof document !== "undefined" ? createPortal(
-    <div ref={menuRef} className="tp-custom-select-menu" style={menuStyle || undefined}>
+    <div
+      ref={menuRef}
+      className={["tp-custom-select-menu", menuClassName].filter(Boolean).join(" ")}
+      style={menuStyle || undefined}
+    >
       {options.map((option) => {
         const capability = getSelectCapabilityLabel(option);
         const isSelected = option.value === value;
@@ -287,7 +240,7 @@ function TripoOverlaySelect({ value, onChange, options }) {
   return (
     <div
       ref={rootRef}
-      className={`tp-custom-select${open ? " open" : ""}`}
+      className={["tp-custom-select", className, open ? "open" : ""].filter(Boolean).join(" ")}
       style={{ position: "relative" }}
     >
       <button
@@ -402,39 +355,69 @@ export default function MultiviewImagesPanel({
   }, [enhancingImagePrompt, getIdToken, prompt, promptEnabled, setPrompt]);
 
   const labelStyle = {
-    color: "rgba(225,226,212,0.70)",
+    color: "rgba(225,226,212,0.74)",
     fontSize: 10,
     fontWeight: 950,
-    letterSpacing: "0.14em",
+    letterSpacing: "0.16em",
     textTransform: "uppercase",
     display: "block",
-    marginBottom: 6,
+    marginBottom: 8,
   };
   const fieldStyle = {
     width: "100%",
-    padding: "12px 14px",
-    borderRadius: 16,
-    border: "1px solid rgba(139,220,255,0.16)",
-    background: "linear-gradient(145deg, rgba(15,23,42,0.44), rgba(3,7,18,0.34))",
-    color: "#e2e8f0",
+    padding: "14px 16px",
+    borderRadius: 18,
+    border: "1px solid rgba(255,255,255,0.09)",
+    background: "linear-gradient(180deg, rgba(31,34,53,0.82), rgba(18,20,34,0.94))",
+    color: "#f1f5f9",
     fontSize: 12,
-    fontWeight: 700,
+    fontWeight: 800,
     boxSizing: "border-box",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 24px rgba(0,0,0,0.12)",
   };
   const sourceModeBtnStyle = (index, count = 1) => ({
     flex: 1,
     minWidth: 0,
-    minHeight: 48,
+    minHeight: 50,
     border: 0,
-    borderLeft: index > 0 ? "1px solid rgba(139,220,255,0.12)" : 0,
+    borderLeft: index > 0 ? "1px solid rgba(255,255,255,0.07)" : 0,
     background: "transparent",
-    color: "#94a3b8",
+    color: "rgba(226,232,240,0.72)",
     fontSize: count >= 3 ? 9 : 10,
     fontWeight: 900,
     textTransform: "uppercase",
-    letterSpacing: "0.04em",
+    letterSpacing: "0.07em",
   });
+  const sectionCardStyle = {
+    borderRadius: 18,
+    border: "1px solid rgba(255,255,255,0.08)",
+    background: "linear-gradient(180deg, rgba(24,27,43,0.84), rgba(15,17,29,0.96))",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 22px rgba(0,0,0,0.12)",
+  };
+  const buildInfoCardStyle = (tone = "neutral") => {
+    if (tone === "accent") {
+      return {
+        ...sectionCardStyle,
+        border: "1px solid rgba(138,43,226,0.18)",
+        background: "linear-gradient(180deg, rgba(36,30,58,0.84), rgba(17,17,31,0.96))",
+      };
+    }
+    if (tone === "success") {
+      return {
+        ...sectionCardStyle,
+        border: "1px solid rgba(16,185,129,0.18)",
+        background: "linear-gradient(180deg, rgba(21,39,37,0.84), rgba(16,18,28,0.96))",
+      };
+    }
+    if (tone === "warning") {
+      return {
+        ...sectionCardStyle,
+        border: "1px solid rgba(245,158,11,0.18)",
+        background: "linear-gradient(180deg, rgba(42,33,24,0.84), rgba(18,18,28,0.96))",
+      };
+    }
+    return sectionCardStyle;
+  };
 
   const uploadPickedImage = (file, setter, uploader, previewOverride = null) => {
     const applyPreview = (preview) => {
@@ -552,18 +535,21 @@ export default function MultiviewImagesPanel({
   ]);
 
   const handleSourceGallerySelect = (imgs) => {
-    const first = imgs?.[0];
-    if (!first?.dataUrl) return;
-    const file = dataUrlToFile(first.dataUrl, first.name || "gallery-source.png");
-    uploadPickedImage(file, setSourceImage, uploadImage, first.dataUrl);
+    const first = galleryItemsToFiles(
+      imgs?.slice(0, 1),
+      (img) => img?.name || "gallery-source.png",
+    )[0];
+    if (!first) return;
+    uploadPickedImage(first.file, setSourceImage, uploadImage, first.preview);
   };
 
   const handleReferenceGallerySelect = (imgs) => {
     const slotsLeft = Math.max(0, referenceSlotsRemaining);
-    imgs.slice(0, slotsLeft).forEach((img, index) => {
-      if (!img?.dataUrl) return;
-      const file = dataUrlToFile(img.dataUrl, img.name || `gallery-reference-${index + 1}.png`);
-      addReferenceFile(file, index, img.dataUrl);
+    galleryItemsToFiles(
+      imgs?.slice(0, slotsLeft),
+      (img, index) => img?.name || `gallery-reference-${index + 1}.png`,
+    ).forEach(({ file, preview }, index) => {
+      addReferenceFile(file, index, preview);
     });
   };
 
@@ -602,9 +588,11 @@ export default function MultiviewImagesPanel({
       aria-disabled={disabled}
       style={{
         minHeight: 168,
-        borderRadius: 18,
-        border: disabled ? "1.5px dashed rgba(148,163,184,0.16)" : "1.5px dashed rgba(0,229,255,0.28)",
-        background: disabled ? "rgba(15,23,42,0.22)" : "rgba(255,255,255,0.025)",
+        borderRadius: 22,
+        border: disabled ? "1px dashed rgba(148,163,184,0.18)" : "1px dashed rgba(138,43,226,0.26)",
+        background: disabled
+          ? "linear-gradient(180deg, rgba(23,26,40,0.62), rgba(16,18,30,0.82))"
+          : "linear-gradient(180deg, rgba(28,31,48,0.80), rgba(17,19,32,0.94))",
         cursor: disabled ? "not-allowed" : "pointer",
         overflow: "hidden",
         position: "relative",
@@ -612,6 +600,7 @@ export default function MultiviewImagesPanel({
         alignItems: "center",
         justifyContent: "center",
         opacity: disabled ? 0.62 : 1,
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 24px rgba(0,0,0,0.12)",
       }}
     >
       {value?.preview ? (
@@ -629,10 +618,10 @@ export default function MultiviewImagesPanel({
           )}
         </>
       ) : (
-        <div style={{ textAlign: "center", padding: 18 }}>
+        <div style={{ textAlign: "center", padding: 22 }}>
           {emptyIcon}
-          <div style={{ color: disabled ? "rgba(226,232,240,0.54)" : "#e2e8f0", fontSize: 12, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em" }}>{emptyTitle}</div>
-          <div style={{ color: disabled ? "rgba(148,163,184,0.58)" : "rgba(148,163,184,0.78)", fontSize: 10, fontWeight: 700, marginTop: 6 }}>{disabled ? disabledHint : emptyHint}</div>
+          <div style={{ color: disabled ? "rgba(226,232,240,0.54)" : "#f1f5f9", fontSize: 12, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em" }}>{emptyTitle}</div>
+          <div style={{ color: disabled ? "rgba(148,163,184,0.58)" : "rgba(148,163,184,0.78)", fontSize: 10, fontWeight: 700, marginTop: 8, lineHeight: 1.45 }}>{disabled ? disabledHint : emptyHint}</div>
         </div>
       )}
     </div>
@@ -702,16 +691,16 @@ export default function MultiviewImagesPanel({
                 style={{
                   minHeight: 104,
                   aspectRatio: "1 / 1",
-                  borderRadius: 16,
+                  borderRadius: 18,
                   border: isActive
-                    ? ready ? "1px solid rgba(16,185,129,0.26)" : "1px solid rgba(0,229,255,0.20)"
-                    : "1px solid rgba(245,158,11,0.26)",
-                  background: "rgba(255,255,255,0.026)",
+                    ? ready ? "1px solid rgba(16,185,129,0.22)" : "1px solid rgba(138,43,226,0.18)"
+                    : "1px solid rgba(245,158,11,0.20)",
+                  background: "linear-gradient(180deg, rgba(28,31,48,0.80), rgba(17,19,32,0.94))",
                   overflow: "hidden",
                   position: "relative",
                   boxShadow: isActive
-                    ? ready ? "0 0 18px rgba(16,185,129,0.08)" : "0 0 18px rgba(0,229,255,0.06)"
-                    : "0 0 18px rgba(245,158,11,0.07)",
+                    ? ready ? "0 10px 20px rgba(0,0,0,0.12)" : "0 10px 20px rgba(0,0,0,0.12)"
+                    : "0 8px 18px rgba(0,0,0,0.10)",
                   opacity: isActive ? 1 : 0.72,
                   cursor: item.preview ? "zoom-in" : "default",
                 }}
@@ -770,10 +759,10 @@ export default function MultiviewImagesPanel({
               style={{
                 minHeight: 104,
                 aspectRatio: "1 / 1",
-                borderRadius: 16,
-                border: "1.5px dashed rgba(0,229,255,0.30)",
-                background: "rgba(0,229,255,0.045)",
-                color: "#a5f3fc",
+                borderRadius: 18,
+                border: "1px dashed rgba(138,43,226,0.26)",
+                background: "linear-gradient(180deg, rgba(31,34,53,0.82), rgba(18,20,34,0.94))",
+                color: "#f1ecff",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -815,7 +804,7 @@ export default function MultiviewImagesPanel({
 
   return (
     <div className="tp-workflow-page" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div className="tp-source-mode-row" style={{ display: "flex", borderRadius: 20, overflow: "hidden", background: "rgba(3,7,18,0.28)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.045)" }}>
+      <div className="tp-source-mode-row tp-image-mode-clean" style={{ display: "flex", borderRadius: 24, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)", background: "linear-gradient(180deg, rgba(23,25,38,0.92), rgba(14,16,27,0.98))", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)" }}>
         <button
           type="button"
           className={`tp-source-mode-btn-clean${mode === "generate_image" ? " active" : ""}`}
@@ -848,15 +837,15 @@ export default function MultiviewImagesPanel({
         </button>
       </div>
 
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 16, background: "rgba(0,229,255,0.055)", border: "1px solid rgba(0,229,255,0.14)", boxShadow: "0 0 22px rgba(0,229,255,0.06)" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", ...buildInfoCardStyle("accent") }}>
         {mode === "generate_image" ? (
-          <Sparkles style={{ width: 15, height: 15, color: "#00e5ff", flex: "0 0 auto", marginTop: 1 }} />
+          <Sparkles style={{ width: 15, height: 15, color: "#c4b5fd", flex: "0 0 auto", marginTop: 1 }} />
         ) : mode === "generate_multiview_image" ? (
-          <Camera style={{ width: 15, height: 15, color: "#00e5ff", flex: "0 0 auto", marginTop: 1 }} />
+          <Camera style={{ width: 15, height: 15, color: "#c4b5fd", flex: "0 0 auto", marginTop: 1 }} />
         ) : (
-          <Edit3 style={{ width: 15, height: 15, color: "#00e5ff", flex: "0 0 auto", marginTop: 1 }} />
+          <Edit3 style={{ width: 15, height: 15, color: "#c4b5fd", flex: "0 0 auto", marginTop: 1 }} />
         )}
-        <p style={{ color: "rgba(226,232,240,0.72)", fontSize: 10, fontWeight: 700, lineHeight: 1.5, margin: 0 }}>{helpText}</p>
+        <p style={{ color: "rgba(226,232,240,0.78)", fontSize: 10, fontWeight: 700, lineHeight: 1.55, margin: 0 }}>{helpText}</p>
       </div>
 
       {mode === "generate_image" ? (
@@ -867,6 +856,8 @@ export default function MultiviewImagesPanel({
               value={generationModel}
               onChange={handleGenerationModelChange}
               options={imageModelOptions}
+              className="tp-image-engine-clean"
+              menuClassName="tp-image-engine-menu-clean"
             />
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginTop: 6 }}>
               <p style={{ color: "rgba(148,163,184,0.72)", fontSize: 10, fontWeight: 800, lineHeight: 1.45, margin: 0 }}>
@@ -888,12 +879,14 @@ export default function MultiviewImagesPanel({
                   onClick={handleEnhanceImagePrompt}
                   title={!promptEnabled ? "This engine does not use a prompt" : !prompt.trim() ? "Write a prompt first" : "Enhance this image prompt"}
                   style={{
-                    minHeight: 28,
-                    padding: "0 10px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(0,229,255,0.18)",
-                    background: promptEnabled && prompt.trim() ? "rgba(0,229,255,0.08)" : "rgba(255,255,255,0.026)",
-                    color: promptEnabled && prompt.trim() ? "#a5f3fc" : "rgba(148,163,184,0.48)",
+                    minHeight: 30,
+                    padding: "0 12px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    background: promptEnabled && prompt.trim()
+                      ? "linear-gradient(180deg, rgba(42,45,68,0.92), rgba(25,27,42,0.98))"
+                      : "rgba(255,255,255,0.026)",
+                    color: promptEnabled && prompt.trim() ? "#f1f5f9" : "rgba(148,163,184,0.48)",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 6,
@@ -901,7 +894,8 @@ export default function MultiviewImagesPanel({
                     fontSize: 9,
                     fontWeight: 950,
                     textTransform: "uppercase",
-                    letterSpacing: "0.08em",
+                    letterSpacing: "0.10em",
+                    boxShadow: promptEnabled && prompt.trim() ? "inset 0 1px 0 rgba(255,255,255,0.06)" : "none",
                   }}
                 >
                   {enhancingImagePrompt ? (
@@ -929,7 +923,7 @@ export default function MultiviewImagesPanel({
               style={{ ...fieldStyle, resize: "vertical", minHeight: 96, opacity: promptEnabled ? 1 : 0.52, cursor: promptEnabled ? "text" : "not-allowed" }}
             />
             {enhanceError && (
-              <div style={{ marginTop: 6, padding: "7px 9px", borderRadius: 10, border: "1px solid rgba(248,113,113,0.22)", background: "rgba(248,113,113,0.08)", color: "#fca5a5", fontSize: 10, fontWeight: 800, lineHeight: 1.45 }}>
+              <div style={{ marginTop: 6, padding: "8px 10px", borderRadius: 12, border: "1px solid rgba(248,113,113,0.20)", background: "linear-gradient(180deg, rgba(67,31,39,0.72), rgba(35,18,24,0.86))", color: "#fca5a5", fontSize: 10, fontWeight: 800, lineHeight: 1.45 }}>
                 {enhanceError}
               </div>
             )}
@@ -938,9 +932,9 @@ export default function MultiviewImagesPanel({
             <label style={labelStyle}>{referenceEnabled ? "Reference Images" : "Reference Images Disabled"}</label>
             {renderReferenceUploadGrid()}
           </div>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 16, background: isReferenceUploaded ? "rgba(16,185,129,0.07)" : "rgba(255,255,255,0.026)", border: isReferenceUploaded ? "1px solid rgba(16,185,129,0.22)" : "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", ...buildInfoCardStyle(isReferenceUploaded ? "success" : "neutral") }}>
             <Wand2 style={{ width: 15, height: 15, color: isReferenceUploaded ? "#10B981" : "#94a3b8", flex: "0 0 auto", marginTop: 1 }} />
-            <p style={{ color: "rgba(226,232,240,0.72)", fontSize: 10, fontWeight: 800, lineHeight: 1.5, margin: 0 }}>
+            <p style={{ color: "rgba(226,232,240,0.76)", fontSize: 10, fontWeight: 800, lineHeight: 1.55, margin: 0 }}>
               {isPromptOnlyEngine
                 ? "Prompt-only engine selected. Image upload is disabled and no reference will be sent."
                 : isReferenceUploaded
@@ -951,9 +945,9 @@ export default function MultiviewImagesPanel({
         </div>
       ) : mode === "generate_multiview_image" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 16, background: isSourceUploaded ? "rgba(16,185,129,0.07)" : "rgba(255,255,255,0.026)", border: isSourceUploaded ? "1px solid rgba(16,185,129,0.22)" : "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", ...buildInfoCardStyle(isSourceUploaded ? "success" : "neutral") }}>
             <Layers3 style={{ width: 15, height: 15, color: isSourceUploaded ? "#10B981" : "#94a3b8", flex: "0 0 auto", marginTop: 1 }} />
-            <p style={{ color: "rgba(226,232,240,0.72)", fontSize: 10, fontWeight: 800, lineHeight: 1.5, margin: 0 }}>
+            <p style={{ color: "rgba(226,232,240,0.76)", fontSize: 10, fontWeight: 800, lineHeight: 1.55, margin: 0 }}>
               {isSourceUploaded ? "Source image uploaded. Use the bottom action button to generate the guide views." : "No extra settings needed here: Tripo only needs one source image for Generate Views."}
             </p>
           </div>
@@ -968,9 +962,9 @@ export default function MultiviewImagesPanel({
         </div>
       ) : (
         <>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 16, background: hasSelectedTask ? "rgba(16,185,129,0.07)" : "rgba(245,158,11,0.055)", border: hasSelectedTask ? "1px solid rgba(16,185,129,0.22)" : "1px solid rgba(245,158,11,0.22)" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", ...buildInfoCardStyle(hasSelectedTask ? "success" : "warning") }}>
             <Check style={{ width: 15, height: 15, color: hasSelectedTask ? "#10B981" : "#F59E0B", flex: "0 0 auto", marginTop: 1 }} />
-            <p style={{ color: "rgba(226,232,240,0.72)", fontSize: 10, fontWeight: 800, lineHeight: 1.5, margin: 0 }}>
+            <p style={{ color: "rgba(226,232,240,0.76)", fontSize: 10, fontWeight: 800, lineHeight: 1.55, margin: 0 }}>
               {hasSelectedTask ? "Using the latest generated or selected multiview image set automatically." : "No generated views are selected yet. Generate Views first."}
             </p>
           </div>
@@ -997,12 +991,14 @@ export default function MultiviewImagesPanel({
                       textTransform: "uppercase",
                       transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                       cursor: "pointer",
-                      border: active ? "2px solid #00e5ff" : "1px solid rgba(255,255,255,0.09)",
-                      background: active ? "linear-gradient(145deg, rgba(0,229,255,0.3), rgba(138,43,226,0.2))" : "rgba(255,255,255,0.04)",
-                      boxShadow: active ? "0 0 25px rgba(0,229,255,0.4), inset 0 1px 0 rgba(255,255,255,0.2)" : "none",
-                      color: active ? "#ffffff" : "rgba(255,255,255,0.4)",
-                      opacity: active ? 1 : 0.7,
-                      transform: active ? "scale(1.02)" : "scale(1)",
+                      border: active ? "1px solid rgba(138,43,226,0.22)" : "1px solid rgba(255,255,255,0.09)",
+                      background: active
+                        ? "linear-gradient(180deg, rgba(78,69,118,0.94), rgba(52,48,84,0.98))"
+                        : "linear-gradient(180deg, rgba(31,34,53,0.82), rgba(18,20,34,0.94))",
+                      boxShadow: active ? "inset 0 1px 0 rgba(255,255,255,0.10), 0 10px 20px rgba(0,0,0,0.14)" : "inset 0 1px 0 rgba(255,255,255,0.04)",
+                      color: active ? "#ffffff" : "rgba(226,232,240,0.62)",
+                      opacity: 1,
+                      transform: "scale(1)",
                     }}
                   >
                     {option.label}
@@ -1018,8 +1014,9 @@ export default function MultiviewImagesPanel({
         </>
       )}
       {sourceChoice && (
-        <ImageSourceChoiceModal
+        <TripoImageSourceChoiceModal
           title={sourceChoice === "reference" ? "Add reference image" : "Add source image"}
+          subtitle="Choose whether the Tripo image input should come from your device or the shared gallery."
           onClose={() => setSourceChoice(null)}
           onDevice={handleSourceChoiceDevice}
           onGallery={handleSourceChoiceGallery}
@@ -1031,6 +1028,10 @@ export default function MultiviewImagesPanel({
           onSelectMultiple={handleSourceGallerySelect}
           getIdToken={getIdToken}
           slotsAvailable={1}
+          variant="tripo"
+          title="Gallery Vault"
+          subtitle="Pick one saved gallery image as the Tripo source image."
+          confirmLabel="Load selected"
         />
       )}
       {referenceGalleryOpen && (
@@ -1039,6 +1040,10 @@ export default function MultiviewImagesPanel({
           onSelectMultiple={handleReferenceGallerySelect}
           getIdToken={getIdToken}
           slotsAvailable={Math.max(0, referenceSlotsRemaining)}
+          variant="tripo"
+          title="Gallery Vault"
+          subtitle="Reuse shared gallery images as Tripo references."
+          confirmLabel="Load selected"
         />
       )}
     </div>
