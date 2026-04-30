@@ -1,300 +1,355 @@
-import React, { useState } from "react";
-import {
-  Settings,
-  X,
-  Save,
-  Eye,
-  Plus,
-  Trash2,
-  Upload,
-  Download,
-  RotateCcw,
-} from "lucide-react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle2, ExternalLink, EyeOff, Flag, Loader2, RotateCcw, Shield, XCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { API_BASE, ENDPOINTS } from '../api/client';
+import { MyUserContext } from '../context/MyUserProvider';
+import { auth } from '../firebase/firebaseApp';
+
+const STATUS_OPTIONS = [
+  { id: 'all', label: 'All' },
+  { id: 'open', label: 'Open' },
+  { id: 'reviewed', label: 'Reviewed' },
+  { id: 'resolved', label: 'Resolved' },
+  { id: 'dismissed', label: 'Dismissed' },
+];
+
+const STATUS_STYLES = {
+  open: 'border-red-400/30 bg-red-400/10 text-red-200',
+  reviewed: 'border-blue-400/30 bg-blue-400/10 text-blue-200',
+  resolved: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200',
+  dismissed: 'border-gray-400/20 bg-white/5 text-gray-300',
+};
+
+const CONTENT_ACTION_LABELS = {
+  hidden: 'Content hidden',
+  restored: 'Content restored',
+  target_missing: 'Target missing',
+};
+
+const ADMIN_EMAIL = 'ludusgen@gmail.com';
+
+function isLudusgenAdmin(user) {
+  return typeof user?.email === 'string' && user.email.trim().toLowerCase() === ADMIN_EMAIL;
+}
+
+function formatReportDate(value) {
+  if (!value) return 'No date';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'No date';
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function sourceLabel(type) {
+  if (type === 'forum_post') return 'Forum post';
+  if (type === 'forum_comment') return 'Forum comment';
+  if (type === 'marketplace_asset') return 'Marketplace';
+  return 'Report';
+}
+
+function StatTile({ label, value, tone = 'text-white' }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500">{label}</p>
+      <p className={`mt-2 text-2xl font-black ${tone}`}>{value}</p>
+    </div>
+  );
+}
 
 export default function LudusGenAdmin() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("content");
+  const { user, authLoading } = useContext(MyUserContext);
+  const navigate = useNavigate();
+  const [reports, setReports] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState('');
+  const [moderatingId, setModeratingId] = useState('');
+  const [error, setError] = useState('');
+  const canAccess = isLudusgenAdmin(user);
 
-  // Example state - replace with your actual state management
-  const [content, setContent] = useState({
-    heroTitle: "A jövő AI platformja",
-    heroSubtitle: "már itt van",
-    description: "Tapasztald meg a következő generációs AI technológiát...",
-    ctaPrimary: "Próbáld ki ingyen",
-    ctaSecondary: "Nézd meg működés közben",
-  });
+  const loadReports = useCallback(async () => {
+    if (!canAccess) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`${API_BASE}${ENDPOINTS.ADMIN_REPORTS}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to load reports');
+      setReports(data.reports || []);
+    } catch (err) {
+      setError(err.message || 'Failed to load reports');
+    } finally {
+      setLoading(false);
+    }
+  }, [canAccess]);
+
+  useEffect(() => {
+    if (!authLoading) loadReports();
+  }, [authLoading, loadReports]);
+
+  const filteredReports = useMemo(() => {
+    if (statusFilter === 'all') return reports;
+    return reports.filter((report) => report.status === statusFilter);
+  }, [reports, statusFilter]);
+
+  const stats = useMemo(() => ({
+    total: reports.length,
+    open: reports.filter((report) => report.status === 'open').length,
+    reviewed: reports.filter((report) => report.status === 'reviewed').length,
+    resolved: reports.filter((report) => report.status === 'resolved').length,
+  }), [reports]);
+
+  const updateStatus = async (reportId, status) => {
+    setUpdatingId(reportId);
+    try {
+      const token = await auth.currentUser?.getIdToken(true);
+      const res = await fetch(`${API_BASE}${ENDPOINTS.ADMIN_REPORT(reportId)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update report');
+      setReports((prev) => prev.map((report) => (report.id === reportId ? data.report : report)));
+      toast.success('Report status updated');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update report');
+    } finally {
+      setUpdatingId('');
+    }
+  };
+
+  const performContentAction = async (report, action) => {
+    if (!report?.id || moderatingId) return;
+    const actionLabel = action === 'hide_content' ? 'hide this content' : 'restore this content';
+    if (!window.confirm(`Are you sure you want to ${actionLabel}?`)) return;
+
+    setModeratingId(report.id);
+    try {
+      const token = await auth.currentUser?.getIdToken(true);
+      const res = await fetch(`${API_BASE}${ENDPOINTS.ADMIN_REPORT_ACTION(report.id)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update content');
+      setReports((prev) => prev.map((item) => (item.id === report.id ? data.report : item)));
+      toast.success(action === 'hide_content' ? 'Content hidden' : 'Content restored');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update content');
+    } finally {
+      setModeratingId('');
+    }
+  };
+
+  const openReportTarget = (report) => {
+    if (report.sourceType === 'marketplace_asset' && report.targetId) {
+      navigate('/marketplace', {
+        state: { openMarketplaceAssetId: report.targetId },
+      });
+      return;
+    }
+    if (report.targetPath) navigate(report.targetPath);
+  };
+
+  if (authLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#05030a] text-white">
+        <Loader2 className="h-7 w-7 animate-spin text-primary" />
+      </main>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <main className="min-h-screen bg-[#05030a] px-6 py-32 text-white">
+        <div className="mx-auto max-w-2xl rounded-3xl border border-red-400/20 bg-red-400/10 p-8">
+          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-red-400/20 bg-red-400/10 text-red-200">
+            <Shield className="h-7 w-7" />
+          </div>
+          <h1 className="text-3xl font-black tracking-tight">Admin access required</h1>
+          <p className="mt-3 text-sm font-bold leading-relaxed text-red-100/70">
+            The /admin report view is only available for the LudusGen admin account.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <>
-      {/* Floating Admin Button */}
-      <button
-        style={{ cursor: "pointer" }}
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-8 right-8 z-[9999] bg-gradient-to-br from-purple-600 to-pink-600 text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform duration-300"
-      >
-        {isOpen ? <X size={24} /> : <Settings size={24} />}
-      </button>
-
-      {/* Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998]"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-
-      {/* Admin Panel */}
-      <div
-        className={`fixed top-0 right-0 h-full w-full sm:w-[500px] bg-gradient-to-b from-[#1a1a2e] to-[#0f0f1e] shadow-2xl z-[9999] transform transition-transform duration-500 ease-out border-l border-purple-500/20 ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 p-6 border-b border-purple-500/20">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-2xl font-bold text-white">Admin Panel</h2>
-              <p className="text-purple-300 text-sm">LudusGen Szerkesztő</p>
+    <main className="min-h-screen bg-[#05030a] px-4 pb-20 pt-28 text-white sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <header className="flex flex-col gap-5 rounded-3xl border border-white/10 bg-white/[0.03] p-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.24em] text-primary">
+              <Flag className="h-3.5 w-3.5" />
+              Reports
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="text-gray-400 hover:text-white transition-colors p-2"
-            >
-              <X size={24} />
-            </button>
+            <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Admin reports</h1>
+            <p className="mt-2 max-w-2xl text-sm font-bold leading-relaxed text-gray-400">
+              Marketplace and forum reports arrive here for moderation review.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={loadReports}
+            className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-5 text-xs font-black uppercase tracking-[0.18em] text-gray-300 transition hover:border-primary/40 hover:text-white"
+          >
+            Refresh
+          </button>
+        </header>
+
+        <section className="grid gap-3 sm:grid-cols-4">
+          <StatTile label="Total" value={stats.total} />
+          <StatTile label="Open" value={stats.open} tone="text-red-200" />
+          <StatTile label="Reviewed" value={stats.reviewed} tone="text-blue-200" />
+          <StatTile label="Resolved" value={stats.resolved} tone="text-emerald-200" />
+        </section>
+
+        <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="mb-4 flex flex-wrap gap-2">
+            {STATUS_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setStatusFilter(option.id)}
+                className={`rounded-2xl px-4 py-2 text-xs font-black uppercase tracking-[0.18em] transition ${
+                  statusFilter === option.id
+                    ? 'bg-primary text-white'
+                    : 'border border-white/10 bg-white/[0.03] text-gray-500 hover:text-white'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex gap-2">
-            <button className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center justify-center gap-2 text-sm font-semibold">
-              <Save size={16} />
-              Mentés
-            </button>
-            <button className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-4 py-2.5 rounded-lg hover:brightness-110 transition-all flex items-center justify-center gap-2 text-sm font-semibold">
-              <Eye size={16} />
-              Előnézet
-            </button>
-          </div>
-        </div>
+          {loading ? (
+            <div className="flex min-h-80 items-center justify-center">
+              <Loader2 className="h-7 w-7 animate-spin text-primary" />
+            </div>
+          ) : error ? (
+            <div className="flex min-h-80 flex-col items-center justify-center gap-3 text-center">
+              <AlertTriangle className="h-9 w-9 text-red-300" />
+              <p className="text-sm font-bold text-red-100">{error}</p>
+            </div>
+          ) : filteredReports.length === 0 ? (
+            <div className="flex min-h-80 flex-col items-center justify-center gap-3 text-center">
+              <CheckCircle2 className="h-10 w-10 text-emerald-300" />
+              <p className="text-sm font-bold text-gray-400">No reports in this view.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredReports.map((report) => (
+                <article key={report.id} className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-gray-300">
+                          {sourceLabel(report.sourceType)}
+                        </span>
+                        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${STATUS_STYLES[report.status] || STATUS_STYLES.open}`}>
+                          {report.status || 'open'}
+                        </span>
+                        <span className="text-xs font-bold text-gray-600">{formatReportDate(report.createdAt)}</span>
+                      </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-purple-500/20 bg-[#0f0f1e]">
-          {["Tartalom", "Média", "Beállítások"].map((tab, idx) => (
-            <button
-              key={tab}
-              onClick={() =>
-                setActiveTab(["content", "media", "settings"][idx])
-              }
-              className={`flex-1 py-3 text-sm font-semibold transition-all ${
-                activeTab === ["content", "media", "settings"][idx]
-                  ? "text-purple-400 border-b-2 border-purple-500 bg-purple-500/10"
-                  : "text-gray-400 hover:text-gray-300"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+                      <h2 className="truncate text-lg font-black text-white">{report.targetTitle || report.targetId}</h2>
+                      <p className="mt-2 text-sm font-bold text-red-100/80">{report.reason}</p>
+                      {report.details && <p className="mt-2 text-sm leading-relaxed text-gray-400">{report.details}</p>}
+                      {report.contentAction && (
+                        <p className="mt-3 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-gray-400">
+                          {CONTENT_ACTION_LABELS[report.contentAction] || report.contentAction}
+                        </p>
+                      )}
 
-        {/* Content Area */}
-        <div className="h-[calc(100vh-200px)] overflow-y-auto p-6">
-          {activeTab === "content" && (
-            <div className="space-y-5">
-              {/* Input Fields */}
-              <div>
-                <label className="block text-purple-300 text-sm font-semibold mb-2">
-                  Főcím
-                </label>
-                <input
-                  type="text"
-                  value={content.heroTitle}
-                  onChange={(e) =>
-                    setContent({ ...content, heroTitle: e.target.value })
-                  }
-                  className="w-full bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
-                  placeholder="Írd be a főcímet..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-purple-300 text-sm font-semibold mb-2">
-                  Alcím (kiemelve)
-                </label>
-                <input
-                  type="text"
-                  value={content.heroSubtitle}
-                  onChange={(e) =>
-                    setContent({ ...content, heroSubtitle: e.target.value })
-                  }
-                  className="w-full bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
-                  placeholder="Kiemelendő rész..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-purple-300 text-sm font-semibold mb-2">
-                  Leírás
-                </label>
-                <textarea
-                  value={content.description}
-                  onChange={(e) =>
-                    setContent({ ...content, description: e.target.value })
-                  }
-                  rows={4}
-                  className="w-full bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all resize-none"
-                  placeholder="Leírás szövege..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-purple-300 text-sm font-semibold mb-2">
-                    Elsődleges gomb
-                  </label>
-                  <input
-                    type="text"
-                    value={content.ctaPrimary}
-                    onChange={(e) =>
-                      setContent({ ...content, ctaPrimary: e.target.value })
-                    }
-                    className="w-full bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-purple-300 text-sm font-semibold mb-2">
-                    Másodlagos gomb
-                  </label>
-                  <input
-                    type="text"
-                    value={content.ctaSecondary}
-                    onChange={(e) =>
-                      setContent({ ...content, ctaSecondary: e.target.value })
-                    }
-                    className="w-full bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* List Manager Example */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-purple-300 text-sm font-semibold">
-                    Funkciók
-                  </label>
-                  <button className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors">
-                    <Plus size={14} />
-                    Hozzáad
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    "Globális AI Hálózat",
-                    "Enterprise Biztonság",
-                    "AI Orchestration",
-                  ].map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 bg-gray-900/30 border border-purple-500/20 rounded-lg p-3"
-                    >
-                      <input
-                        type="text"
-                        value={item}
-                        className="flex-1 bg-transparent border-none text-white text-sm focus:outline-none"
-                      />
-                      <button className="text-red-400 hover:text-red-300 transition-colors p-1">
-                        <Trash2 size={16} />
-                      </button>
+                      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-gray-500">
+                        <span>Reporter: {report.reporterEmail || report.reporterId || 'unknown'}</span>
+                        {report.targetOwnerId && <span>Owner: {report.targetOwnerId}</span>}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
+
+                    <div className="flex shrink-0 flex-wrap gap-2 lg:w-72 lg:justify-end">
+                      {(report.targetPath || (report.sourceType === 'marketplace_asset' && report.targetId)) && (
+                        <button
+                          type="button"
+                          onClick={() => openReportTarget(report)}
+                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-black text-gray-300 transition hover:text-white"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Open
+                        </button>
+                      )}
+                      {report.contentAction === 'hidden' ? (
+                        <button
+                          type="button"
+                          disabled={moderatingId === report.id}
+                          onClick={() => performContentAction(report, 'restore_content')}
+                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-200 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          {moderatingId === report.id ? '...' : 'Restore Content'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={moderatingId === report.id || report.contentAction === 'target_missing'}
+                          onClick={() => performContentAction(report, 'hide_content')}
+                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-3 text-[10px] font-black uppercase tracking-[0.14em] text-red-200 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <EyeOff className="h-3.5 w-3.5" />
+                          {moderatingId === report.id ? '...' : 'Hide Content'}
+                        </button>
+                      )}
+                      {['reviewed', 'resolved', 'dismissed'].map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          disabled={updatingId === report.id || report.status === status}
+                          onClick={() => updateStatus(report.id, status)}
+                          className="h-10 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-[10px] font-black uppercase tracking-[0.14em] text-gray-400 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {updatingId === report.id ? '...' : status}
+                        </button>
+                      ))}
+                      {report.status !== 'open' && (
+                        <button
+                          type="button"
+                          disabled={updatingId === report.id}
+                          onClick={() => updateStatus(report.id, 'open')}
+                          className="h-10 rounded-xl border border-red-400/20 bg-red-400/10 px-3 text-[10px] font-black uppercase tracking-[0.14em] text-red-200 transition hover:text-white disabled:opacity-40"
+                        >
+                          <XCircle className="mr-1 inline h-3.5 w-3.5" />
+                          Reopen
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           )}
-
-          {activeTab === "media" && (
-            <div className="space-y-5">
-              <div className="border-2 border-dashed border-purple-500/30 rounded-lg p-8 text-center hover:border-purple-500/50 transition-colors cursor-pointer">
-                <Upload size={32} className="mx-auto text-purple-400 mb-3" />
-                <p className="text-white font-semibold mb-1">Kép feltöltése</p>
-                <p className="text-gray-400 text-sm">
-                  Kattints vagy húzd ide a fájlt
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-purple-300 text-sm font-semibold mb-2">
-                  Kép URL
-                </label>
-                <input
-                  type="text"
-                  className="w-full bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
-                  placeholder="https://..."
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === "settings" && (
-            <div className="space-y-5">
-              {/* Color Pickers */}
-              <div>
-                <label className="block text-purple-300 text-sm font-semibold mb-2">
-                  Elsődleges szín
-                </label>
-                <div className="flex gap-3">
-                  <input
-                    type="color"
-                    defaultValue="#a855f7"
-                    className="w-16 h-12 rounded-lg border-2 border-purple-500/30 cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    defaultValue="#a855f7"
-                    className="flex-1 bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-purple-300 text-sm font-semibold mb-2">
-                  Másodlagos szín
-                </label>
-                <div className="flex gap-3">
-                  <input
-                    type="color"
-                    defaultValue="#ec4899"
-                    className="w-16 h-12 rounded-lg border-2 border-purple-500/30 cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    defaultValue="#ec4899"
-                    className="flex-1 bg-gray-900/50 border border-purple-500/30 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Export/Import */}
-              <div className="pt-4 border-t border-purple-500/20">
-                <h3 className="text-white font-semibold mb-3">Adatkezelés</h3>
-                <div className="space-y-2">
-                  <button className="w-full bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 px-4 py-3 rounded-lg transition-all flex items-center justify-center gap-2 text-sm font-semibold">
-                    <Download size={16} />
-                    Exportálás (JSON)
-                  </button>
-                  <button className="w-full bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-green-300 px-4 py-3 rounded-lg transition-all flex items-center justify-center gap-2 text-sm font-semibold">
-                    <Upload size={16} />
-                    Importálás
-                  </button>
-                  <button className="w-full bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg transition-all flex items-center justify-center gap-2 text-sm font-semibold">
-                    <RotateCcw size={16} />
-                    Alaphelyzet
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        </section>
       </div>
-    </>
+    </main>
   );
 }

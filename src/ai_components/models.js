@@ -101,25 +101,7 @@ const RAW_MODEL_GROUPS = [
                 id: "code_models",
                 label: null,
                 models: [
-                    {
-                        id: "trinity-large",
-                        name: "Trinity Large",
-                        tier: "lite", tierLabel: "Free",
-                        description: "Professional developer assistant with free Trinity access through OpenRouter",
-                        badge: "Free / daily limit",
-                        apiModel: "arcee-ai/trinity-large-preview:free",
-                        provider: "openrouter",
-                        color: "#6366f1",
-                        gradient: "from-indigo-500 to-purple-500",
-                        panelType: "chat",
-                        defaultSystemPrompt: `You are an elite software engineer with deep expertise across all programming languages and paradigms.
-                            - Produce production-ready, optimized code
-                            - Apply SOLID principles and design patterns
-                            - Include comprehensive error handling
-                            - Write thorough technical explanations
-                            - Review and suggest improvements proactively
-                            - Respond in the same language the user writes in`
-                    },
+                    { id: "google-gemma-3-27b-it", name: "Gemma 3 27B IT", apiModel: "google/gemma-3-27b-it", provider: "nvidia", color: "#4285f4", gradient: "from-blue-400 to-red-400", supportsVision: true, defaultTemperature: 0.8, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
                     {
                         id: "gemini-3-flash",
                         name: "Gemini 3 Flash",
@@ -131,6 +113,7 @@ const RAW_MODEL_GROUPS = [
                         color: "#4285f4",
                         gradient: "from-blue-500 to-red-500",
                         panelType: "chat",
+                        supportsVision: true,
                         defaultSystemPrompt: "You are a helpful AI assistant powered by Google Gemini. Respond in the same language the user writes in.",
                     },
                     {
@@ -144,19 +127,34 @@ const RAW_MODEL_GROUPS = [
                         color: "#4285f4",
                         gradient: "from-blue-600 to-indigo-600",
                         panelType: "chat",
+                        supportsVision: true,
                         defaultSystemPrompt: "You are a helpful AI assistant powered by Google Gemini. Respond in the same language the user writes in.",
                     },
+                    {
+                        id: "trinity-large",
+                        name: "Trinity Large Thinking",
+                        tier: "pro", tierLabel: "OpenRouter",
+                        description: "Professional developer assistant powered by Arcee Trinity Large Thinking through OpenRouter",
+                        badge: "OpenRouter",
+                        apiModel: "arcee-ai/trinity-large-thinking",
+                        provider: "openrouter",
+                        color: "#6366f1",
+                        gradient: "from-indigo-500 to-purple-500",
+                        panelType: "chat",
+                        defaultSystemPrompt: `You are an elite software engineer with deep expertise across all programming languages and paradigms.
+                            - Produce production-ready, optimized code
+                            - Apply SOLID principles and design patterns
+                            - Include comprehensive error handling
+                            - Write thorough technical explanations
+                            - Review and suggest improvements proactively
+                            - Respond in the same language the user writes in`
+                    },
+                    { id: "mistral-large", name: "Mistral Large", apiModel: "mistral-large-latest", provider: "mistral", color: "#f97316", gradient: "from-orange-400 to-red-500", defaultTemperature: 0.2, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat" },
                     { id: "groq-gpt120b", name: "GPT OSS 120B", apiModel: "openai/gpt-oss-120b", provider: "groq", color: "#10a37f", gradient: "from-teal-400 to-emerald-500", panelType: "chat" },
-                    { id: "groq-qwen3", name: "Qwen3 32B", apiModel: "qwen/qwen3-32b", provider: "groq", color: "#9333ea", gradient: "from-purple-400 to-indigo-500", panelType: "chat" },
+                    { id: "nvidia-glm4.7", name: "Z.ai GLM 4.7", apiModel: "z-ai/glm4.7", provider: "nvidia", color: "#16f921", gradient: "from-lime-400 to-green-500", defaultTemperature: 0.7, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat" },
                     { id: "groq-llama70b", name: "Llama 3.3 70B", apiModel: "llama-3.3-70b-versatile", provider: "groq", color: "#f55036", gradient: "from-orange-500 to-red-600", panelType: "chat" },
-                    { id: "cerebras-llama8b", name: "Llama 3.1 8B (Cerebras)", apiModel: "llama3.1-8b", provider: "cerebras", color: "#818cf8", gradient: "from-indigo-400 to-blue-500", panelType: "chat" },
-                    { id: "mistral-large", name: "Mistral Large (Mistral)", apiModel: "mistral-large-latest", provider: "mistral", color: "#f97316", gradient: "from-orange-400 to-red-500", defaultTemperature: 0.2, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat" },
-                    { id: "nvidia-glm4.7", name: "Z.ai GLM 4.7 (NVIDIA)", apiModel: "z-ai/glm4.7", provider: "nvidia", color: "#16f921", gradient: "from-lime-400 to-green-500", defaultTemperature: 0.7, defaultMaxTokens: 2048, defaultTopP: 0.9, panelType: "chat" },
-                    { id: "deepseek-v3.2", name: "DeepSeek v3.2 (NVIDIA)", apiModel: "deepseek-ai/deepseek-v3.2", provider: "nvidia", color: "#3b82f6", gradient: "from-blue-500 to-indigo-600", defaultTemperature: 0.3, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
-                    { id: "google-gemma-3-27b-it", name: "(img) Gemma 3 27B IT (NVIDIA)", apiModel: "google/gemma-3-27b-it", provider: "nvidia", color: "#4285f4", gradient: "from-blue-400 to-red-400", supportsVision: true, defaultTemperature: 0.8, defaultMaxTokens: 2048, defaultTopP: 0.95, panelType: "chat" },
-
-
-
+                    { id: "groq-qwen3", name: "Qwen3 32B", apiModel: "qwen/qwen3-32b", provider: "groq", color: "#9333ea", gradient: "from-purple-400 to-indigo-500", panelType: "chat" },
+                    { id: "cerebras-llama8b", name: "Llama 3.1 8B", apiModel: "llama3.1-8b", provider: "cerebras", color: "#818cf8", gradient: "from-indigo-400 to-blue-500", panelType: "chat" },
                     //                     {
                     //                         id: "deepseek_coder",
                     //                         name: "DeepSeek Coder V3",
@@ -175,25 +173,7 @@ const RAW_MODEL_GROUPS = [
                     // - Point out potential issues or improvements
                     // - Respond in the same language the user writes in`,
                     //                     },
-                    {
-                        id: "gpt4o_code",
-                        name: "GPT-4o Code",
-                        tier: "pro", tierLabel: "Premium",
-                        description: "Professional developer assistant",
-                        badge: "$5 / 1M tok",
-                        apiModel: "gpt-4o",
-                        provider: "openai",
-                        color: "#6366f1",
-                        gradient: "from-indigo-500 to-purple-500",
-                        panelType: "chat",
-                        defaultSystemPrompt: `You are an elite software engineer with deep expertise across all programming languages and paradigms.
-- Produce production-ready, optimized code
-- Apply SOLID principles and design patterns
-- Include comprehensive error handling
-- Write thorough technical explanations
-- Review and suggest improvements proactively
-- Respond in the same language the user writes in`,
-                    },
+
                 ],
             },
         ],
@@ -213,7 +193,7 @@ const RAW_MODEL_GROUPS = [
                 models: [
                     {
                         id: "cf-sdxl",
-                        name: "Stable Diffusion XL (Cloudflare)",
+                        name: "Stable Diffusion XL",
                         apiModel: "@cf/stabilityai/stable-diffusion-xl-base-1.0",
                         provider: "cloudflare",
                         color: "#f6821f",
@@ -224,7 +204,7 @@ const RAW_MODEL_GROUPS = [
                     },
                     {
                         id: "nvidia-sd3-medium",
-                        name: "Stable Diffusion 3 Medium (NVIDIA)",
+                        name: "Stable Diffusion 3 Medium",
                         apiModel: "stabilityai/stable-diffusion-3-medium",
                         provider: "nvidia-image",
                         color: "#16f921",
@@ -233,7 +213,7 @@ const RAW_MODEL_GROUPS = [
                     },
                     {
                         id: "nvidia-flux-dev",
-                        name: "Flux 1 Dev (NVIDIA)",
+                        name: "Flux 1 Dev",
                         apiModel: "black-forest-labs/flux.1-dev",
                         provider: "nvidia-image",
                         color: "#16f921",
@@ -242,7 +222,7 @@ const RAW_MODEL_GROUPS = [
                     },
                     {
                         id: "z-image-turbo",
-                        name: "Z-Image Turbo (ModelScope)",
+                        name: "Z-Image Turbo",
                         apiModel: "Tongyi-MAI/Z-Image-Turbo",
                         provider: "modelscope",
                         color: "#9333ea",
@@ -254,7 +234,7 @@ const RAW_MODEL_GROUPS = [
                     },
                     {
                         id: "qwen-image-2512",
-                        name: "Qwen Image (ModelScope)",
+                        name: "Qwen Image",
                         apiModel: "Qwen/Qwen-Image-2512",
                         provider: "modelscope",
                         color: "#9333ea",
@@ -266,7 +246,7 @@ const RAW_MODEL_GROUPS = [
                     },
                     {
                         id: "flux2-klein-base-9B",
-                        name: "Flux 2 (ModelScope)",
+                        name: "Flux 2",
                         apiModel: "flux-community/FLUX.2-klein-base-9B",
                         provider: "modelscope",
                         color: "#9333ea",
@@ -278,7 +258,7 @@ const RAW_MODEL_GROUPS = [
                     },
                     {
                         id: "sd3-medium",
-                        name: "Stable Diffusion 3 (ModelScope)",
+                        name: "Stable Diffusion 3",
                         apiModel: "MusePublic/stable-diffusion-3-medium",
                         provider: "modelscope",
                         color: "#9333ea",
@@ -290,7 +270,7 @@ const RAW_MODEL_GROUPS = [
                     },
                     {
                         id: "qwen-image-edit",
-                        name: "Qwen Image Edit (ModelScope)",
+                        name: "Qwen Image Edit",
                         apiModel: "Qwen/Qwen-Image-Edit-2511",
                         provider: "modelscope",
                         color: "#7c3aed",
@@ -303,7 +283,7 @@ const RAW_MODEL_GROUPS = [
                     },
                     {
                         id: "flux-1-edit",
-                        name: "FLUX Edit (ModelScope)",
+                        name: "FLUX Edit",
                         apiModel: "MusePublic/FLUX.1-Kontext-Dev",
                         provider: "modelscope",
                         color: "#7c3aed",
@@ -468,8 +448,23 @@ const RAW_MODEL_GROUPS = [
                 label: "Text to Music",
                 models: [
                     {
+                        id: "deapi_acestep_1_5_xl_turbo_int8",
+                        name: "ACE-Step 1.5 XL Turbo INT8",
+                        tier: "lite", tierLabel: "API",
+                        description: "deAPI ACE-Step XL Turbo INT8 text-to-music generation",
+                        badge: "deAPI",
+                        priceNote: "Queue-based",
+                        apiId: "txt2music",
+                        provider: "deapi",
+                        deapiModelSlug: "AceStep_1_5_XL_Turbo_INT8",
+                        color: "#38bdf8",
+                        gradient: "from-sky-400 to-cyan-500",
+                        panelType: "audio",
+                        audioType: "music",
+                    },
+                    {
                         id: "deapi_acestep_1_5_base",
-                        name: "Ace Step 1.5 Base",
+                        name: "ACE-Step 1.5 Base",
                         tier: "lite", tierLabel: "API",
                         description: "deAPI ACE-Step 1.5 Base text-to-music generation",
                         badge: "deAPI",
@@ -501,38 +496,8 @@ const RAW_MODEL_GROUPS = [
                 label: "Kép → 3D",
                 models: [
                     {
-                        id: "triposr",
-                        name: "TripoSR",
-                        tier: "lite", tierLabel: "Gyors",
-                        description: "Stability AI — villámgyors",
-                        badge: "$0.07 / gen",
-                        priceNote: "~0.5 sec",
-                        apiId: "fal-ai/triposr",
-                        provider: "fal",
-                        color: "#38bdf8",
-                        gradient: "from-sky-400 to-cyan-400",
-                        inputType: "image",
-                        outputNote: "GLB / OBJ",
-                        panelType: "threed",        // → Trellis2Panel (Meshy)
-                    },
-                    {
-                        id: "trellis2",
-                        name: "TRELLIS.2",
-                        tier: "pro", tierLabel: "Prémium",
-                        description: "Microsoft — PBR textúrás, profi",
-                        badge: "$0.25–0.35",
-                        priceNote: "3–60 sec",
-                        apiId: "fal-ai/trellis-2",
-                        provider: "fal",
-                        color: "#06b6d4",
-                        gradient: "from-cyan-500 to-indigo-500",
-                        inputType: "image",
-                        outputNote: "GLB (PBR)",
-                        panelType: "threed",        // → Trellis2Panel (Meshy)
-                    },
-                    {
                         id: "nvidia_trellis",
-                        name: "Trellis (NVIDIA)",
+                        name: "Trellis",
                         tier: "pro", tierLabel: "Prémium",
                         description: "microsoft/trellis — NVIDIA NIM",
                         badge: "NVIDIA NIM",
@@ -565,21 +530,22 @@ const RAW_MODEL_GROUPS = [
                         outputNote: "GLB / FBX",
                         panelType: "tripo",
                     },
-                    {
-                        id: "meshy6",
-                        name: "Meshy v6",
-                        tier: "pro", tierLabel: "Prémium",
-                        description: "Meshy AI — legjobb textúra",
-                        badge: "~$0.75 / gen",
-                        priceNote: "~30–60 sec",
-                        apiId: "fal-ai/meshy/v6-preview/text-to-3d",
-                        provider: "fal",
-                        color: "#d946ef",
-                        gradient: "from-purple-500 to-pink-500",
-                        inputType: "text",
-                        outputNote: "GLB (PBR+)",
-                        panelType: "threed",
-                    },
+                    // Meshy is disabled for now; keep this block for later reactivation.
+                    //{
+                    //    id: "meshy6",
+                    //    name: "Meshy v6",
+                    //    tier: "pro", tierLabel: "Prémium",
+                    //    description: "Meshy AI — legjobb textúra",
+                    //    badge: "~$0.75 / gen",
+                    //    priceNote: "~30–60 sec",
+                    //    apiId: "fal-ai/meshy/v6-preview/text-to-3d",
+                    //    provider: "fal",
+                    //    color: "#d946ef",
+                    //    gradient: "from-purple-500 to-pink-500",
+                    //    inputType: "text",
+                    //    outputNote: "GLB (PBR+)",
+                    //    panelType: "threed",
+                    //},
                 ],
             },
         ],
@@ -604,6 +570,24 @@ export const MODEL_GROUPS = RAW_MODEL_GROUPS.map((group) => ({
 export const ALL_MODELS = MODEL_GROUPS.flatMap((g) =>
     g.categories.flatMap((c) => c.models)
 );
+
+export const AUDIO_SPEECH_MODEL_ORDER = [
+    "deapi_qwen3_tts",
+    "deapi_kokoro_tts",
+    "deapi_chatterbox_tts",
+    "nvidia_magpie_tts",
+];
+
+const getAudioSpeechModelRank = (modelId) => {
+    const index = AUDIO_SPEECH_MODEL_ORDER.indexOf(modelId);
+    return index === -1 ? AUDIO_SPEECH_MODEL_ORDER.length : index;
+};
+
+export const sortAudioSpeechModels = (models) =>
+    [...models].sort((a, b) => getAudioSpeechModelRank(a.id) - getAudioSpeechModelRank(b.id));
+
+export const getAudioSpeechModels = () =>
+    sortAudioSpeechModels(ALL_MODELS.filter((model) => model.panelType === "audio" && model.audioType === "tts"));
 
 export const getModel = (id) => ALL_MODELS.find((m) => m.id === id);
 

@@ -52,5 +52,9 @@ assert(
   selectedItemBlock.includes("historyItemsReferToSameTask"),
   "selected preview item memo should reuse thumbnails when ids differ but taskIds match",
 );
+assert(
+  selectedItemBlock.includes("const baseItem = selectedBaseItem || viewerH;"),
+  "selected preview should keep the manual selection pinned before falling back to the viewer item",
+);
 
 console.log("tripoSelectedPreviewLoadOrder assertions passed");

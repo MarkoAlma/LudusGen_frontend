@@ -343,7 +343,7 @@ export default function DownloadModal({ isOpen, onClose, glbBlobUrl, scene, file
             color: "#161625", fontSize: 8.5,
             fontFamily: "'SF Mono', monospace", textAlign: "center",
           }}>
-            GLB -> native download · GLTF / OBJ / STL -> GLB reparsing
+              GLB to native download · GLTF / OBJ / STL to GLB reparsing
           </div>
 
         </div>

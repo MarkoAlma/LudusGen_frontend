@@ -1,9 +1,9 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquare, Image, Music2, Box, Loader2,
   CheckCircle2, XCircle, Clock4, ChevronRight,
-  Cpu, Mic2, Layers, Wand2, Volume2, LayoutGrid, X
+  Cpu, Mic2, Layers, Wand2, Volume2, X
 } from 'lucide-react';
 import { useJobs } from '../../context/JobsContext';
 
@@ -17,7 +17,7 @@ const PANEL_META = {
   threed: { icon: Box, label: '3D', color: '#a78bfa', glow: 'rgba(167,139,250,0.35)' },
   trellis: { icon: Layers, label: 'Trellis', color: '#38bdf8', glow: 'rgba(56,189,248,0.35)' },
   tripo: { icon: Cpu, label: 'Tripo', color: '#d946ef', glow: 'rgba(217,70,239,0.35)' },
-  meshy: { icon: LayoutGrid, label: 'Meshy', color: '#f97316', glow: 'rgba(249,115,22,0.35)' },
+  // meshy: { icon: LayoutGrid, label: 'Meshy', color: '#f97316', glow: 'rgba(249,115,22,0.35)' },
 };
 
 const STATUS_META = {
@@ -124,7 +124,7 @@ function SpinningRing({ color }) {
   return (
     <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 36 36">
       <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" />
-      <motion.circle
+      <Motion.circle
         cx="18" cy="18" r="15"
         fill="none"
         stroke={color}
@@ -162,7 +162,7 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
         : panelMeta.color;
 
   return (
-    <motion.div
+    <Motion.div
       onClick={() => { if (isDone || isError) onMarkSeen?.(job.id); onOpen(job); }}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (isDone || isError) onMarkSeen?.(job.id); onOpen(job); } }}
       role="button"
@@ -250,7 +250,7 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
 
         {/* Progress bar */}
         <div className="h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-          <motion.div
+          <Motion.div
             className="h-full rounded-full"
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
@@ -304,12 +304,28 @@ function JobRow({ job, onOpen, onCancel, onMarkSeen }) {
         </button>
         <ChevronRight className="w-3.5 h-3.5 text-zinc-700 group-hover/row:text-zinc-400 transition-colors" />
       </div>
-    </motion.div>
+    </Motion.div>
   );
 }
 
 export default function JobQueueWidget({ onOpenJob, activeChatSessionId, activeMediaJob, activePanelType }) {
   const { jobs, cancelJob, updateJob } = useJobs();
+
+  React.useEffect(() => {
+    if (activePanelType !== 'chat' || !activeChatSessionId) return;
+
+    jobs.forEach((job) => {
+      if (
+        (job.panelType === 'chat' || job.panelType === 'code') &&
+        job.sessionId === activeChatSessionId &&
+        (job.status === 'done' || job.status === 'error') &&
+        !job.seenAt
+      ) {
+        updateJob(job.id, { seenAt: Date.now() });
+      }
+    });
+  }, [activePanelType, activeChatSessionId, jobs, updateJob]);
+
   React.useEffect(() => {
     if (activePanelType !== 'image' && activePanelType !== 'audio') return;
 
@@ -352,7 +368,7 @@ export default function JobQueueWidget({ onOpenJob, activeChatSessionId, activeM
       <div className="relative h-px mx-5 mb-4">
         <div className="absolute inset-0 bg-white/5" />
         {activeCount > 0 && (
-          <motion.div
+          <Motion.div
             className="absolute inset-0"
             animate={{ opacity: [0.4, 1, 0.4] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
@@ -380,7 +396,7 @@ export default function JobQueueWidget({ onOpenJob, activeChatSessionId, activeM
           </div>
 
           {activeCount > 0 && (
-            <motion.span
+            <Motion.span
               key={activeCount}
               initial={{ scale: 0.7, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -392,7 +408,7 @@ export default function JobQueueWidget({ onOpenJob, activeChatSessionId, activeM
               }}
             >
               {activeCount} active
-            </motion.span>
+            </Motion.span>
           )}
         </div>
 
@@ -400,7 +416,7 @@ export default function JobQueueWidget({ onOpenJob, activeChatSessionId, activeM
         <div className="space-y-2 max-h-[340px] overflow-y-auto scrollbar-hide">
           <AnimatePresence initial={false}>
             {visibleJobs.length === 0 ? (
-              <motion.div
+              <Motion.div
                 key="empty"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -412,10 +428,10 @@ export default function JobQueueWidget({ onOpenJob, activeChatSessionId, activeM
                 <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-zinc-700">
                   No active tasks
                 </p>
-              </motion.div>
+              </Motion.div>
             ) : (
               visibleJobs.map((job) => (
-                <motion.div
+                <Motion.div
                   key={job.id}
                   layout
                   initial={{ opacity: 0, y: 8, scale: 0.96 }}
@@ -424,7 +440,7 @@ export default function JobQueueWidget({ onOpenJob, activeChatSessionId, activeM
                   transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <JobRow job={job} onOpen={onOpenJob} onCancel={cancelJob} onMarkSeen={(id) => updateJob(id, { seenAt: Date.now() })} />
-                </motion.div>
+                </Motion.div>
               ))
             )}
           </AnimatePresence>

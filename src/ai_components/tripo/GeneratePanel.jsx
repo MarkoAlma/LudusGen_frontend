@@ -99,12 +99,13 @@ function SeedSpinner({ value, onChange, disabled = false }) {
     onChange(next);
   };
   return (
-    <div style={{
+    <div className="tp-seed-spinner" style={{
       display: "flex", alignItems: "stretch",
       background: "var(--bg-raised)", border: "1px solid var(--border)",
-      borderRadius: 8, overflow: "hidden", height: 26,
+      borderRadius: 8, overflow: "hidden", height: 26, flexShrink: 0,
     }}>
       <input
+        className="tp-seed-spinner-input"
         type="number" min="0" placeholder="Random"
         value={value ?? ""}
         onChange={handleText}
@@ -121,6 +122,7 @@ function SeedSpinner({ value, onChange, disabled = false }) {
         borderLeft: "1px solid var(--border)",
       }}>
         <button
+          className="tp-seed-spinner-btn"
           type="button" onClick={() => step(1)} disabled={disabled}
           style={{
             flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
@@ -133,6 +135,7 @@ function SeedSpinner({ value, onChange, disabled = false }) {
           <ChevronUp style={{ width: 9, height: 9 }} />
         </button>
         <button
+          className="tp-seed-spinner-btn"
           type="button" onClick={() => step(-1)} disabled={disabled}
           style={{
             flex: 1, display: "flex", alignItems: "center", justifyContent: "center",

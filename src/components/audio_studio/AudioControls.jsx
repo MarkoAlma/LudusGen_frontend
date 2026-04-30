@@ -18,7 +18,9 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { ALL_MODELS } from '../../ai_components/models';
+import { ALL_MODELS, getAudioSpeechModels } from '../../ai_components/models';
+
+const MODEL_LIMIT_LABEL = "Global limit";
 
 const TTS_VOICES = [
   { id: "alloy", label: "Alloy", desc: "Neutral, balanced" },
@@ -82,9 +84,12 @@ const DEAPI_TIME_SIGNATURES = [
   { id: "4", label: "4", description: "time signature" },
   { id: "6", label: "6", description: "time signature" },
 ];
-const DEAPI_TURBO_INT8_MODEL_SLUG = "acestep_1_5_xl_turbo_int8";
 const normalizeDeapiModelSlug = (slug) => String(slug || "").trim().toLowerCase();
-const isDeapiTurboInt8ModelSlug = (slug) => normalizeDeapiModelSlug(slug) === DEAPI_TURBO_INT8_MODEL_SLUG;
+const DEAPI_TURBO_MODEL_SLUGS = new Set(["acestep_1_5_xl_turbo_int8"]);
+const isDeapiTurboInt8ModelSlug = (slug) => {
+  const normalizedSlug = normalizeDeapiModelSlug(slug);
+  return DEAPI_TURBO_MODEL_SLUGS.has(normalizedSlug) || normalizedSlug.includes("turbo");
+};
 const getDeapiLimitNumber = (limits, key, fallback) => {
   const value = Number(limits?.[key]);
   return Number.isFinite(value) ? value : fallback;
@@ -215,11 +220,10 @@ function TextAreaField({ label, value, onChange, placeholder, hint, rows = 4, di
         placeholder={placeholder}
         rows={rows}
         disabled={disabled}
-        className={`w-full border transition-all resize-none focus:outline-none ${textareaSizeClassName} ${
-          disabled
-            ? 'cursor-not-allowed border-white/5 bg-white/[0.015] text-zinc-600 placeholder:text-zinc-800'
-            : 'border-white/6 bg-white/[0.02] text-zinc-200 placeholder:text-zinc-800 focus:border-white/12'
-        }`}
+        className={`w-full border transition-all resize-none focus:outline-none ${textareaSizeClassName} ${disabled
+          ? 'cursor-not-allowed border-white/5 bg-white/[0.015] text-zinc-600 placeholder:text-zinc-800'
+          : 'border-white/6 bg-white/[0.02] text-zinc-200 placeholder:text-zinc-800 focus:border-white/12'
+          }`}
       />
       {hint ? (
         <p className={hintClassName}>{hint}</p>
@@ -302,13 +306,12 @@ function ToggleCard({ color, label, description, active, onClick, icon: Icon, di
       type="button"
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
-      className={`min-w-0 w-full rounded-[1.35rem] border p-4 text-left transition-all duration-300 ${
-        disabled
-          ? 'cursor-not-allowed border-white/5 bg-white/[0.015] opacity-45'
-          : active
-            ? 'shadow-[0_12px_30px_rgba(0,0,0,0.18)]'
-            : 'border-white/6 bg-white/[0.018] hover:border-white/12 hover:bg-white/[0.03]'
-      }`}
+      className={`min-w-0 w-full rounded-[1.35rem] border p-4 text-left transition-all duration-300 ${disabled
+        ? 'cursor-not-allowed border-white/5 bg-white/[0.015] opacity-45'
+        : active
+          ? 'shadow-[0_12px_30px_rgba(0,0,0,0.18)]'
+          : 'border-white/6 bg-white/[0.018] hover:border-white/12 hover:bg-white/[0.03]'
+        }`}
       style={active ? { borderColor: `${color}55`, backgroundColor: `${color}12` } : undefined}
     >
       <div className="flex items-start justify-between gap-3">
@@ -343,25 +346,23 @@ function ToggleCard({ color, label, description, active, onClick, icon: Icon, di
 
 function OptionCard({ color, label, description, active, onClick, disabled = false, compact = false }) {
   const buttonClassName = compact
-    ? `min-w-0 rounded-[0.95rem] border px-2 py-2 text-center transition-all duration-300 ${
-        disabled
-          ? 'cursor-not-allowed border-white/5 bg-white/[0.015] opacity-40'
-          : active
-            ? 'shadow-[0_10px_22px_rgba(0,0,0,0.16)]'
-            : 'border-white/6 bg-white/[0.018] hover:border-white/12 hover:bg-white/[0.03]'
-      }`
-    : `min-w-0 rounded-[1.2rem] border px-3 py-3 text-center transition-all duration-300 ${
-        disabled
-          ? 'cursor-not-allowed border-white/5 bg-white/[0.015] opacity-40'
-          : active
-            ? 'shadow-[0_12px_30px_rgba(0,0,0,0.18)]'
-            : 'border-white/6 bg-white/[0.018] hover:border-white/12 hover:bg-white/[0.03]'
-      }`;
+    ? `min-w-0 rounded-[0.95rem] border px-1.5 py-2 text-center transition-all duration-300 ${disabled
+      ? 'cursor-not-allowed border-white/5 bg-white/[0.015] opacity-40'
+      : active
+        ? 'shadow-[0_10px_22px_rgba(0,0,0,0.16)]'
+        : 'border-white/6 bg-white/[0.018] hover:border-white/12 hover:bg-white/[0.03]'
+    }`
+    : `min-w-0 rounded-[1.2rem] border px-3 py-3 text-center transition-all duration-300 ${disabled
+      ? 'cursor-not-allowed border-white/5 bg-white/[0.015] opacity-40'
+      : active
+        ? 'shadow-[0_12px_30px_rgba(0,0,0,0.18)]'
+        : 'border-white/6 bg-white/[0.018] hover:border-white/12 hover:bg-white/[0.03]'
+    }`;
   const contentClassName = compact
     ? "flex min-h-[2.7rem] flex-col items-center justify-center gap-0.5"
     : "flex min-h-[4.75rem] flex-col items-center justify-center gap-1";
   const labelClassName = compact
-    ? `break-words text-[9px] font-black uppercase tracking-[0.06em] leading-tight ${active ? 'text-white' : 'text-zinc-200'}`
+    ? `break-words text-[8px] font-black uppercase tracking-[0.015em] leading-tight ${active ? 'text-white' : 'text-zinc-200'}`
     : `break-words text-[11px] font-black uppercase tracking-[0.16em] leading-tight ${active ? 'text-white' : 'text-zinc-200'}`;
   const descriptionClassName = compact
     ? "break-words text-[8px] font-semibold uppercase tracking-[0.02em] leading-tight text-zinc-500"
@@ -533,13 +534,7 @@ export default function AudioControls({
   const deapiTimeSignatureIndex = Math.max(0, DEAPI_TIME_SIGNATURES.findIndex((signature) => signature.id === deapiTimesignature));
   const deapiSelectedTimeSignature = DEAPI_TIME_SIGNATURES[deapiTimeSignatureIndex] || DEAPI_TIME_SIGNATURES[0];
 
-  const speechModels = ALL_MODELS
-    .filter((model) => model.panelType === 'audio' && model.audioType === 'tts')
-    .sort((a, b) => {
-      if (a.id === 'nvidia_magpie_tts') return -1;
-      if (b.id === 'nvidia_magpie_tts') return 1;
-      return 0;
-    });
+  const speechModels = getAudioSpeechModels();
   const musicModels = ALL_MODELS.filter((model) => model.panelType === 'audio' && model.audioType === 'music');
   const availableModels = isTTS ? speechModels : musicModels;
 
@@ -557,7 +552,7 @@ export default function AudioControls({
         ? !!String(deapiTtsVoice || "").trim()
         : effectiveDeapiTtsMode === "voice_clone"
           ? !!deapiTtsReferenceAudio
-        : !!String(deapiTtsInstruct || "").trim()
+          : !!String(deapiTtsInstruct || "").trim()
     );
   const canGenerate = isTTS ? (isDeapiTTS ? canGenerateDeapiTts : !!text.trim()) : canGenerateMusic;
 
@@ -626,11 +621,10 @@ export default function AudioControls({
           <button
             type="button"
             onClick={() => setOpen((current) => !current)}
-            className={`flex w-full min-w-0 items-center gap-2 border border-white/8 bg-white/[0.04] text-left transition-all duration-300 hover:border-white/15 hover:bg-white/[0.06] focus:outline-none focus:border-white/15 ${
-              compact
-                ? 'min-h-10 rounded-xl py-2 pl-2 pr-3'
-                : 'min-h-12 rounded-[1.1rem] py-2.5 pl-2.5 pr-4'
-            }`}
+            className={`flex w-full min-w-0 items-center gap-2 border border-white/8 bg-white/[0.04] text-left transition-all duration-300 hover:border-white/15 hover:bg-white/[0.06] focus:outline-none focus:border-white/15 ${compact
+              ? 'min-h-10 rounded-xl py-2 pl-2 pr-3'
+              : 'min-h-12 rounded-[1.1rem] py-2.5 pl-2.5 pr-4'
+              }`}
           >
             {Icon ? (
               <span
@@ -671,9 +665,8 @@ export default function AudioControls({
                         onChange(optionValue);
                         setOpen(false);
                       }}
-                      className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all ${
-                        isActive ? 'bg-white/[0.05]' : 'hover:bg-white/[0.025]'
-                      }`}
+                      className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all ${isActive ? 'bg-white/[0.05]' : 'hover:bg-white/[0.025]'
+                        }`}
                     >
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -718,7 +711,7 @@ export default function AudioControls({
             </div>
 
             <div className="min-w-0 flex-1 text-left">
-              <p className="mb-0.5 text-[9px] font-black uppercase tracking-[0.25em] leading-none text-zinc-600">
+              <p className="mb-1 text-[9px] font-black uppercase tracking-[0.25em] leading-none text-zinc-600">
                 {isTTS ? 'Neural synthesis' : 'Music generation'}
               </p>
               <p className="truncate text-[12px] font-black leading-none text-white">{selectedModel.name}</p>
@@ -751,15 +744,23 @@ export default function AudioControls({
                         onModelChange?.(model);
                         setDropdownOpen(false);
                       }}
-                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-all ${
-                        selectedModel.id === model.id ? 'bg-white/[0.05]' : 'hover:bg-white/[0.02]'
-                      }`}
+                      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-all ${selectedModel.id === model.id ? 'bg-white/[0.05]' : 'hover:bg-white/[0.02]'
+                        }`}
                     >
                       <div className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: model.color }} />
                       <div className="min-w-0 flex-1">
                         <span className="block truncate text-[12px] font-bold text-white">{model.name}</span>
-                        <span className="text-[9px] font-medium text-zinc-600">{model.provider}</span>
                       </div>
+                      <span
+                        className="flex-shrink-0 rounded-md border px-2 py-0.5 text-[8px] font-bold"
+                        style={{
+                          color: selectedModel.id === model.id ? model.color : '#6b7280',
+                          borderColor: selectedModel.id === model.id ? `${model.color}40` : 'rgba(255,255,255,0.06)',
+                          backgroundColor: selectedModel.id === model.id ? `${model.color}12` : 'rgba(255,255,255,0.02)',
+                        }}
+                      >
+                        {MODEL_LIMIT_LABEL}
+                      </span>
                       {selectedModel.id === model.id ? (
                         <span className="flex-shrink-0 text-[8px] font-black uppercase text-emerald-500">Active</span>
                       ) : null}
@@ -875,11 +876,10 @@ export default function AudioControls({
                               key={voice.id}
                               type="button"
                               onClick={() => setDeapiTtsVoice(voice.id)}
-                              className={`rounded-xl border px-2 py-2 text-left transition-all duration-300 ${
-                                deapiTtsVoice === voice.id
-                                  ? ''
-                                  : 'border-white/5 bg-white/[0.01] text-zinc-700 hover:border-white/10 hover:text-zinc-500'
-                              }`}
+                              className={`rounded-xl border px-2 py-2 text-left transition-all duration-300 ${deapiTtsVoice === voice.id
+                                ? ''
+                                : 'border-white/5 bg-white/[0.01] text-zinc-700 hover:border-white/10 hover:text-zinc-500'
+                                }`}
                               style={
                                 deapiTtsVoice === voice.id
                                   ? { backgroundColor: `${color}15`, borderColor: `${color}40`, color }
@@ -995,19 +995,18 @@ export default function AudioControls({
                             key={voice.name}
                             type="button"
                             onClick={() => setRivaVoiceName(voice.name)}
-                            className={`rounded-xl border py-2.5 transition-all duration-300 ${
-                              rivaVoiceName === voice.name
-                                ? ''
-                                : 'border-white/5 bg-white/[0.01] text-zinc-700 hover:border-white/10 hover:text-zinc-500'
-                            }`}
+                            className={`rounded-xl border py-2.5 transition-all duration-300 ${rivaVoiceName === voice.name
+                              ? ''
+                              : 'border-white/5 bg-white/[0.01] text-zinc-700 hover:border-white/10 hover:text-zinc-500'
+                              }`}
                             style={
                               rivaVoiceName === voice.name
                                 ? {
-                                    backgroundColor: `${color}15`,
-                                    borderColor: `${color}40`,
-                                    color,
-                                    boxShadow: `0 0 15px ${color}08`,
-                                  }
+                                  backgroundColor: `${color}15`,
+                                  borderColor: `${color}40`,
+                                  color,
+                                  boxShadow: `0 0 15px ${color}08`,
+                                }
                                 : undefined
                             }
                           >
@@ -1032,19 +1031,18 @@ export default function AudioControls({
                               key={emotion}
                               type="button"
                               onClick={() => setRivaEmotion(emotion)}
-                              className={`rounded-lg border px-3 py-1.5 text-[9px] font-black transition-all duration-300 ${
-                                rivaEmotion === emotion
-                                  ? ''
-                                  : 'border-white/5 bg-white/[0.01] text-zinc-700 hover:border-white/10 hover:text-zinc-500'
-                              }`}
+                              className={`rounded-lg border px-3 py-1.5 text-[9px] font-black transition-all duration-300 ${rivaEmotion === emotion
+                                ? ''
+                                : 'border-white/5 bg-white/[0.01] text-zinc-700 hover:border-white/10 hover:text-zinc-500'
+                                }`}
                               style={
                                 rivaEmotion === emotion
                                   ? {
-                                      backgroundColor: `${color}15`,
-                                      borderColor: `${color}40`,
-                                      color,
-                                      boxShadow: `0 0 15px ${color}08`,
-                                    }
+                                    backgroundColor: `${color}15`,
+                                    borderColor: `${color}40`,
+                                    color,
+                                    boxShadow: `0 0 15px ${color}08`,
+                                  }
                                   : undefined
                               }
                             >
@@ -1061,7 +1059,7 @@ export default function AudioControls({
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 px-1">
                         <Activity className="h-3 w-3 text-zinc-600" />
-                          <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 italic">Voice character</span>
+                        <span className="text-[8px] font-black uppercase tracking-widest text-zinc-600 italic">Voice character</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         {TTS_VOICES.map((voice) => (
@@ -1069,19 +1067,18 @@ export default function AudioControls({
                             key={voice.id}
                             type="button"
                             onClick={() => setSelectedVoice(voice.id)}
-                            className={`rounded-xl border py-2.5 transition-all duration-300 ${
-                              selectedVoice === voice.id
-                                ? ''
-                                : 'border-white/5 bg-white/[0.01] text-zinc-700 hover:border-white/10 hover:text-zinc-500'
-                            }`}
+                            className={`rounded-xl border py-2.5 transition-all duration-300 ${selectedVoice === voice.id
+                              ? ''
+                              : 'border-white/5 bg-white/[0.01] text-zinc-700 hover:border-white/10 hover:text-zinc-500'
+                              }`}
                             style={
                               selectedVoice === voice.id
                                 ? {
-                                    backgroundColor: `${color}15`,
-                                    borderColor: `${color}40`,
-                                    color,
-                                    boxShadow: `0 0 15px ${color}08`,
-                                  }
+                                  backgroundColor: `${color}15`,
+                                  borderColor: `${color}40`,
+                                  color,
+                                  boxShadow: `0 0 15px ${color}08`,
+                                }
                                 : undefined
                             }
                           >
@@ -1158,7 +1155,7 @@ export default function AudioControls({
                       <RotateCcw className="h-3.5 w-3.5 flex-shrink-0" />
                       <span className="whitespace-nowrap">Defaults</span>
                     </button>
-                    
+
                     <button
                       type="button"
                       onClick={onDeapiEnhancePrompt}
@@ -1272,7 +1269,7 @@ export default function AudioControls({
                         min={deapiStepsMin}
                         max={deapiStepsMax}
                         step={1}
-                        hint="Usually 8 for Turbo models"
+                        hint="5-100"
                         compact
                         showLimit={false}
                       />
@@ -1286,7 +1283,7 @@ export default function AudioControls({
                         min={deapiGuidanceMin}
                         max={deapiGuidanceMax}
                         step={0.1}
-                        hint="0–20"
+                        hint="3–20"
                         compact
                         showLimit={false}
                       />
@@ -1299,7 +1296,7 @@ export default function AudioControls({
                     value={deapiSeed}
                     onChange={(value) => setDeapiSeed(value.replace(/\D/g, ""))}
                     step={1}
-                    hint="Empty = random (-1)"
+
                     compact
                   />
                   <Select
@@ -1320,7 +1317,7 @@ export default function AudioControls({
                     min={deapiBpmMin}
                     max={deapiBpmMax}
                     step={1}
-                    hint={isTurboInt8DeapiModel ? "Max 200" : undefined}
+                    hint="50-200"
                     compact
                     showLimit={false}
                   />
@@ -1350,11 +1347,10 @@ export default function AudioControls({
                         key={signature.id || "auto"}
                         type="button"
                         onClick={() => setDeapiTimesignature(signature.id)}
-                        className={`rounded-[0.75rem] border px-1 py-1.5 text-center transition-all duration-300 ${
-                          deapiTimesignature === signature.id
-                            ? ""
-                            : "border-white/6 bg-white/[0.018] text-zinc-500 hover:border-white/12 hover:bg-white/[0.03]"
-                        }`}
+                        className={`rounded-[0.75rem] border px-1 py-1.5 text-center transition-all duration-300 ${deapiTimesignature === signature.id
+                          ? ""
+                          : "border-white/6 bg-white/[0.018] text-zinc-500 hover:border-white/12 hover:bg-white/[0.03]"
+                          }`}
                         style={deapiTimesignature === signature.id ? { borderColor: `${color}55`, backgroundColor: `${color}12`, color: "#fff" } : undefined}
                       >
                         <div className="text-[8px] font-black uppercase tracking-[0.06em]">{signature.label}</div>

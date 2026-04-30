@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Check, User, Bot } from 'lucide-react';
 import { getModel } from '../../ai_components/models';
+import { stripAssistantThinking } from '../../utils/assistantContent';
 
 /* ──────────────────────────────────────────────────────────────────── */
 /*  Code Block                                                        */
@@ -62,7 +63,29 @@ const CodeBlock = ({ lang, code }) => {
 /* ──────────────────────────────────────────────────────────────────── */
 /*  Markdown-lite renderer                                            */
 /* ──────────────────────────────────────────────────────────────────── */
-const renderContent = (text) => {
+const getMessageText = (content) => {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((part) => part?.type === 'text')
+      .map((part) => part.text || '')
+      .join('\n')
+      .trim();
+  }
+  return content == null ? '' : String(content);
+};
+
+const getMessageImagePreview = (content) => {
+  if (!Array.isArray(content)) return null;
+  const imagePart = content.find((part) => part?.type === 'image_url');
+  const imageUrl = typeof imagePart?.image_url === 'string'
+    ? imagePart.image_url
+    : imagePart?.image_url?.url;
+  return typeof imageUrl === 'string' ? imageUrl : null;
+};
+
+const renderContent = (content) => {
+  const text = getMessageText(content);
   if (!text) return null;
 
   // Split by ``` to handle both closed and open (streaming) code blocks
@@ -130,6 +153,9 @@ export default function MessageItem({ message, themeColor }) {
   const msgModel = isAi && (message.modelId || message.model) ? getModel(message.modelId || message.model) : null;
   const messageColor = msgModel?.color || themeColor;
   const [copiedInline, setCopiedInline] = useState(false);
+  const rawMessageText = getMessageText(message.content);
+  const messageText = isAi ? stripAssistantThinking(rawMessageText) : rawMessageText;
+  const imagePreview = message.attachedImagePreview || getMessageImagePreview(message.content);
 
   const timestamp = useMemo(() => {
     let date = null;
@@ -211,15 +237,15 @@ export default function MessageItem({ message, themeColor }) {
               }`}
           >
             {/* Image Attachment */}
-            {message.attachedImagePreview && (
+            {imagePreview && (
               <div className="mb-6 rounded-2xl overflow-hidden border border-white/10">
-                <img src={message.attachedImagePreview} alt="attachment" className="w-full h-auto max-h-[400px] object-cover" />
+                <img src={imagePreview} alt="attachment" className="w-full h-auto max-h-[400px] object-cover" />
               </div>
             )}
 
             {/* Text Content */}
             <div className="relative z-10">
-              {renderContent(message.content)}
+              {renderContent(messageText)}
             </div>
 
             {/* Thinking State */}
@@ -245,7 +271,7 @@ export default function MessageItem({ message, themeColor }) {
           {isAi && !message.isStreaming && (
             <button
               onClick={() => {
-                navigator.clipboard.writeText(message.content);
+                navigator.clipboard.writeText(messageText);
                 setCopiedInline(true);
                 setTimeout(() => setCopiedInline(false), 2000);
               }}

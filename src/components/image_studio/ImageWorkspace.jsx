@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, ZoomIn, RefreshCw, AlertCircle, ImageIcon, Share2, X, ChevronLeft, ChevronRight, Sparkles, Zap } from 'lucide-react';
+import { Download, ZoomIn, RefreshCw, AlertCircle, ImageIcon, X, ChevronLeft, ChevronRight, Sparkles, Zap, Loader2 } from 'lucide-react';
 import { API_BASE } from '../../api/client';
 
 function normalizeImageUrl(url) {
@@ -26,6 +26,13 @@ function getImageFilename(img, idx = 0) {
   return `ludusgen_${id || `${Date.now()}_${idx + 1}`}.png`;
 }
 
+function getImageDownloadKey(img, idx = 0) {
+  if (typeof img === 'object' && img) {
+    return String(img.imageId || img.id || img.requestId || img.fullKey || img.downloadUrl || img.download_url || idx);
+  }
+  return `${idx}:${String(img || '').slice(0, 80)}`;
+}
+
 function triggerDownload(href, filename) {
   const a = document.createElement('a');
   a.href = href;
@@ -36,10 +43,12 @@ function triggerDownload(href, filename) {
 }
 
 // ── Lightbox Modal ──────────────────────────────────────────────────────────────
-function Lightbox({ images, startIndex, onClose, onDownload }) {
+function Lightbox({ images, startIndex, onClose, onDownload, downloadingKey, isDownloadingAll }) {
   const [current, setCurrent] = useState(startIndex);
   const currentImage = images[current];
   const currentUrl = getImageDisplayUrl(currentImage);
+  const isCurrentDownloading = isDownloadingAll || downloadingKey === getImageDownloadKey(currentImage, current);
+  const downloadDisabled = isDownloadingAll || Boolean(downloadingKey);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -76,7 +85,7 @@ function Lightbox({ images, startIndex, onClose, onDownload }) {
         />
 
         {/* Gomb sáv alul */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10">
+        <div className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+1rem)] left-1/2 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 flex-nowrap items-center gap-2 rounded-2xl border border-white/10 bg-black/60 px-3 py-2 backdrop-blur-md sm:bottom-4 sm:gap-3 sm:px-4">
           {images.length > 1 && (
             <button
               onClick={() => setCurrent((c) => (c - 1 + images.length) % images.length)}
@@ -86,15 +95,19 @@ function Lightbox({ images, startIndex, onClose, onDownload }) {
             </button>
           )}
           <button
-            onClick={() => onDownload(currentImage, current)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white hover:bg-white/10 transition-all"
+            onClick={() => {
+              if (!downloadDisabled) onDownload(currentImage, current);
+            }}
+            disabled={downloadDisabled}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-white hover:bg-white/10 transition-all disabled:cursor-wait disabled:opacity-60"
+            title={isCurrentDownloading ? 'Downloading...' : 'Download'}
           >
-            <Download className="w-4 h-4" />
+            {isCurrentDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           </button>
           {images.length > 1 && (
             <>
-              <span className="text-white/40 text-[11px] font-black tracking-widest">
-                {current + 1} / {images.length}
+              <span className="min-w-[3rem] whitespace-nowrap text-center text-[11px] font-black tracking-[0.18em] text-white/40 tabular-nums">
+                {current + 1}/{images.length}
               </span>
               <button
                 onClick={() => setCurrent((c) => (c + 1) % images.length)}
@@ -120,7 +133,7 @@ function Lightbox({ images, startIndex, onClose, onDownload }) {
 }
 
 // ── Egy képkártya ───────────────────────────────────────────────────────────────
-function ImageCard({ img, idx, onZoom, onDownload }) {
+function ImageCard({ img, idx, onZoom, onDownload, isDownloading, downloadDisabled }) {
   const [hovered, setHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const imageUrl = getImageDisplayUrl(img);
@@ -175,15 +188,16 @@ function ImageCard({ img, idx, onZoom, onDownload }) {
                   <ZoomIn className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={() => onDownload(img, idx)}
-                  className="w-11 h-11 rounded-[1.1rem] bg-white text-black flex items-center justify-center hover:scale-105 transition-all active:scale-95 shadow-xl"
+                  onClick={() => {
+                    if (!downloadDisabled) onDownload(img, idx);
+                  }}
+                  disabled={downloadDisabled}
+                  className="w-11 h-11 rounded-[1.1rem] bg-white text-black flex items-center justify-center hover:scale-105 transition-all active:scale-95 shadow-xl disabled:cursor-wait disabled:opacity-70 disabled:hover:scale-100"
+                  title={isDownloading ? 'Downloading...' : 'Download'}
                 >
-                  <Download className="w-5 h-5" />
+                  {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
                 </button>
               </div>
-              <button className="w-11 h-11 rounded-[1.1rem] bg-white/10 backdrop-blur-md border border-white/15 text-white flex items-center justify-center hover:bg-white/20 transition-all hover:scale-105 active:scale-95">
-                <Share2 className="w-5 h-5" />
-              </button>
             </div>
           </motion.div>
         )}
@@ -202,48 +216,72 @@ function ImageCard({ img, idx, onZoom, onDownload }) {
 // ── Fő komponens ────────────────────────────────────────────────────────────────
 export default function ImageWorkspace({ isGenerating, images, onClear, error, selectedModel, genProgress = 0, genStatus = '', genElapsed = 0, activityLabel = 'Creating image', getIdToken }) {
   const [lightboxIdx, setLightboxIdx] = useState(null);
+  const [downloadingKey, setDownloadingKey] = useState(null);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
-  const downloadImage = async (img, idx = 0) => {
+  const downloadImage = async (img, idx = 0, { manageState = true } = {}) => {
+    const key = getImageDownloadKey(img, idx);
     const url = getImageDownloadUrl(img);
-    if (!url) return;
-
-    const filename = getImageFilename(img, idx);
+    if (manageState) setDownloadingKey(key);
 
     try {
-      if (url.startsWith('data:')) {
-        const blob = await (await fetch(url)).blob();
-        const objectUrl = URL.createObjectURL(blob);
-        triggerDownload(objectUrl, filename);
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-        return;
+      if (!url) return;
+
+      const filename = getImageFilename(img, idx);
+
+      try {
+        if (url.startsWith('data:')) {
+          const blob = await (await fetch(url)).blob();
+          const objectUrl = URL.createObjectURL(blob);
+          triggerDownload(objectUrl, filename);
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          return;
+        }
+
+        if (typeof getIdToken === 'function') {
+          const token = await getIdToken();
+          const response = await fetch(`${API_BASE}/api/image/download`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              imageUrl: url,
+              imageKey: typeof img === 'object' && img ? img.fullKey : null,
+              filename,
+            }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const blob = await response.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          triggerDownload(objectUrl, filename);
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          return;
+        }
+      } catch (err) {
+        console.warn('Image download proxy failed, falling back to direct download:', err);
       }
 
-      if (typeof getIdToken === 'function') {
-        const token = await getIdToken();
-        const response = await fetch(`${API_BASE}/api/image/download`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            imageUrl: url,
-            imageKey: typeof img === 'object' && img ? img.fullKey : null,
-            filename,
-          }),
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        triggerDownload(objectUrl, filename);
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-        return;
+      triggerDownload(url, filename);
+    } finally {
+      if (manageState) {
+        setDownloadingKey((current) => (current === key ? null : current));
       }
-    } catch (err) {
-      console.warn('Image download proxy failed, falling back to direct download:', err);
     }
+  };
 
-    triggerDownload(url, filename);
+  const downloadAllImages = async () => {
+    if (isDownloadingAll || downloadingKey) return;
+
+    setIsDownloadingAll(true);
+    try {
+      for (let idx = 0; idx < images.length; idx += 1) {
+        await downloadImage(images[idx], idx);
+      }
+    } finally {
+      setIsDownloadingAll(false);
+    }
   };
 
   // Elrendezés: 1 kép → teljes szélesség, 2-4 kép → 2 oszlop
@@ -303,12 +341,12 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
                     <Zap className="w-8 h-8 text-white animate-pulse" />
                   </div>
                 </div>
-                <div className="space-y-5">
+                <div className="space-y-5 flex flex-col items-center">
                   <h3 className="text-2xl font-black text-white italic tracking-[0.4em] uppercase">
                     {activityLabel}<span className="animate-pulse">...</span>
                   </h3>
                   {genStatus && (
-                    <div className={`text-[8px] font-black uppercase tracking-widest px-3 py-1.5 rounded-md border ${
+                    <div className={`w-[min(78vw,28rem)] text-center text-[8px] font-black uppercase tracking-widest px-3 py-1.5 rounded-md border ${
                       genStatus === 'PROCESSING'
                         ? 'text-white bg-white/10 border-white/20'
                         : 'text-zinc-400 bg-white/[0.02] border-white/5'
@@ -316,7 +354,7 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
                       {genStatus}
                     </div>
                   )}
-                  <div className="w-64 flex flex-col items-center gap-2">
+                  <div className="w-[min(78vw,28rem)] flex flex-col items-center gap-2">
                     <div className="w-full h-[2px] bg-white/5 rounded-full overflow-hidden">
                       <motion.div
                         className="h-full rounded-full"
@@ -364,6 +402,8 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
                 idx={idx}
                 onZoom={setLightboxIdx}
                 onDownload={downloadImage}
+                isDownloading={isDownloadingAll || downloadingKey === getImageDownloadKey(img, idx)}
+                downloadDisabled={isDownloadingAll || Boolean(downloadingKey)}
               />
             ))}
           </motion.div>
@@ -379,10 +419,20 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
           className="fixed bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 z-40 px-6 py-3 rounded-[2rem] bg-white/[0.02] backdrop-blur-3xl border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
         >
           <button
-            onClick={() => images.forEach((img, idx) => downloadImage(img, idx))}
-            className="px-6 py-3 rounded-xl bg-white/5 border border-white/5 text-zinc-500 font-black text-[10px] uppercase tracking-[0.2em] hover:text-white hover:bg-white/10 transition-all flex items-center gap-3"
+            onClick={downloadAllImages}
+            disabled={isDownloadingAll || Boolean(downloadingKey)}
+            className="px-6 py-3 rounded-xl bg-white/5 border border-white/5 text-zinc-500 font-black text-[10px] uppercase tracking-[0.2em] hover:text-white hover:bg-white/10 transition-all flex items-center gap-3 disabled:cursor-wait disabled:opacity-60"
+            title={isDownloadingAll ? 'Downloading...' : 'Download all'}
           >
-            Download all <Download className="w-4 h-4" />
+            {isDownloadingAll ? (
+              <>
+                Downloading <Loader2 className="w-4 h-4 animate-spin" />
+              </>
+            ) : (
+              <>
+                Download all <Download className="w-4 h-4" />
+              </>
+            )}
           </button>
           <div className="w-px h-5 bg-white/5 mx-2" />
           <button 
@@ -402,6 +452,8 @@ export default function ImageWorkspace({ isGenerating, images, onClear, error, s
             startIndex={lightboxIdx}
             onClose={() => setLightboxIdx(null)}
             onDownload={downloadImage}
+            downloadingKey={downloadingKey}
+            isDownloadingAll={isDownloadingAll}
           />
         )}
       </AnimatePresence>

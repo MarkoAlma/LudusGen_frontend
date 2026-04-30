@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Download, Mic, Music, Layout,
-  Sparkles, History, Activity, Share2, Trash2, X, AlertCircle
+  Sparkles, History, Activity, Trash2, X, AlertCircle
 } from 'lucide-react';
 import { API_BASE } from '../../api/client';
+import { ALL_MODELS } from '../../ai_components/models';
 import LudusAudioPlayer from './LudusAudioPlayer';
 
 const MiniWaveform = ({ color, isPlaying }) => (
@@ -104,13 +105,68 @@ const getHistoryTitle = (item) => {
   return String(title || "Untitled audio").trim();
 };
 
+const normalizeModelKey = (value) => String(value || "")
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "");
+
+const AUDIO_MODEL_NAME_BY_KEY = ALL_MODELS
+  .filter((model) => model.panelType === "audio")
+  .reduce((lookup, model) => {
+    const aliases = [
+      model.id,
+      model.name,
+      model.apiModel,
+      model.deapiModelSlug,
+      model.deapiTtsModelSlug,
+      ...(Array.isArray(model.deapiTtsVariants)
+        ? model.deapiTtsVariants.map((variant) => variant.slug)
+        : []),
+    ];
+
+    aliases.forEach((alias) => {
+      const key = normalizeModelKey(alias);
+      if (key) lookup.set(key, model.name);
+    });
+
+    return lookup;
+  }, new Map());
+
+const HIDDEN_HISTORY_META_KEYS = new Set([
+  "deapi",
+  "nvidia",
+  "nvidiariva",
+  "minimax",
+]);
+
+const getHistoryModelName = (item) => {
+  const candidates = [
+    item?.modelId,
+    item?.legacyModelId,
+    item?.deapiModel,
+    item?.model,
+    item?.apiModel,
+  ];
+
+  for (const candidate of candidates) {
+    const key = normalizeModelKey(candidate);
+    if (!key) continue;
+    const modelName = AUDIO_MODEL_NAME_BY_KEY.get(key);
+    if (modelName) return modelName;
+  }
+
+  return "";
+};
+
 const getHistoryMeta = (item) => {
-  const model = item?.deapiModel || item?.model || item?.modelId || item?.legacyModelId;
+  const model = getHistoryModelName(item);
   return [
-    item?.provider,
     model,
     item?.fileFormat || item?.format,
-  ].filter(Boolean).map((part) => String(part));
+  ]
+    .filter(Boolean)
+    .map((part) => String(part))
+    .filter((part) => !HIDDEN_HISTORY_META_KEYS.has(normalizeModelKey(part)));
 };
 
 const buildHistoryAudioInfo = (item) => ({
@@ -272,6 +328,10 @@ export default function AudioWorkspace({
     formatSampleRate(activeHistoryAudioInfo?.sampleRate),
     formatBitrate(activeHistoryAudioInfo?.bitrate),
   ].filter(Boolean).join(" | ");
+  const activeHistoryChips = [
+    ...activeHistoryMeta.filter((part) => part.toUpperCase() !== activeHistoryAudioInfo?.fileFormat?.toUpperCase()),
+    formatHistoryDate(activeHistoryItem),
+  ].filter(Boolean).filter((part, index, parts) => parts.findIndex((value) => value.toLowerCase() === part.toLowerCase()) === index);
 
   return (
     <div className="h-full w-full relative z-10 flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
@@ -441,14 +501,14 @@ export default function AudioWorkspace({
                     </h3>
                   </div>
 
-                  <div className="w-full max-w-2xl">
+                  <div className="flex w-full max-w-2xl justify-center">
                     <LudusAudioPlayer
                       src={audioUrl}
                       title="Neural Master v1"
                       eyebrow="Audio created successfully"
                       accent={color}
                       details={playbackDetails || 'AI audio output'}
-                      className="max-w-none"
+                      className="mx-auto"
                     />
                   </div>
 
@@ -465,9 +525,6 @@ export default function AudioWorkspace({
                         ) : (
                           <Download className="w-4 h-4 sm:w-5 sm:h-5" />
                         )}
-                      </button>
-                      <button className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all">
-                        <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     </div>
                     {downloadError ? (
@@ -522,8 +579,8 @@ export default function AudioWorkspace({
               transition={{ duration: 0.18, ease: "easeOut" }}
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-4 border-b border-white/5 px-5 py-4 sm:px-6">
-                <div className="flex min-w-0 items-center gap-3">
+              <div className="relative border-b border-white/5 px-5 py-6 text-center sm:px-8">
+                <div className="mx-auto flex max-w-xl flex-col items-center gap-3">
                   <div
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border"
                     style={{
@@ -541,7 +598,7 @@ export default function AudioWorkspace({
                     >
                       {activeHistoryKind.label}
                     </div>
-                    <h3 className="line-clamp-2 text-base font-black leading-tight text-white sm:text-lg">
+                    <h3 className="line-clamp-3 text-base font-black leading-tight text-white sm:text-lg">
                       {activeHistoryTitle}
                     </h3>
                   </div>
@@ -549,23 +606,20 @@ export default function AudioWorkspace({
                 <button
                   type="button"
                   onClick={closeHistoryModal}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/5 bg-white/[0.03] text-white/40 transition-all hover:border-white/15 hover:bg-white/10 hover:text-white"
+                  className="absolute right-4 top-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/5 bg-white/[0.03] text-white/40 transition-all hover:border-white/15 hover:bg-white/10 hover:text-white"
                   title="Close"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
 
-              <div className="px-5 py-5 sm:px-6">
-                <div className="mb-4 flex flex-wrap items-center gap-2 text-[8px] font-black uppercase tracking-[0.16em] text-white/30">
-                  {[...activeHistoryMeta, activeHistoryDetails, formatHistoryDate(activeHistoryItem)]
-                    .filter(Boolean)
-                    .slice(0, 5)
-                    .map((part) => (
-                      <span key={part} className="max-w-[12rem] truncate rounded-lg border border-white/5 bg-white/[0.025] px-2 py-1">
-                        {part}
-                      </span>
-                    ))}
+              <div className="px-5 py-6 sm:px-8">
+                <div className="mb-5 flex flex-wrap items-center justify-center gap-2 text-[8px] font-black uppercase tracking-[0.16em] text-white/30">
+                  {activeHistoryChips.slice(0, 4).map((part) => (
+                    <span key={part} className="max-w-[12rem] truncate rounded-lg border border-white/5 bg-white/[0.025] px-2 py-1">
+                      {part}
+                    </span>
+                  ))}
                 </div>
 
                 {isHistoryAudioLoading ? (
@@ -577,20 +631,19 @@ export default function AudioWorkspace({
                     {historyModalError}
                   </div>
                 ) : (
-                  <LudusAudioPlayer
-                    src={activeHistoryAudioUrl}
-                    title={activeHistoryTitle}
-                    eyebrow="Archive playback"
-                    accent={activeHistoryKind.accent}
-                    details={activeHistoryDetails || "AI audio"}
-                    className="max-w-none"
-                  />
+                  <div className="flex w-full justify-center">
+                    <LudusAudioPlayer
+                      src={activeHistoryAudioUrl}
+                      title={`Archived ${activeHistoryKind.label.toLowerCase()}`}
+                      eyebrow="Archive playback"
+                      accent={activeHistoryKind.accent}
+                      details={activeHistoryDetails || "AI audio"}
+                      className="mx-auto"
+                    />
+                  </div>
                 )}
 
-                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-[9px] font-black uppercase tracking-[0.18em] text-white/25">
-                    {activeHistoryDetails || "AI audio"}
-                  </div>
+                <div className="mt-5 flex justify-center">
                   <button
                     type="button"
                     onClick={handleHistoryDownload}
@@ -602,7 +655,7 @@ export default function AudioWorkspace({
                   </button>
                 </div>
                 {downloadError ? (
-                  <div className="mt-3 text-right text-[9px] font-bold uppercase tracking-[0.12em] text-rose-300">
+                  <div className="mt-3 text-center text-[9px] font-bold uppercase tracking-[0.12em] text-rose-300">
                     {downloadError}
                   </div>
                 ) : null}

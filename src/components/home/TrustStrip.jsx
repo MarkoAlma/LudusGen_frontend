@@ -1,22 +1,42 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Users, Cpu, ShieldCheck, Zap } from 'lucide-react';
+import { Box, Image as ImageIcon, MessageSquare, Music } from 'lucide-react';
 import Container from '../ui/Container';
+import { ALL_MODELS } from '../../ai_components/models';
 
 export default function TrustStrip() {
   const metrics = [
-    { value: "50k+", label: "Aktív Fejlesztő", icon: Users, color: 'text-primary' },
-    { value: "120+", label: "AI Modell", icon: Cpu, color: 'text-blue-400' },
-    { value: "99.9%", label: "Uptime SLA", icon: ShieldCheck, color: 'text-emerald-400' },
-    { value: "250M+", label: "Generálás", icon: Zap, color: 'text-amber-500' },
+    {
+      value: ALL_MODELS.filter((model) => model.panelType === 'chat').length,
+      label: 'chat model',
+      icon: MessageSquare,
+      color: 'text-primary',
+    },
+    {
+      value: ALL_MODELS.filter((model) => model.panelType === 'image').length,
+      label: 'image tool',
+      icon: ImageIcon,
+      color: 'text-blue-400',
+    },
+    {
+      value: ALL_MODELS.filter((model) => model.panelType === 'audio').length,
+      label: 'audio model',
+      icon: Music,
+      color: 'text-emerald-400',
+    },
+    {
+      value: ALL_MODELS.filter((model) => ['trellis', 'tripo'].includes(model.panelType)).length,
+      label: '3D workflow',
+      icon: Box,
+      color: 'text-amber-500',
+    },
   ];
 
   return (
     <section className="relative py-16 bg-transparent overflow-hidden">
-      {/* Light Streak Accents */}
       <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
-         <div className="absolute top-0 left-[-10%] w-[120%] h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent animate-shimmer" />
-         <div className="absolute bottom-0 right-[-10%] w-[120%] h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent animate-shimmer-reverse" />
+        <div className="absolute top-0 left-[-10%] w-[120%] h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent animate-shimmer" />
+        <div className="absolute bottom-0 right-[-10%] w-[120%] h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent animate-shimmer-reverse" />
       </div>
 
       <Container>
@@ -24,8 +44,8 @@ export default function TrustStrip() {
           {metrics.map((metric, i) => {
             const Icon = metric.icon;
             return (
-              <motion.div 
-                key={i}
+              <motion.div
+                key={metric.label}
                 initial={{ opacity: 0, x: -20 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
@@ -43,10 +63,9 @@ export default function TrustStrip() {
                     {metric.label}
                   </div>
                 </div>
-                
-                {/* Separator Line for Desktop */}
+
                 {i < 3 && (
-                   <div className="hidden lg:block w-px h-12 bg-gradient-to-b from-transparent via-white/5 to-transparent ml-8" />
+                  <div className="hidden lg:block w-px h-12 bg-gradient-to-b from-transparent via-white/5 to-transparent ml-8" />
                 )}
               </motion.div>
             );

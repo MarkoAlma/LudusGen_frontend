@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings2, Sparkles, ChevronDown, Plus, History } from 'lucide-react';
+import { Settings2, Sparkles, ChevronDown, Plus, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MODEL_GROUPS, ALL_MODELS } from '../../ai_components/models';
 
@@ -11,21 +11,7 @@ const CODE_MODELS = CODE_GROUP
   ? CODE_GROUP.categories.flatMap(c => c.models)
   : ALL_MODELS.filter(m => m.panelType === 'chat');
 
-// Price map for Code models (fallback for models without badge)
-const MODEL_PRICES = {
-  'trinity-large': 'Free',
-  'gemini-3-flash': 'Free',
-  'gemini-2.5-pro': 'Premium',
-  'groq-gpt120b': '$0.50 / 1M tok',
-  'groq-qwen3': '$0.30 / 1M tok',
-  'groq-llama70b': '$0.60 / 1M tok',
-  'cerebras-llama8b': '$0.10 / 1M tok',
-  'mistral-large': '$2.00 / 1M tok',
-  'nvidia-glm4.7': '$0.40 / 1M tok',
-  'deepseek-v3.2': '$0.80 / 1M tok',
-  'google-gemma-3-27b-it': 'Free',
-  'gpt4o_code': '$5.00 / 1M tok',
-};
+const CODE_MODEL_LIMIT_LABEL = "Global limit";
 
 export default function ModelBar({
   selectedModel,
@@ -40,6 +26,7 @@ export default function ModelBar({
   initialDropdownOpen = false
 }) {
   const themeColor = selectedModel?.color || "#8b5cf6";
+  const selectedSupportsVision = Boolean(selectedModel?.supportsVision);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(initialDropdownOpen);
   const dropdownRef = useRef(null);
 
@@ -94,6 +81,12 @@ export default function ModelBar({
             <span className="text-[11px] font-bold truncate max-w-[150px]">
               {selectedModel?.name || 'AI'}
             </span>
+            {selectedSupportsVision && (
+              <ImageIcon
+                className="w-3 h-3 shrink-0 text-sky-300"
+                aria-label="Accepts images"
+              />
+            )}
 
             {/* Chevron */}
             <ChevronDown className={`w-3 h-3 text-zinc-600 transition-transform duration-200 ${modelDropdownOpen ? 'rotate-180' : ''}`} />
@@ -119,7 +112,7 @@ export default function ModelBar({
                 <div className="max-h-80 overflow-y-auto py-1">
                   {CODE_MODELS.map(model => {
                     const isActive = selectedModel?.id === model.id;
-                    const price = model.badge || MODEL_PRICES[model.id] || '';
+                    const price = CODE_MODEL_LIMIT_LABEL;
 
                     return (
                       <button
@@ -137,14 +130,22 @@ export default function ModelBar({
                           }}
                         />
 
-                        {/* Name + provider */}
+                        {/* Name */}
                         <div className="flex-1 min-w-0">
-                          <span className="text-[12px] font-bold text-white truncate block">
-                            {model.name}
-                          </span>
-                          <span className="text-[9px] text-gray-600 font-medium">
-                            {model.provider}
-                          </span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[12px] font-bold text-white truncate block">
+                              {model.name}
+                            </span>
+                            {model.supportsVision && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-sky-400/20 bg-sky-400/10 text-[7px] font-black uppercase tracking-wider text-sky-200 shrink-0"
+                                title="Accepts images"
+                              >
+                                <ImageIcon className="w-2.5 h-2.5" />
+                                Vision
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Price badge */}
@@ -188,15 +189,6 @@ export default function ModelBar({
         </button>
 
         <div className="w-px h-4 bg-white/10 hidden sm:block mx-1" />
-
-        {/* History toggle (mobile) */}
-        <button
-          onClick={() => setHistorySidebarOpen(true)}
-          className="xl:hidden p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06] transition-all"
-          title="Open history"
-        >
-          <History className="w-4 h-4" />
-        </button>
 
         {/* Config */}
         <button

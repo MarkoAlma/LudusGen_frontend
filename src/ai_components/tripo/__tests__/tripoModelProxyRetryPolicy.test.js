@@ -38,6 +38,10 @@ assert(
   !loadBlock.includes("setModelUrl(item.model_url)"),
   "history loading should not fall back to the stale direct Tripo URL after proxy failure",
 );
+assert(
+  !loadBlock.includes("await purgeExpiredHistoryItem(item);\n            revokeBlobUrl(prevUrl.current);"),
+  "expiring a dead history item should not immediately tear down the currently visible viewer model",
+);
 
 assert(
   !source.includes('key={modelUrl || "tripo-empty-viewer"}'),

@@ -82,6 +82,7 @@ const HISTORY_THUMB_FETCH_LIMIT = 2;
 let activeHistoryThumbFetches = 0;
 const historyThumbFetchQueue = [];
 const historyThumbFetchInFlight = new Map();
+const historyThumbTerminalFailures = new Map();
 
 function runLimitedHistoryThumbFetch(task) {
   return new Promise((resolve, reject) => {
@@ -192,6 +193,12 @@ export async function fetchModelData(modelUrl, getIdToken, taskId = null) {
     };
 
     const inFlightKey = `${taskId ?? "no-task"}|${fetchUrl}`;
+    const terminalStatus = historyThumbTerminalFailures.get(inFlightKey);
+    if (terminalStatus) {
+      const err = new Error(`Model fetch failed: HTTP ${terminalStatus}`);
+      err.status = terminalStatus;
+      throw err;
+    }
     let requestPromise = historyThumbFetchInFlight.get(inFlightKey);
 
     if (!requestPromise) {
@@ -206,11 +213,15 @@ export async function fetchModelData(modelUrl, getIdToken, taskId = null) {
         }
 
         if (!r.ok) {
+          if ([404, 410].includes(r.status)) {
+            historyThumbTerminalFailures.set(inFlightKey, r.status);
+          }
           const err = new Error(`Model fetch failed: HTTP ${r.status}`);
           err.status = r.status;
           throw err;
         }
 
+        historyThumbTerminalFailures.delete(inFlightKey);
         return r.arrayBuffer();
       })();
 

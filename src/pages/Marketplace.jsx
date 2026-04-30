@@ -1,14 +1,17 @@
 import React, { useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowDownUp,
+  ArrowUp,
   BadgeCheck,
   Box,
   ChevronDown,
   CheckCircle2,
   Coins,
   Download,
+  Flag,
   Filter,
   Image as ImageIcon,
   Library,
@@ -43,6 +46,7 @@ import {
   isImageHistoryItem,
 } from '../ai_components/tripo/tripoImageHistoryUtils';
 import MarketplaceBg from '../assets/marketplace_bg.png';
+import { REPORT_REASONS, submitContentReport } from '../utils/reports';
 
 const TYPE_TABS = [
   { id: 'all', label: 'All', icon: Sparkles },
@@ -455,14 +459,14 @@ function AssetCard({ asset, onOpen }) {
           )}
         </div>
         
-        <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="flex flex-1 flex-col gap-4 p-3 sm:p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="truncate text-lg font-black italic tracking-tighter text-white">{asset.title}</h3>
+              <h3 className="truncate text-base font-black italic tracking-tighter text-white sm:text-lg">{asset.title}</h3>
               <p className="mt-0.5 truncate text-[11px] font-black uppercase tracking-[0.2em] text-gray-500">{asset.ownerName}</p>
             </div>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-primary backdrop-blur-md transition-colors group-hover:bg-primary group-hover:text-white">
-              <TypeIcon className="h-5 w-5" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-primary backdrop-blur-md transition-colors group-hover:bg-primary group-hover:text-white sm:h-10 sm:w-10">
+              <TypeIcon className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
 
@@ -489,16 +493,16 @@ function AssetCard({ asset, onOpen }) {
             )}
           </div>
 
-          <div className="mt-auto flex items-center justify-between border-t border-white/5 pt-4">
-            <div className="flex items-center gap-2">
+          <div className="mt-auto flex min-w-0 items-center justify-between gap-3 border-t border-white/5 pt-4">
+            <div className="flex min-w-0 items-center gap-2">
                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary">
                   <Coins className="h-4 w-4" />
                </div>
-               <span className="text-sm font-black tracking-tight text-white">
+               <span className="truncate text-sm font-black tracking-tight text-white">
                  {formatCredits(asset.priceCredits)}
                </span>
             </div>
-            <span className="text-[10px] font-bold text-gray-500">
+            <span className="shrink-0 text-[10px] font-bold text-gray-500">
               {createdAt ? createdAt.toLocaleDateString('en-US') : ''}
             </span>
           </div>
@@ -674,9 +678,9 @@ function MarketplaceSelect({ icon: Icon, value, onChange, options = [], label })
 
   return (
     <div ref={rootRef} className="relative flex min-w-0 flex-1 flex-col gap-2.5">
-      <span id={`${listboxId}-label`} className="pl-1 text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">{label}</span>
+      <span id={`${listboxId}-label`} className="pl-1 text-[9px] font-black uppercase tracking-[0.18em] text-gray-500 sm:text-[10px] sm:tracking-[0.3em]">{label}</span>
       <div className="relative group">
-        <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 transition-colors group-focus-within:text-primary">
+        <div className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 transition-colors group-focus-within:text-primary sm:left-4">
            {React.createElement(Icon, { className: 'h-4 w-4' })}
         </div>
         <MotionButton
@@ -686,7 +690,7 @@ function MarketplaceSelect({ icon: Icon, value, onChange, options = [], label })
           aria-expanded={open}
           aria-labelledby={`${listboxId}-label ${listboxId}-value`}
           onClick={() => setOpen((current) => !current)}
-          className={`h-13 w-full rounded-2xl border pl-11 pr-10 text-left text-xs font-bold text-white outline-none transition-all ${
+          className={`h-12 w-full rounded-2xl border pl-10 pr-9 text-left text-xs font-bold text-white outline-none transition-all sm:h-13 sm:pl-11 sm:pr-10 ${
             open
               ? 'border-primary/50 bg-white/[0.04] ring-4 ring-primary/10 shadow-[0_0_30px_rgba(138,43,226,0.14)]'
               : 'border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]'
@@ -696,7 +700,7 @@ function MarketplaceSelect({ icon: Icon, value, onChange, options = [], label })
             {selectedOption?.label}
           </span>
         </MotionButton>
-        <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
+        <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 sm:right-4">
            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-300 ${open ? 'rotate-180 text-primary' : ''}`} />
         </div>
 
@@ -745,7 +749,7 @@ function MarketplaceSelect({ icon: Icon, value, onChange, options = [], label })
   );
 }
 
-function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDelete, busy, user }) {
+function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDelete, onReport, busy, user }) {
   if (!asset) return null;
   const isOwner = user?.uid === asset.ownerId;
   const canDownload = asset.owned || isOwner;
@@ -861,6 +865,16 @@ function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDe
                 </div>
 
                 <div className="mt-auto pt-10 flex flex-col gap-4">
+                  <Button
+                    variant="subtle"
+                    onClick={() => onReport(asset)}
+                    disabled={busy}
+                    size="lg"
+                    className="w-full"
+                  >
+                    <Flag className="h-5 w-5" />
+                    Report asset
+                  </Button>
                   {canDownload ? (
                     <>
                       <Button
@@ -952,6 +966,94 @@ function DeleteAssetConfirmModal({ asset, isOpen, onClose, onConfirm, busy }) {
               <Button variant="danger" size="lg" className="flex-1" onClick={() => onConfirm(asset)} loading={busy}>
                 <Trash2 className="h-5 w-5" />
                 Delete
+              </Button>
+            </div>
+          </MotionDiv>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function ReportAssetModal({ asset, isOpen, onClose, onConfirm, busy }) {
+  const [reason, setReason] = useState('');
+  const [details, setDetails] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setReason('');
+      setDetails('');
+    }
+  }, [isOpen]);
+
+  if (!asset) return null;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+          <MotionDiv
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+            onClick={busy ? undefined : onClose}
+          />
+          <MotionDiv
+            initial={{ opacity: 0, scale: 0.96, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 18 }}
+            className="glass-panel relative w-full max-w-lg p-8 shadow-[0_40px_100px_rgba(0,0,0,0.8)]"
+          >
+            <div className="mb-6 flex items-start gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 text-red-300">
+                <Flag className="h-7 w-7" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-200">Report marketplace asset</p>
+                <h2 className="mt-2 truncate text-2xl font-black italic tracking-tighter text-white">{asset.title}</h2>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {REPORT_REASONS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setReason(item)}
+                  className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-xs font-black transition-all ${
+                    reason === item
+                      ? 'border-red-400/40 bg-red-400/10 text-red-100'
+                      : 'border-white/10 bg-white/[0.03] text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {item}
+                  {reason === item && <CheckCircle2 className="h-4 w-4 text-red-200" />}
+                </button>
+              ))}
+              <textarea
+                value={details}
+                onChange={(event) => setDetails(event.target.value)}
+                rows={3}
+                className="mt-3 w-full resize-none rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm font-bold text-white outline-none transition focus:border-red-400/40"
+                placeholder="Optional context"
+              />
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Button variant="subtle" size="lg" className="flex-1" onClick={onClose} disabled={busy}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="lg"
+                className="flex-1"
+                onClick={() => onConfirm(asset, { reason, details })}
+                disabled={!reason}
+                loading={busy}
+              >
+                <Flag className="h-5 w-5" />
+                Send report
               </Button>
             </div>
           </MotionDiv>
@@ -1456,6 +1558,8 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
 
 export default function Marketplace() {
   const { user, setIsAuthOpen, refreshCredits, setShowCreditTopup } = useContext(MyUserContext);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [filters, setFilters] = useState({
     type: 'all',
     search: '',
@@ -1477,6 +1581,10 @@ export default function Marketplace() {
   const [actionBusy, setActionBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const filtersRef = useRef(null);
   const loadMoreRef = useRef(null);
   const assetRequestSeqRef = useRef(0);
   const loadingMoreRef = useRef(false);
@@ -1628,29 +1736,55 @@ export default function Marketplace() {
   }, [hasMoreAssets, loadNextAssets, loading, loadingMore]);
 
   useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 720);
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToMarketplaceTop = useCallback(() => {
+    const targetTop = filtersRef.current
+      ? filtersRef.current.getBoundingClientRect().top + window.scrollY - 88
+      : 0;
+
+    window.scrollTo({
+      top: Math.max(targetTop, 0),
+      behavior: 'smooth',
+    });
+  }, []);
+
+  useEffect(() => {
     loadLibrary();
   }, [loadLibrary]);
 
   const updateFilter = (key, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-      ...(key === 'type' && value !== '3d' ? { tripo: 'all' } : {}),
-    }));
+    setFilters((prev) => {
+      const patch = {
+        [key]: value,
+        ...(key === 'type' && value !== '3d' ? { tripo: 'all' } : {}),
+      };
+      const changed = Object.entries(patch).some(([patchKey, patchValue]) => prev[patchKey] !== patchValue);
+      if (!changed) return prev;
+      return { ...prev, ...patch };
+    });
   };
 
   const hydrateOwned = useCallback((asset, options) => (
     hydrateAssetForViewer(asset, ownedAssetIds, viewerId, options)
   ), [ownedAssetIds, viewerId]);
 
-  const openDetail = async (asset) => {
-    setSelectedAsset(hydrateOwned(asset));
+  const openDetail = useCallback(async (asset) => {
+    const assetId = typeof asset === 'string' ? asset : asset?.id;
+    if (!assetId) return;
+    if (typeof asset === 'object' && asset?.title) setSelectedAsset(hydrateOwned(asset));
     try {
       const requestViewerId = viewerId;
       if (getCurrentViewerId() !== requestViewerId) return;
-      const { res, data } = await fetchMarketplacePublicJson(`/api/marketplace/assets/${asset.id}`, {
-        token: '',
-        retryWithoutAuth: true,
+      const res = await fetch(`${API_BASE}/api/marketplace/assets/${assetId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (getCurrentViewerId() !== requestViewerId) return;
       if (res.ok && data.success) {
@@ -1666,11 +1800,23 @@ export default function Marketplace() {
             ? { ...item, metadata: hydratedAsset.metadata || item.metadata }
             : item
         )));
+      } else if (typeof asset !== 'object' || !asset?.title) {
+        toast.error(data.message || 'Asset not found');
       }
-    } catch {
-      // The list card already has enough data for the modal.
+    } catch (err) {
+      if (typeof asset !== 'object' || !asset?.title) {
+        toast.error(err.message || 'Failed to open asset');
+      }
+      // List cards already have enough data for the modal when the user opened from the grid.
     }
-  };
+  }, [hydrateOwned, ownedAssetIds, viewerId]);
+
+  useEffect(() => {
+    const assetId = location.state?.openMarketplaceAssetId;
+    if (typeof assetId !== 'string' || !assetId) return;
+    openDetail(assetId);
+    navigate('/marketplace', { replace: true, state: null });
+  }, [location.state, navigate, openDetail]);
 
   const handlePurchase = async (asset) => {
     if (!user) {
@@ -1750,6 +1896,41 @@ export default function Marketplace() {
       return;
     }
     setDeleteTarget(asset);
+  };
+
+  const requestReport = (asset) => {
+    if (!user) {
+      openAuth();
+      return;
+    }
+    setReportTarget(asset);
+  };
+
+  const confirmReport = async (asset, { reason, details }) => {
+    if (!asset || reportBusy) return;
+    setReportBusy(true);
+    try {
+      await submitContentReport({
+        sourceType: 'marketplace_asset',
+        targetId: asset.id,
+        targetPath: '/marketplace',
+        targetTitle: asset.title,
+        targetOwnerId: asset.ownerId,
+        reason,
+        details,
+        metadata: {
+          type: asset.type,
+          ownerName: asset.ownerName,
+          priceCredits: asset.priceCredits,
+        },
+      });
+      toast.success('Report sent');
+      setReportTarget(null);
+    } catch (err) {
+      toast.error(err.message || 'Failed to send report');
+    } finally {
+      setReportBusy(false);
+    }
   };
 
   const confirmDelete = async (asset) => {
@@ -1846,38 +2027,38 @@ export default function Marketplace() {
         </div>
       </section>
 
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-12 px-6 pb-32">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-8 px-4 pb-32 sm:px-6 md:gap-12">
         {/* Floating Filters Panel */}
-        <section className="sticky top-24 z-30">
+        <section ref={filtersRef} className="relative z-20 scroll-mt-24 md:sticky md:top-24 md:z-30">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="glass-panel p-2 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
+            className="glass-panel p-3 shadow-[0_20px_60px_rgba(0,0,0,0.5)] sm:p-2"
           >
-            <div className="flex flex-col gap-4 p-2 lg:flex-row lg:items-end">
+            <div className="flex flex-col gap-3 p-0 sm:p-2 lg:flex-row lg:items-end">
                {/* Search */}
                <div className="flex-1">
                   <label className="relative block group">
-                    <Search className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500 transition-colors group-focus-within:text-primary" />
+                    <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 transition-colors group-focus-within:text-primary sm:left-5 sm:h-5 sm:w-5" />
                     <input
                       value={filters.search}
                       onChange={(event) => updateFilter('search', event.target.value)}
-                      className="h-16 w-full rounded-[1.25rem] border border-white/5 bg-white/[0.03] pl-14 pr-6 text-sm font-bold text-white outline-none transition-all placeholder:text-gray-600 hover:bg-white/[0.05] focus:border-primary/50 focus:bg-white/[0.02] focus:ring-4 focus:ring-primary/5"
+                      className="h-14 w-full rounded-[1.25rem] border border-white/5 bg-white/[0.03] pl-11 pr-4 text-xs font-bold text-white outline-none transition-all placeholder:text-gray-600 hover:bg-white/[0.05] focus:border-primary/50 focus:bg-white/[0.02] focus:ring-4 focus:ring-primary/5 sm:h-16 sm:pl-14 sm:pr-6 sm:text-sm"
                       placeholder="Search assets, tags, or styles..."
                     />
                   </label>
                </div>
 
                {/* Tabs */}
-               <div className="flex gap-2 rounded-2xl bg-black/40 p-1.5 border border-white/5">
+               <div className="grid w-full grid-cols-2 gap-2 rounded-2xl border border-white/5 bg-black/40 p-1.5 sm:flex sm:w-auto sm:gap-2">
                   {TYPE_TABS.map((tab) => (
                     <MotionButton
                       key={tab.id}
                       type="button"
                       whileTap={{ scale: 0.95 }}
                       onClick={() => updateFilter('type', tab.id)}
-                      className={`relative flex h-13 min-w-[100px] items-center justify-center gap-2.5 rounded-[1.15rem] px-5 text-xs font-black uppercase tracking-widest transition-all ${
+                      className={`relative flex h-11 min-w-0 items-center justify-start gap-2 rounded-[1.15rem] px-3 text-[11px] font-black uppercase tracking-[0.06em] transition-all sm:h-13 sm:min-w-[100px] sm:justify-center sm:gap-2.5 sm:px-5 sm:text-xs sm:tracking-widest ${
                         filters.type === tab.id
                           ? 'text-white'
                           : 'text-gray-500 hover:text-white hover:bg-white/5'
@@ -1889,9 +2070,9 @@ export default function Marketplace() {
                           className="absolute inset-0 rounded-[1.15rem] bg-gradient-to-r from-primary to-primary-light shadow-[0_0_20px_rgba(138,43,226,0.3)]"
                         />
                       )}
-                      <span className="relative z-10 flex items-center gap-2.5">
-                        <tab.icon className="h-4 w-4" />
-                        {tab.label}
+                      <span className="relative z-10 flex min-w-0 items-center gap-2 sm:gap-2.5">
+                        <tab.icon className="h-4 w-4 shrink-0" />
+                        <span className="whitespace-nowrap">{tab.label}</span>
                       </span>
                     </MotionButton>
                   ))}
@@ -1899,7 +2080,7 @@ export default function Marketplace() {
             </div>
 
             {/* Advanced Filters Overlay (simplified row for premium look) */}
-            <div className="grid gap-6 border-t border-white/5 p-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-3 grid gap-4 border-t border-white/5 p-0 pt-3 sm:p-4 md:grid-cols-2 lg:grid-cols-4">
               <MarketplaceSelect
                 icon={ArrowDownUp}
                 label="Sort"
@@ -1924,28 +2105,30 @@ export default function Marketplace() {
                 options={TRIPO_OPTIONS}
               />
 
-              <div className="flex items-end gap-3">
-                 <div className="flex-1 grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_3rem] items-end gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_52px] sm:gap-3">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={filters.minPrice}
-                      onChange={(event) => updateFilter('minPrice', event.target.value)}
-                      className="h-13 rounded-2xl border border-white/5 bg-white/[0.03] px-4 text-xs font-bold text-white outline-none focus:border-primary/50"
+                      onChange={(event) => updateFilter('minPrice', event.target.value.replace(/\D/g, ''))}
+                      className="h-12 min-w-0 rounded-2xl border border-white/5 bg-white/[0.03] px-3 text-xs font-bold text-white outline-none focus:border-primary/50 sm:h-13 sm:px-4"
                       placeholder="Min price"
                     />
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={filters.maxPrice}
-                      onChange={(event) => updateFilter('maxPrice', event.target.value)}
-                      className="h-13 rounded-2xl border border-white/5 bg-white/[0.03] px-4 text-xs font-bold text-white outline-none focus:border-primary/50"
+                      onChange={(event) => updateFilter('maxPrice', event.target.value.replace(/\D/g, ''))}
+                      className="h-12 min-w-0 rounded-2xl border border-white/5 bg-white/[0.03] px-3 text-xs font-bold text-white outline-none focus:border-primary/50 sm:h-13 sm:px-4"
                       placeholder="Max price"
                     />
-                 </div>
                  <motion.button
                    whileHover={{ scale: 1.05 }}
                    whileTap={{ scale: 0.95 }}
                    onClick={() => setFilters({ type: 'all', search: '', sort: 'featured', minPrice: '', maxPrice: '', ownership: 'all', tripo: 'all' })}
-                   className="flex h-13 w-13 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-gray-500 hover:text-white hover:bg-white/10 transition-colors"
+                   className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-gray-500 transition-colors hover:bg-white/10 hover:text-white sm:h-13 sm:w-13"
                    title="Reset Filters"
                  >
                    <X className="h-5 w-5" />
@@ -1979,7 +2162,7 @@ export default function Marketplace() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3 xl:grid-cols-4">
                 {assets.map((asset) => (
                   <AssetCard key={asset.id} asset={hydrateOwned(asset)} onOpen={openDetail} />
                 ))}
@@ -2100,6 +2283,24 @@ export default function Marketplace() {
         )}
       </div>
 
+      <AnimatePresence>
+        {showBackToTop && (
+          <motion.button
+            type="button"
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.96 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            onClick={scrollToMarketplaceTop}
+            className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+1rem)] right-4 z-40 flex h-12 items-center gap-2 rounded-full border border-primary/35 bg-[#120b1f]/90 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_14px_40px_rgba(0,0,0,0.5),0_0_24px_rgba(138,43,226,0.22)] backdrop-blur-2xl transition-colors hover:border-primary/60 hover:bg-[#1a102a] md:hidden"
+            aria-label="Back to marketplace filters"
+          >
+            <ArrowUp className="h-4 w-4 text-primary" />
+            Top
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       <AssetDetailModal
         asset={selectedAssetForModal}
         isOpen={Boolean(selectedAssetForModal)}
@@ -2107,6 +2308,7 @@ export default function Marketplace() {
         onPurchase={handlePurchase}
         onDownload={handleDownload}
         onDelete={requestDelete}
+        onReport={requestReport}
         busy={actionBusy}
         user={user}
       />
@@ -2117,6 +2319,14 @@ export default function Marketplace() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
         busy={deleteBusy}
+      />
+
+      <ReportAssetModal
+        asset={reportTarget}
+        isOpen={Boolean(reportTarget)}
+        onClose={() => setReportTarget(null)}
+        onConfirm={confirmReport}
+        busy={reportBusy}
       />
 
       <PublishAssetModal

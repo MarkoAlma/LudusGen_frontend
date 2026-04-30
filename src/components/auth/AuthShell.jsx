@@ -7,7 +7,7 @@ export default function AuthShell({ children, isOpen, onClose }) {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[1000] flex items-start lg:items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
         {/* Cinematic Animated Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}

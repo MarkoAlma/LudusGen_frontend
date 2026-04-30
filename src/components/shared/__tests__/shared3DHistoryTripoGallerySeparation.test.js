@@ -23,4 +23,24 @@ assert(
   "Shared3DHistory should explain that Tripo image outputs now live in Gallery",
 );
 
+const emptyBridgeIndex = sharedHistorySource.indexOf("!histLoad && activeTab === 'tripo' && filtHist.length === 0");
+const emptyStateIndex = sharedHistorySource.indexOf('!histLoad && filtHist.length === 0 && (');
+
+assert.notEqual(
+  emptyBridgeIndex,
+  -1,
+  "Shared3DHistory should render the gallery bridge in the empty Tripo state",
+);
+
+assert.notEqual(
+  emptyStateIndex,
+  -1,
+  "Shared3DHistory should still render the generic empty state block",
+);
+
+assert(
+  emptyBridgeIndex < emptyStateIndex,
+  "The empty Tripo state should show the gallery bridge before the empty-state placeholder",
+);
+
 console.log("shared3DHistoryTripoGallerySeparation assertions passed");

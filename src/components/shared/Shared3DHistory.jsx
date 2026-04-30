@@ -677,6 +677,10 @@ export default function Shared3DHistory({
           </div>
         )}
 
+        {!histLoad && activeTab === 'tripo' && filtHist.length === 0 && (
+          <TripoGalleryBridge />
+        )}
+
         {!histLoad && filtHist.length === 0 && (
           <EmptyState accent={accent} message={histQ ? "No matches found" : activeTab === 'upload' ? "No uploads yet" : "Archive empty"} />
         )}
@@ -685,7 +689,7 @@ export default function Shared3DHistory({
         {!histLoad && activeTab === 'tripo' && tripoSections && (
           <AnimatePresence mode="sync">
             <MotionDiv key={`${activeTab}-${subTab}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
-              <TripoGalleryBridge />
+              {filtHist.length > 0 && <TripoGalleryBridge />}
               {subTab === 'all' ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                   {[...filtHist].sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0)).map(item => {

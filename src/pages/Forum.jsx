@@ -12,8 +12,9 @@ import {
   ArrowUp, Rss, Award, Tag, Globe, Heart, Smile,
   BarChart2, PenSquare, HelpCircle, Megaphone, AtSign,
   Trash2, Edit3, Unlock, Home, Code, Image, Music, Box,
-  Bold, Italic, List, Heading2, Quote, Link,
+  Bold, Italic, List, Heading2, Quote, Link, Flag,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import ForumPost from "./ForumPost";
 import ForumAnimatedBg from "../components/ForumAnimatedBg";
 import CreditTopup from "../components/CreditTopup";
@@ -25,6 +26,7 @@ import {
   getProfileDisplayName,
   getProfileInitial,
 } from "../utils/communityProfiles";
+import { REPORT_REASONS, submitContentReport } from "../utils/reports";
 import { auth, db } from "../firebase/firebaseApp";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -220,7 +222,7 @@ const CATEGORIES = [
   },
   {
     id: "threed", label: "3D AI", color: "#38bdf8",
-    description: "Meshy, Tripo3D, TripoSG, text/image to 3D", icon: Box
+    description: "Tripo3D, Trellis, text/image to 3D", icon: Box
   },
 ];
 
@@ -240,7 +242,12 @@ const normalizeCommunityPost = (post) => ({
   ...post,
   category: normalizeCommunityCategory(post?.category),
 });
-const isVisibleCommunityPost = (post) => !!post && VALID_CATEGORY_IDS.has(normalizeCommunityCategory(post.category));
+const HIDDEN_CONTENT_STATUSES = new Set(["hidden", "deleted", "removed"]);
+const isVisibleCommunityPost = (post) => {
+  if (!post || !VALID_CATEGORY_IDS.has(normalizeCommunityCategory(post.category))) return false;
+  if (post.isHidden === true || post.deletedAt) return false;
+  return !HIDDEN_CONTENT_STATUSES.has(String(post.status || "").toLowerCase());
+};
 const CategoryIcon = ({ category, className = "w-4 h-4", style = {} }) => {
   const Icon = category?.icon || Hash;
   return <Icon className={className} style={{ color: category?.color, ...style }} />;
@@ -315,13 +322,13 @@ export const MOCK_POSTS = [
   },
   {
     id: "mock_5", category: "threed", pinned: false, hot: true, locked: false, solved: false,
-    title: "Meshy vs TripoSG - which creates better 3D models from images? [2025 test]",
-    preview: "I tested both platforms with the same images...",
-    content: `I tested both platforms with the same reference images.`,
+    title: "Tripo3D vs Trellis - which creates better 3D models from references? [2025 test]",
+    preview: "I tested both workflows with the same references...",
+    content: `I tested both workflows with the same reference images.`,
     author: "3d_builder", avatar: "3", avatarColor: "#0284c7",
     authorId: "mock_user_5",
     time: "1 w ago", views: 2134, likes: 156, comments: 58,
-    tags: ["meshy", "triposg", "3d", "comparison"],
+    tags: ["tripo3d", "trellis", "3d", "comparison"],
     readTime: 4, poll: null,
   },
 ];
@@ -468,9 +475,85 @@ const NotifDropdown = ({ notifs, onNotifClick, onDeleteAll, onDeleteOne, onClose
 };
 
 // ─── Poszt kártya ─────────────────────────────────────────────────
+const ReportTopicModal = ({ post, isOpen, onClose, onSubmit, busy }) => {
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+
+  useEffect(() => {
+    if (!isOpen) {
+      setReason("");
+      setDetails("");
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !post) return null;
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
+      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={busy ? undefined : onClose} />
+      <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#13111c] p-5 shadow-2xl">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-red-400/20 bg-red-400/10 text-red-300">
+            <Flag className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-red-200">Report forum post</p>
+            <h3 className="mt-1 truncate text-lg font-black text-white">{post.title}</h3>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {REPORT_REASONS.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setReason(item)}
+              className="flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs font-bold transition-all"
+              style={{
+                background: reason === item ? "rgba(248,113,113,0.12)" : "rgba(255,255,255,0.03)",
+                borderColor: reason === item ? "rgba(248,113,113,0.35)" : "rgba(255,255,255,0.08)",
+                color: reason === item ? "#fecaca" : "#9ca3af",
+              }}
+            >
+              {item}
+              {reason === item && <CheckCircle className="h-4 w-4 text-red-200" />}
+            </button>
+          ))}
+          <textarea
+            value={details}
+            onChange={(event) => setDetails(event.target.value)}
+            rows={3}
+            className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm font-medium text-white outline-none focus:border-red-400/40"
+            placeholder="Optional context"
+          />
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="flex-1 rounded-xl border border-white/10 bg-white/[0.03] py-2.5 text-sm font-bold text-gray-400 transition hover:text-white disabled:opacity-40"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSubmit({ reason, details })}
+            disabled={!reason || busy}
+            className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white transition hover:bg-red-500 disabled:opacity-40"
+          >
+            {busy ? "Sending..." : "Send report"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PostCard = ({
   post, onClick, bookmarked, onBookmark, viewedIds,
-  currentUserId, isAdmin, onDelete, onEdit, onToggle,
+  currentUserId, isAdmin, onDelete, onEdit, onToggle, onReport,
 }) => {
   const normalizedCategory = normalizeCommunityCategory(post.category);
   const cat = CATEGORIES.find(c => c.id === normalizedCategory) || CATEGORIES.find(c => c.id === DEFAULT_CATEGORY);
@@ -601,6 +684,11 @@ const PostCard = ({
                   <button onClick={e => { e.stopPropagation(); onBookmark(post.id); setShowMenu(false); }}
                     className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
                     <Bookmark className={`w-3.5 h-3.5 ${bookmarked ? "text-amber-400 fill-current" : ""}`} /> {bookmarked ? "Remove bookmark" : "Save"}
+                  </button>
+
+                  <button onClick={e => { e.stopPropagation(); setShowMenu(false); onReport?.(post); }}
+                    className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-red-400 hover:bg-red-400/10 transition-colors">
+                    <Flag className="w-3.5 h-3.5" /> Report
                   </button>
 
                   {canManage && (
@@ -1449,6 +1537,8 @@ export default function Forum() {
   const [notifications, setNotifications] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportBusy, setReportBusy] = useState(false);
   const [authorProfiles, setAuthorProfiles] = useState({});
   const [visiblePostCount, setVisiblePostCount] = useState(POSTS_BATCH_SIZE);
 
@@ -1573,6 +1663,39 @@ export default function Forum() {
     setEditingPost(post);
   };
 
+  const handleReportPost = (post) => {
+    if (!requireCommunityAuth()) return;
+    setReportTarget(post);
+  };
+
+  const handleSubmitReport = async ({ reason, details }) => {
+    if (!reportTarget || reportBusy) return;
+    setReportBusy(true);
+    try {
+      const category = normalizeCommunityCategory(reportTarget.category);
+      await submitContentReport({
+        sourceType: "forum_post",
+        targetId: String(reportTarget.id),
+        targetPath: `/forum/${category}/${reportTarget.slug || reportTarget.id}`,
+        targetTitle: reportTarget.title,
+        targetOwnerId: reportTarget.authorId || "",
+        reason,
+        details,
+        metadata: {
+          category,
+          author: reportTarget.author || reportTarget.authorName || "",
+          preview: buildPreviewText(reportTarget.content || reportTarget.preview || "", 600),
+        },
+      });
+      toast.success("Report sent");
+      setReportTarget(null);
+    } catch (err) {
+      toast.error(err.message || "Failed to send report");
+    } finally {
+      setReportBusy(false);
+    }
+  };
+
   // ── Auth state figyelés ──────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -1693,8 +1816,8 @@ export default function Forum() {
   // ── Poszt keresése ───────────────────────────────────────────────
   const findPost = useCallback((category, slug, postList) => {
     return (
-      postList.find(p => p.slug === slug && p.category === normalizeCommunityCategory(category)) ||
-      postList.find(p => p.slug === slug) ||
+      postList.find(p => isVisibleCommunityPost(p) && p.slug === slug && p.category === normalizeCommunityCategory(category)) ||
+      postList.find(p => isVisibleCommunityPost(p) && p.slug === slug) ||
       null
     );
   }, []);
@@ -2342,6 +2465,14 @@ export default function Forum() {
         }}
       />
 
+      <ReportTopicModal
+        post={reportTarget}
+        isOpen={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        onSubmit={handleSubmitReport}
+        busy={reportBusy}
+      />
+
     </>
   );
 
@@ -2959,6 +3090,7 @@ export default function Forum() {
                   }}
                   onEdit={handleEdit}
                   onToggle={handleToggleField}
+                  onReport={handleReportPost}
                 />
               ))}
             </div>

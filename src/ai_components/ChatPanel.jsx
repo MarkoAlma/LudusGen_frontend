@@ -204,6 +204,7 @@ export default function ChatPanel({ selectedModel, userId, getIdToken, isGlobalO
                   attachedImage={attachedImage}
                   setAttachedImage={setAttachedImage}
                   textareaRef={textareaRef}
+                  supportsImageInput={Boolean(selectedModel?.supportsVision)}
                 />
               </div>
 

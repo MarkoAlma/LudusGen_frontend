@@ -8,6 +8,7 @@ import {
 import { DEFAULT_PRESETS, ALL_MODELS, findModelGroup } from "../ai_components/models";
 import { API_BASE } from "../api/client";
 import { useJobs } from "../context/JobsContext";
+import { stripAssistantThinking } from "../utils/assistantContent";
 
 // Legacy model IDs for migration
 const CHAT_MODEL_IDS = ALL_MODELS.filter(m => m.panelType === 'chat').map(m => m.id);
@@ -71,6 +72,12 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
   const legacyLoadedRef = useRef(false);
   const liveChatRunsRef = useRef(new Map());
   const isTyping = runningSessionIds.has(sessionId);
+
+  useEffect(() => {
+    if (!attachedImage || selectedModel?.supportsVision) return;
+    setAttachedImage(null);
+    toast.error('This model does not accept images.');
+  }, [attachedImage, selectedModel?.id, selectedModel?.supportsVision]);
 
   const setSessionRunning = useCallback((sid, isRunning) => {
     if (!sid) return;
@@ -380,7 +387,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
     // User scrolled up (>10px) → do NOT auto-scroll, let them read
   }, [messages]);
 
-  const saveMessage = async (msg, targetSessionId = sessionIdRef.current) => {
+  const saveMessage = async (msg, targetSessionId = sessionIdRef.current, modelOverride = null) => {
     if (!userId) return;
     try {
       const sessionId = targetSessionId;
@@ -389,7 +396,7 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
         ? msg.content.find((p) => p.type === "text")?.text || ""
         : msg.content;
 
-      const model = selectedModelRef.current;
+      const model = modelOverride || selectedModelRef.current;
 
       const msgData = {
         role: msg.role,
@@ -519,11 +526,11 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
   // ── Trigger summary generation (fire-and-forget) ──────────────────
   // REMOVED — backend now handles context/summary
 
-  const syncFinalMessage = useCallback(async (sid, msgId, content, isFirstMessage = false) => {
+  const syncFinalMessage = useCallback(async (sid, msgId, content, isFirstMessage = false, modelOverride = null) => {
     if (!msgId || !sid || !userId) return;
     try {
       // 1. Direct Frontend Persistence (Bulletproof fallback)
-      const model = selectedModelRef.current;
+      const model = modelOverride || selectedModelRef.current;
       const msgData = {
         role: "assistant",
         content: content,
@@ -540,6 +547,8 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
       
       // Update session metadata too
       await setDoc(getSessionRef(sid), {
+        modelId: model.id,
+        modelName: model.name,
         lastMessage: content.slice(0, 100),
         lastRole: "assistant",
         updatedAt: serverTimestamp(),
@@ -570,6 +579,12 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
     const isFirstMessage = messages.length === 0;
     const model = selectedModelRef.current;
     const sessionId = sessionIdRef.current;
+
+    if (attachedImage && !model?.supportsVision) {
+      setAttachedImage(null);
+      toast.error('This model does not accept images.');
+      return;
+    }
 
     const userMsg = {
       role: "user",
@@ -623,8 +638,12 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
     setAttachedImage(null);
     setSessionRunning(sessionId, true);
 
-    // Save user message to Firestore
-    await saveMessage(userMsg, sessionId);
+    let userMessageSaved = false;
+    const persistUserMessage = async () => {
+      if (userMessageSaved) return;
+      await saveMessage(userMsg, sessionId, model);
+      userMessageSaved = true;
+    };
 
     let token;
 
@@ -654,7 +673,10 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
           sessionId,
           message: textToSend.trim(),
           attachedImage: attachedImage?.dataUrl,
-          messageId: aiMsgId, // Pass the ID to the backend
+          modelId: model.id,
+          modelName: model.name,
+          messageId: aiMsgId,
+          assistantMessageId: aiMsgId,
         }),
         signal: controller.signal,
       });
@@ -684,39 +706,61 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
             if (line.startsWith("data: ")) {
               const data = line.slice(6);
               if (data === "[DONE]") continue;
+              let parsed;
               try {
-                const parsed = JSON.parse(data);
-                if (parsed.summaryStarted) {
-                  setIsSummarizing(true);
-                  continue;
-                }
-                if (parsed.summaryRefreshed) {
-                  summaryRefreshed = true;
-                  setIsSummarizing(false);
-                  continue;
-                }
-                accumulated += parsed.delta || "";
-                const activeRequest = activeChatRequestsRef.current.get(chatJobId);
-                if (activeRequest) activeRequest.accumulated = accumulated;
-                updateLiveAssistant(chatJobId, { content: accumulated });
-
-                const nextProgress = Math.min(92, 12 + Math.floor(accumulated.length / 80));
-                if (nextProgress > lastJobProgress) {
-                  lastJobProgress = nextProgress;
-                  updateJob(chatJobId, { progress: nextProgress });
-                }
+                parsed = JSON.parse(data);
               } catch {
                 continue;
+              }
+              if (parsed.error) {
+                throw new Error(parsed.error);
+              }
+              if (parsed.retry) {
+                const attemptLabel = parsed.attempt && parsed.maxAttempts ? `${parsed.attempt}/${parsed.maxAttempts}` : "...";
+                const providerLabel = parsed.provider?.includes('gemini')
+                  ? 'Gemini'
+                  : parsed.provider?.includes('modelscope')
+                    ? 'ModelScope'
+                    : 'AI provider';
+                const retryProgress = Math.min(60, Math.max(lastJobProgress, 12 + ((parsed.attempt || 1) * 6)));
+                lastJobProgress = retryProgress;
+                updateLiveAssistant(chatJobId, {
+                  content: `${providerLabel} hit a temporary rate limit. Retrying... (${attemptLabel})`
+                });
+                updateJob(chatJobId, { progress: retryProgress });
+                continue;
+              }
+              if (parsed.summaryStarted) {
+                setIsSummarizing(true);
+                continue;
+              }
+              if (parsed.summaryRefreshed) {
+                summaryRefreshed = true;
+                setIsSummarizing(false);
+                continue;
+              }
+              accumulated += parsed.delta || "";
+              const visibleContent = stripAssistantThinking(accumulated);
+              const activeRequest = activeChatRequestsRef.current.get(chatJobId);
+              if (activeRequest) activeRequest.accumulated = accumulated;
+              updateLiveAssistant(chatJobId, { content: visibleContent });
+
+              const nextProgress = Math.min(92, 12 + Math.floor(visibleContent.length / 80));
+              if (nextProgress > lastJobProgress) {
+                lastJobProgress = nextProgress;
+                updateJob(chatJobId, { progress: nextProgress });
               }
             }
           }
         }
 
-        const finalMsg = { role: "assistant", content: accumulated, model: model.id, id: aiMsgId, isStreaming: false };
+        const finalContent = stripAssistantThinking(accumulated);
+        const finalMsg = { role: "assistant", content: finalContent, model: model.id, id: aiMsgId, isStreaming: false };
         updateLiveAssistant(chatJobId, finalMsg);
         
         // Ensure the partial or complete content is saved to DB
-        await syncFinalMessage(sessionId, aiMsgId, accumulated, isFirstMessage);
+        await persistUserMessage();
+        await syncFinalMessage(sessionId, aiMsgId, finalContent, isFirstMessage, model);
         liveChatRunsRef.current.delete(chatJobId);
         finishChatJob();
 
@@ -730,11 +774,13 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
         const data = await res.json();
         if (data.success) {
           summaryRefreshed = Boolean(data.summaryRefreshed);
-          const finalMsg = { role: "assistant", content: data.content, model: model.id, id: aiMsgId, isStreaming: false };
+          const finalContent = stripAssistantThinking(data.content);
+          const finalMsg = { role: "assistant", content: finalContent, model: model.id, id: aiMsgId, isStreaming: false };
           updateLiveAssistant(chatJobId, finalMsg);
           
           // Ensure the answer is saved to DB
-          await syncFinalMessage(sessionId, aiMsgId, data.content, isFirstMessage);
+          await persistUserMessage();
+          await syncFinalMessage(sessionId, aiMsgId, finalContent, isFirstMessage, model);
           liveChatRunsRef.current.delete(chatJobId);
           finishChatJob();
 
@@ -749,13 +795,15 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
     } catch (e) {
       if (e.name === 'AbortError') {
         const accumulated = activeChatRequestsRef.current.get(chatJobId)?.accumulated || "";
-        const finalMsg = { role: "assistant", content: accumulated, model: model.id, id: aiMsgId, isStreaming: false };
+        const finalContent = stripAssistantThinking(accumulated);
+        const finalMsg = { role: "assistant", content: finalContent, model: model.id, id: aiMsgId, isStreaming: false };
 
         // Update local UI immediately
         updateLiveAssistant(chatJobId, finalMsg);
 
         // Sync with DB
-        await syncFinalMessage(sessionId, aiMsgId, accumulated, isFirstMessage);
+        await persistUserMessage();
+        await syncFinalMessage(sessionId, aiMsgId, finalContent, isFirstMessage, model);
         liveChatRunsRef.current.delete(chatJobId);
         finishChatJob();
       } else {
