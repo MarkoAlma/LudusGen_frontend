@@ -128,6 +128,18 @@ export default function Navbar() {
     { label: 'AI 3D', icon: Box, path: '/chat?tab=3d' },
   ];
 
+  const openStudioPath = (path) => {
+    setStudioDropdownOpen(false);
+    setMobileMenuOpen(false);
+
+    if (!user) {
+      setIsAuthOpen(true);
+      return;
+    }
+
+    navigate(path);
+  };
+
   if (!showNavbar) return null;
   if (location.pathname.startsWith('/chat')) return null;
 
@@ -187,17 +199,17 @@ export default function Navbar() {
                           const isActive = location.pathname.startsWith('/chat') && currentTab === targetTab;
 
                           return (
-                            <Link
+                            <button
                               key={item.label}
-                              to={item.path}
-                              onClick={() => setStudioDropdownOpen(false)}
-                              className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${isActive ? 'bg-primary/20 text-primary' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}
+                              type="button"
+                              onClick={() => openStudioPath(item.path)}
+                              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all group text-left ${isActive ? 'bg-primary/20 text-primary' : 'hover:bg-white/5 text-gray-400 hover:text-white'}`}
                             >
                               <div className={`p-1.5 rounded-lg transition-all ${isActive ? 'bg-primary/30 text-primary' : 'bg-white/5 group-hover:bg-primary/20 group-hover:text-primary'}`}>
                                 <item.icon className="w-4 h-4" />
                               </div>
                               <span className="text-xs font-black uppercase tracking-widest">{item.label}</span>
-                            </Link>
+                            </button>
                           );
                         })}
                       </div>
@@ -358,7 +370,7 @@ export default function Navbar() {
 
                 <div className="grid grid-cols-1 gap-3">
                   <MobileNavItem to="/" icon={Home} label="Home" onClick={() => setMobileMenuOpen(false)} />
-                  <MobileNavItem to="/chat" icon={Sparkles} label="AI Studio" onClick={() => setMobileMenuOpen(false)} />
+                  <MobileNavItem to="/chat?tab=chat" icon={Sparkles} label="AI Studio" onClick={() => openStudioPath('/chat?tab=chat')} asButton />
                   <MobileNavItem to="/marketplace" icon={ShoppingBag} label="Marketplace" onClick={() => setMobileMenuOpen(false)} />
                   <MobileNavItem to="/forum" icon={Users} label="Community" onClick={() => setMobileMenuOpen(false)} />
                   {isLudusgenAdmin && (
@@ -390,14 +402,25 @@ export default function Navbar() {
   );
 }
 
-function MobileNavItem({ to, icon: Icon, label, onClick }) {
+function MobileNavItem({ to, icon: Icon, label, onClick, asButton = false }) {
   const location = useLocation();
   const isActive = location.pathname === to;
+  const className = `flex items-center gap-4 p-4 rounded-2xl transition-all ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 text-gray-400 hover:text-white'}`;
+
+  if (asButton) {
+    return (
+      <button type="button" onClick={onClick} className={`${className} w-full text-left`}>
+        <Icon className="w-5 h-5" />
+        <span className="font-bold uppercase tracking-widest text-sm">{label}</span>
+      </button>
+    );
+  }
+
   return (
     <Link
       to={to}
       onClick={onClick}
-      className={`flex items-center gap-4 p-4 rounded-2xl transition-all ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 text-gray-400 hover:text-white'}`}
+      className={className}
     >
       <Icon className="w-5 h-5" />
       <span className="font-bold uppercase tracking-widest text-sm">{label}</span>

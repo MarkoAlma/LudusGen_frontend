@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Container from '../ui/Container';
 import { ArrowRight, ShoppingBag, Sparkles } from 'lucide-react';
-import FloatingCore from '../ui/FloatingCore';
 import { MyUserContext } from '../../context/MyUserProvider';
+import HomeBackdrop from './HomeBackdrop';
 import HeroRender from '../../assets/ludusgen_WqbSkeD7zYPnJkdmdmtR.avif';
 
 export default function Hero() {
@@ -26,10 +26,11 @@ export default function Hero() {
 
   return (
     <section className="relative pt-32 pb-24 md:pt-40 md:pb-36 overflow-hidden">
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40 transform scale-110">
-        <img src={HeroRender} alt="" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#03000a]/30 to-[#03000a]" />
-      </div>
+      <HomeBackdrop
+        image={HeroRender}
+        className="opacity-40 transform scale-110"
+        overlayClassName="bg-gradient-to-b from-transparent via-[#03000a]/30 to-[#03000a]"
+      />
 
       <Container>
         <div className="relative z-10 flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
@@ -81,9 +82,6 @@ export default function Hero() {
             className="flex-1 w-full max-w-[500px] lg:max-w-none aspect-square relative"
           >
             <div className="absolute inset-0 bg-primary/20 blur-[120px] rounded-full scale-75 animate-pulse" />
-            <div className="w-full h-full relative z-10 transition-transform duration-700 hover:scale-105 active:scale-95">
-              <FloatingCore size={1.2} />
-            </div>
 
             <div className="absolute -top-10 -right-10 hidden xl:block p-6 rounded-3xl bg-white/[0.02] border border-white/10 backdrop-blur-xl">
               <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em] mb-2">Active modules</p>

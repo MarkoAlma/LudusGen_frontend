@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Box, History, Image as ImageIcon, MessageSquare, Music, ShoppingBag, Sparkles } from 'lucide-react';
 import Container from '../ui/Container';
-import FloatingCore from '../ui/FloatingCore';
+import HomeBackdrop from './HomeBackdrop';
 import FeaturesBG from '../../assets/ludusgen_YZ6MbnvSCX5w1GewEIga.avif';
 
 export default function FeaturesGrid() {
@@ -47,16 +47,12 @@ export default function FeaturesGrid() {
 
   return (
     <section className="py-24 md:py-48 relative overflow-hidden" id="features">
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40 transform scale-110 rotate-1">
-        <img src={FeaturesBG} alt="" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#03000a] via-[#03000a]/20 to-[#03000a]" />
-        <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#03000a] to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#03000a] to-transparent" />
-      </div>
-
-      <div className="absolute top-1/4 -right-20 opacity-30 z-0">
-        <FloatingCore type="box" size={1.5} color="#8b5cf6" speed={1.2} />
-      </div>
+      <HomeBackdrop
+        image={FeaturesBG}
+        className="opacity-40 transform scale-110 rotate-1"
+        topFade
+        bottomFade
+      />
 
       <Container>
         <div className="flex flex-col lg:flex-row items-center gap-16 mb-24">
@@ -76,11 +72,6 @@ export default function FeaturesGrid() {
             <p className="text-lg md:text-xl text-gray-500 max-w-xl font-bold leading-relaxed mb-6">
               Chat, image, audio, and 3D tools each use focused controls while staying connected to the same LudusGen workspace.
             </p>
-          </div>
-
-          <div className="w-full max-w-[400px] aspect-square relative z-10 flex items-center justify-center">
-            <div className="absolute inset-0 bg-primary/10 blur-[100px] rounded-full animate-pulse" />
-            <FloatingCore type="box" size={0.8} color="#3B82F6" speed={0.8} />
           </div>
         </div>
 
