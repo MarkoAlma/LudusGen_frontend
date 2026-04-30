@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { Cookie, FileText, Mail, ShieldCheck, Sparkles } from 'lucide-react';
 import Container from '../ui/Container';
+import { MyUserContext } from '../../context/MyUserProvider';
 
 const LEGAL_UPDATED = 'April 28, 2026';
 
@@ -9,10 +10,10 @@ const columns = [
   {
     title: 'Platform',
     links: [
-      { label: 'AI Code', to: '/chat' },
-      { label: 'AI Images', to: '/chat?tab=image' },
-      { label: 'AI Audio', to: '/chat?tab=audio' },
-      { label: 'AI 3D', to: '/chat?tab=3d' },
+      { label: 'AI Code', to: '/chat?tab=chat', requiresAuth: true },
+      { label: 'AI Images', to: '/chat?tab=image', requiresAuth: true },
+      { label: 'AI Audio', to: '/chat?tab=audio', requiresAuth: true },
+      { label: 'AI 3D', to: '/chat?tab=3d', requiresAuth: true },
     ],
   },
   {
@@ -34,8 +35,16 @@ const columns = [
   },
 ];
 
-function FooterLink({ link }) {
+function FooterLink({ link, user, setIsAuthOpen }) {
   const className = 'text-sm font-bold text-gray-500 hover:text-primary transition-colors';
+
+  if (link.requiresAuth && !user) {
+    return (
+      <button type="button" onClick={() => setIsAuthOpen(true)} className={`${className} text-left`}>
+        {link.label}
+      </button>
+    );
+  }
 
   if (link.to) {
     return (
@@ -53,6 +62,8 @@ function FooterLink({ link }) {
 }
 
 export default function Footer() {
+  const { user, setIsAuthOpen } = useContext(MyUserContext);
+
   return (
     <footer className="relative py-20 border-t border-white/5 bg-[#03000a] overflow-hidden">
       {/* Subtle Background Glow */}
@@ -115,7 +126,7 @@ export default function Footer() {
               <ul className="space-y-4">
                 {column.links.map((link) => (
                   <li key={link.label}>
-                    <FooterLink link={link} />
+                    <FooterLink link={link} user={user} setIsAuthOpen={setIsAuthOpen} />
                   </li>
                 ))}
               </ul>

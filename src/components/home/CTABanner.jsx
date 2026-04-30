@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Container from '../ui/Container';
-import FloatingCore from '../ui/FloatingCore';
 import { MyUserContext } from '../../context/MyUserProvider';
+import HomeBackdrop from './HomeBackdrop';
 import CTABG from '../../assets/ludusgen_XVCGbiWdME0qkh5OzkEb.avif';
 
 export default function CTABanner() {
@@ -21,11 +21,11 @@ export default function CTABanner() {
 
   return (
     <section className="py-24 md:py-48 relative overflow-hidden">
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-50 transform scale-105">
-        <img src={CTABG} alt="" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#03000a] via-[#03000a]/20 to-[#03000a]" />
-        <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#03000a] to-transparent" />
-      </div>
+      <HomeBackdrop
+        image={CTABG}
+        className="opacity-50 transform scale-105"
+        topFade
+      />
 
       <Container>
         <motion.div
@@ -35,10 +35,6 @@ export default function CTABanner() {
           transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
           className="relative glass-panel p-12 md:p-32 rounded-[4rem] border border-white/5 overflow-hidden text-center flex flex-col items-center gap-12 shadow-[0_50px_100px_rgba(0,0,0,0.8)] bg-white/[0.01]"
         >
-          <div className="absolute inset-0 z-0 opacity-40 pointer-events-none scale-150">
-            <FloatingCore type="sphere" size={1.5} color="#8b5cf6" speed={0.5} />
-          </div>
-
           <div className="relative z-10 space-y-8 max-w-4xl">
             <motion.div
               animate={{ y: [0, -10, 0] }}

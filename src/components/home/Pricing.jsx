@@ -2,9 +2,9 @@ import React, { useContext } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Zap } from 'lucide-react';
 import Container from '../ui/Container';
-import FloatingCore from '../ui/FloatingCore';
 import { MyUserContext } from '../../context/MyUserProvider';
 import { packages as creditPackages } from '../../data/packages';
+import HomeBackdrop from './HomeBackdrop';
 import PricingBG from '../../assets/ludusgen_YyFNLFHgAq7XHYJrtMXZ.avif';
 
 export default function Pricing() {
@@ -20,20 +20,15 @@ export default function Pricing() {
 
   return (
     <section className="py-24 md:py-48 relative overflow-hidden" id="pricing">
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40 transform scale-105">
-        <img src={PricingBG} alt="" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#03000a] via-[#03000a]/20 to-[#03000a]" />
-        <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#03000a] to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#03000a] to-transparent" />
-      </div>
+      <HomeBackdrop
+        image={PricingBG}
+        className="opacity-40 transform scale-105"
+        topFade
+        bottomFade
+      />
 
       <Container>
         <div className="flex flex-col lg:flex-row items-center gap-16 mb-24">
-          <div className="w-full max-w-[400px] aspect-square relative z-10 hidden lg:flex items-center justify-center">
-            <div className="absolute inset-0 bg-amber-500/10 blur-[100px] rounded-full animate-pulse" />
-            <FloatingCore type="torus" size={0.9} color="#f59e0b" speed={1.2} />
-          </div>
-
           <div className="flex-1 text-center lg:text-left relative z-10">
             <motion.div
               initial={{ opacity: 0 }}

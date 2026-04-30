@@ -8,8 +8,8 @@ import ImageImg from '../../assets/home_preview_ludusgen_image.png';
 import AudioImg from '../../assets/home_preview_ludusgen_audio.png';
 import ForgeImg from '../../assets/home_preview_ludusgen_3d.png';
 
+import HomeBackdrop from './HomeBackdrop';
 import ChatStudioBG from '../../assets/ludusgen_jvubFciJtA0Fw42FoJ0N.avif';
-import FloatingCore from '../ui/FloatingCore';
 
 export default function ToolsPreview() {
   const [activeTab, setActiveTab] = useState(0);
@@ -51,16 +51,12 @@ export default function ToolsPreview() {
 
   return (
     <section className="py-24 md:py-48 relative overflow-hidden">
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40 transform scale-110">
-        <img src={ChatStudioBG} alt="" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#03000a] via-[#03000a]/20 to-[#03000a]" />
-        <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#03000a] to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#03000a] to-transparent" />
-      </div>
-
-      <div className="absolute bottom-20 -left-20 opacity-20 z-0 scale-125">
-        <FloatingCore type="box" size={1.2} color="#7C3AED" speed={0.9} />
-      </div>
+      <HomeBackdrop
+        image={ChatStudioBG}
+        className="opacity-40 transform scale-110"
+        topFade
+        bottomFade
+      />
 
       <Container>
         <div className="text-center mb-24">
