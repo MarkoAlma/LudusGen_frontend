@@ -1,15 +1,12 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import Background from './components/Background';
-import Navbar from './components/Nav';
+import { useState, useEffect, useCallback, useLayoutEffect } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import AppLayout from './components/layout/AppLayout';
+import PageTransition from './components/layout/PageTransition';
 import Home from './pages/Home';
-import Footer from './components/Footer';
 import LudusGenAdmin from './pages/Admin';
-import AuthPage from './pages/Login';
 import AuthModal from './pages/Login';
 import { useContext } from 'react';
 import { MyUserContext } from './context/MyUserProvider';
-import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 import { Toaster } from 'react-hot-toast';
@@ -21,25 +18,46 @@ import { ProtectedRoute } from './ProtectedRoute';
 import AIChat from './ai_components/AiChat';
 import { auth } from './firebase/firebaseApp';
 import Forum from './pages/Forum';
+import Marketplace from './pages/Marketplace';
+import NotFound from './pages/NotFound';
+import Legal from './pages/Legal';
+import { AnimatePresence } from 'framer-motion';
+import CreditTopup from './components/CreditTopup';
+
+function ScrollToTopOnRouteChange() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const originalScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+
+    return () => {
+      window.history.scrollRestoration = originalScrollRestoration;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    scrollToTop();
+    const frameId = window.requestAnimationFrame(scrollToTop);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [location.key, location.pathname, location.search]);
+
+  return null;
+}
 
 function App() {
-  const {showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled} = useContext(MyUserContext);
+  const { showNavbar, setShowNavbar, user, isAuthOpen, setIsAuthOpen, msg, setMsg, is2FAEnabled, showCreditTopup, setShowCreditTopup } = useContext(MyUserContext);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Forum has its own header/nav, so hide the global Navbar & Footer there
   const isForumRoute = location.pathname.startsWith('/forum');
-
-  useEffect(()=>{
-    console.log('====================================');
-    console.log("Változott", isAuthOpen);
-    console.log('====================================');
-  },[isAuthOpen])
-
-  const bezar = () => {
-    setIsAuthOpen(false);
-    setShowNavbar(true);
-  };
 
   useEffect(() => {
     if (isAuthOpen) {
@@ -47,9 +65,6 @@ function App() {
     } else {
       document.body.style.overflow = '';
     }
-    
-
-    // Cleanup when the component is unmounted or modal is closed
     return () => {
       document.body.style.overflow = '';
     };
@@ -67,32 +82,56 @@ function App() {
     }
   }, [location, navigate]);
 
+  const closeAuth = () => {
+    setIsAuthOpen(false);
+    setShowNavbar(true);
+  };
+  
+  const getAuthToken = useCallback((forceRefresh = false) => auth.currentUser?.getIdToken(forceRefresh), []);
+
   return (
     <div className="min-h-screen bg-black text-white relative">
-      <Background />
-      {!isForumRoute && <Navbar />}
+      <ScrollToTopOnRouteChange />
+      <AppLayout>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname.split('/')[1] || '/'}>
 
-      <main>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/chat" element={<ProtectedRoute>
-            <AIChat user={user} getIdToken={() => auth.currentUser?.getIdToken(true)} />
-          </ProtectedRoute>} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/forum" element={<Forum />} />
-          {/* ÚJ: kategória/slug alapú route */}
-          <Route path="/forum/:category/:slug" element={<Forum />} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        </Routes>
-      </main>
+            <Route path="/" element={<PageTransition><Home /></PageTransition>} />
+            <Route path="/chat" element={
+              <PageTransition>
+                <ProtectedRoute>
+                  <AIChat user={user} getIdToken={getAuthToken} />
+                </ProtectedRoute>
+              </PageTransition>
+            } />
+            <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
+            <Route path="/verify-email" element={<PageTransition><VerifyEmail /></PageTransition>} />
+            <Route path="/forum/*" element={<PageTransition><Forum /></PageTransition>} />
+            <Route path="/marketplace" element={<PageTransition><Marketplace /></PageTransition>} />
+            <Route path="/admin" element={
+              <PageTransition>
+                <ProtectedRoute><LudusGenAdmin /></ProtectedRoute>
+              </PageTransition>
+            } />
+            <Route path="/legal/:slug" element={<PageTransition><Legal /></PageTransition>} />
+            <Route path="/profile" element={
+              <PageTransition>
+                <ProtectedRoute><Settings /></ProtectedRoute>
+              </PageTransition>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Navigate to="/profile" replace />
+              </ProtectedRoute>
+            } />
+            <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
+          </Routes>
+        </AnimatePresence>
+      </AppLayout>
 
-      <LudusGenAdmin />
-      <AuthModal
-        isOpen={isAuthOpen}
-        onClose={() => bezar()}
-      />
-      {!isForumRoute && <Footer />}
+      <AuthModal isOpen={isAuthOpen} onClose={closeAuth} />
+      <CreditTopup isOpen={showCreditTopup} onClose={() => setShowCreditTopup(false)} />
+      <Toaster position="top-center" toastOptions={{ style: { background: '#15121f', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' } }} />
 
       {msg && <MyToastify {...msg} />}
     </div>

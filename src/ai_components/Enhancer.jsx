@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Loader2, Zap, Wand2, AlertCircle, Eye } from 'lucide-react';
+import { Loader2, Zap, Wand2, AlertCircle, Eye, Sparkles } from 'lucide-react';
+import { API_BASE, authHeaders } from '../api/client';
 
 function Tooltip({ text, children, side = 'top' }) {
   const [show, setShow] = useState(false);
@@ -47,7 +48,13 @@ function Tooltip({ text, children, side = 'top' }) {
   );
 }
 
-const MAX_CHARS = 1000;
+const MAX_CHARS = 850;
+
+function trimToLimit(text, limit = 850) {
+  if (text.length <= limit) return text;
+  const cut = text.lastIndexOf(",", limit);
+  return cut > 0 ? text.slice(0, cut).trimEnd() : text.slice(0, limit).trimEnd();
+}
 
 // ── Gemma Vision: képleírás prompt ──────────────────────────────────────────
 // Ez a prompt kerül elküldésre a Gemma 3 27B IT (NVIDIA) modellnek,
@@ -83,9 +90,11 @@ function Enhancer({
   getIdToken,
   enhancing_prompt,
   dechanting_prompt,
+  super_enhancing_prompt,   // ← opcionális super enhance prompt
   onBusyChange,
   inputImages = [],          // ← feltöltött képek [{dataUrl, name}]
   gemmaVisionPrompt = '',    // ← opcionális override; ha üres, GEMMA_IMAGE_DESCRIBE_PROMPT-ot használ
+  stylePrefix = '',          // ← nem módosítható szürke prefix (pl. "[Image #1] ")
 }) {
   const disabled = false;
 
@@ -94,12 +103,17 @@ function Enhancer({
     return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
   }, [getIdToken]);
 
-  const [enhancing,        setEnhancing]        = useState(false);
-  const [dechanting,       setDechanting]        = useState(false);
-  const [describingImages, setDescribingImages]  = useState(false);
-  const [streamError,      setStreamError]       = useState(null);
+  const [enhancing, setEnhancing] = useState(false);
+  const [superEnhancing, setSuperEnhancing] = useState(false);
+  const [dechanting, setDechanting] = useState(false);
+  const [describingImages, setDescribingImages] = useState(false);
+  const [streamError, setStreamError] = useState(null);
 
-  const isBusy = enhancing || dechanting || describingImages;
+  // Undo stack — stores previous prompt values before AI replaces them
+  const undoStack = useRef([]);
+
+
+  const isBusy = enhancing || superEnhancing || dechanting || describingImages;
 
   useEffect(() => {
     onBusyChange?.(isBusy);
@@ -109,15 +123,15 @@ function Enhancer({
   const callChat = useCallback(async (systemPrompt, userContent, temperature, top_p, max_tokens) => {
     const headers = await authHeaders();
 
-    const res = await fetch('http://localhost:3001/api/enhance', {
+    const res = await fetch(`${API_BASE}/api/enhance`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model:    'openai/gpt-oss-120b',
+        model: 'openai/gpt-oss-120b',
         provider: 'groq',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user',   content: userContent  },
+          { role: 'user', content: userContent },
         ],
         temperature,
         top_p,
@@ -127,12 +141,12 @@ function Enhancer({
 
     if (!res.ok) {
       let errMsg = `HTTP ${res.status}`;
-      try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+      try { const j = await res.json(); errMsg = j.message || errMsg; } catch { }
       throw new Error(errMsg);
     }
 
     const json = await res.json();
-    if (!json.success) throw new Error(json.message || 'API hiba');
+    if (!json.success) throw new Error(json.message || 'API error');
     return (json.content || '').trim();
   }, [authHeaders]);
 
@@ -142,25 +156,30 @@ function Enhancer({
   const callVisionDescribe = useCallback(async (images) => {
     const headers = await authHeaders();
 
-    const res = await fetch('http://localhost:3001/api/vision-describe', {
+    const res = await fetch(`${API_BASE}/api/vision-describe`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        images:       images.map(img => img.dataUrl),
+        images: images.map(img => img.dataUrl),
         systemPrompt: gemmaVisionPrompt || GEMMA_IMAGE_DESCRIBE_PROMPT,
       }),
     });
 
     if (!res.ok) {
       let errMsg = `HTTP ${res.status}`;
-      try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+      try { const j = await res.json(); errMsg = j.message || errMsg; } catch { }
       throw new Error(errMsg);
     }
 
     const json = await res.json();
-    if (!json.success) throw new Error(json.message || 'Vision describe hiba');
+    if (!json.success) throw new Error(json.message || 'Vision describe error');
     return (json.description || '').trim();
   }, [authHeaders, gemmaVisionPrompt]);
+
+  // ── Undo: snapshot before AI overwrites prompt ───────────────────────────
+  const pushUndo = useCallback(() => {
+    if (value.trim()) undoStack.current.push(value);
+  }, [value]);
 
   // ── AI válasz feldolgozása: JSON vagy plain string ────────────────────────
   const applyResult = useCallback((raw) => {
@@ -174,9 +193,9 @@ function Enhancer({
       const parsed = JSON.parse(cleaned);
       if (parsed && typeof parsed === 'object') {
         if (typeof parsed.prompt === 'string' && parsed.prompt.trim()) {
-          onChange(parsed.prompt.trim());
+          onChange(trimToLimit(parsed.prompt.trim())); // trimToLimit already enforces 850-char limit
           if (typeof parsed.negative_prompt === 'string' && onNegativeChange) {
-            onNegativeChange(parsed.negative_prompt.trim());
+            onNegativeChange(parsed.negative_prompt.trim().slice(0, 250));
           }
           return true;
         }
@@ -186,7 +205,7 @@ function Enhancer({
     }
 
     if (raw.trim()) {
-      onChange(raw.trim());
+      onChange(trimToLimit(raw.trim()));
       return true;
     }
 
@@ -196,13 +215,19 @@ function Enhancer({
   // ── Enhance ───────────────────────────────────────────────────────────────
   // Ha vannak feltöltött képek (edit mód), először Gemma leírja őket,
   // majd a leírás + felhasználói szöveg együtt megy a Cerebras edit enhancernek.
-  const handleEnhance = useCallback(async () => {
-    if (!value.trim() || enhancing || describingImages) return;
-    setEnhancing(true);
+  // A stylePrefix-et mindig kiszűrjük a küldés előtt — az AI nem látja.
+  const handleEnhance = useCallback(async (superMode = false) => {
+    if (!value.trim() || enhancing || superEnhancing || describingImages) return;
+    if (superMode) setSuperEnhancing(true);
+    else setEnhancing(true);
     setStreamError(null);
 
     try {
+      // Strip stylePrefix from the value before sending to AI
       let userContent = value.trim();
+      if (stylePrefix && userContent.startsWith(stylePrefix)) {
+        userContent = userContent.slice(stylePrefix.length).trim();
+      }
 
       // Ha vannak feltöltött képek → vision describe lépés
       if (inputImages.length > 0) {
@@ -210,35 +235,34 @@ function Enhancer({
         try {
           const description = await callVisionDescribe(inputImages);
           if (description) {
-            // A Cerebras edit enhancer ezt kapja:
-            // felhasználói utasítás + Gemma képleírás mint kontextus
             userContent =
-              `USER'S EDIT INSTRUCTION:\n${value.trim()}\n\n` +
+              `USER'S EDIT INSTRUCTION:\n${userContent}\n\n` +
               `---\n` +
               `VISUAL CONTEXT — uploaded images analyzed by vision AI (Gemma 3 27B IT):\n${description}`;
           }
         } catch (vErr) {
-          // Vision describe sikertelen → graceful fallback, csak szöveggel próbáljuk
           console.warn('Vision describe failed, falling back to text-only enhance:', vErr.message);
-          setStreamError(`⚠️ Képelemzés sikertelen (${vErr.message}), csak szöveges prompttal próbálom.`);
-          // Ne dobjuk tovább — folytassuk szöveg-only módban
+          setStreamError(`⚠️ Image analysis failed (${vErr.message}); trying text-only prompt.`);
         } finally {
           setDescribingImages(false);
         }
       }
 
-      const raw = await callChat(enhancing_prompt, userContent, 0.4, 0.9, 10000);
-      const ok  = applyResult(raw);
-      if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
-      else if (streamError?.startsWith('⚠️')) setStreamError(null); // sikeres → töröljük a warning-ot
+      const systemPrompt = superMode && super_enhancing_prompt ? super_enhancing_prompt : enhancing_prompt;
+      const raw = await callChat(systemPrompt, userContent, 0.4, 0.9, 2048);
+      pushUndo();
+      const ok = applyResult(raw);
+      if (!ok) setStreamError('The AI returned an empty response. Try again.');
+      else if (streamError?.startsWith('⚠️')) setStreamError(null);
     } catch (err) {
       console.error('Enhance hiba:', err);
       setStreamError(err.message || 'Enhance sikertelen');
     } finally {
       setEnhancing(false);
+      setSuperEnhancing(false);
       setDescribingImages(false);
     }
-  }, [value, enhancing, describingImages, enhancing_prompt, inputImages, callChat, callVisionDescribe, applyResult, streamError]);
+  }, [value, enhancing, superEnhancing, describingImages, enhancing_prompt, super_enhancing_prompt, inputImages, callChat, callVisionDescribe, applyResult, pushUndo, streamError, stylePrefix]);
 
   // ── Dechance ──────────────────────────────────────────────────────────────
   const handleDechance = useCallback(async () => {
@@ -247,22 +271,24 @@ function Enhancer({
     setStreamError(null);
     try {
       const raw = await callChat(dechanting_prompt, value.trim(), 0.4, 0.9, 800);
-      const ok  = applyResult(raw);
-      if (!ok) setStreamError('Az AI üres választ adott vissza — próbáld újra.');
+      pushUndo();
+      const ok = applyResult(raw);
+      if (!ok) setStreamError('The AI returned an empty response. Try again.');
     } catch (err) {
       console.error('Dechance hiba:', err);
       setStreamError(err.message || 'Simplify sikertelen');
     } finally {
       setDechanting(false);
     }
-  }, [value, dechanting, dechanting_prompt, callChat, applyResult]);
+  }, [value, dechanting, dechanting_prompt, callChat, applyResult, pushUndo]);
 
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef(null);
-  const remaining   = MAX_CHARS - value.length;
+  const prefixLen = stylePrefix.length;
+  const remaining = MAX_CHARS - value.length;
   const isOverLimit = remaining < 0;
-  const hasContent  = value.trim().length > 0;
-  const hasImages   = inputImages.length > 0;
+  const hasContent = value.trim().length > 0;
+  const hasImages = inputImages.length > 0;
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -274,33 +300,39 @@ function Enhancer({
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !disabled && value.trim() && !isOverLimit) {
       onSubmit();
+      return;
     }
-  }, [disabled, value, isOverLimit, onSubmit]);
+    if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey && undoStack.current.length > 0) {
+      e.preventDefault();
+      const prev = undoStack.current.pop();
+      onChange(prev);
+    }
+  }, [disabled, value, isOverLimit, onSubmit, onChange]);
 
-  const simplifyDisabled = !hasContent || dechanting  || disabled;
-  const enhanceDisabled  = !hasContent || enhancing   || describingImages || disabled;
+  const simplifyDisabled = !hasContent || dechanting || disabled;
+  const enhanceDisabled = !hasContent || enhancing || describingImages || disabled;
 
   const borderColor = isOverLimit
     ? 'rgba(248,113,113,0.5)'
     : focused ? `${color}60`
-    : hasContent ? `${color}30`
-    : 'rgba(255,255,255,0.07)';
+      : hasContent ? `${color}30`
+        : 'rgba(255,255,255,0.07)';
 
   const glowShadow = focused && !isOverLimit
     ? `0 0 0 3px ${color}14, 0 2px 8px rgba(0,0,0,0.5)`
     : '0 1px 3px rgba(0,0,0,0.35)';
 
-  const fillPct  = Math.min(100, ((MAX_CHARS - remaining) / MAX_CHARS) * 100);
+  const fillPct = Math.min(100, ((MAX_CHARS - remaining) / MAX_CHARS) * 100);
   const barColor = isOverLimit ? '#f87171' : remaining < 100 ? '#f59e0b' : color;
 
   // Enhance gomb tooltip szövege
   const enhanceTooltip = !hasContent
-    ? 'Írj be egy promptot először'
+    ? 'Enter a prompt first'
     : describingImages
-      ? 'Képelemzés folyamatban…'
+      ? 'Image analysis in progress...'
       : hasImages
-        ? `AI prompt fejlesztés (${inputImages.length} kép → vision + reprompt)`
-        : 'AI prompt fejlesztés';
+        ? `AI prompt enhancement (${inputImages.length} images -> vision + reprompt)`
+        : 'AI prompt enhancement';
 
   return (
     <div style={{ marginBottom: 14 }}>
@@ -339,7 +371,7 @@ function Enhancer({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           disabled={disabled}
-          placeholder={'Írj le egy promptot angolul…\npl. a rustic log cabin with a stone chimney'}
+          placeholder={stylePrefix ? 'Describe a prompt in English...' : 'Describe a prompt in English...\ne.g. a rustic log cabin with a stone chimney'}
           rows={5}
           style={{
             width: '100%', boxSizing: 'border-box',
@@ -369,7 +401,7 @@ function Enhancer({
             letterSpacing: '0.06em', textTransform: 'uppercase',
             fontFamily: "'SF Mono', 'JetBrains Mono', monospace",
           }}>
-            ⌘↵ generálás
+            Cmd+Enter generate
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             {hasContent && (
@@ -401,7 +433,7 @@ function Enhancer({
         }}>
           <Eye style={{ width: 11, height: 11, color: '#34d399', flexShrink: 0 }} />
           <span style={{ fontSize: 10, color: '#6ee7b7', lineHeight: 1.4 }}>
-            Gemma 3 27B elemzi a képeket ({inputImages.length} db)…
+            Gemma 3 27B is analyzing the images ({inputImages.length})...
           </span>
           <Loader2 style={{ width: 10, height: 10, color: '#34d399', marginLeft: 'auto', flexShrink: 0, animation: 'enhancerSpin 1s linear infinite' }} />
         </div>
@@ -439,14 +471,14 @@ function Enhancer({
         }}>
           <Eye style={{ width: 9, height: 9, color: '#34d399', flexShrink: 0 }} />
           <span style={{ fontSize: 9, color: '#6ee7b7', lineHeight: 1.4 }}>
-            Enhance: Gemma {inputImages.length} képet elemez → Cerebras fejleszti a promptot
+              Enhance: Gemma analyzes {inputImages.length} images, then Cerebras improves the prompt
           </span>
         </div>
       )}
 
       {/* Action buttons */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 5, marginTop: 7 }}>
-        <Tooltip text={!hasContent ? 'Írj be egy promptot először' : 'Prompt egyszerűsítése'} side="top">
+        <Tooltip text={!hasContent ? 'Enter a prompt first' : 'Simplify prompt'} side="top">
           <ActionButton
             onClick={handleDechance}
             disabled={simplifyDisabled}
@@ -459,7 +491,7 @@ function Enhancer({
         </Tooltip>
         <Tooltip text={enhanceTooltip} side="top">
           <ActionButton
-            onClick={handleEnhance}
+            onClick={() => handleEnhance(false)}
             disabled={enhanceDisabled}
             loading={enhancing || describingImages}
             accentColor={color}
@@ -471,6 +503,19 @@ function Enhancer({
             loadingLabel={describingImages ? 'Gemma…' : 'Enhance…'}
           />
         </Tooltip>
+        {super_enhancing_prompt && (
+          <Tooltip text={!hasContent ? 'Enter a prompt first' : 'Super Enhance - extra surface, material, and construction details'} side="top">
+            <ActionButton
+              onClick={() => handleEnhance(true)}
+              disabled={enhanceDisabled}
+              loading={superEnhancing || describingImages}
+              accentColor="#a855f7"
+              icon={<Sparkles style={{ width: 10, height: 10 }} />}
+              label="Super Enhance"
+              loadingLabel={describingImages ? 'Gemma…' : 'Super…'}
+            />
+          </Tooltip>
+        )}
       </div>
 
       <style>{`
@@ -483,10 +528,10 @@ function Enhancer({
 function ActionButton({ onClick, disabled, loading, accentColor, icon, label, loadingLabel }) {
   const [hovered, setHovered] = useState(false);
 
-  const bg        = loading || hovered ? `rgba(${hexToRgb(accentColor)}, 0.14)` : `rgba(${hexToRgb(accentColor)}, 0.07)`;
-  const outline   = hovered && !disabled ? `1px solid rgba(${hexToRgb(accentColor)}, 0.38)` : `1px solid rgba(${hexToRgb(accentColor)}, 0.16)`;
+  const bg = loading || hovered ? `rgba(${hexToRgb(accentColor)}, 0.14)` : `rgba(${hexToRgb(accentColor)}, 0.07)`;
+  const outline = hovered && !disabled ? `1px solid rgba(${hexToRgb(accentColor)}, 0.38)` : `1px solid rgba(${hexToRgb(accentColor)}, 0.16)`;
   const textColor = disabled ? `rgba(${hexToRgb(accentColor)}, 0.3)` : accentColor;
-  const glow      = (loading || hovered) && !disabled ? `0 0 14px rgba(${hexToRgb(accentColor)}, 0.18)` : 'none';
+  const glow = (loading || hovered) && !disabled ? `0 0 14px rgba(${hexToRgb(accentColor)}, 0.18)` : 'none';
 
   return (
     <button
@@ -513,9 +558,9 @@ function ActionButton({ onClick, disabled, loading, accentColor, icon, label, lo
 }
 
 function hexToRgb(hex) {
-  const h    = hex.replace('#', '');
+  const h = hex.replace('#', '');
   const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
-  const n    = parseInt(full, 16);
+  const n = parseInt(full, 16);
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 

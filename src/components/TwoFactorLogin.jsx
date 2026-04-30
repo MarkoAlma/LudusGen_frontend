@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Shield, Key, X, Sparkles, AlertCircle, RotateCcw } from "lucide-react";
 import axios from "axios";
+import { API_BASE } from "../api/client";
 import { signInWithCustomToken } from "firebase/auth";
 import { auth } from "../firebase/firebaseApp";
 
@@ -38,11 +39,11 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email, sess
       let res;
       if (provider === "google" && !isBackupMode) {
         res = await axios.post(
-          "http://localhost:3001/api/login-with-2fa-google",
+          `${API_BASE}/api/login-with-2fa-google`,
           { sessionId, code }
         );
       } else {
-        res = await axios.post("http://localhost:3001/api/login-with-2fa", {
+        res = await axios.post(`${API_BASE}/api/login-with-2fa`, {
           email,
           code,
         });
@@ -80,12 +81,8 @@ export default function TwoFactorLogin({ isOpen, onClose, onSuccess, email, sess
         }}
       >
         <div
-          className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-scale-in"
+          className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-[0_0_80px_rgba(138,43,226,0.15)] glass-panel animate-scale-in"
           onClick={(e) => e.stopPropagation()}
-          style={{
-            background: "linear-gradient(to bottom, #1a1a2e 0%, #0f0f1e 100%)",
-            border: "1px solid rgba(168, 85, 247, 0.3)",
-          }}
         >
           {/* Close Button */}
           <button

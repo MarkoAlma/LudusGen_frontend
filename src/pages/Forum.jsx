@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback, useContext } from "react";
+import React, { useState, useRef, useEffect, useCallback, useContext, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { MyUserContext } from "../context/MyUserProvider";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageSquare, ChevronRight, ChevronDown,
   ThumbsUp, Eye, Clock, Pin, Flame, Sparkles, Trophy,
@@ -9,18 +11,32 @@ import {
   Shield, Lock, CheckCircle, RefreshCw, SlidersHorizontal,
   ArrowUp, Rss, Award, Tag, Globe, Heart, Smile,
   BarChart2, PenSquare, HelpCircle, Megaphone, AtSign,
-  Trash2, Edit3, Unlock, Home,
+  Trash2, Edit3, Unlock, Home, Code, Image, Music, Box,
+  Bold, Italic, List, Heading2, Quote, Link, Flag,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import ForumPost from "./ForumPost";
+import ForumAnimatedBg from "../components/ForumAnimatedBg";
+import CreditTopup from "../components/CreditTopup";
+import { API_BASE } from "../api/client";
+import {
+  applyProfileToForumPost,
+  fetchPublicProfile,
+  getProfileAvatarUrl,
+  getProfileDisplayName,
+  getProfileInitial,
+} from "../utils/communityProfiles";
+import { REPORT_REASONS, submitContentReport } from "../utils/reports";
 import { auth, db } from "../firebase/firebaseApp";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-  collection, addDoc, getDocs, deleteDoc, doc, updateDoc,
+  collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc, arrayUnion, arrayRemove,
   query, orderBy, serverTimestamp, getDoc, onSnapshot, where, limit, Timestamp, writeBatch,
+  increment
 } from "firebase/firestore";
 
 // ─── Admin UIDs ───────────────────────────────────────────────────
-const ADMIN_UIDS = [];
+const ADMIN_UIDS = ["T7fU9Zp3N5M9wz2G8xQ4L1rV6bY2"];
 
 // ─── DEBUG MODE ───────────────────────────────────────────────────
 const DEBUG = true;
@@ -42,159 +58,285 @@ export function generateSlug(title) {
 
 // ─── Firebase timestamp → olvasható szöveg ────────────────────────
 const formatFirebaseTime = (timestamp) => {
-  if (!timestamp?.toDate) return "Nemrég";
+  if (!timestamp?.toDate) return "Recently";
   const date = timestamp.toDate();
   const diff = Date.now() - date;
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "Most";
-  if (m < 60) return `${m} perce`;
+  if (m < 1) return "Now";
+  if (m < 60) return `${m} min ago`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} órája`;
+  if (h < 24) return `${h} h ago`;
   const d = Math.floor(h / 24);
-  if (d < 7) return `${d} napja`;
-  return `${Math.floor(d / 7)} hete`;
+  if (d < 7) return `${d} d ago`;
+  return `${Math.floor(d / 7)} w ago`;
+};
+
+const buildPreviewText = (value, maxLen = 140) => {
+  const plain = String(value || "")
+    .replace(/```[\s\S]*?```/g, " code ")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^>\s?/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/\[([^\]]+)\]\((?:https?:\/\/|mailto:)[^)]+\)/gi, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*\*([^*]+)\*\*\*/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!plain) return "";
+  if (plain.length <= maxLen) return plain;
+  return `${plain.slice(0, maxLen).trimEnd()}...`;
+};
+
+const buildPreviewMarkdown = (value, maxLen = 160) => {
+  const text = String(value || "")
+    .replace(/```[\s\S]*?```/g, " `code` ")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^>\s?/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return "";
+  if (text.length <= maxLen) return text;
+  return `${text.slice(0, maxLen).trimEnd()}...`;
+};
+
+const renderPreviewMarkdown = (value, maxLen = 160) => {
+  const text = buildPreviewMarkdown(value, maxLen);
+  if (!text) return "Start reading...";
+
+  return text
+    .split(/(`[^`]+`|\[[^\]]+\]\((?:https?:\/\/|mailto:)[^)]+\)|\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*)/gi)
+    .map((chunk, index) => {
+      if (!chunk) return null;
+
+      const linkMatch = chunk.match(/^\[([^\]]+)\]\((?:https?:\/\/|mailto:)[^)]+\)$/i);
+      if (linkMatch) return <span key={index} className="text-purple-300">{linkMatch[1]}</span>;
+      if (chunk.startsWith("`") && chunk.endsWith("`")) return <code key={index} className="px-1 py-0.5 rounded bg-white/5 text-cyan-200 text-[0.9em]">{chunk.slice(1, -1)}</code>;
+      if (chunk.startsWith("***") && chunk.endsWith("***")) return <strong key={index} className="text-zinc-200 font-bold"><em className="italic">{chunk.slice(3, -3)}</em></strong>;
+      if (chunk.startsWith("**") && chunk.endsWith("**")) return <strong key={index} className="text-zinc-200 font-bold">{chunk.slice(2, -2)}</strong>;
+      if (chunk.startsWith("*") && chunk.endsWith("*")) return <em key={index} className="text-zinc-300 italic">{chunk.slice(1, -1)}</em>;
+      return chunk.replace(/\*+/g, "");
+    });
+};
+
+const asCount = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+};
+
+const timestampToMs = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value < 10_000_000_000 ? value * 1000 : value;
+  }
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  if (typeof value?.seconds === "number") {
+    return (value.seconds * 1000) + Math.floor((value.nanoseconds || 0) / 1_000_000);
+  }
+  return null;
+};
+
+const relativeTimeToMs = (value) => {
+  const text = String(value || "").trim().toLowerCase();
+  if (!text) return null;
+  if (text === "most" || text.includes("épp most")) return Date.now();
+
+  const match = text.match(/(\d+)\s*(min|mine|óra|órája|nap|napja|hét|hete|hónap|hónapja|év|éve)/i);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) return null;
+
+  const unit = match[2];
+  const minutes =
+    unit.startsWith("min") ? amount :
+      unit.startsWith("óra") ? amount * 60 :
+        unit.startsWith("nap") ? amount * 60 * 24 :
+          unit.startsWith("hét") || unit.startsWith("het") ? amount * 60 * 24 * 7 :
+            unit.startsWith("hónap") ? amount * 60 * 24 * 30 :
+              amount * 60 * 24 * 365;
+
+  return Date.now() - (minutes * 60 * 1000);
+};
+
+const getPostCreatedMs = (post) => {
+  const explicitTime =
+    timestampToMs(post?.createdAt) ??
+    timestampToMs(post?.createdAtMs) ??
+    timestampToMs(post?.publishedAt) ??
+    timestampToMs(post?.date);
+
+  if (explicitTime) return explicitTime;
+
+  const localIdMatch = String(post?.id || "").match(/^local_(\d+)$/);
+  if (localIdMatch) return Number(localIdMatch[1]);
+
+  return relativeTimeToMs(post?.time) ?? 0;
+};
+
+const getHotScore = (post) => {
+  const ageHours = Math.max(1, (Date.now() - getPostCreatedMs(post)) / 3_600_000);
+  const engagement = (asCount(post?.likes) * 4) + (asCount(post?.comments) * 3) + (asCount(post?.views) * 0.08);
+  const manualBoost = post?.hot ? 80 : 0;
+  return (engagement + manualBoost) / Math.pow(ageHours + 2, 0.45);
+};
+
+const getTopScore = (post) => (asCount(post?.likes) * 2) + asCount(post?.comments);
+
+const getPopularityScore = (post) => asCount(post?.views);
+
+const comparePostsBySort = (sortBy) => (a, b) => {
+  const newestDiff = getPostCreatedMs(b) - getPostCreatedMs(a);
+  const tieBreak = newestDiff || String(b.id || "").localeCompare(String(a.id || ""));
+
+  if (sortBy === "new") return tieBreak;
+  if (sortBy === "top") return (getTopScore(b) - getTopScore(a)) || tieBreak;
+  if (sortBy === "views") return (getPopularityScore(b) - getPopularityScore(a)) || tieBreak;
+  return (getHotScore(b) - getHotScore(a)) || tieBreak;
 };
 
 // ─── Adatok ───────────────────────────────────────────────────────
 const CATEGORIES = [
-  { id: "all", label: "Összes", emoji: "🌐", color: "#a78bfa", threads: 5241, online: 203 },
+  { id: "all", label: "All", color: "#6366f1", icon: Globe },
   {
-    id: "chat", label: "Chat AI", emoji: "💬", color: "#a78bfa", threads: 1284, online: 47,
-    description: "GPT, Claude, Gemini és egyéb chat modellek", icon: "MessageSquare"
+    id: "code", label: "Code AI", color: "#34d399",
+    description: "GitHub Copilot, Cursor, code generation and review", icon: Code
   },
   {
-    id: "code", label: "Code AI", emoji: "🧠", color: "#34d399", threads: 893, online: 31,
-    description: "GitHub Copilot, Cursor, kód generálás és review"
+    id: "image", label: "Image AI", color: "#f472b6",
+    description: "Midjourney, DALL-E, Stable Diffusion prompts", icon: Image
   },
   {
-    id: "image", label: "Kép AI", emoji: "🖼️", color: "#f472b6", threads: 2156, online: 89,
-    description: "Midjourney, DALL·E, Stable Diffusion promptok"
+    id: "audio", label: "Audio AI", color: "#fb923c",
+    description: "Suno, Udio, ElevenLabs, voice cloning", icon: Music
   },
   {
-    id: "audio", label: "Hang AI", emoji: "🎵", color: "#fb923c", threads: 567, online: 22,
-    description: "Suno, Udio, ElevenLabs, hangklónozás"
-  },
-  {
-    id: "threed", label: "3D AI", emoji: "🧊", color: "#38bdf8", threads: 341, online: 14,
-    description: "Meshy, Tripo3D, TripoSG, szövegből/képből 3D"
+    id: "threed", label: "3D AI", color: "#38bdf8",
+    description: "Tripo3D, Trellis, text/image to 3D", icon: Box
   },
 ];
 
-const ALL_TAGS = [
-  { label: "prompt-engineering", count: 342, color: "#a78bfa" },
-  { label: "claude", count: 289, color: "#a78bfa" },
-  { label: "midjourney", count: 256, color: "#f472b6" },
-  { label: "gpt-4o", count: 234, color: "#34d399" },
-  { label: "cursor", count: 198, color: "#34d399" },
-  { label: "suno", count: 167, color: "#fb923c" },
-  { label: "stable-diffusion", count: 145, color: "#f472b6" },
-  { label: "meshy", count: 112, color: "#38bdf8" },
-  { label: "összehasonlítás", count: 98, color: "#fbbf24" },
-  { label: "tipp", count: 87, color: "#4ade80" },
-];
+const DEFAULT_CATEGORY = "code";
+const CATEGORY_OPTIONS = CATEGORIES.filter(c => c.id !== "all");
+const VALID_CATEGORY_IDS = new Set(CATEGORY_OPTIONS.map(c => c.id));
+const CATEGORY_ALIASES = {
+  chat: DEFAULT_CATEGORY,
+  "chat-ai": DEFAULT_CATEGORY,
+  chat_ai: DEFAULT_CATEGORY,
+};
+const normalizeCommunityCategory = (category) => {
+  const key = String(category || "").trim().toLowerCase();
+  return CATEGORY_ALIASES[key] || (VALID_CATEGORY_IDS.has(key) ? key : DEFAULT_CATEGORY);
+};
+const normalizeCommunityPost = (post) => ({
+  ...post,
+  category: normalizeCommunityCategory(post?.category),
+});
+const HIDDEN_CONTENT_STATUSES = new Set(["hidden", "deleted", "removed"]);
+const isVisibleCommunityPost = (post) => {
+  if (!post || !VALID_CATEGORY_IDS.has(normalizeCommunityCategory(post.category))) return false;
+  if (post.isHidden === true || post.deletedAt) return false;
+  return !HIDDEN_CONTENT_STATUSES.has(String(post.status || "").toLowerCase());
+};
+const CategoryIcon = ({ category, className = "w-4 h-4", style = {} }) => {
+  const Icon = category?.icon || Hash;
+  return <Icon className={className} style={{ color: category?.color, ...style }} />;
+};
+
+// Dynamic tags will be calculated inside the component
+
 
 const ANNOUNCEMENTS = [
-  { id: 1, text: "🚀 Új funkció: AI Fórum LIVE chat — hamarosan!", color: "#a78bfa" },
-  { id: 2, text: "📢 Pályázat: Legjobb AI prompt — 50.000 Ft díj!", color: "#fbbf24" },
-  { id: 3, text: "🧪 Beta tesztelők kerestetnek a 3D AI szekcióhoz", color: "#38bdf8" },
+  { id: 1, text: "🚀 New feature: AI Forum improvements coming soon!", color: "#a78bfa" },
+  { id: 2, text: "📢 Challenge: Best AI prompt - 50,000 HUF prize!", color: "#fbbf24" },
+  { id: 3, text: "🧪 Beta testers wanted for the 3D AI section", color: "#38bdf8" },
 ];
 
-const LEADERBOARD = [
-  { name: "prompt_guru", points: 4821, badge: "🥇", color: "#fbbf24", posts: 234 },
-  { name: "pixel_witch", points: 3214, badge: "🥈", color: "#94a3b8", posts: 189 },
-  { name: "devmaster_hu", points: 2987, badge: "🥉", color: "#b45309", posts: 156 },
-  { name: "3d_builder", points: 1876, badge: "⭐", color: "#a78bfa", posts: 98 },
-  { name: "typescript_king", points: 1543, badge: "⭐", color: "#34d399", posts: 87 },
-];
+// ─── Hash-based Tag Colors ────────────────────────────────────────
+const TAG_PALETTE = ["#a78bfa", "#34d399", "#f472b6", "#fb923c", "#38bdf8", "#fbbf24", "#4ade80", "#a855f7", "#ec4899", "#8b5cf6"];
+const getTagColor = (label) => {
+  if (!label) return TAG_PALETTE[0];
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) {
+    hash = label.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
+};
 
-const RECENT_ACTIVITY = [
-  { user: "pixel_witch", action: "hozzászólt", post: "Midjourney v7 guide", time: "2p", color: "#f472b6" },
-  { user: "devmaster_hu", action: "új témát nyitott", post: "Claude API tippek", time: "5p", color: "#7c3aed" },
-  { user: "beatmaker99", action: "like-olt", post: "Suno prompting technikák", time: "12p", color: "#ea580c" },
-  { user: "typescript_king", action: "hozzászólt", post: "Cursor AI konfig", time: "18p", color: "#34d399" },
-  { user: "3d_builder", action: "új témát nyitott", post: "Meshy vs TripoSG 2025", time: "31p", color: "#0284c7" },
-];
+// ── Circuit Board Background — dense, detailed, GPU-optimized ──
+
+// ─── Forum Background — Animated Canvas (particles + grid + network + orbs) ──
+const ForumBackground = ForumAnimatedBg;
 
 export const MOCK_POSTS = [
   {
-    id: 1, category: "chat", pinned: true, hot: true, locked: false, solved: false,
-    title: "Claude vs GPT-4o — melyik a jobb kódoláshoz? [Összehasonlítás 2025]",
-    preview: "Elvégeztem 50+ tesztet mindkét modellen. Az eredmények meglepőek: Claude jobban teljesít hosszú fájloknál, de GPT gyorsabb egyszerű snippeteknél...",
-    content: `Elvégeztem **50+ tesztet** mindkét modellen, különböző kódolási feladatokon.`,
-    author: "devmaster_hu", avatar: "D", avatarColor: "#7c3aed",
-    authorId: null,
-    time: "2 órája", views: 3241, likes: 187, comments: 64,
-    tags: ["claude", "gpt-4o", "összehasonlítás", "kódolás"],
-    readTime: 4, poll: null,
-  },
-  {
-    id: 2, category: "image", pinned: false, hot: true, locked: false, solved: false,
-    title: "Midjourney v7 vs FLUX — részletes prompt guide kezdőknek",
-    preview: "Az új MJ v7 teljesen megváltoztatta a prompt struktúrát. Összeállítottam egy 20 pontos checklist-et...",
-    content: `Az új **Midjourney v7** teljesen megváltoztatta a prompt struktúrát.`,
+    id: "mock_2", category: "image", pinned: false, hot: true, locked: false, solved: false,
+    title: "Midjourney v7 vs FLUX - detailed prompt guide for beginners",
+    preview: "The new MJ v7 completely changed prompt structure. I put together a 20-point checklist...",
+    content: `The new **Midjourney v7** completely changed prompt structure.`,
     author: "pixel_witch", avatar: "P", avatarColor: "#db2777",
-    authorId: null,
-    time: "5 órája", views: 5892, likes: 412, comments: 103,
-    tags: ["midjourney", "flux", "prompt", "összehasonlítás"],
+    authorId: "mock_user_2",
+    time: "5 h ago", views: 5892, likes: 412, comments: 103,
+    tags: ["midjourney", "flux", "prompt", "comparison"],
     readTime: 6, poll: {
-      question: "Melyiket használod inkább?",
+      question: "Which one do you use more?",
       options: [
         { id: "a", label: "Midjourney v7", votes: 234 },
         { id: "b", label: "FLUX", votes: 189 },
-        { id: "c", label: "Mindkettőt", votes: 67 },
-        { id: "d", label: "Mást", votes: 23 },
+        { id: "c", label: "Both", votes: 67 },
+        { id: "d", label: "Something else", votes: 23 },
       ],
     },
   },
   {
-    id: 3, category: "code", pinned: false, hot: false, locked: false, solved: true,
-    title: "Cursor AI beállítása React projekthez — teljes konfig + .cursorrules",
-    preview: "Megosztom a .cursorrules fájlomat amit 3 hónap alatt finomítottam...",
-    content: `Megosztom a **.cursorrules** fájlomat amit 3 hónap alatt finomítottam.`,
+    id: "mock_3", category: "code", pinned: false, hot: false, locked: false, solved: true,
+    title: "Setting up Cursor AI for a React project - full config + .cursorrules",
+    preview: "I am sharing my .cursorrules file, refined over 3 months...",
+    content: `I am sharing my **.cursorrules** file, refined over 3 months.`,
     author: "typescript_king", avatar: "T", avatarColor: "#34d399",
-    authorId: null,
-    time: "1 napja", views: 1876, likes: 234, comments: 47,
-    tags: ["cursor", "react", "typescript", "tipp"],
+    authorId: "mock_user_3",
+    time: "1 d ago", views: 1876, likes: 234, comments: 47,
+    tags: ["cursor", "react", "typescript", "tip"],
     readTime: 3, poll: null,
   },
   {
-    id: 4, category: "audio", pinned: false, hot: false, locked: false, solved: false,
-    title: "Suno v4 — prompting technikák amikkel profin szól a zene",
-    preview: "A legtöbb ember rosszul használja a Suno-t. A kulcs nem a stílusban van, hanem a struktúra...",
-    content: `A legtöbb ember rosszul használja a Suno-t.`,
+    id: "mock_4", category: "audio", pinned: false, hot: false, locked: false, solved: false,
+    title: "Suno v4 - prompting techniques that make music sound professional",
+    preview: "Most people use Suno the wrong way. The key is not style, but structure...",
+    content: `Most people use Suno the wrong way.`,
     author: "beatmaker99", avatar: "B", avatarColor: "#ea580c",
-    authorId: null,
-    time: "3 napja", views: 987, likes: 89, comments: 31,
-    tags: ["suno", "prompt", "zene", "tipp"],
+    authorId: "mock_user_4",
+    time: "3 d ago", views: 987, likes: 89, comments: 31,
+    tags: ["suno", "prompt", "music", "tip"],
     readTime: 5, poll: null,
   },
   {
-    id: 5, category: "threed", pinned: false, hot: true, locked: false, solved: false,
-    title: "Meshy vs TripoSG — melyik generál jobb 3D modellt képből? [2025 teszt]",
-    preview: "Teszteltem mindkét platformot ugyanazokkal a képekkel...",
-    content: `Teszteltem mindkét platformot ugyanazokkal a referencia képekkel.`,
+    id: "mock_5", category: "threed", pinned: false, hot: true, locked: false, solved: false,
+    title: "Tripo3D vs Trellis - which creates better 3D models from references? [2025 test]",
+    preview: "I tested both workflows with the same references...",
+    content: `I tested both workflows with the same reference images.`,
     author: "3d_builder", avatar: "3", avatarColor: "#0284c7",
-    authorId: null,
-    time: "1 hete", views: 2134, likes: 156, comments: 58,
-    tags: ["meshy", "triposg", "3d", "összehasonlítás"],
+    authorId: "mock_user_5",
+    time: "1 w ago", views: 2134, likes: 156, comments: 58,
+    tags: ["tripo3d", "trellis", "3d", "comparison"],
     readTime: 4, poll: null,
-  },
-  {
-    id: 6, category: "chat", pinned: false, hot: false, locked: true, solved: false,
-    title: "Hogyan írjak tökéletes system promptot? Bevált módszerek gyűjteménye",
-    preview: "3 éve dolgozom prompt engineeringgel. Megosztom azokat a mintákat amik mindig működnek...",
-    content: `3 éve dolgozom prompt engineeringgel. Ezek a minták mindig működnek.`,
-    author: "prompt_guru", avatar: "G", avatarColor: "#a78bfa",
-    authorId: null,
-    time: "2 hete", views: 8754, likes: 921, comments: 203,
-    tags: ["prompt-engineering", "tipp", "claude", "gpt-4o"],
-    readTime: 8, poll: null,
   },
 ];
 
 MOCK_POSTS.forEach(p => { if (!p.slug) p.slug = generateSlug(p.title); });
 
 // ─── Router segédfüggvények ───────────────────────────────────────
+const POSTS_BATCH_SIZE = 20;
 const BASE_PATH = "/forum";
 
 function getPostInfoFromURL() {
@@ -212,13 +354,12 @@ function pushForumURL() {
 }
 
 // ─── Segéd UI ─────────────────────────────────────────────────────
-const GlassCard = ({ children, style = {}, className = "" }) => (
+const SurfaceCard = ({ children, style = {}, className = "", hover = false }) => (
   <div className={className} style={{
-    background: "rgba(12,12,30,0.75)",
-    backdropFilter: "blur(24px)",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: "1.25rem",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)",
+    background: "#13111c",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: "1rem",
+    ...(hover ? { transition: "border-color 0.2s, transform 0.2s" } : {}),
     ...style,
   }}>{children}</div>
 );
@@ -226,37 +367,41 @@ const GlassCard = ({ children, style = {}, className = "" }) => (
 const TagPill = ({ label, color, active, onClick, count }) => (
   <button onClick={onClick} className="cursor-pointer transition-all active:scale-95 flex-shrink-0"
     style={{
-      background: active ? `${color}25` : "rgba(255,255,255,0.04)",
-      border: `1px solid ${active ? color + "55" : "rgba(255,255,255,0.08)"}`,
+      background: active ? `${color}12` : "transparent",
+      border: `1px solid ${active ? color + "30" : "rgba(255,255,255,0.07)"}`,
       borderRadius: "2rem", padding: "0.25rem 0.625rem",
-      color: active ? color : "#6b7280", fontSize: "0.7rem", fontWeight: active ? 700 : 500,
+      color: active ? color : "#5a5470", fontSize: "0.7rem", fontWeight: active ? 600 : 500,
     }}>
     #{label}{count ? <span className="ml-1 opacity-60">{count}</span> : null}
   </button>
 );
 
-// ─── Announcement banner ──────────────────────────────────────────
 const AnnouncementBanner = () => {
   const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
+  const announcements = [
+    { id: 1, text: "🚀 New feature: AI Forum improvements coming soon!", color: "#a78bfa" },
+    { id: 2, text: "📢 Challenge: Best AI prompt - 50,000 HUF prize!", color: "#fbbf24" },
+    { id: 3, text: "🧪 Beta testers wanted for the 3D AI section", color: "#38bdf8" },
+  ];
   useEffect(() => {
-    const t = setInterval(() => setIdx(i => (i + 1) % ANNOUNCEMENTS.length), 4000);
+    const t = setInterval(() => setIdx(i => (i + 1) % announcements.length), 4000);
     return () => clearInterval(t);
-  }, []);
+  }, [announcements.length]);
   if (!visible) return null;
-  const ann = ANNOUNCEMENTS[idx];
+  const ann = announcements[idx];
   return (
     <div className="flex items-center justify-between px-4 py-2.5 rounded-xl mb-3 transition-all duration-500"
-      style={{ background: `${ann.color}12`, border: `1px solid ${ann.color}30` }}>
+      style={{ background: `${ann.color}06`, border: `1px solid ${ann.color}12` }}>
       <div className="flex items-center gap-2">
         <Megaphone className="w-3.5 h-3.5 flex-shrink-0" style={{ color: ann.color }} />
-        <span className="text-white text-xs font-medium">{ann.text}</span>
+        <span className="text-white/80 text-xs font-medium">{ann.text}</span>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <div className="flex gap-1">
-          {ANNOUNCEMENTS.map((_, i) => (
+          {announcements.map((_, i) => (
             <button key={i} onClick={() => setIdx(i)} className="cursor-pointer w-1 h-1 rounded-full transition-all"
-              style={{ background: i === idx ? ann.color : "rgba(255,255,255,0.2)", transform: i === idx ? "scale(1.5)" : "scale(1)" }} />
+              style={{ background: i === idx ? ann.color : "rgba(255,255,255,0.12)", transform: i === idx ? "scale(1.5)" : "scale(1)" }} />
           ))}
         </div>
         <button onClick={() => setVisible(false)} className="cursor-pointer text-gray-600 hover:text-gray-400 p-0.5">
@@ -269,14 +414,14 @@ const AnnouncementBanner = () => {
 
 // ─── Notification dropdown ────────────────────────────────────────
 const formatNotifTime = (ts) => {
-  if (!ts?.toDate) return "Most";
+  if (!ts?.toDate) return "Now";
   const diff = Date.now() - ts.toDate();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "Most";
-  if (m < 60) return `${m}p`;
+  if (m < 1) return "Now";
+  if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}ó`;
-  return `${Math.floor(h / 24)}n`;
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
 };
 
 const NOTIF_COLORS = {
@@ -287,61 +432,136 @@ const NOTIF_COLORS = {
   system: "#fbbf24",
 };
 
-const NotifDropdown = ({ notifs, onMarkRead, onMarkAllRead, onClose }) => {
+const NotifDropdown = ({ notifs, onNotifClick, onDeleteAll, onDeleteOne, onClose }) => {
   return (
-    <div className="absolute right-5 top-18 w-80 rounded-2xl overflow-hidden mt-2"
-      style={{ zIndex: 100000, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
-        <span className="text-white font-semibold text-sm">Értesítések</span>
-        <button onClick={(e) => { e.stopPropagation(); onMarkAllRead(); }} className="cursor-pointer text-xs text-purple-400 hover:text-purple-300">Mind olvasott</button>
+    <div className="absolute right-0 top-full w-80 rounded-2xl overflow-hidden mt-2"
+      style={{ zIndex: 100000, background: "#13111c", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+        <span className="text-white/90 font-semibold text-sm">Notifications</span>
+        <button onClick={(e) => { e.stopPropagation(); onDeleteAll(); }} className="cursor-pointer text-xs text-red-400 hover:text-red-300">Clear all</button>
       </div>
       {notifs.length === 0 && (
         <div className="px-4 py-6 text-center">
           <Bell className="w-6 h-6 text-gray-700 mx-auto mb-2" />
-          <p className="text-gray-600 text-xs">Nincs értesítés</p>
+          <p className="text-gray-600 text-xs">No notifications</p>
         </div>
       )}
-      {notifs.slice(0, 8).map(n => (
-        <div key={n.id}
-          onClick={(e) => { e.stopPropagation(); onMarkRead(n.id); }}
-          className="flex items-start gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
-          style={{ background: !n.read ? "rgba(167,139,250,0.04)" : "transparent" }}>
-          {!n.read && <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: NOTIF_COLORS[n.type] || "#a78bfa" }} />}
-          {n.read && <div className="w-1.5 h-1.5 flex-shrink-0" />}
-          <div className="flex-1 min-w-0">
-            <p className="text-xs leading-relaxed" style={{ color: n.read ? "#6b7280" : "#d1d5db" }}>{n.text}</p>
-            <p className="text-gray-600 text-xs mt-0.5">{typeof n.time === "string" ? n.time : formatNotifTime(n.createdAt)}</p>
+      <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+        {notifs.map(n => (
+          <div key={n.id}
+            onClick={(e) => { e.stopPropagation(); onNotifClick(n); }}
+            className="flex items-start gap-3 px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer group/notif"
+            style={{ background: !n.read ? "rgba(139,92,246,0.04)" : "transparent" }}>
+            {!n.read && <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: NOTIF_COLORS[n.type] || "#8b5cf6" }} />}
+            {n.read && <div className="w-1.5 h-1.5 flex-shrink-0" />}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs leading-relaxed" style={{ color: n.read ? "#6b5f8a" : "#c4b5d8" }}>{n.text}</p>
+              <p className="text-gray-600 text-xs mt-0.5">{typeof n.time === "string" ? n.time : formatNotifTime(n.createdAt)}</p>
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              {!n.read && <CheckCircle className="w-3 h-3 text-gray-700" />}
+              <button
+                onClick={(e) => { e.stopPropagation(); onDeleteOne(n.id); }}
+                className="cursor-pointer p-1 rounded-md text-gray-700 hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/notif:opacity-100"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           </div>
-          {!n.read && <div className="flex-shrink-0 mt-1"><CheckCircle className="w-3 h-3 text-gray-700 hover:text-purple-400 transition-colors" /></div>}
-        </div>
-      ))}
-      {notifs.length > 8 && (
-        <div className="px-4 py-2.5 text-center">
-          <span className="text-xs text-gray-600">+{notifs.length - 8} további értesítés</span>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 };
 
 // ─── Poszt kártya ─────────────────────────────────────────────────
+const ReportTopicModal = ({ post, isOpen, onClose, onSubmit, busy }) => {
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+
+  useEffect(() => {
+    if (!isOpen) {
+      setReason("");
+      setDetails("");
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !post) return null;
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
+      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={busy ? undefined : onClose} />
+      <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#13111c] p-5 shadow-2xl">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-red-400/20 bg-red-400/10 text-red-300">
+            <Flag className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-red-200">Report forum post</p>
+            <h3 className="mt-1 truncate text-lg font-black text-white">{post.title}</h3>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {REPORT_REASONS.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setReason(item)}
+              className="flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs font-bold transition-all"
+              style={{
+                background: reason === item ? "rgba(248,113,113,0.12)" : "rgba(255,255,255,0.03)",
+                borderColor: reason === item ? "rgba(248,113,113,0.35)" : "rgba(255,255,255,0.08)",
+                color: reason === item ? "#fecaca" : "#9ca3af",
+              }}
+            >
+              {item}
+              {reason === item && <CheckCircle className="h-4 w-4 text-red-200" />}
+            </button>
+          ))}
+          <textarea
+            value={details}
+            onChange={(event) => setDetails(event.target.value)}
+            rows={3}
+            className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm font-medium text-white outline-none focus:border-red-400/40"
+            placeholder="Optional context"
+          />
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="flex-1 rounded-xl border border-white/10 bg-white/[0.03] py-2.5 text-sm font-bold text-gray-400 transition hover:text-white disabled:opacity-40"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSubmit({ reason, details })}
+            disabled={!reason || busy}
+            className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white transition hover:bg-red-500 disabled:opacity-40"
+          >
+            {busy ? "Sending..." : "Send report"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PostCard = ({
   post, onClick, bookmarked, onBookmark, viewedIds,
-  currentUserId, isAdmin, onDelete, onEdit, onToggle,
+  currentUserId, isAdmin, onDelete, onEdit, onToggle, onReport,
 }) => {
-  const cat = CATEGORIES.find(c => c.id === post.category) || CATEGORIES[1];
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(post.likes);
+  const normalizedCategory = normalizeCommunityCategory(post.category);
+  const cat = CATEGORIES.find(c => c.id === normalizedCategory) || CATEGORIES.find(c => c.id === DEFAULT_CATEGORY);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
   const isRead = viewedIds?.has(post.id);
-
-  const isOwn = !post.authorId || (!!currentUserId && currentUserId === post.authorId);
+  const isOwn = currentUserId && post.authorId === currentUserId;
   const canManage = isOwn || isAdmin;
-
-  useEffect(() => {
-    dbg(`PostCard render | post.id=${post.id} | post.authorId=${post.authorId} | currentUserId=${currentUserId} | isAdmin=${isAdmin} | isOwn=${isOwn} | canManage=${canManage}`);
-  }, [post.id, post.authorId, currentUserId, isAdmin, isOwn, canManage]);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -355,297 +575,298 @@ const PostCard = ({
   }, [showMenu]);
 
   return (
-    <div
-      className="group cursor-pointer transition-all duration-200 relative"
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -3, scale: 1.015 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className="group cursor-pointer relative overflow-hidden sm:overflow-visible"
       style={{
-        background: isRead ? "rgba(255,255,255,0.015)" : "rgba(255,255,255,0.03)",
-        border: `1px solid ${isRead ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.08)"}`,
-        borderRadius: "1rem", padding: "1.125rem 1.25rem",
-        overflow: "visible",
+        background: "linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.4))",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        borderColor: `${cat.color}25`,
+        borderTop: `1px solid ${cat.color}40`,
+        borderLeft: `1px solid ${cat.color}30`,
+        borderRight: `1px solid ${cat.color}10`,
+        borderBottom: `1px solid ${cat.color}10`,
+        boxShadow: `0 20px 50px -10px rgba(0,0,0,0.8), 0 0 35px -10px ${cat.color}35, inset 0 1px 0 0 ${cat.color}20`,
+        borderRadius: "1.5rem",
+        padding: "1rem",
+        marginBottom: "0.75rem",
         zIndex: showMenu ? 50 : "auto",
-        position: "relative",
+        transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-        e.currentTarget.style.border = `1px solid ${cat.color}30`;
-        e.currentTarget.style.transform = "translateY(-1px)";
+        e.currentTarget.style.background = "linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.2))";
+        e.currentTarget.style.borderColor = `${cat.color}50`;
+        e.currentTarget.style.borderTop = `1px solid ${cat.color}70`;
+        e.currentTarget.style.borderLeft = `1px solid ${cat.color}60`;
+        e.currentTarget.style.boxShadow = `0 30px 60px -15px rgba(0,0,0,0.9), 0 0 50px -10px ${cat.color}50, inset 0 1px 0 0 ${cat.color}40`;
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.background = isRead ? "rgba(255,255,255,0.015)" : "rgba(255,255,255,0.03)";
-        e.currentTarget.style.border = `1px solid ${isRead ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.08)"}`;
-        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.background = "linear-gradient(145deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.3))";
+        e.currentTarget.style.borderColor = `${cat.color}25`;
+        e.currentTarget.style.borderTop = `1px solid ${cat.color}40`;
+        e.currentTarget.style.borderLeft = `1px solid ${cat.color}30`;
+        e.currentTarget.style.boxShadow = `0 20px 50px -10px rgba(0,0,0,0.8), 0 0 35px -10px ${cat.color}35, inset 0 1px 0 0 ${cat.color}20`;
       }}
       onClick={onClick}
     >
-      {isRead
-        ? <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-full" style={{ background: "rgba(255,255,255,0.08)" }} />
-        : <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-full" style={{ background: `linear-gradient(180deg, ${cat.color}, ${cat.color}40)` }} />
-      }
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-3 sm:gap-5">
 
-      <div className="flex items-start gap-3 pl-1">
-        {post.avatarUrl ? <img src={post.avatarUrl} alt="avatar" className="w-9 h-9 rounded-xl object-cover flex-shrink-0 mt-0.5" /> : <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0 mt-0.5"
-          style={{ background: post.avatarColor + "45", border: `1px solid ${post.avatarColor}35` }}>
-          {post.avatar}
-        </div>}
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-            {post.pinned && (
-              <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-semibold"
-                style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}>
-                <Pin className="w-2.5 h-2.5" /> Kitűzve
+        {/* Left Column (Icon + Decorative) */}
+        <div className="flex flex-col items-center mt-0.5 flex-shrink-0 self-stretch">
+          {/* Avatar Logo */}
+          <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center relative z-10 transition-transform duration-300 group-hover:scale-105"
+            style={{
+              background: "rgba(255,255,255,0.02)",
+              border: "1px solid rgba(255,255,255,0.05)",
+              boxShadow: `inset 0 0 20px ${cat.color}10`
+            }}>
+            {cat.icon ? (
+              <cat.icon className="w-4 h-4 sm:w-6 sm:h-6 transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" style={{ color: cat.color }} />
+            ) : (
+              <span className="text-white/80 font-black italic text-base sm:text-xl uppercase transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" style={{ color: cat.color }}>
+                {cat.label?.[0] || "U"}
               </span>
             )}
-            {post.hot && (
-              <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-semibold"
-                style={{ background: "rgba(251,113,33,0.15)", color: "#fb923c", border: "1px solid rgba(251,113,33,0.25)" }}>
-                <Flame className="w-2.5 h-2.5" /> Trending
-              </span>
-            )}
-            {post.locked && (
-              <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-semibold"
-                style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)" }}>
-                <Lock className="w-2.5 h-2.5" /> Lezárva
-              </span>
-            )}
-            {post.solved && (
-              <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-semibold"
-                style={{ background: "rgba(74,222,128,0.15)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)" }}>
-                <CheckCircle className="w-2.5 h-2.5" /> Megoldva
-              </span>
-            )}
-            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-              style={{ background: `${cat.color}15`, color: cat.color, border: `1px solid ${cat.color}30` }}>
-              {cat.emoji} {cat.label}
-            </span>
-            <span className="text-xs text-gray-700 flex items-center gap-0.5 ml-auto">
-              <Clock className="w-2.5 h-2.5" />{post.readTime} perc olvasás
-            </span>
           </div>
 
-          <h3 className={`font-semibold text-sm leading-snug mb-1 transition-colors group-hover:text-purple-200 ${isRead ? "text-gray-300" : "text-white"}`}>
-            {post.title}
-          </h3>
+          {/* Premium Tech Circuit Tracker - hidden on mobile */}
+          <div className="relative flex-1 w-full flex flex-col items-center mt-3 mb-1 min-h-[3.5rem] opacity-40 group-hover:opacity-100 transition-opacity duration-500 hidden sm:flex">
+            {/* Background Track */}
+            <div className="absolute inset-y-0 w-px bg-gradient-to-b from-white/10 via-white/5 to-transparent" />
 
-          <p className="text-gray-500 text-xs leading-relaxed line-clamp-2 mb-2">{post.preview}</p>
+            {/* Data Pulse Core */}
+            <div className="absolute top-2 w-[2px] h-10 rounded-full"
+              style={{
+                background: `linear-gradient(to bottom, transparent, ${cat.color}, transparent)`,
+                boxShadow: `0 0 12px ${cat.color}`
+              }} />
 
-          <div className="flex gap-1.5 flex-wrap mb-2.5">
-            {post.tags.slice(0, 4).map(t => (
-              <span key={t} className="text-xs px-1.5 py-0.5 rounded-full"
-                style={{ background: `${cat.color}12`, color: cat.color + "cc", border: `1px solid ${cat.color}20` }}>
-                #{t}
-              </span>
-            ))}
+            {/* Cyber Nodes */}
+            <div className="absolute top-4 w-2 h-2 rotate-45 border transition-all duration-300 group-hover:rotate-90 group-hover:scale-110"
+              style={{ borderColor: cat.color, background: 'rgba(0,0,0,0.8)' }} />
+            <div className="absolute top-8 w-1 h-1 rounded-full bg-white/50" />
+            <div className="absolute top-12 w-3 h-px opacity-70"
+              style={{ background: cat.color, boxShadow: `0 0 8px ${cat.color}` }} />
           </div>
+        </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs text-gray-600">
-              <span className="font-semibold" style={{ color: post.avatarColor }}>{post.author}</span>
-              {isOwn && (
-                <span className="text-xs px-1 py-0.5 rounded font-semibold"
-                  style={{ background: "rgba(167,139,250,0.15)", color: "#a78bfa", fontSize: "0.6rem" }}>
-                  TE
-                </span>
-              )}
-              <span>·</span>
-              <span>{post.time}</span>
-            </div>
+        {/* Main Content */}
+        <div className="w-full flex-1 min-w-0 flex flex-col gap-1.5">
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={e => { e.stopPropagation(); onBookmark(post.id); }}
-                className="cursor-pointer p-1 rounded-lg transition-all opacity-0 group-hover:opacity-100 hover:bg-white/10"
-                style={{ color: bookmarked ? "#fbbf24" : "#6b7280" }}
-                title="Mentés"
-              >
-                <Bookmark className={`w-3.5 h-3.5 ${bookmarked ? "fill-current" : ""}`} />
+          {/* Header: Cat Pill & Time */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[0.55rem] px-2 py-0.5 sm:px-3 sm:py-1 rounded-[1rem] font-black tracking-[0.25em] uppercase italic whitespace-nowrap"
+              style={{ background: `${cat.color}15`, color: cat.color, border: `1px solid ${cat.color}25` }}>
+              {cat.label}
+            </span>
+            <div className="flex items-center gap-1.5 text-[0.6rem] text-zinc-500 font-bold tracking-widest uppercase relative flex-shrink-0" ref={menuRef}>
+              <span className="flex items-center gap-1 opacity-70">
+                <Clock className="w-3 h-3" /> {post.time}
+              </span>
+              <span className="opacity-30 hidden sm:inline">•</span>
+
+              {/* MORE / Menu Button */}
+              <button onClick={e => { e.stopPropagation(); setShowMenu(v => !v); }}
+                className="flex items-center gap-0.5 cursor-pointer hover:text-zinc-300 transition-colors px-1 py-0.5 rounded-md border border-white/5 bg-white/[0.02]">
+                MORE
               </button>
 
-              <button
-                onClick={e => { e.stopPropagation(); setLiked(v => !v); setLikeCount(c => liked ? c - 1 : c + 1); }}
-                className="cursor-pointer flex items-center gap-1 text-xs transition-all active:scale-90 px-2 py-1 rounded-lg hover:bg-white/8"
-                style={{ color: liked ? "#f472b6" : "#6b7280" }}
-              >
-                <Heart className={`w-3 h-3 ${liked ? "fill-current" : ""}`} />
-                <span>{likeCount}</span>
-              </button>
-
-              <span className="flex items-center gap-1 text-xs text-gray-600">
-                <MessageSquare className="w-3 h-3" />{post.comments}
-              </span>
-              <span className="flex items-center gap-1 text-xs text-gray-600">
-                <Eye className="w-3 h-3" />{post.views.toLocaleString()}
-              </span>
-
-              {canManage && (
-                <div
-                  className="relative"
-                  ref={menuRef}
+              {/* Dropdown Menu */}
+              {showMenu && (
+                <div className="absolute right-0 top-full mt-2 w-52 rounded-xl overflow-hidden shadow-2xl"
                   onClick={e => e.stopPropagation()}
-                >
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      setShowMenu(v => !v);
-                    }}
-                    className="cursor-pointer p-1 rounded-lg transition-all hover:bg-white/10"
-                    style={{
-                      color: showMenu ? "#a78bfa" : "#6b7280",
-                      background: showMenu ? "rgba(167,139,250,0.15)" : "transparent",
-                      border: `1px solid ${showMenu ? "rgba(167,139,250,0.3)" : "transparent"}`,
-                    }}
-                  >
-                    <MoreHorizontal className="w-3.5 h-3.5" />
+                  style={{ zIndex: 9999, background: "#13111c", border: `1px solid ${cat.color}30`, boxShadow: `0 12px 40px rgba(0,0,0,0.8), 0 0 0 1px ${cat.color}15` }}>
+
+                  <button onClick={e => { e.stopPropagation(); onBookmark(post.id); setShowMenu(false); }}
+                    className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                    <Bookmark className={`w-3.5 h-3.5 ${bookmarked ? "text-amber-400 fill-current" : ""}`} /> {bookmarked ? "Remove bookmark" : "Save"}
                   </button>
 
-                  {showMenu && (
-                    <div
-                      className="absolute right-0 bottom-full mb-1 w-48 rounded-xl overflow-hidden"
-                      style={{
-                        zIndex: 9999,
-                        background: "rgba(10,10,28,0.98)",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        boxShadow: "0 10px 40px rgba(0,0,0,0.8)",
-                      }}
-                    >
-                      {DEBUG && (
-                        <div className="px-3 py-1.5 border-b border-white/10" style={{ background: "rgba(239,68,68,0.1)" }}>
-                          <p style={{ color: "#f87171", fontSize: "0.55rem", fontFamily: "monospace" }}>
-                            DEBUG | isOwn={String(isOwn)} | isAdmin={String(isAdmin)}<br />
-                            authorId={String(post.authorId)} | uid={String(currentUserId)}
-                          </p>
-                        </div>
-                      )}
+                  <button onClick={e => { e.stopPropagation(); setShowMenu(false); onReport?.(post); }}
+                    className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-red-400 hover:bg-red-400/10 transition-colors">
+                    <Flag className="w-3.5 h-3.5" /> Report
+                  </button>
 
+                  {canManage && (
+                    <>
+                      <div className="border-t border-white/5 my-1" />
                       {isOwn && (
                         <>
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              setShowMenu(false);
-                              onEdit(post);
-                            }}
-                            className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
-                          >
-                            <Edit3 className="w-3.5 h-3.5 text-blue-400" /> Szerkesztés
-                          </button>
-
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              setShowMenu(false);
-                              onToggle(post.id, "solved", !post.solved);
-                            }}
-                            className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5 text-green-400" />
-                            {post.solved ? "Megoldás visszavon" : "Megoldva jelöl"}
-                          </button>
-
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              setShowMenu(false);
-                              onToggle(post.id, "locked", !post.locked);
-                            }}
-                            className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
-                          >
-                            {post.locked
-                              ? <><Unlock className="w-3.5 h-3.5 text-blue-400" /> Zárolás feloldása</>
-                              : <><Lock className="w-3.5 h-3.5 text-orange-400" /> Téma zárolása</>
-                            }
+                          <button onClick={e => { e.stopPropagation(); setShowMenu(false); onEdit(post); }}
+                            className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                            <Edit3 className="w-3.5 h-3.5 text-blue-400" /> Edit
                           </button>
                         </>
                       )}
-
                       {isAdmin && (
                         <>
-                          <div className="border-t border-white/8 my-0.5" />
-                          <p className="px-3 pt-1.5 pb-0.5 text-gray-600" style={{ fontSize: "0.6rem", letterSpacing: "0.08em", textTransform: "uppercase" }}>Admin</p>
-
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              setShowMenu(false);
-                              onToggle(post.id, "pinned", !post.pinned);
-                            }}
-                            className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
-                          >
-                            <Pin className="w-3.5 h-3.5 text-yellow-400" />
-                            {post.pinned ? "Kitűzés eltávolítása" : "Kitűzés"}
+                          <button onClick={e => { e.stopPropagation(); setShowMenu(false); onToggle(post.id, "pinned", !post.pinned); }}
+                            className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                            <Pin className="w-3.5 h-3.5 text-amber-400" /> {post.pinned ? "Unpin" : "Pin"}
                           </button>
-
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              setShowMenu(false);
-                              onToggle(post.id, "hot", !post.hot);
-                            }}
-                            className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
-                          >
-                            <Flame className="w-3.5 h-3.5 text-orange-400" />
-                            {post.hot ? "Trending eltávolítása" : "Trending jelölés"}
-                          </button>
-
-                          {!isOwn && (
-                            <button
-                              onClick={e => {
-                                e.stopPropagation();
-                                setShowMenu(false);
-                                onToggle(post.id, "locked", !post.locked);
-                              }}
-                              className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-300 hover:text-white hover:bg-white/8 transition-colors"
-                            >
-                              {post.locked
-                                ? <><Unlock className="w-3.5 h-3.5 text-blue-400" /> Zárolás feloldása</>
-                                : <><Lock className="w-3.5 h-3.5 text-red-400" /> Téma zárolása</>
-                              }
-                            </button>
-                          )}
                         </>
                       )}
-
-                      <div className="border-t border-white/8 my-0.5" />
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          setShowMenu(false);
-                          onDelete(post.id, post.authorId);
-                        }}
-                        className="cursor-pointer w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-400/10 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Téma törlése
+                      <div className="border-t border-white/5 my-1" />
+                      <button onClick={e => { e.stopPropagation(); setShowMenu(false); onDelete(post.id, post.authorId); }}
+                        className="cursor-pointer w-full flex items-center gap-2 px-4 py-2.5 text-xs text-red-400 hover:bg-red-400/10 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
                       </button>
-                    </div>
+                    </>
                   )}
                 </div>
               )}
             </div>
           </div>
+
+          {/* Title */}
+          <h3 className="text-base sm:text-lg font-black italic leading-tight py-1 transition-all duration-300 group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] line-clamp-2 min-h-[2.4rem] sm:min-h-[2.8rem]"
+            style={{ color: cat.color }}>
+            {post.title}
+          </h3>
+
+          {/* Preview text */}
+          <p className="text-zinc-400 text-[12px] sm:text-[13px] font-medium leading-relaxed line-clamp-2 mb-1 min-h-[2.3rem] sm:min-h-[2.7rem]">
+            {renderPreviewMarkdown(post.content || post.preview, 160)}
+          </p>
+
+          {/* Footer row */}
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5 gap-2">
+
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              {/* Author Pill */}
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg pr-2 sm:pr-3 pl-1 py-1 transition-all min-w-0 max-w-[9.5rem] sm:max-w-none"
+                style={{ background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)" }}>
+                {post.avatarUrl || post.authorPhotoUrl ? (
+                  <img src={post.avatarUrl || post.authorPhotoUrl} alt={post.author} className="w-4 h-4 sm:w-5 sm:h-5 rounded object-cover border border-white/10" />
+                ) : (
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 rounded flex items-center justify-center font-black text-[0.5rem] sm:text-[0.6rem] uppercase"
+                    style={{ background: "rgba(0,0,0,0.4)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    {post.avatar || post.author?.[0] || "U"}
+                  </div>
+                )}
+                <span className="text-[0.55rem] sm:text-[0.6rem] font-black text-zinc-500 tracking-[0.2em] uppercase italic opacity-80 truncate max-w-[72px] sm:max-w-[110px] md:max-w-none">{post.author}</span>
+              </div>
+
+              {/* Stats */}
+              <div className="flex items-center gap-2 sm:gap-4 text-zinc-500 text-[0.65rem] sm:text-[0.7rem] font-bold flex-shrink-0">
+                <span className="flex items-center gap-1 sm:gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><MessageSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{post.comments}</span>
+                <span className="flex items-center gap-1 sm:gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><Heart className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{post.likes}</span>
+                <span className="flex items-center gap-1 sm:gap-1.5 opacity-60 hover:opacity-100 transition-opacity"><Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />{post.views?.toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Chevron Edge Button */}
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+              style={{
+                background: `${cat.color}08`,
+                border: `1px solid ${cat.color}20`,
+                color: cat.color,
+                boxShadow: `0 0 15px ${cat.color}15`
+              }}>
+              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </div>
+
+          </div>
+
         </div>
+
       </div>
-    </div>
+    </motion.div>
   );
 };
 
-// ─── New / Edit Post Modal ────────────────────────────────────────
+// ─── WYSIWYG Editor Styles ────────────────────────────────────────
+const editorStyles = `
+  .wysiwyg-editor h2 {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .wysiwyg-editor h2::before {
+    content: '';
+    width: 3px;
+    height: 1.2rem;
+    background: #8b5cf6;
+    border-radius: 99px;
+    display: inline-block;
+  }
+  .wysiwyg-editor blockquote {
+    border-left: 3px solid #8b5cf6;
+    padding-left: 1rem;
+    color: #9ca3af;
+    font-style: italic;
+    margin: 1rem 0;
+  }
+  .wysiwyg-editor pre {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    font-family: monospace;
+    color: #67e8f9;
+    margin: 1rem 0;
+    white-space: pre-wrap;
+  }
+  .wysiwyg-editor ul {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    margin: 1rem 0;
+  }
+  .wysiwyg-editor li {
+    margin-bottom: 0.25rem;
+    color: #d1d5db;
+  }
+  .wysiwyg-editor a {
+    color: #8b5cf6;
+    text-decoration: underline;
+  }
+`;
 const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = null }) => {
   const isEditMode = !!editPost;
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [selectedCat, setSelectedCat] = useState(defaultCategory || "chat");
+  const [selectedCat, setSelectedCat] = useState(normalizeCommunityCategory(defaultCategory));
   const [tags, setTags] = useState("");
   const [addPoll, setAddPoll] = useState(false);
   const [pollQ, setPollQ] = useState("");
   const [pollOpts, setPollOpts] = useState(["", ""]);
-  const [preview, setPreview] = useState(false);
+
+  const editorRef = useRef(null);
+  const [isEditorEmpty, setIsEditorEmpty] = useState(!content);
+  const cat = CATEGORIES.find(c => c.id === selectedCat) || CATEGORIES.find(c => c.id === DEFAULT_CATEGORY);
+  const emptyFormatState = {
+    bold: false,
+    italic: false,
+    h2: false,
+    blockquote: false,
+    insertUnorderedList: false,
+    pre: false,
+    createLink: false,
+  };
+  const [formatState, setFormatState] = useState(emptyFormatState);
 
   useEffect(() => {
     if (isOpen) {
       if (isEditMode && editPost) {
         setTitle(editPost.title || "");
+        // Pre-fill contentEditable with HTML if needed, but since we store MD, 
+        // we'll need a basic MD->HTML converter for editing
+        const initialHtml = markdownToHtml(editPost.content || "");
+        if (editorRef.current) {
+          editorRef.current.innerHTML = initialHtml;
+        }
         setContent(editPost.content || "");
-        setSelectedCat(editPost.category || "chat");
+        setIsEditorEmpty(!editPost.content);
+        setSelectedCat(normalizeCommunityCategory(editPost.category));
         setTags((editPost.tags || []).join(", "));
         if (editPost.poll) {
           setAddPoll(true);
@@ -658,27 +879,347 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
         }
       } else {
         setTitle("");
+        if (editorRef.current) editorRef.current.innerHTML = "";
         setContent("");
-        setSelectedCat(defaultCategory || "chat");
+        setIsEditorEmpty(true);
+        setSelectedCat(normalizeCommunityCategory(defaultCategory));
         setTags("");
         setAddPoll(false);
         setPollQ("");
         setPollOpts(["", ""]);
       }
-      setPreview(false);
     }
   }, [isOpen, isEditMode, editPost, defaultCategory]);
 
+  // Track formatting state at cursor position (Word-like behavior)
+  const updateFormatState = () => {
+    const sel = window.getSelection();
+    const editor = editorRef.current;
+    if (!sel || sel.rangeCount === 0 || !editor) {
+      setFormatState(emptyFormatState);
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) {
+      setFormatState(emptyFormatState);
+      return;
+    }
+
+    let blockVal = "";
+    let node = range.startContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+    // Walk up, skipping <p> wrappers to find the real block container
+    while (node && node !== editor && node !== document.body) {
+      const tag = node.tagName?.toLowerCase();
+      if (tag === "h2" || tag === "blockquote" || tag === "pre") {
+        blockVal = tag;
+        break;
+      }
+      if (tag === "p") { node = node.parentElement; continue; }
+      node = node.parentElement;
+    }
+
+    setFormatState({
+      bold: document.queryCommandState("bold"),
+      italic: document.queryCommandState("italic"),
+      h2: blockVal === "h2",
+      blockquote: blockVal === "blockquote",
+      insertUnorderedList: document.queryCommandState("insertUnorderedList"),
+      pre: blockVal === "pre",
+      createLink: document.queryCommandState("createLink"),
+    });
+  };
+
+  useEffect(() => {
+    document.addEventListener("selectionchange", updateFormatState);
+    return () => document.removeEventListener("selectionchange", updateFormatState);
+  }, []);
+
   if (!isOpen) return null;
-  const cat = CATEGORIES.find(c => c.id === selectedCat);
+
+  // Simple MD to HTML for initializing the editor in edit mode
+  const markdownToHtml = (md) => {
+    if (!md) return "";
+    const escaped = String(md)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    return escaped
+      .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^)]+)\)/gi, '<a href="$2">$1</a>')
+      .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+      .replace(/^&gt; (.*$)/gm, '<blockquote>$1</blockquote>')
+      .replace(/^- (.*$)/gm, '<li>$1</li>')
+      .replace(/`(.*?)`/g, '<code>$1</code>')
+      .replace(/\n/g, '<br>');
+  };
+
+  // HTML to MD for serializing the editor content before submission
+  const htmlToMarkdown = (html) => {
+    if (!html) return "";
+
+    const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+    const root = doc.body.firstElementChild;
+    const blockTags = new Set(["address", "article", "aside", "blockquote", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "ol", "p", "pre", "section", "ul"]);
+    const isElement = (node) => node?.nodeType === Node.ELEMENT_NODE;
+    const tagName = (node) => isElement(node) ? node.tagName.toLowerCase() : "";
+    const normalizeText = (value) => String(value || "").replace(/\u00a0/g, " ");
+    const normalizeUrl = (value) => {
+      const url = String(value || "").trim();
+      return /^(https?:\/\/|mailto:)/i.test(url) ? url : "";
+    };
+    const cleanMarkdown = (value) => String(value || "")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    const serializeInline = (node) => {
+      if (!node) return "";
+      if (node.nodeType === Node.TEXT_NODE) return normalizeText(node.textContent);
+      if (!isElement(node)) return "";
+
+      const tag = tagName(node);
+      if (tag === "br") return "\n";
+      if (tag === "code") return `\`${normalizeText(node.textContent)}\``;
+
+      const text = Array.from(node.childNodes).map(serializeInline).join("");
+      if (!text) return "";
+
+      if (tag === "a") {
+        const href = normalizeUrl(node.getAttribute("href"));
+        return href ? `[${text}](${href})` : text;
+      }
+
+      const style = (node.getAttribute("style") || "").toLowerCase();
+      const isBold = tag === "strong" || tag === "b" || /font-weight:\s*(bold|[6-9]00)/.test(style);
+      const isItalic = tag === "em" || tag === "i" || /font-style:\s*italic/.test(style);
+
+      if (isBold && isItalic) return `***${text}***`;
+      if (isBold) return `**${text}**`;
+      if (isItalic) return `*${text}*`;
+      return text;
+    };
+
+    const serializeBlocks = (parent) => {
+      const blocks = [];
+      let inlineParts = [];
+      const flushInline = () => {
+        const inline = inlineParts.join("").trim();
+        if (inline) blocks.push(inline);
+        inlineParts = [];
+      };
+
+      Array.from(parent.childNodes).forEach((child) => {
+        if (child.nodeType === Node.TEXT_NODE) {
+          inlineParts.push(normalizeText(child.textContent));
+          return;
+        }
+
+        const childTag = tagName(child);
+        if (childTag === "br") {
+          flushInline();
+          return;
+        }
+
+        if (blockTags.has(childTag)) {
+          flushInline();
+          const block = serializeBlock(child).trim();
+          if (block) blocks.push(block);
+          return;
+        }
+
+        inlineParts.push(serializeInline(child));
+      });
+
+      flushInline();
+      return blocks.join("\n");
+    };
+
+    const serializeBlock = (node) => {
+      const tag = tagName(node);
+      if (!tag) return normalizeText(node.textContent);
+
+      if (/^h[1-6]$/.test(tag)) {
+        const level = tag === "h1" ? "#" : "##";
+        return `${level} ${serializeInline(node).trim()}`;
+      }
+
+      if (tag === "blockquote") {
+        const body = serializeBlocks(node) || serializeInline(node);
+        return cleanMarkdown(body)
+          .split("\n")
+          .map((line) => `> ${line}`)
+          .join("\n");
+      }
+
+      if (tag === "pre") {
+        return `\`\`\`\n${normalizeText(node.textContent).trimEnd()}\n\`\`\``;
+      }
+
+      if (tag === "ul" || tag === "ol") {
+        return Array.from(node.children)
+          .filter((child) => tagName(child) === "li")
+          .map((child, index) => {
+            const marker = tag === "ol" ? `${index + 1}.` : "-";
+            return `${marker} ${cleanMarkdown(serializeBlocks(child) || serializeInline(child))}`;
+          })
+          .join("\n");
+      }
+
+      if (tag === "li") {
+        return `- ${cleanMarkdown(serializeBlocks(node) || serializeInline(node))}`;
+      }
+
+      return serializeBlocks(node) || serializeInline(node);
+    };
+
+    return cleanMarkdown(serializeBlocks(root));
+  };
 
   const addPollOpt = () => { if (pollOpts.length < 6) setPollOpts(p => [...p, ""]); };
 
+  const handleFormat = (command, value = null) => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !editorRef.current) return;
+    const currentRange = sel.getRangeAt(0);
+    if (!editorRef.current.contains(currentRange.startContainer) || !editorRef.current.contains(currentRange.endContainer)) {
+      setFormatState(emptyFormatState);
+      return;
+    }
+
+    // Save the current selection before focus changes
+    const savedRange = currentRange.cloneRange();
+
+    // Restore selection in the editor
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+    editorRef.current.focus();
+
+    const range = savedRange;
+
+    // Block-level commands: toggle behavior (mutually exclusive)
+    if (command === "formatBlock" && value) {
+      // Find the block element at cursor by walking up to editor's direct child
+      let node = range.startContainer;
+      if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+      // Walk up until we reach a direct child of the editor
+      while (node && node.parentElement !== editorRef.current && node !== editorRef.current) {
+        const tag = node.tagName?.toLowerCase();
+        if (tag === "h2" || tag === "blockquote" || tag === "pre") break;
+        if (tag === "p") { node = node.parentElement; continue; }
+        node = node.parentElement;
+      }
+      const currentTag = node?.tagName?.toLowerCase() || "";
+
+      if (currentTag === value) {
+        // Already in this format — toggle off to <p> via direct DOM
+        const p = document.createElement("p");
+        p.innerHTML = node.innerHTML;
+        node.replaceWith(p);
+        const newRange = document.createRange();
+        newRange.setStart(p.firstChild || p, 0);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } else if (currentTag === "h2" || currentTag === "blockquote" || currentTag === "pre") {
+        // In a different block format — replace the block element directly
+        let innerHTML = node.innerHTML;
+        innerHTML = innerHTML.replace(/^<p[^>]*>/i, '').replace(/<\/p>$/i, '');
+        const newBlock = document.createElement(value);
+        newBlock.innerHTML = innerHTML || "\u00A0";
+        node.replaceWith(newBlock);
+        const newRange = document.createRange();
+        newRange.setStart(newBlock.firstChild || newBlock, 0);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } else {
+        document.execCommand("formatBlock", false, value);
+      }
+      updateFormatState();
+      return;
+    }
+
+    if (command === "insertUnorderedList") {
+      document.execCommand("insertUnorderedList");
+      return;
+    }
+
+    // Inline commands with no selection: auto-select the word at cursor (invisibly)
+    if (sel.isCollapsed) {
+      const node = range.startContainer;
+      const offset = range.startOffset;
+
+      if (node.nodeType === Node.TEXT_NODE && editorRef.current.contains(node)) {
+        const text = node.textContent;
+        let start = offset;
+        let end = offset;
+        while (start > 0 && /\S/.test(text[start - 1])) start--;
+        while (end < text.length && /\S/.test(text[end])) end++;
+
+        if (start !== end) {
+          const wordRange = document.createRange();
+          wordRange.setStart(node, start);
+          wordRange.setEnd(node, end);
+          sel.removeAllRanges();
+          sel.addRange(wordRange);
+
+          document.execCommand(command, false, value);
+
+          // Restore cursor to original position (hide selection from user)
+          try {
+            const restoredRange = document.createRange();
+            let targetNode = node;
+            let remainingOffset = offset;
+            while (remainingOffset > targetNode.textContent.length && targetNode.nextSibling) {
+              remainingOffset -= targetNode.textContent.length;
+              targetNode = targetNode.nextSibling;
+            }
+            const safeOffset = Math.min(remainingOffset, targetNode.textContent.length);
+            restoredRange.setStart(targetNode, safeOffset);
+            restoredRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(restoredRange);
+          } catch {
+            if (editorRef.current.lastChild) {
+              const r = document.createRange();
+              r.selectNodeContents(editorRef.current);
+              r.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(r);
+            }
+          }
+          return;
+        }
+      }
+    }
+
+    document.execCommand(command, false, value);
+  };
+
+  const handleLink = () => {
+    const url = window.prompt("Enter the link URL:", "https://");
+    if (url) handleFormat("createLink", url);
+  };
+
+  const handleEditorInput = (e) => {
+    const html = e.currentTarget.innerHTML;
+    setIsEditorEmpty(!e.currentTarget.textContent.trim() && !html.includes('<img') && !html.includes('<br'));
+  };
+
   const handleSubmit = () => {
     if (!title.trim() || title.trim().length < 10) return;
+
+    // Serialize editor HTML to Markdown
+    const finalContent = editorRef.current ? htmlToMarkdown(editorRef.current.innerHTML) : "";
+
     const data = {
       title: title.trim(),
-      content: content.trim(),
+      content: finalContent,
       category: selectedCat,
       tags: tags.split(",").map(t => t.trim()).filter(Boolean),
       poll: addPoll && pollQ
@@ -692,210 +1233,286 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10000 }}>
+  const ToolbarBtn = ({ icon: Icon, onClick, label, active }) => (
+    <button
+      onPointerDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      title={label}
+      className={`cursor-pointer p-1.5 rounded-lg transition-all active:scale-90 group relative ${active
+        ? 'bg-white/10 text-white'
+        : 'text-gray-500 hover:text-white hover:bg-white/5'
+        }`}>
+      <Icon className={`w-3.5 h-3.5 ${active ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}`} />
+      <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-black text-[0.6rem] text-white opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+        {label}
+      </div>
+    </button>
+  );
+
+  return createPortal(
+    <div className="fixed inset-0 flex items-center justify-center p-3 sm:p-4" style={{ zIndex: 10000 }}>
+      <style>{editorStyles}</style>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-2xl rounded-2xl overflow-hidden flex flex-col"
-        style={{ background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.1)", maxHeight: "92vh", boxShadow: `0 30px 80px rgba(0,0,0,0.8), 0 0 60px ${cat?.color || "#7c3aed"}12` }}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8 flex-shrink-0">
-          <h3 className="text-white font-bold flex items-center gap-2 text-sm">
-            {isEditMode
-              ? <><Edit3 className="w-4 h-4" style={{ color: cat?.color }} /> Téma szerkesztése</>
-              : <><PenSquare className="w-4 h-4" style={{ color: cat?.color }} /> Új téma indítása</>
-            }
-          </h3>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setPreview(v => !v)}
-              className="cursor-pointer text-xs px-3 py-1.5 rounded-lg transition-all"
-              style={{ background: preview ? `${cat?.color}20` : "rgba(255,255,255,0.06)", color: preview ? cat?.color : "#9ca3af", border: `1px solid ${preview ? cat?.color + "40" : "rgba(255,255,255,0.1)"}` }}>
-              {preview ? "Szerkesztés" : "Előnézet"}
-            </button>
-            <button onClick={onClose} className="cursor-pointer p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all"><X className="w-4 h-4" /></button>
+        style={{ background: "#13111c", border: "1px solid rgba(255,255,255,0.08)", maxHeight: "92vh", boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-white/5 flex-shrink-0 bg-white/[0.01]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${cat?.color}15`, color: cat?.color }}>
+              {isEditMode ? <Edit3 className="w-4 h-4" /> : <PenSquare className="w-5 h-5" />}
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-sm tracking-tight leading-none" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {isEditMode ? "Edit topic" : "Start a new topic"}
+              </h3>
+              <p className="text-[0.6rem] text-gray-500 mt-1.5 uppercase tracking-widest font-bold opacity-40">Create post</p>
+            </div>
           </div>
+          <button onClick={onClose} className="cursor-pointer p-2 rounded-xl text-gray-600 hover:text-white hover:bg-white/5 transition-all"><X className="w-4 h-4" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          <div>
-            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider block mb-2">Kategória *</label>
-            <div className="grid grid-cols-5 gap-2">
-              {CATEGORIES.filter(c => c.id !== "all").map(c => (
+        <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-6 space-y-7">
+          {/* Category */}
+          <div className="space-y-3">
+            <label className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest block opacity-70">Choose category</label>
+            <div className="grid grid-cols-5 gap-2.5">
+              {CATEGORY_OPTIONS.map(c => (
                 <button key={c.id} onClick={() => setSelectedCat(c.id)}
-                  className="cursor-pointer flex flex-col items-center gap-1 py-2.5 rounded-xl transition-all text-xs active:scale-95"
-                  style={{ background: selectedCat === c.id ? `${c.color}20` : "rgba(255,255,255,0.04)", border: `1px solid ${selectedCat === c.id ? c.color + "50" : "rgba(255,255,255,0.08)"}`, color: selectedCat === c.id ? c.color : "#6b7280" }}>
-                  <span className="text-lg">{c.emoji}</span>
-                  <span className="font-medium leading-tight text-center">{c.label}</span>
+                  className="cursor-pointer flex flex-col items-center gap-2 py-3.5 rounded-2xl transition-all active:scale-95"
+                  style={{
+                    background: selectedCat === c.id ? `${c.color}15` : "rgba(255,255,255,0.02)",
+                    border: `1px solid ${selectedCat === c.id ? c.color + "50" : "rgba(255,255,255,0.05)"}`,
+                    color: selectedCat === c.id ? "#ffffff" : "#5a5470",
+                    boxShadow: selectedCat === c.id ? `0 8px 20px ${c.color}20` : "none"
+                  }}>
+                  <CategoryIcon category={c} className="h-5 w-5 drop-shadow-sm" />
+                  <span className="font-bold text-[0.65rem] tracking-tight">{c.label}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          <div>
-            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider block mb-1.5">Cím *</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Fogalmazd meg egyértelműen a témát..."
-              className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none transition-all"
-              style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${title.length >= 10 ? (cat?.color || "#7c3aed") + "50" : "rgba(255,255,255,0.1)"}` }} />
-            <div className="flex justify-between mt-1">
-              <span className="text-xs" style={{ color: title.length > 0 && title.length < 10 ? "#f87171" : "#6b7280" }}>
-                {title.length > 0 && title.length < 10 ? `Még ${10 - title.length} karakter kell` : "Min. 10 karakter"}
+          {/* Title */}
+          <div className="space-y-3">
+            <label className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest block opacity-70">Topic title</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="What would you like to discuss?"
+              className="w-full px-5 py-4 rounded-2xl text-white text-[0.95rem] placeholder-gray-700 bg-white/[0.03] border border-white/[0.06] focus:border-purple-500/30 focus:outline-none transition-all shadow-inner"
+            />
+            <div className="flex justify-between items-center text-[0.6rem] px-1 font-bold tracking-wider">
+              <span style={{ color: title.length > 0 && title.length < 10 ? "#f87171" : "#5a5470" }}>
+                {title.length > 0 && title.length < 10 ? `NEEDED: ${10 - title.length} CHARACTERS` : "MINIMUM 10 CHARACTERS ELEVE"}
               </span>
-              <span className="text-xs" style={{ color: title.length >= 10 ? "#4ade80" : "#6b7280" }}>{title.length}/200</span>
+              <span className="opacity-40">{title.length}/200</span>
             </div>
-            {title.length >= 5 && (
-              <div className="mt-1 flex items-center gap-1.5">
-                <span className="text-gray-700 text-xs">URL:</span>
-                <span className="text-gray-600 text-xs font-mono">
-                  /forum/{selectedCat}/{generateSlug(title) || "..."}
-                </span>
-              </div>
-            )}
           </div>
 
-          <div>
-            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider block mb-1.5">Tartalom</label>
-            {!preview ? (
-              <textarea value={content} onChange={e => setContent(e.target.value)}
-                placeholder="Markdown támogatott: **félkövér**, `kód`, ## fejléc, - lista..."
-                rows={7} className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 resize-none focus:outline-none font-mono"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }} />
-            ) : (
-              <div className="w-full px-3 py-2.5 rounded-xl text-gray-300 text-sm min-h-[160px] leading-relaxed"
-                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                {content || <span className="text-gray-600 italic">Tartalom előnézete itt jelenik meg...</span>}
+          {/* Editor */}
+          <div className="space-y-3">
+            <label className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest block opacity-70">Details</label>
+            <div className="flex flex-col rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden focus-within:border-purple-500/30 transition-all shadow-inner relative">
+              <div className="px-3 py-2 border-b border-white/[0.04] bg-white/[0.01] flex items-center gap-1">
+                <ToolbarBtn icon={Bold} onClick={() => handleFormat("bold")} label="Bold" active={formatState.bold} />
+                <ToolbarBtn icon={Italic} onClick={() => handleFormat("italic")} label="Italic" active={formatState.italic} />
+                <div className="w-px h-4 bg-white/10 mx-1.5" />
+                <ToolbarBtn icon={Heading2} onClick={() => handleFormat("formatBlock", "h2")} label="Heading" active={formatState.h2} />
+                <ToolbarBtn icon={Quote} onClick={() => handleFormat("formatBlock", "blockquote")} label="Quote" active={formatState.blockquote} />
+                <ToolbarBtn icon={List} onClick={() => handleFormat("insertUnorderedList")} label="List" active={formatState.insertUnorderedList} />
+                <div className="w-px h-4 bg-white/10 mx-1.5" />
+                <ToolbarBtn icon={Code} onClick={() => handleFormat("formatBlock", "pre")} label="Code" active={formatState.pre} />
+                <ToolbarBtn icon={Link} onClick={handleLink} label="Link" active={formatState.createLink} />
               </div>
-            )}
+              <div className="relative min-h-[220px] flex flex-col">
+                {isEditorEmpty && (
+                  <div className="absolute top-4 left-5 text-gray-700 pointer-events-none text-[0.95rem] select-none">
+                    Write your post content here...
+                  </div>
+                )}
+                <div
+                  ref={editorRef}
+                  contentEditable={true}
+                  onInput={handleEditorInput}
+                  className="w-full px-5 py-4 text-white text-[0.95rem] bg-transparent focus:outline-none leading-relaxed min-h-[200px] wysiwyg-editor"
+                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                />
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="text-gray-400 text-xs font-semibold uppercase tracking-wider block mb-1.5">Tagek (vesszővel elválasztva)</label>
-            <input value={tags} onChange={e => setTags(e.target.value)} placeholder="pl. claude, prompt-engineering, tipp"
-              className="w-full px-3 py-2.5 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }} />
-            {tags && (
-              <div className="flex gap-1.5 flex-wrap mt-2">
-                {tags.split(",").map(t => t.trim()).filter(Boolean).map(t => (
-                  <span key={t} className="text-xs px-2 py-0.5 rounded-full" style={{ background: `${cat?.color}18`, color: cat?.color, border: `1px solid ${cat?.color}30` }}>#{t}</span>
+          {/* Tags */}
+          <div className="space-y-3">
+            <label className="text-gray-500 text-[0.65rem] font-bold uppercase tracking-widest block opacity-70">Add tags</label>
+            {tags.trim() && (
+              <div className="flex flex-wrap gap-2 px-1">
+                {tags.split(",").map(t => t.trim()).filter(Boolean).map((t, i) => (
+                  <span key={i} className="px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[0.7rem] font-bold tracking-wide">
+                    #{t}
+                  </span>
                 ))}
               </div>
             )}
+            <div className="relative group">
+              <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-700 group-focus-within:text-purple-400 transition-colors" />
+              <input value={tags} onChange={e => setTags(e.target.value)} placeholder="e.g. cursor, tip, news (comma separated)"
+                className="w-full pl-11 pr-5 py-4 rounded-2xl text-white text-sm placeholder-gray-700 bg-white/[0.03] border border-white/[0.06] focus:outline-none focus:border-purple-500/30 transition-all" />
+            </div>
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-            <div className="flex items-center gap-2">
-              <BarChart2 className="w-4 h-4 text-purple-400" />
-              <span className="text-white text-sm font-medium">Szavazás hozzáadása</span>
+          {/* Poll */}
+          <div className="p-5 rounded-2xl border border-white/[0.06] bg-white/[0.02] flex items-center justify-between group hover:border-emerald-500/20 transition-all">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-all">
+                <BarChart2 className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <span className="text-white font-bold block leading-none text-sm">Start a poll</span>
+                <span className="text-[0.65rem] text-gray-500 mt-1.5 font-medium block">An interactive question for other users</span>
+              </div>
             </div>
             <button onClick={() => setAddPoll(v => !v)}
-              className="cursor-pointer relative rounded-full transition-all duration-200"
-              style={{ background: addPoll ? `linear-gradient(135deg, ${cat?.color}, ${cat?.color}99)` : "rgba(255,255,255,0.1)", minWidth: "2.5rem", height: "1.375rem", width: "2.5rem" }}>
-              <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
-                style={{ left: addPoll ? "calc(100% - 1.125rem)" : "0.125rem" }} />
+              className="cursor-pointer relative w-11 h-6 rounded-full transition-all duration-300 shadow-inner"
+              style={{ background: addPoll ? "#10b981" : "rgba(255,255,255,0.08)" }}>
+              <span className="absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300 shadow-md"
+                style={{ left: addPoll ? "24px" : "4px" }} />
             </button>
           </div>
 
           {addPoll && (
-            <div className="p-4 rounded-xl space-y-3" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <input value={pollQ} onChange={e => setPollQ(e.target.value)} placeholder="Szavazás kérdése..."
-                className="w-full px-3 py-2 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }} />
-              {pollOpts.map((opt, i) => (
-                <div key={i} className="flex gap-2">
-                  <input value={opt} onChange={e => { const n = [...pollOpts]; n[i] = e.target.value; setPollOpts(n); }}
-                    placeholder={`${i + 1}. lehetőség`}
-                    className="flex-1 px-3 py-2 rounded-xl text-white text-sm placeholder-gray-600 focus:outline-none"
-                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }} />
-                  {i > 1 && (
-                    <button onClick={() => setPollOpts(p => p.filter((_, j) => j !== i))}
-                      className="cursor-pointer p-2 rounded-xl text-red-500 hover:bg-red-500/10 transition-all"><X className="w-3.5 h-3.5" /></button>
-                  )}
-                </div>
-              ))}
+            <div className="p-6 rounded-2xl border border-white/[0.06] bg-white/[0.02] space-y-5 animate-in fade-in slide-in-from-top-4 duration-500">
+              <input value={pollQ} onChange={e => setPollQ(e.target.value)} placeholder="Ask your question..."
+                className="w-full px-5 py-3 rounded-xl text-white text-sm placeholder-gray-700 bg-white/[0.03] border border-white/[0.06] focus:outline-none" />
+              <div className="space-y-3">
+                {pollOpts.map((opt, i) => (
+                  <div key={i} className="flex gap-3">
+                    <input value={opt} onChange={e => { const n = [...pollOpts]; n[i] = e.target.value; setPollOpts(n); }}
+                      placeholder={`${i + 1}. option`}
+                      className="flex-1 px-5 py-3 rounded-xl text-white text-sm placeholder-gray-700 bg-white/[0.03] border border-white/[0.06] focus:outline-none" />
+                    {i > 1 && (
+                      <button onClick={() => setPollOpts(p => p.filter((_, j) => j !== i))}
+                        className="cursor-pointer p-2.5 text-red-400/40 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"><X className="w-4 h-4" /></button>
+                    )}
+                  </div>
+                ))}
+              </div>
               {pollOpts.length < 6 && (
-                <button onClick={addPollOpt} className="cursor-pointer text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1">
-                  <Plus className="w-3 h-3" /> Lehetőség hozzáadása
+                <button onClick={addPollOpt} className="cursor-pointer text-xs font-bold text-gray-500 hover:text-white flex items-center gap-2 transition-all p-1">
+                  <Plus className="w-4 h-4" /> Add option
                 </button>
               )}
             </div>
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-white/8 flex gap-2 flex-shrink-0">
-          <button onClick={onClose} className="cursor-pointer flex-1 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white transition-all"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>Mégse</button>
+        {/* Footer */}
+        <div className="px-6 py-6 border-t border-white/5 flex gap-4 flex-shrink-0 bg-white/[0.01]">
+          <button onClick={onClose} className="cursor-pointer flex-1 py-4 rounded-2xl text-sm font-bold text-gray-500 hover:text-white bg-white/[0.03] border border-white/[0.06] transition-all">Cancel</button>
           <button onClick={handleSubmit} disabled={title.trim().length < 10}
-            className="cursor-pointer flex-1 py-2.5 rounded-xl text-sm text-white font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-30 flex items-center justify-center gap-2"
-            style={{ background: cat ? `linear-gradient(135deg, ${cat.color}, ${cat.color}99)` : "rgba(255,255,255,0.1)", boxShadow: cat && title.length >= 10 ? `0 4px 20px ${cat.color}30` : "none" }}>
-            {isEditMode
-              ? <><CheckCircle className="w-3.5 h-3.5" /> Mentés</>
-              : <><Send className="w-3.5 h-3.5" /> Közzétesz</>
-            }
+            className="cursor-pointer flex-[2] py-4 rounded-2xl text-sm text-white font-bold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-30 disabled:grayscale flex items-center justify-center gap-2.5"
+            style={{
+              background: cat ? `linear-gradient(135deg, ${cat.color}, ${cat.color}CC)` : "rgba(255,255,255,0.08)",
+              boxShadow: cat && title.length >= 10 ? `0 12px 30px ${cat.color}35` : "none"
+            }}>
+            {isEditMode ? <CheckCircle className="w-4 h-4" /> : <Send className="w-5 h-5" />}
+            {isEditMode ? "Save changes" : "Publish topic"}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
-// ─── Törlés megerősítő dialog ─────────────────────────────────────
+// ─── Delete megerősítő dialog ─────────────────────────────────────
 const ConfirmDialog = ({ isOpen, onConfirm, onCancel, message }) => {
   if (!isOpen) return null;
-  return (
+  return createPortal(
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10001 }}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+      <div className="absolute inset-0 bg-black/70" onClick={onCancel} />
       <div className="relative rounded-2xl p-6 max-w-sm w-full"
-        style={{ background: "rgba(10,10,28,0.99)", border: "1px solid rgba(239,68,68,0.3)", boxShadow: "0 20px 60px rgba(0,0,0,0.8)" }}>
+        style={{ background: "#13111c", border: "1px solid rgba(239,68,68,0.15)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
         <div className="flex items-center gap-3 mb-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }}>
+            style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.15)" }}>
             <Trash2 className="w-4 h-4 text-red-400" />
           </div>
-          <h3 className="text-white font-semibold text-sm">Biztosan törlöd?</h3>
+          <h3 className="text-white/90 font-semibold text-sm">Are you sure?</h3>
         </div>
-        <p className="text-gray-400 text-xs mb-5 leading-relaxed">{message || "Ez a művelet nem vonható vissza."}</p>
+        <p className="text-gray-500 text-xs mb-5 leading-relaxed">{message || "This action cannot be undone."}</p>
         <div className="flex gap-2">
           <button onClick={onCancel}
-            className="cursor-pointer flex-1 py-2 rounded-xl text-xs text-gray-400 hover:text-white transition-all"
-            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-            Mégse
+            className="cursor-pointer flex-1 py-2 rounded-xl text-xs text-gray-500 hover:text-gray-300 transition-all"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            Cancel
           </button>
           <button onClick={onConfirm}
             className="cursor-pointer flex-1 py-2 rounded-xl text-xs text-white font-semibold transition-all hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}>
-            Törlés
+            style={{ background: "linear-gradient(135deg, #7c3aed, #dc2626)" }}>
+            Delete
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
-// ─── Kategória sidebar card ───────────────────────────────────────
-const CatSidebarCard = ({ cat, isActive, onClick }) => (
-  <button onClick={() => onClick(cat.id)} className="cursor-pointer w-full text-left transition-all duration-150 active:scale-[0.98]"
-    style={{ background: isActive ? `${cat.color}12` : "rgba(255,255,255,0.02)", border: `1.5px solid ${isActive ? cat.color + "45" : "rgba(255,255,255,0.06)"}`, borderRadius: "0.875rem", padding: "0.75rem 0.875rem" }}
-    onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = `${cat.color}08`; e.currentTarget.style.border = `1.5px solid ${cat.color}25`; } }}
-    onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; e.currentTarget.style.border = "1.5px solid rgba(255,255,255,0.06)"; } }}>
-    <div className="flex items-center gap-2.5">
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-base"
-        style={{ background: `${cat.color}20`, color: cat.color }}>{cat.emoji}</div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-1">
-          <span className="text-white font-semibold text-xs">{cat.label}</span>
-          <span className="text-gray-600 text-xs">{cat.threads}</span>
+// ─── Category sidebar card ───────────────────────────────────────
+const CatSidebarCard = ({ cat, isActive, onClick, threadCount }) => {
+  const Icon = cat.icon || Hash;
+
+  return (
+    <motion.button
+      whileHover={{ x: 3 }}
+      transition={{ type: "spring", stiffness: 420, damping: 28 }}
+      onClick={() => onClick(cat.id)}
+      className="cursor-pointer group relative w-full overflow-hidden text-left transition-all duration-200 active:scale-[0.98]"
+      style={{
+        background: isActive ? `${cat.color}16` : "rgba(255,255,255,0.028)",
+        border: `1px solid ${isActive ? cat.color + "55" : "rgba(255,255,255,0.075)"}`,
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+        borderRadius: "0.95rem",
+        padding: "0.78rem 0.85rem",
+        boxShadow: isActive ? `0 12px 28px ${cat.color}14, inset 0 1px 0 ${cat.color}22` : "none",
+      }}
+    >
+      <div
+        className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full opacity-0 transition-opacity duration-200 group-hover:opacity-60"
+        style={{ background: cat.color, opacity: isActive ? 1 : undefined }}
+      />
+      <div className="relative flex items-center gap-3">
+        <div
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border text-sm"
+          style={{ background: `${cat.color}13`, borderColor: `${cat.color}24`, color: cat.color }}
+        >
+          <Icon className="h-4 w-4" />
         </div>
-        <div className="flex items-center gap-1 mt-0.5">
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0" style={{ background: "#4ade80" }} />
-          <span className="text-gray-600 text-xs">{cat.online} online</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-[0.82rem] font-semibold text-white/85">{cat.label}</span>
+            <span
+              className="rounded-full px-2 py-0.5 text-[0.65rem] font-semibold"
+              style={{ background: isActive ? `${cat.color}18` : "rgba(255,255,255,0.035)", color: isActive ? cat.color : "#6f6880" }}
+            >
+              {threadCount}
+            </span>
+          </div>
+          {cat.description && (
+            <p className="mt-0.5 truncate text-[0.66rem] font-medium text-gray-600 group-hover:text-gray-500">
+              {cat.description}
+            </p>
+          )}
         </div>
       </div>
-    </div>
-  </button>
-);
+    </motion.button>
+  );
+};
 
 // ─── FŐ KOMPONENS ─────────────────────────────────────────────────
 export default function Forum() {
-  const { user: globalUser, logoutUser, setIsAuthOpen, setShowNavbar } = useContext(MyUserContext);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user: globalUser, setIsAuthOpen } = useContext(MyUserContext);
   const [posts, setPosts] = useState(MOCK_POSTS);
   const [activeCategory, setActiveCategory] = useState("all");
   const [sortBy, setSortBy] = useState("hot");
@@ -903,44 +1520,194 @@ export default function Forum() {
   const [newPostOpen, setNewPostOpen] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
   const [openPost, setOpenPost] = useState(null);
+  const [isInitializingRoute, setIsInitializingRoute] = useState(() => !!getPostInfoFromURL());
   const [bookmarks, setBookmarks] = useState(new Set());
   const [viewedIds, setViewedIds] = useState(new Set());
-  const [activeTagFilter, setActiveTagFilter] = useState(null);
+  const [activeTagFilters, setActiveTagFilters] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showOnlyBookmarks, setShowOnlyBookmarks] = useState(false);
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
-  const [filterLocked, setFilterLocked] = useState(false);
+  const [filterOwn, setFilterOwn] = useState(false);
+  const [filterFollowed, setFilterFollowed] = useState(false);
+  const [followingIds, setFollowingIds] = useState(new Set());
   const [filterSolved, setFilterSolved] = useState(false);
+  const [filterPinned, setFilterPinned] = useState(false);
+  const [filterHot, setFilterHot] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportBusy, setReportBusy] = useState(false);
+  const [authorProfiles, setAuthorProfiles] = useState({});
+  const [visiblePostCount, setVisiblePostCount] = useState(POSTS_BATCH_SIZE);
+
+  // ─── Optimized Popular Tags (Firestore Aggregation) ──────────────
+  const [popularTags, setPopularTags] = useState([]);
+
+  useEffect(() => {
+    // Top 15 tag lekérése a statisztikai táblából
+    const q = query(
+      collection(db, "forum_tag_stats"),
+      orderBy("count", "desc"),
+      limit(15)
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const tags = snap.docs.map(d => ({
+        label: d.id,
+        count: d.data().count || 0,
+        color: getTagColor(d.id)
+      }));
+      setPopularTags(tags);
+    }, (err) => {
+      console.error("Failed to load tag stats:", err);
+      // Fallback a meglévő posztokból való számításra ha üres a tábla (csak bootstrap idejére)
+      if (posts.length > 0 && popularTags.length === 0) {
+        // ... (elhagyható, ha már van adat a DB-ben)
+      }
+    });
+
+    return unsub;
+  }, []);
+
   const [isAdmin, setIsAdmin] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const notifRef = useRef(null);
   const userMenuRef = useRef(null);
   const initialSlugRef = useRef(false);
+  const loadMoreSentinelRef = useRef(null);
+  const loadMoreThrottleRef = useRef(0);
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const accentColor = CATEGORIES.find(c => c.id === activeCategory)?.color || "#a78bfa";
+  const isCommunityAuthenticated = !!(currentUserId || globalUser?.uid);
+  const currentAuthorProfile = useMemo(() => {
+    const uid = currentUserId || globalUser?.uid;
+    if (!uid && !currentUser && !globalUser) return null;
 
-  // ── Auth figyelés ────────────────────────────────────────────────
+    return {
+      uid,
+      displayName: globalUser?.displayName || currentUser?.displayName || "",
+      name: globalUser?.name || globalUser?.displayName || currentUser?.displayName || "",
+      email: globalUser?.email || currentUser?.email || "",
+      profilePicture: globalUser?.profilePicture || currentUser?.photoURL || null,
+      photoURL: globalUser?.photoURL || currentUser?.photoURL || null,
+    };
+  }, [
+    currentUserId,
+    currentUser?.displayName,
+    currentUser?.email,
+    currentUser?.photoURL,
+    globalUser?.uid,
+    globalUser?.displayName,
+    globalUser?.name,
+    globalUser?.email,
+    globalUser?.profilePicture,
+    globalUser?.photoURL,
+  ]);
+
+  const getAuthorProfile = useCallback((authorId) => {
+    if (!authorId) return null;
+    if ((currentUserId && authorId === currentUserId) || (globalUser?.uid && authorId === globalUser.uid)) {
+      return currentAuthorProfile;
+    }
+    return authorProfiles[authorId] || null;
+  }, [authorProfiles, currentAuthorProfile, currentUserId, globalUser?.uid]);
+
+  const hydrateForumPost = useCallback((post) => {
+    return applyProfileToForumPost(post, getAuthorProfile(post?.authorId));
+  }, [getAuthorProfile]);
+
+  const profileAwarePosts = useMemo(
+    () => posts.map(post => hydrateForumPost(post)),
+    [posts, hydrateForumPost]
+  );
+
+  const profileAwareOpenPost = useMemo(() => {
+    if (!openPost) return null;
+    return profileAwarePosts.find(p => String(p.id) === String(openPost.id)) || hydrateForumPost(openPost);
+  }, [hydrateForumPost, openPost, profileAwarePosts]);
+
+  useEffect(() => {
+    if (activeCategory !== "all" && !VALID_CATEGORY_IDS.has(activeCategory)) {
+      setActiveCategory("all");
+    }
+  }, [activeCategory]);
+
+  const requireCommunityAuth = useCallback(() => {
+    if (isCommunityAuthenticated) return true;
+    setIsAuthOpen(true);
+    return false;
+  }, [isCommunityAuthenticated, setIsAuthOpen]);
+  const activeQuickFiltersCount = [
+    showOnlyBookmarks,
+    filterOwn,
+    filterFollowed,
+    filterSolved,
+    filterPinned,
+    filterHot,
+    activeTagFilters.length > 0,
+    activeCategory !== "all",
+    !!search,
+    sortBy !== "hot",
+  ].filter(Boolean).length;
+  const handlePostClick = (post) => {
+    // Increment views via status toggle
+    toggleStatus(post.id, "views", (post.views || 0) + 1);
+    navigate(`/forum/${normalizeCommunityCategory(post.category)}/${post.slug || post.id}`);
+  };
+
+  const handleEdit = (post) => {
+    if (!requireCommunityAuth()) return;
+    setEditingPost(post);
+  };
+
+  const handleReportPost = (post) => {
+    if (!requireCommunityAuth()) return;
+    setReportTarget(post);
+  };
+
+  const handleSubmitReport = async ({ reason, details }) => {
+    if (!reportTarget || reportBusy) return;
+    setReportBusy(true);
+    try {
+      const category = normalizeCommunityCategory(reportTarget.category);
+      await submitContentReport({
+        sourceType: "forum_post",
+        targetId: String(reportTarget.id),
+        targetPath: `/forum/${category}/${reportTarget.slug || reportTarget.id}`,
+        targetTitle: reportTarget.title,
+        targetOwnerId: reportTarget.authorId || "",
+        reason,
+        details,
+        metadata: {
+          category,
+          author: reportTarget.author || reportTarget.authorName || "",
+          preview: buildPreviewText(reportTarget.content || reportTarget.preview || "", 600),
+        },
+      });
+      toast.success("Report sent");
+      setReportTarget(null);
+    } catch (err) {
+      toast.error(err.message || "Failed to send report");
+    } finally {
+      setReportBusy(false);
+    }
+  };
+
+  // ── Auth state figyelés ──────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      dbg("Auth state changed:", user ? `uid=${user.uid}` : "null");
       setCurrentUser(user || null);
       setCurrentUserId(user?.uid || null);
-      if (user) {
-        const adminStatus = ADMIN_UIDS.includes(user.uid);
-        setIsAdmin(adminStatus);
-      } else {
-        setIsAdmin(false);
-      }
+      setIsAdmin(!!user && ADMIN_UIDS.includes(user.uid));
+      dbg("Auth state:", { uid: user?.uid, isAdmin: ADMIN_UIDS.includes(user?.uid) });
     });
     return unsub;
   }, []);
 
-  // ── Értesítések Firebase figyelés ───────────────────────────────
+  // ── Notifications Firebase figyelés ───────────────────────────────
   useEffect(() => {
     if (!currentUserId) { setNotifications([]); return; }
     const q = query(
@@ -959,19 +1726,103 @@ export default function Forum() {
     return unsub;
   }, [currentUserId]);
 
+  useEffect(() => {
+    const signedInUser = auth.currentUser;
+    if (!signedInUser) return undefined;
+
+    const currentUid = currentUserId || globalUser?.uid;
+    const missingAuthorIds = Array.from(
+      new Set(posts.map(p => p.authorId).filter(Boolean))
+    ).filter(uid => uid !== currentUid && !(uid in authorProfiles));
+
+    if (missingAuthorIds.length === 0) return undefined;
+
+    let cancelled = false;
+
+    const loadAuthorProfiles = async () => {
+      try {
+        const token = await signedInUser.getIdToken();
+        const profiles = await Promise.all(
+          missingAuthorIds.map(async (uid) => [
+            uid,
+            await fetchPublicProfile(API_BASE, uid, token).catch(() => null),
+          ])
+        );
+
+        if (cancelled) return;
+
+        setAuthorProfiles(prev => {
+          const next = { ...prev };
+          profiles.forEach(([uid, profile]) => {
+            next[uid] = profile;
+          });
+          return next;
+        });
+      } catch (e) {
+        console.error("Failed to load forum author profiles:", e);
+      }
+    };
+
+    loadAuthorProfiles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authorProfiles, currentUserId, globalUser?.uid, posts]);
+
   useEffect(() => { dbg("confirmDelete state:", confirmDelete); }, [confirmDelete]);
   useEffect(() => { dbg("editingPost state:", editingPost ? `id=${editingPost.id}` : "null"); }, [editingPost]);
+
+  useEffect(() => {
+    if (!currentUserId) {
+      setBookmarks(new Set());
+      setFollowingIds(new Set());
+      setShowOnlyBookmarks(false);
+      setFilterOwn(false);
+      setFilterFollowed(false);
+      setShowNotifs(false);
+      setNewPostOpen(false);
+      setEditingPost(null);
+      setConfirmDelete(null);
+      return;
+    }
+
+    // Load Bookmarks
+    const loadBookmarks = async () => {
+      try {
+        const snap = await getDoc(doc(db, "forum_bookmarks", currentUserId));
+        if (snap.exists() && snap.data().postIds) {
+          setBookmarks(new Set(snap.data().postIds));
+        } else {
+          setBookmarks(new Set());
+        }
+      } catch (e) {
+        console.error("Failed to load bookmarks:", e);
+      }
+    };
+    loadBookmarks();
+
+    // Load Following
+    const qF = query(collection(db, "forum_follows"), where("followerId", "==", currentUserId));
+    const unsubF = onSnapshot(qF, (snap) => {
+      const ids = snap.docs.map(d => d.data().followedId);
+      setFollowingIds(new Set(ids));
+      dbg(`Following sync: ${ids.length} users`);
+    }, (err) => console.error("Following listener error:", err));
+
+    return () => unsubF();
+  }, [currentUserId]);
 
   // ── Poszt keresése ───────────────────────────────────────────────
   const findPost = useCallback((category, slug, postList) => {
     return (
-      postList.find(p => p.slug === slug && p.category === category) ||
-      postList.find(p => p.slug === slug) ||
+      postList.find(p => isVisibleCommunityPost(p) && p.slug === slug && p.category === normalizeCommunityCategory(category)) ||
+      postList.find(p => isVisibleCommunityPost(p) && p.slug === slug) ||
       null
     );
   }, []);
 
-  // ── Firebase betöltés ────────────────────────────────────────────
+  // ── Firebase betöltés (Egyszeri betöltés) ────────────────────────
   useEffect(() => {
     const loadFirebasePosts = async () => {
       try {
@@ -981,54 +1832,72 @@ export default function Forum() {
           const data = d.data();
           return {
             ...data,
+            category: normalizeCommunityCategory(data.category),
             id: d.id,
             time: formatFirebaseTime(data.createdAt),
+            createdAtMs: timestampToMs(data.createdAt) ?? timestampToMs(data.createdAtMs),
             slug: data.slug || generateSlug(data.title || ""),
+            preview: buildPreviewText(data.preview || data.content, 160),
+            author: data.author || "Anonymous",
+            comments: asCount(data.comments),
+            likes: asCount(data.likes),
+            views: asCount(data.views),
           };
         });
-        dbg(`Firebase: ${fbPosts.length} poszt betöltve`);
-        if (fbPosts.length > 0) {
-          setPosts([...fbPosts, ...MOCK_POSTS]);
+        dbg(`Firebase: ${fbPosts.length} posts loaded`);
+
+        // Összefésülés a mock adatokkal
+        const allPosts = [...fbPosts, ...MOCK_POSTS.map(normalizeCommunityPost)];
+        setPosts(allPosts);
+
+        // REFRESH FIX: Azonnal ellenőrizzük az URL-t a betöltött adatokkal
+        if (!initialSlugRef.current) {
+          const info = getPostInfoFromURL();
+          if (info) {
+            const found = findPost(info.category, info.slug, allPosts);
+            if (found) {
+              setOpenPost(found);
+              setViewedIds(prev => new Set([...prev, found.id]));
+            }
+          }
+          initialSlugRef.current = true;
+          setIsInitializingRoute(false);
         }
       } catch (e) {
-        console.error("Firebase betöltési hiba:", e);
+        console.error("Firebase load error:", e);
+        if (!initialSlugRef.current) {
+          initialSlugRef.current = true;
+          setIsInitializingRoute(false);
+        }
       }
     };
     loadFirebasePosts();
-  }, []);
-
-  // ── URL routing ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (initialSlugRef.current) return;
-    const info = getPostInfoFromURL();
-    if (!info) { initialSlugRef.current = true; return; }
-    const found = findPost(info.category, info.slug, posts);
-    if (found) {
-      setOpenPost(found);
-      setViewedIds(prev => new Set([...prev, found.id]));
-      initialSlugRef.current = true;
-    }
-  }, [posts, findPost]);
-
-  useEffect(() => {
-    const handlePopState = () => {
-      const info = getPostInfoFromURL();
-      if (info) {
-        setPosts(currentPosts => {
-          const found = findPost(info.category, info.slug, currentPosts);
-          if (found) {
-            setOpenPost(found);
-            setViewedIds(prev => new Set([...prev, found.id]));
-          }
-          return currentPosts;
-        });
-      } else {
-        setOpenPost(null);
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
   }, [findPost]);
+
+  // ── React Router location → openPost szinkronizáció ────────────
+  // Ez az egyetlen megbízható módszer: a React Router location.pathname
+  // változását figyeljük, és ennek alapján állítjuk be az openPost state-et.
+  // A handleOpenPost és handleBack is navigate()-et használ, így ez mindig
+  // lefut mind a Navbar Community linkre kattintásnál, mind a Vissza gomb,
+  // mind pedig a böngésző vissza/előre gombjainál.
+  useEffect(() => {
+    const isPostRoute = /^\/forum\/([^/]+)\/(.+)/.exec(location.pathname);
+    if (!isPostRoute) {
+      // Nem poszt URL → zárjuk be a posztot
+      if (openPost) setOpenPost(null);
+    } else {
+      // Poszt URL → nyissuk meg a megfelelő posztot (ha még nincs nyitva)
+      const category = isPostRoute[1];
+      const slug = isPostRoute[2];
+      if (!openPost || openPost.slug !== slug) {
+        const found = findPost(category, slug, profileAwarePosts);
+        if (found) {
+          setOpenPost(found);
+          setViewedIds(prev => new Set([...prev, found.id]));
+        }
+      }
+    }
+  }, [location.pathname, profileAwarePosts, findPost, openPost]);
 
   useEffect(() => {
     const handler = e => {
@@ -1039,44 +1908,144 @@ export default function Forum() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const toggleBookmark = id => setBookmarks(p => {
-    const n = new Set(p);
-    n.has(id) ? n.delete(id) : n.add(id);
-    return n;
-  });
+  const toggleFollow = async (followedId) => {
+    if (!requireCommunityAuth()) return;
+    if (!currentUserId || !followedId || followedId === currentUserId) return;
+
+    try {
+      const q = query(
+        collection(db, "forum_follows"),
+        where("followerId", "==", currentUserId),
+        where("followedId", "==", followedId)
+      );
+      const snap = await getDocs(q);
+
+      if (!snap.empty) {
+        // Unfollow
+        const batch = writeBatch(db);
+        snap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        dbg("Unfollowed user:", followedId);
+      } else {
+        // Follow
+        await addDoc(collection(db, "forum_follows"), {
+          followerId: currentUserId,
+          followedId,
+          createdAt: serverTimestamp()
+        });
+        dbg("Followed user:", followedId);
+      }
+    } catch (e) {
+      console.error("Toggle follow error:", e);
+    }
+  };
+
+  const toggleBookmark = async (id) => {
+    if (!requireCommunityAuth()) return;
+    const isBookmarked = bookmarks.has(id);
+    setBookmarks(p => {
+      const n = new Set(p);
+      isBookmarked ? n.delete(id) : n.add(id);
+      return n;
+    });
+
+    if (currentUserId) {
+      try {
+        const ref = doc(db, "forum_bookmarks", currentUserId);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          await setDoc(ref, { postIds: [id] });
+        } else {
+          await updateDoc(ref, {
+            postIds: isBookmarked ? arrayRemove(id) : arrayUnion(id)
+          });
+        }
+      } catch (e) {
+        console.error("Failed to save bookmark:", e);
+      }
+    }
+  };
 
   const handleOpenPost = (post) => {
     setViewedIds(p => new Set([...p, post.id]));
-    setOpenPost(post);
-    pushPostURL(post.category, post.slug);
+    // navigate() használata pushState helyett, hogy a React Router
+    // location.pathname is frissüljön → a location useEffect zárja/nyitja a posztot
+    navigate(`/forum/${normalizeCommunityCategory(post.category)}/${post.slug || post.id}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleBack = () => {
-    setOpenPost(null);
-    pushForumURL();
+    navigate("/forum");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // ── Értesítés kezelők ────────────────────────────────────────
-  const markNotifRead = async (notifId) => {
+  const handleNotifClick = async (notif) => {
+    if (!requireCommunityAuth()) return;
     try {
-      await updateDoc(doc(db, "forum_notifications", notifId), { read: true });
-    } catch (e) { console.error("Notif read error:", e); }
+      if (!notif.read) {
+        await updateDoc(doc(db, "forum_notifications", notif.id), { read: true });
+      }
+
+      // Navigáció a bejegyzéshez
+      if (notif.postId) {
+        // 1. Megpróbáljuk megkeresni a helyi állapotban
+        let postToOpen = posts.find(p => p.id === notif.postId);
+
+        // 2. Ha nincs meg (pl. most jött létre és nem frissült még a tábla), lekérjük a DB-ből
+        if (!postToOpen) {
+          dbg("[Forum] Notification post missing from state, fetching from DB:", notif.postId);
+          const pSnap = await getDoc(doc(db, "forum_posts", notif.postId));
+          if (pSnap.exists()) {
+            const data = pSnap.data();
+            postToOpen = {
+              ...data,
+              id: pSnap.id,
+              time: formatFirebaseTime(data.createdAt),
+              slug: data.slug || generateSlug(data.title || ""),
+            };
+            // Hozzáadjuk a listához, hogy később is meg legyen
+            setPosts(prev => [postToOpen, ...prev]);
+          }
+        }
+
+        if (postToOpen) {
+          handleOpenPost(postToOpen);
+        } else {
+          console.warn("[Forum] Notification linked post not found even in DB:", notif.postId);
+          // Fallback: Ha van kategória és slug, próbáljunk oda navigálni hátha a route betölti
+          if (notif.category && notif.slug) {
+            pushPostURL(notif.category, notif.slug);
+          }
+        }
+      }
+      setShowNotifs(false);
+    } catch (e) { console.error("Notif click error:", e); }
   };
 
-  const markAllNotifsRead = async () => {
+  const deleteNotification = async (notifId) => {
+    if (!requireCommunityAuth()) return;
+    try {
+      await deleteDoc(doc(db, "forum_notifications", notifId));
+      dbg("Notification deleted:", notifId);
+    } catch (e) { console.error("Notif delete error:", e); }
+  };
+
+  const deleteAllNotifications = async () => {
+    if (!requireCommunityAuth()) return;
+    if (notifications.length === 0) return;
     try {
       const batch = writeBatch(db);
-      notifications.filter(n => !n.read).forEach(n => {
-        batch.update(doc(db, "forum_notifications", n.id), { read: true });
+      notifications.forEach(n => {
+        batch.delete(doc(db, "forum_notifications", n.id));
       });
       await batch.commit();
-    } catch (e) { console.error("Notif batch read error:", e); }
+      dbg("All notifications deleted for user:", currentUserId);
+    } catch (e) { console.error("Notif batch delete error:", e); }
   };
 
   // Értesítés létrehozás segédfüggvény
-  const createNotification = async (recipientId, type, text) => {
+  const createNotification = async (recipientId, type, text, extraData = {}) => {
     if (!recipientId || recipientId === currentUserId) return; // ne értesítsd magad
     try {
       await addDoc(collection(db, "forum_notifications"), {
@@ -1085,23 +2054,50 @@ export default function Forum() {
         text,
         read: false,
         createdAt: serverTimestamp(),
+        ...extraData
       });
-      dbg("Notification created:", { recipientId, type, text });
+      dbg("Notification created:", { recipientId, type, text, ...extraData });
     } catch (e) { console.error("Create notif error:", e); }
   };
 
-  // ── Új / szerkesztett poszt mentése ─────────────────────────────
+  // ── New / szerkesztett poszt mentése ─────────────────────────────
+  // ── New poszt értesítés követőknek ─────────────────────────────
+  const notifyFollowersNewPost = async (authorId, authorName, postTitle, postId, category, slug) => {
+    if (!authorId) return;
+    try {
+      const q = query(collection(db, "forum_follows"), where("followedId", "==", authorId));
+      const snap = await getDocs(q);
+
+      const notifPromises = snap.docs.map(d => {
+        const followerId = d.data().followerId;
+        return createNotification(
+          followerId,
+          "system",
+          `${authorName} started a new topic: "${postTitle}"`,
+          { postId, category, slug }
+        );
+      });
+
+      await Promise.all(notifPromises);
+      dbg(`Follower notifications sent: ${snap.docs.length}`);
+    } catch (e) {
+      console.error("Notify followers error:", e);
+    }
+  };
+
   const handleNewPost = async (data, editId = null) => {
+    if (!requireCommunityAuth()) return;
+    const normalizedCategory = normalizeCommunityCategory(data.category);
     dbg("handleNewPost:", { editId, title: data.title });
 
     if (editId !== null) {
       const updates = {
         title: data.title,
         content: data.content,
-        category: data.category,
+        category: normalizedCategory,
         tags: data.tags,
         poll: data.poll,
-        preview: data.content?.slice(0, 120) || "",
+        preview: buildPreviewText(data.content, 120),
         slug: generateSlug(data.title),
       };
 
@@ -1111,9 +2107,9 @@ export default function Forum() {
       if (isFbPost) {
         try {
           await updateDoc(doc(db, "forum_posts", postIdStr), updates);
-          dbg("Firebase frissítés OK:", postIdStr);
+          dbg("Firebase update OK:", postIdStr);
         } catch (e) {
-          console.error("Firebase frissítési hiba:", e);
+          console.error("Firebase update error:", e);
         }
       }
 
@@ -1127,25 +2123,26 @@ export default function Forum() {
       return;
     }
 
-    // Új poszt
+    // New poszt
     const slug = generateSlug(data.title);
     let finalSlug = slug;
     let counter = 1;
-    while (posts.some(p => p.slug === finalSlug && p.category === data.category)) {
+    while (posts.some(p => p.slug === finalSlug && normalizeCommunityCategory(p.category) === normalizedCategory)) {
       finalSlug = `${slug}-${counter++}`;
     }
 
     const postData = {
       slug: finalSlug,
       ...data,
+      category: normalizedCategory,
       pinned: false, hot: false, locked: false, solved: false,
-      author: globalUser?.displayName || currentUser?.displayName || currentUser?.email?.split("@")[0] || "Névtelen",
-      avatar: (globalUser?.displayName?.[0] || currentUser?.displayName?.[0] || currentUser?.email?.[0] || "?").toUpperCase(),
-      avatarUrl: globalUser?.profilePicture || null,
+      author: getProfileDisplayName(currentAuthorProfile, "Anonymous"),
+      avatar: getProfileInitial(currentAuthorProfile, "Anonymous"),
+      avatarUrl: getProfileAvatarUrl(currentAuthorProfile),
       avatarColor: accentColor,
       authorId: currentUser?.uid || null,
-      time: "Most", views: 1, likes: 0, comments: 0, readTime: 1,
-      preview: data.content?.slice(0, 120) || "",
+      time: "Now", createdAtMs: Date.now(), views: 1, likes: 0, comments: 0, readTime: 1,
+      preview: buildPreviewText(data.content, 120),
     };
 
     let finalId = `local_${Date.now()}`;
@@ -1155,36 +2152,80 @@ export default function Forum() {
         createdAt: serverTimestamp(),
       });
       finalId = docRef.id;
-      dbg("Firebase mentés OK:", docRef.id);
+      dbg("Firebase save OK:", docRef.id);
+
+      // ─── TAG STATS UPDATE ───────────────────────────────────────
+      if (postData.tags && postData.tags.length > 0) {
+        const batch = writeBatch(db);
+        postData.tags.forEach(tag => {
+          const cleanTag = tag.trim().toLowerCase();
+          if (cleanTag) {
+            const tagRef = doc(db, "forum_tag_stats", cleanTag);
+            batch.set(tagRef, { count: increment(1) }, { merge: true });
+          }
+        });
+        await batch.commit();
+        dbg("Tag stats updated (increment)");
+      }
     } catch (e) {
-      console.error("Firebase mentési hiba:", e);
+      console.error("Firebase save error:", e);
     }
 
     setPosts(p => [{ ...postData, id: finalId }, ...p]);
+
+    // Értesítjük a követőket az új posztról
+    notifyFollowersNewPost(currentUserId, postData.author, postData.title, finalId, postData.category, postData.slug);
   };
 
   // ── Poszt törlése ────────────────────────────────────────────────
   const handleDeletePost = async (postId, authorId) => {
+    if (!requireCommunityAuth()) return;
     dbg("handleDeletePost:", { postId, authorId, currentUserId, isAdmin });
 
-    if (authorId && !currentUserId) { dbg("MEGTAGADVA: nincs bejelentkezés"); return; }
-    if (authorId && currentUserId !== authorId && !isAdmin) { dbg("MEGTAGADVA: nem saját poszt"); return; }
+    if (authorId && !currentUserId) { dbg("DENIED: not signed in"); return; }
+    if (authorId && currentUserId !== authorId && !isAdmin) { dbg("DENIED: not owner"); return; }
 
     const postIdStr = String(postId);
     const isFbPost = !postIdStr.startsWith("local_") && isNaN(Number(postIdStr));
+    let deleteSucceeded = !isFbPost;
 
     if (isFbPost) {
+      deleteSucceeded = true;
       try {
+        // Poszt adatok lekérése a tagek miatt a törlés előtt
+        const postSnap = await getDoc(doc(db, "forum_posts", postIdStr));
+        const postTags = postSnap.exists() ? (postSnap.data().tags || []) : [];
+
         await deleteDoc(doc(db, "forum_posts", postIdStr));
-        dbg("Firebase törlés OK:", postIdStr);
+        dbg("Firebase delete OK:", postIdStr);
+
+        // ─── TAG STATS UPDATE ─────────────────────────────────────
+        if (postTags.length > 0) {
+          const batch = writeBatch(db);
+          postTags.forEach(tag => {
+            const cleanTag = tag.trim().toLowerCase();
+            if (cleanTag) {
+              const tagRef = doc(db, "forum_tag_stats", cleanTag);
+              batch.set(tagRef, { count: increment(-1) }, { merge: true });
+            }
+          });
+          await batch.commit();
+          dbg("Tag stats updated (decrement)");
+        }
       } catch (e) {
-        console.error("Firebase törlési hiba:", e);
+        console.error("Firebase delete error:", e);
+        deleteSucceeded = false;
       }
+    }
+
+    if (!deleteSucceeded) {
+      setConfirmDelete(null);
+      return;
     }
 
     setPosts(p => {
       const filtered = p.filter(post => String(post.id) !== postIdStr);
-      dbg(`Törlés után: ${p.length} → ${filtered.length} poszt`);
+      dbg(`After delete: ${p.length} → ${filtered.length} posts`);
       return filtered;
     });
     setConfirmDelete(null);
@@ -1196,19 +2237,11 @@ export default function Forum() {
 
   // ── Toggle mező ──────────────────────────────────────────────────
   const handleToggleField = async (postId, field, value) => {
+    if (field !== "views" && !requireCommunityAuth()) return;
     dbg("handleToggleField:", { postId, field, value });
     const postIdStr = String(postId);
-    const isFbPost = !postIdStr.startsWith("local_") && isNaN(Number(postIdStr));
 
-    if (isFbPost) {
-      try {
-        await updateDoc(doc(db, "forum_posts", postIdStr), { [field]: value });
-        dbg(`Firebase toggle OK: ${field}=${value}`);
-      } catch (e) {
-        console.error(`Firebase ${field} toggle hiba:`, e);
-      }
-    }
-
+    // 1. Optimista UI: azonnal frissítjük a lokális state-eket
     setPosts(p => p.map(post =>
       String(post.id) === postIdStr ? { ...post, [field]: value } : post
     ));
@@ -1216,27 +2249,185 @@ export default function Forum() {
     if (openPost && String(openPost.id) === postIdStr) {
       setOpenPost(prev => ({ ...prev, [field]: value }));
     }
+
+    // 2. Háttérben elküldjük a Firebase-nek
+    const isFbPost = !postIdStr.startsWith("local_") &&
+      !postIdStr.startsWith("mock_") &&
+      isNaN(Number(postIdStr));
+
+    if (isFbPost) {
+      try {
+        await updateDoc(doc(db, "forum_posts", postIdStr), { [field]: value });
+        dbg(`Firebase save successful: ${field}=${value}`);
+      } catch (e) {
+        console.error(`!!! FIREBASE SAVE ERROR. Check the rules in the Firebase console!`, e);
+      }
+    } else {
+      dbg("Local/mock post changed - the change will be lost after refresh (not a Firebase post).");
+    }
   };
 
-  // ── Szűrés + rendezés ────────────────────────────────────────────
-  const filteredPosts = posts.filter(p => {
-    if (showOnlyBookmarks && !bookmarks.has(p.id)) return false;
-    if (activeCategory !== "all" && p.category !== activeCategory) return false;
-    if (activeTagFilter && !p.tags.includes(activeTagFilter)) return false;
-    if (filterLocked && !p.locked) return false;
-    if (filterSolved && !p.solved) return false;
-    if (search && !p.title.toLowerCase().includes(search.toLowerCase()) && !p.tags.some(t => t.includes(search.toLowerCase()))) return false;
-    return true;
-  }).sort((a, b) => {
-    if (sortBy === "hot") return (b.likes * 3 + b.views / 10 + b.comments * 2) - (a.likes * 3 + a.views / 10 + a.comments * 2);
-    if (sortBy === "new") return String(b.id) > String(a.id) ? 1 : -1;
-    if (sortBy === "top") return b.likes - a.likes;
-    if (sortBy === "views") return b.views - a.views;
-    return 0;
-  });
+  // ── Like kezelése ────────────────────────────────────────────────
+  const handleLikePost = useCallback(async (postId) => {
+    if (!requireCommunityAuth()) return;
+    if (!currentUserId) return;
+    const postIdStr = String(postId);
 
-  const totalOnline = CATEGORIES.slice(1).reduce((s, c) => s + c.online, 0);
-  const totalThreads = CATEGORIES.slice(1).reduce((s, c) => s + c.threads, 0);
+    let isLikedNow = false;
+
+    // 1. Állam frissítése belső updaterrel a konkurrencia miatt
+    const updateState = (prevPosts) => {
+      return prevPosts.map(p => {
+        if (String(p.id) !== postIdStr) return p;
+
+        const isLiked = p.likedIds?.includes(currentUserId);
+        isLikedNow = isLiked; // Ezt használjuk majd a Firebase híváshoz
+
+        const newLikes = isLiked ? Math.max(0, (p.likes || 0) - 1) : (p.likes || 0) + 1;
+        const newLikedIds = isLiked
+          ? (p.likedIds || []).filter(id => id !== currentUserId)
+          : [...(p.likedIds || []), currentUserId];
+
+        return { ...p, likes: newLikes, likedIds: newLikedIds };
+      });
+    };
+
+    setPosts(prev => updateState(prev));
+    setOpenPost(prev => {
+      if (!prev || String(prev.id) !== postIdStr) return prev;
+      const isLiked = prev.likedIds?.includes(currentUserId);
+      const newLikes = isLiked ? Math.max(0, (prev.likes || 0) - 1) : (prev.likes || 0) + 1;
+      const newLikedIds = isLiked
+        ? (prev.likedIds || []).filter(id => id !== currentUserId)
+        : [...(prev.likedIds || []), currentUserId];
+      return { ...prev, likes: newLikes, likedIds: newLikedIds };
+    });
+
+    // 2. Firebase szinkronizáció
+    const isFbPost = !postIdStr.startsWith("local_") && !postIdStr.startsWith("mock_") && isNaN(Number(postIdStr));
+    if (isFbPost) {
+      try {
+        const postRef = doc(db, "forum_posts", postIdStr);
+        // Itt megint meg kell néznünk a pillanatnyi állapotot a Firebase-hez,
+        // de az optimista UI már lefutott. A backendnél az increment() és arrayUnion() atomi.
+        await updateDoc(postRef, {
+          likes: increment(isLikedNow ? -1 : 1),
+          likedIds: isLikedNow ? arrayRemove(currentUserId) : arrayUnion(currentUserId)
+        });
+      } catch (e) {
+      console.error("Failed to save like:", e);
+      }
+    }
+  }, [currentUserId, requireCommunityAuth]);
+
+
+  // ── Szűrés + rendezés ────────────────────────────────────────────
+  const filteredPosts = useMemo(() => (
+    profileAwarePosts.filter(p => {
+      if (!isVisibleCommunityPost(p)) return false;
+      if (showOnlyBookmarks && !bookmarks.has(p.id)) return false;
+      const postCategory = normalizeCommunityCategory(p.category);
+      if (activeCategory !== "all" && postCategory !== activeCategory) return false;
+      if (activeTagFilters.length > 0 && !activeTagFilters.every(t => p.tags?.includes(t))) return false;
+      if (filterOwn && p.authorId !== currentUserId) return false;
+      if (filterFollowed && !followingIds.has(p.authorId)) return false;
+      if (filterSolved && !p.solved) return false;
+      if (filterPinned && !p.pinned) return false;
+      if (filterHot && !p.hot) return false;
+      const searchText = search.trim().toLowerCase();
+      if (searchText && !String(p.title || "").toLowerCase().includes(searchText) && !(p.tags || []).some(t => String(t).toLowerCase().includes(searchText))) return false;
+      return true;
+    }).sort(comparePostsBySort(sortBy))
+  ), [
+    profileAwarePosts,
+    showOnlyBookmarks,
+    bookmarks,
+    activeCategory,
+    activeTagFilters,
+    filterOwn,
+    currentUserId,
+    filterFollowed,
+    followingIds,
+    filterSolved,
+    filterPinned,
+    filterHot,
+    search,
+    sortBy,
+  ]);
+
+  const visiblePosts = filteredPosts.slice(0, visiblePostCount);
+  const hasMorePosts = visiblePostCount < filteredPosts.length;
+
+  const categoryCounts = useMemo(() => {
+    const counts = {};
+    profileAwarePosts.forEach(p => {
+      if (isVisibleCommunityPost(p)) {
+        const postCategory = normalizeCommunityCategory(p.category);
+        counts[postCategory] = (counts[postCategory] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [profileAwarePosts]);
+
+  const totalThreads = useMemo(() => profileAwarePosts.filter(isVisibleCommunityPost).length, [profileAwarePosts]);
+
+  const resetFilters = () => {
+    setActiveCategory("all");
+    setActiveTagFilters([]);
+    setShowOnlyBookmarks(false);
+    setFilterOwn(false);
+    setFilterFollowed(false);
+    setFilterSolved(false);
+    setFilterPinned(false);
+    setFilterHot(false);
+    setSortBy("hot");
+    setSearch("");
+  };
+
+  useEffect(() => {
+    loadMoreThrottleRef.current = 0;
+    setVisiblePostCount(POSTS_BATCH_SIZE);
+  }, [
+    activeCategory,
+    activeTagFilters,
+    showOnlyBookmarks,
+    filterOwn,
+    filterFollowed,
+    filterSolved,
+    filterPinned,
+    filterHot,
+    search,
+    sortBy,
+    showOnlyBookmarks ? bookmarks : null,
+    filterFollowed ? followingIds : null,
+    filterOwn ? currentUserId : null,
+  ]);
+
+  useEffect(() => {
+    if (!hasMorePosts) return undefined;
+
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel) return undefined;
+
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      const now = Date.now();
+
+      if (!entry?.isIntersecting || now - loadMoreThrottleRef.current < 250) {
+        return;
+      }
+
+      loadMoreThrottleRef.current = now;
+      setVisiblePostCount(prev => Math.min(prev + POSTS_BATCH_SIZE, filteredPosts.length));
+    }, {
+      threshold: 0.1,
+      rootMargin: "240px 0px",
+    });
+
+    observer.observe(sentinel);
+
+    return () => observer.disconnect();
+  }, [hasMorePosts, filteredPosts.length]);
 
   // ── Közös modálok (mindkét nézetben renderelve) ──────────────────
   // FIX: ezek korábban az early-return UTÁN voltak, így poszt-nézetben
@@ -1247,15 +2438,23 @@ export default function Forum() {
       <NewPostModal
         isOpen={!!editingPost}
         onClose={() => setEditingPost(null)}
-        defaultCategory={editingPost?.category || "chat"}
+        defaultCategory={normalizeCommunityCategory(editingPost?.category)}
         onSubmit={handleNewPost}
         editPost={editingPost}
       />
 
-      {/* Törlés megerősítő */}
+      {/* New poszt modal */}
+      <NewPostModal
+        isOpen={newPostOpen}
+        onClose={() => setNewPostOpen(false)}
+        defaultCategory={activeCategory !== "all" ? normalizeCommunityCategory(activeCategory) : DEFAULT_CATEGORY}
+        onSubmit={handleNewPost}
+      />
+
+      {/* Delete megerősítő */}
       <ConfirmDialog
         isOpen={!!confirmDelete}
-        message="A poszt véglegesen törlődik. Ez a művelet nem vonható vissza."
+        message="The post will be permanently deleted. This action cannot be undone."
         onConfirm={() => {
           dbg("ConfirmDialog onConfirm → handleDeletePost", confirmDelete);
           handleDeletePost(confirmDelete.id, confirmDelete.authorId);
@@ -1265,264 +2464,617 @@ export default function Forum() {
           setConfirmDelete(null);
         }}
       />
+
+      <ReportTopicModal
+        post={reportTarget}
+        isOpen={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        onSubmit={handleSubmitReport}
+        busy={reportBusy}
+      />
+
     </>
   );
 
   // ── Poszt nézet (early return — de a modálok most itt is benne vannak!) ──
-  if (openPost) {
+  if (isInitializingRoute) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white" style={{ backgroundColor: "#06050a" }}>
+        <div className="w-10 h-10 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (profileAwareOpenPost) {
     return (
       <>
         <ForumPost
-          post={openPost}
-          allPosts={posts}
+          post={profileAwareOpenPost}
+          allPosts={profileAwarePosts}
           onBack={handleBack}
           onOpenPost={handleOpenPost}
           currentUserId={currentUserId}
           isAdmin={isAdmin}
+          isBookmarked={bookmarks.has(profileAwareOpenPost?.id)}
+          onBookmark={toggleBookmark}
+          isFollowing={followingIds.has(profileAwareOpenPost?.authorId)}
+          onToggleFollow={toggleFollow}
+          onRequireAuth={requireCommunityAuth}
           onDelete={(id, authorId) => {
+            if (!requireCommunityAuth()) return;
             dbg("ForumPost onDelete:", { id, authorId });
             setConfirmDelete({ id, authorId });
           }}
           onEdit={(post) => {
+            if (!requireCommunityAuth()) return;
             dbg("ForumPost onEdit:", post.id);
             setEditingPost(post);
           }}
           onToggle={handleToggleField}
+          onLike={handleLikePost}
         />
         {sharedModals}
       </>
     );
   }
 
-  // ── Fórum lista nézet ────────────────────────────────────────────
+  // ── Forum lista nézet ────────────────────────────────────────────
   return (
-    <div className="min-h-screen relative overflow-x-hidden"
-      style={{ background: "radial-gradient(ellipse at top, #1a0b2e 0%, #0a0118 50%, #000000 100%)", fontFamily: "'SF Pro Display', -apple-system, system-ui, sans-serif" }}>
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" style={{ animation: "floatA 22s ease-in-out infinite" }} />
-        <div className="absolute bottom-1/3 right-1/5 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" style={{ animation: "floatA 28s ease-in-out infinite reverse" }} />
-        <div className="absolute top-2/3 left-1/2 w-72 h-72 rounded-full blur-3xl transition-all duration-1000" style={{ background: `${accentColor}07`, animation: "floatA 32s ease-in-out infinite" }} />
-      </div>
+    <div className="min-h-screen relative overflow-hidden text-white"
+      style={{
+        backgroundColor: "transparent",
+        fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif"
+      }}>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-3 md:px-5 py-5">
+      {/* ── Studio Background ── */}
+      <ForumBackground />
 
-        {/* ══ HEADER ══ */}
-        {showNotifs && <NotifDropdown notifs={notifications} onMarkRead={markNotifRead} onMarkAllRead={markAllNotifsRead} onClose={() => setShowNotifs(false)} />}
-        
-        {showUserMenu && (
-          <div className="absolute right-[135px] top-18 mt-2 w-52 rounded-2xl overflow-hidden"
-            style={{ zIndex: 100000, background: "rgba(10,10,28,0.98)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }}>
-            <div className="px-4 py-3 border-b border-white/8">
-              <p className="text-white font-semibold text-sm">{currentUser?.displayName || currentUser?.email || "Felhasználó"}</p>
-              <p className="text-gray-500 text-xs">{isAdmin ? "👑 Admin" : "Tag"}</p>
-            </div>
-            {[
-              { icon: <Home className="w-3.5 h-3.5" />, label: "Kezdőlap", action: () => { setShowUserMenu(false); navigate('/'); } },
-              { icon: <Bookmark className="w-3.5 h-3.5" />, label: "Mentett témák", action: () => { setShowOnlyBookmarks(v => !v); setShowUserMenu(false); } },
-              { icon: <Settings className="w-3.5 h-3.5" />, label: "Beállítások", action: () => { setShowUserMenu(false); navigate('/settings'); } },
-              ...(isAdmin ? [{ icon: <Shield className="w-3.5 h-3.5" />, label: "Admin panel", action: null }] : []),
-            ].map(item => (
-              <button key={item.label} onClick={item.action || undefined}
-                className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-gray-400 hover:text-white hover:bg-white/8 transition-colors text-xs">
-                {item.icon}{item.label}
-                {item.label === "Mentett témák" && bookmarks.size > 0 && (
-                  <span className="ml-auto text-xs px-1.5 rounded-full" style={{ background: "rgba(167,139,250,0.2)", color: "#a78bfa" }}>{bookmarks.size}</span>
-                )}
-              </button>
-            ))}
-            <div className="border-t border-white/8">
-              <button onClick={() => { setShowUserMenu(false); logoutUser(); navigate('/'); }}
-                className="cursor-pointer w-full flex items-center gap-2.5 px-4 py-2.5 text-red-400 hover:bg-red-400/10 transition-colors text-xs">
-                <LogOut className="w-3.5 h-3.5" /> Kijelentkezés
-              </button>
-            </div>
+
+
+      <div className="relative z-10 w-full overflow-x-hidden">
+
+        {/* ══ SEARCH & ACTIONS ══ */}
+        <div className="relative z-50 max-w-[1200px] mx-auto px-3 sm:px-4 mt-5 mb-6">
+          {/* Search bar — full width, own row */}
+          <div className="relative mb-3">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+            <input
+              type="text"
+              placeholder="Search the forum..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-[#13111c] border border-white/5 rounded-xl py-3 pl-11 pr-4 text-sm placeholder-gray-600 focus:outline-none focus:border-purple-500/20 transition-all"
+            />
           </div>
-        )}
 
-        <GlassCard style={{ marginBottom: "1rem", padding: "0.875rem 1.25rem", zIndex: (showNotifs || showUserMenu) ? 1000 : 100 }}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <button onClick={() => navigate('/')} title="Kezdőlap"
-                className="cursor-pointer w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all hover:scale-105 active:scale-95"
-                style={{ background: "linear-gradient(135deg, #7c3aed40, #7c3aed20)", border: "1px solid #7c3aed35" }}>
-                <Home className="w-4 h-4 text-purple-400" />
-              </button>
-              <div>
-                <h1 className="text-white font-bold text-base leading-tight flex items-center gap-2">
-                  AI Fórum
-                  <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(74,222,128,0.15)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)" }}>BETA</span>
-                  {isAdmin && (
-                    <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}>
-                      👑 Admin
-                    </span>
-                  )}
-                  {DEBUG && (
-                    <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(239,68,68,0.15)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)" }}>
-                      🐛 DEBUG
-                    </span>
-                  )}
-                </h1>
-                <p className="text-gray-500 text-xs">
-                  {totalThreads.toLocaleString()} téma · <span className="text-green-400">{totalOnline} online</span>
-                  {DEBUG && <span className="text-red-400 ml-2">· uid: {currentUserId || "null"}</span>}
-                </p>
-              </div>
+          {/* Action buttons — separate row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <span className="font-medium">{totalThreads.toLocaleString()} topics</span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="relative hidden sm:block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600" />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Keresés..."
-                  className="w-48 md:w-60 pl-8 pr-3 py-2 rounded-xl text-white text-xs placeholder-gray-600 focus:outline-none transition-all"
-                  style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${search ? accentColor + "40" : "rgba(255,255,255,0.08)"}` }} />
-                {search && <button onClick={() => setSearch("")} className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400"><X className="w-3 h-3" /></button>}
-              </div>
-
-              <div ref={notifRef} className="relative" style={{ zIndex: showNotifs ? 99999 : "auto" }}>
-                <button onClick={() => setShowNotifs(v => !v)}
-                  className="cursor-pointer relative p-2 rounded-xl text-gray-400 hover:text-white hover:bg-white/8 transition-all"
-                  style={{ background: showNotifs ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${showNotifs ? "rgba(167,139,250,0.4)" : "rgba(255,255,255,0.08)"}` }}>
+            <div className="flex items-center gap-3">
+              <div className="relative" ref={notifRef}>
+                <button
+                  onClick={() => {
+                    if (!requireCommunityAuth()) return;
+                    setShowNotifs(!showNotifs);
+                  }}
+                  className="cursor-pointer p-2.5 rounded-xl bg-[#13111c] border border-white/5 text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all relative"
+                >
                   <Bell className="w-4 h-4" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                      style={{ background: "linear-gradient(135deg,#7c3aed,#db2777)", fontSize: "0.6rem" }}>{unreadCount > 9 ? "9+" : unreadCount}</span>
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
                   )}
                 </button>
+                {showNotifs && (
+                  <NotifDropdown
+                    notifs={notifications}
+                    onNotifClick={handleNotifClick}
+                    onDeleteAll={deleteAllNotifications}
+                    onDeleteOne={deleteNotification}
+                    onClose={() => setShowNotifs(false)}
+                  />
+                )}
               </div>
 
-              <div ref={userMenuRef} className="relative">
-                <button onClick={() => setShowUserMenu(v => !v)}
-                  className="cursor-pointer w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm text-white transition-all overflow-hidden"
-                  style={{ background: globalUser?.profilePicture ? "transparent" : "linear-gradient(135deg,#7c3aed,#db2777)", boxShadow: showUserMenu ? "0 0 20px rgba(124,58,237,0.5)" : "none" }}>
-                  {globalUser?.profilePicture ? (
-                    <img src={globalUser.profilePicture} alt="user avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    globalUser?.displayName?.[0]?.toUpperCase() || currentUser?.displayName?.[0]?.toUpperCase() || currentUser?.email?.[0]?.toUpperCase() || "?"
-                  )}
-                </button>
-              </div>
-
-              <button onClick={() => setNewPostOpen(true)}
-                className="cursor-pointer flex items-center gap-1.5 px-3 py-2 rounded-xl text-white text-xs font-semibold transition-all hover:opacity-90 active:scale-[0.97] flex-shrink-0"
-                style={{ background: "linear-gradient(135deg, #7c3aed, #db2777)", boxShadow: "0 4px 20px rgba(124,58,237,0.35)" }}>
-                <Plus className="w-3.5 h-3.5" /><span className="hidden sm:inline">Új téma</span>
+              <button
+                onClick={() => {
+                  if (!requireCommunityAuth()) return;
+                  setNewPostOpen(true);
+                }}
+                className="px-6 py-2.5 rounded-[1rem] text-[0.65rem] font-black uppercase tracking-[0.2em] italic transition-all flex items-center gap-2 hover:scale-105 active:scale-95 group/btn relative overflow-hidden"
+                style={{
+                  background: `${accentColor}10`,
+                  color: accentColor,
+                  border: `1px solid ${accentColor}30`,
+                  boxShadow: `inset 0 0 15px ${accentColor}10, 0 5px 25px ${accentColor}15`
+                }}
+              >
+                <div className="absolute inset-0 bg-white/20 opacity-0 group-hover/btn:opacity-10 transition-opacity" />
+                <span className="tracking-[0.25em]">New Topic</span> <Plus className="w-4 h-4 text-white" />
               </button>
             </div>
           </div>
-        </GlassCard>
-
-        <AnnouncementBanner />
-
-        {/* ══ STATS GRID ══ */}
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-4">
-          {CATEGORIES.filter(c => c.id !== "all").map(cat => (
-            <button key={cat.id} onClick={() => setActiveCategory(activeCategory === cat.id ? "all" : cat.id)}
-              className="cursor-pointer text-center py-3 px-2 rounded-xl transition-all duration-200 active:scale-[0.96]"
-              style={{ background: activeCategory === cat.id ? `${cat.color}18` : "rgba(255,255,255,0.025)", border: `1px solid ${activeCategory === cat.id ? cat.color + "45" : "rgba(255,255,255,0.07)"}` }}>
-              <div className="text-xl mb-0.5">{cat.emoji}</div>
-              <div className="text-white font-bold text-sm">{cat.threads}</div>
-              <div className="text-xs mt-0.5 truncate" style={{ color: activeCategory === cat.id ? cat.color : "#6b7280" }}>{cat.label}</div>
-            </button>
-          ))}
         </div>
 
-        {/* ══ TAG CLOUD ══ */}
-        <div className="flex gap-1.5 flex-wrap mb-4">
-          <div className="flex items-center gap-1.5 text-gray-600 text-xs flex-shrink-0">
-            <Tag className="w-3 h-3" /> Szűrők:
-          </div>
-          {ALL_TAGS.map(t => (
-            <TagPill key={t.label} label={t.label} color={t.color} count={t.count}
-              active={activeTagFilter === t.label}
-              onClick={() => setActiveTagFilter(activeTagFilter === t.label ? null : t.label)} />
-          ))}
-          {(activeTagFilter || showOnlyBookmarks || filterLocked || filterSolved) && (
-            <button onClick={() => { setActiveTagFilter(null); setShowOnlyBookmarks(false); setFilterLocked(false); setFilterSolved(false); }}
-              className="cursor-pointer flex items-center gap-1 text-xs px-2 py-0.5 rounded-full text-red-400 hover:bg-red-400/10 transition-all"
-              style={{ border: "1px solid rgba(239,68,68,0.3)" }}>
-              <X className="w-2.5 h-2.5" /> Szűrők törlése
-            </button>
-          )}
-        </div>
+        <main className="relative z-10 max-w-[1200px] mx-auto px-3 sm:px-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-6 pb-16">
+          {/* Left Column: Post List */}
+          <div>
+            <div className="mb-4">
+              <div
+                className="rounded-xl border px-3 py-3 sm:px-4"
+                style={{
+                  background: "rgba(19,17,28,0.88)",
+                  borderColor: "rgba(255,255,255,0.07)",
+                  boxShadow: "0 16px 45px rgba(0,0,0,0.22)",
+                }}
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-white/90">Community feed</div>
+                    <div className="text-xs text-gray-600">{filteredPosts.length} results</div>
+                  </div>
 
-        {/* ══ MAIN GRID ══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_272px] gap-4">
+                  {activeQuickFiltersCount > 0 && (
+                    <button
+                      onClick={resetFilters}
+                      className="cursor-pointer self-start sm:self-auto inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-gray-300 transition-all hover:bg-white/5 hover:text-white"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Clear filters
+                    </button>
+                  )}
+                </div>
 
-          {/* ── POSZT LISTA ── */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 flex-1">
-                {activeCategory !== "all" && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold flex-shrink-0"
-                    style={{ background: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}35` }}>
-                    {CATEGORIES.find(c => c.id === activeCategory)?.emoji} {CATEGORIES.find(c => c.id === activeCategory)?.label}
-                    <button onClick={() => setActiveCategory("all")} className="cursor-pointer ml-0.5"><X className="w-2.5 h-2.5" /></button>
+                <div className="mt-3 overflow-x-auto pb-1 -mx-1 lg:hidden">
+                  <div className="flex min-w-max items-center gap-1.5 px-1">
+                    {CATEGORIES.map((cat) => {
+                      const isActive = activeCategory === cat.id;
+                      const count = cat.id === "all" ? totalThreads : categoryCounts[cat.id] || 0;
+                      return (
+                        <button
+                          key={cat.id}
+                          onClick={() => setActiveCategory(cat.id)}
+                          aria-pressed={isActive}
+                          className="cursor-pointer inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition-all active:scale-[0.98]"
+                          style={{
+                            background: isActive ? `${cat.color}14` : "rgba(255,255,255,0.025)",
+                            borderColor: isActive ? `${cat.color}55` : "rgba(255,255,255,0.07)",
+                            color: isActive ? "#ffffff" : "#aaa4ba",
+                          }}
+                        >
+                          <CategoryIcon category={cat} className="h-4 w-4" />
+                          <span>{cat.label}</span>
+                          <span className="text-[0.68rem] text-gray-500">{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="overflow-x-auto pb-1 -mx-1">
+                    <div className="flex min-w-max items-center gap-1.5 px-1">
+                      {[
+                        { id: "hot", label: "Trending", icon: Flame, color: "#fb923c" },
+                        { id: "new", label: "Newest", icon: Clock, color: "#38bdf8" },
+                        { id: "top", label: "Top", icon: Trophy, color: "#a78bfa" },
+                      ].map(option => {
+                        const Icon = option.icon;
+                        const active = sortBy === option.id;
+                        return (
+                          <button
+                            key={option.id}
+                            onClick={() => setSortBy(option.id)}
+                            aria-pressed={active}
+                            className="cursor-pointer inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all hover:bg-white/5"
+                            style={{
+                              background: active ? `${option.color}12` : "transparent",
+                              borderColor: active ? `${option.color}45` : "rgba(255,255,255,0.07)",
+                              color: active ? "#ffffff" : "#8f879f",
+                            }}
+                          >
+                            <Icon className="w-3.5 h-3.5" style={{ color: option.color }} />
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto pb-1 -mx-1">
+                    <div className="flex min-w-max items-center gap-1.5 px-1">
+                      {isCommunityAuthenticated && [
+                        {
+                          key: "bookmarks",
+                          active: showOnlyBookmarks,
+                          onClick: () => setShowOnlyBookmarks(v => !v),
+                          label: "Saved",
+                          icon: Bookmark,
+                          color: "#fbbf24",
+                        },
+                        {
+                          key: "own",
+                          active: filterOwn,
+                          onClick: () => setFilterOwn(v => !v),
+                          label: "Mine",
+                          icon: User,
+                          color: "#a855f7",
+                        },
+                        {
+                          key: "followed",
+                          active: filterFollowed,
+                          onClick: () => setFilterFollowed(v => !v),
+                          label: "Following",
+                          icon: Rss,
+                          color: "#38bdf8",
+                        },
+                      ].map(item => {
+                        const Icon = item.icon;
+                        return (
+                          <button
+                            key={item.key}
+                            onClick={item.onClick}
+                            aria-pressed={item.active}
+                            className="cursor-pointer inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all hover:bg-white/5"
+                            style={{
+                              background: item.active ? `${item.color}12` : "transparent",
+                              borderColor: item.active ? `${item.color}45` : "rgba(255,255,255,0.07)",
+                              color: item.active ? "#ffffff" : "#8f879f",
+                            }}
+                          >
+                            <Icon className={`w-3.5 h-3.5 ${item.key === "bookmarks" && item.active ? "fill-current" : ""}`} style={{ color: item.color }} />
+                            {item.label}
+                          </button>
+                        );
+                      })}
+
+                    </div>
+                  </div>
+                </div>
+
+                {(activeTagFilters.length > 0 || search) && (
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-white/5 pt-3">
+                    {activeTagFilters.map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => setActiveTagFilters(prev => prev.filter(t => t !== tag))}
+                        className="cursor-pointer inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-all hover:bg-white/5"
+                        style={{ background: `${accentColor}10`, borderColor: `${accentColor}35`, color: accentColor }}
+                      >
+                        <Tag className="w-3 h-3" />
+                        #{tag}
+                        <X className="w-3 h-3" />
+                      </button>
+                    ))}
+                    {search && (
+                      <button
+                        onClick={() => setSearch("")}
+                        className="cursor-pointer inline-flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-all hover:bg-white/5"
+                      >
+                        <Search className="w-3 h-3" />
+                        {search}
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 )}
-                {showOnlyBookmarks && (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold"
-                    style={{ background: "rgba(251,191,36,0.15)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.3)" }}>
-                    <Bookmark className="w-3 h-3" /> Mentett ({bookmarks.size})
-                    <button onClick={() => setShowOnlyBookmarks(false)} className="cursor-pointer ml-0.5"><X className="w-2.5 h-2.5" /></button>
-                  </div>
-                )}
-                <span className="text-gray-600 text-xs">{filteredPosts.length} téma</span>
-              </div>
-
-              <button onClick={() => setShowAdvancedFilter(v => !v)}
-                className="cursor-pointer flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs transition-all"
-                style={{ background: showAdvancedFilter ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.04)", color: showAdvancedFilter ? "#a78bfa" : "#6b7280", border: `1px solid ${showAdvancedFilter ? "rgba(167,139,250,0.4)" : "rgba(255,255,255,0.08)"}` }}>
-                <SlidersHorizontal className="w-3 h-3" /> Szűrő
-              </button>
-
-              <div className="flex items-center gap-0.5 p-0.5 rounded-lg"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                {[
-                  { id: "hot", icon: <Flame className="w-3 h-3" />, label: "Trending" },
-                  { id: "new", icon: <Zap className="w-3 h-3" />, label: "Új" },
-                  { id: "top", icon: <TrendingUp className="w-3 h-3" />, label: "Legjobb" },
-                  { id: "views", icon: <Eye className="w-3 h-3" />, label: "Nézett" },
-                ].map(s => (
-                  <button key={s.id} onClick={() => setSortBy(s.id)}
-                    className="cursor-pointer flex items-center gap-1 px-2 py-1.5 rounded-md text-xs transition-all"
-                    style={{ background: sortBy === s.id ? `${accentColor}20` : "transparent", color: sortBy === s.id ? "white" : "#6b7280", fontWeight: sortBy === s.id ? 600 : 400 }}>
-                    {s.icon}<span className="hidden sm:inline">{s.label}</span>
-                  </button>
-                ))}
               </div>
             </div>
 
-            {showAdvancedFilter && (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl flex-wrap"
-                style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.2)" }}>
-                <span className="text-gray-400 text-xs font-semibold">Állapot:</span>
-                {[
-                  { label: "🔒 Lezárt", val: filterLocked, set: setFilterLocked },
-                  { label: "✅ Megoldott", val: filterSolved, set: setFilterSolved },
-                  { label: "🔖 Mentett", val: showOnlyBookmarks, set: setShowOnlyBookmarks },
-                ].map(f => (
-                  <button key={f.label} onClick={() => f.set(v => !v)}
-                    className="cursor-pointer text-xs px-2.5 py-1 rounded-lg transition-all"
-                    style={{ background: f.val ? "rgba(167,139,250,0.2)" : "rgba(255,255,255,0.05)", color: f.val ? "#a78bfa" : "#6b7280", border: `1px solid ${f.val ? "rgba(167,139,250,0.4)" : "rgba(255,255,255,0.08)"}` }}>
-                    {f.label}
+            <div className={filteredPosts.length === 0 ? "mb-5" : "hidden"}>
+              <div
+                className="hidden"
+                style={{
+                  background: "#13111c",
+                  borderColor: "rgba(255,255,255,0.06)",
+                }}
+              >
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="flex h-7 w-7 items-center justify-center rounded-lg"
+                          style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}18` }}
+                        >
+                          <SlidersHorizontal className="w-3.5 h-3.5" style={{ color: accentColor }} />
+                        </div>
+                        <div>
+                          <div className="text-[0.68rem] font-semibold text-white/80">
+                            Filters
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            {filteredPosts.length} results • {activeQuickFiltersCount} active filters
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div
+                        className="rounded-lg px-2.5 py-1.5 text-xs font-medium"
+                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "#9a90a8" }}
+                      >
+                        {activeCategory === "all" ? "All categories" : CATEGORIES.find(c => c.id === activeCategory)?.label}
+                      </div>
+                      <button
+                        onClick={resetFilters}
+                        className="cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all hover:bg-white/5"
+                        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: activeQuickFiltersCount > 0 ? "#c4b5d8" : "#5a5470" }}
+                      >
+                        Clear filters
+                      </button>
+                      <button
+                        onClick={() => setShowAdvancedFilter(v => !v)}
+                        className="lg:hidden cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all flex items-center gap-1.5"
+                        style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}25`, color: "#cfc4ea" }}
+                      >
+                        <span>{showAdvancedFilter ? "Less" : "Details"}</span>
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvancedFilter ? "rotate-180" : ""}`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className={`${showAdvancedFilter ? "block" : "hidden"} lg:block`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div
+                        className="rounded-xl p-3"
+                        style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+                      >
+                        <div className="mb-2.5 flex items-center gap-2 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
+                          <Zap className="w-3 h-3" />
+                          Quick filters
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            {
+                              key: "bookmarks",
+                              active: showOnlyBookmarks,
+                              onClick: () => {
+                                if (!requireCommunityAuth()) return;
+                                setShowOnlyBookmarks(v => !v);
+                              },
+                              label: "Bookmark",
+                              icon: Bookmark,
+                              color: "#fbbf24",
+                              fill: true,
+                            },
+                            {
+                              key: "pinned",
+                              active: filterPinned,
+                              onClick: () => setFilterPinned(v => !v),
+                              label: "Pinned",
+                              icon: Pin,
+                              color: "#f59e0b",
+                            },
+                            {
+                              key: "solved",
+                              active: filterSolved,
+                              onClick: () => setFilterSolved(v => !v),
+                              label: "Solved",
+                              icon: CheckCircle,
+                              color: "#4ade80",
+                            },
+                            {
+                              key: "own",
+                              active: filterOwn,
+                              onClick: () => {
+                                if (!requireCommunityAuth()) return;
+                                setFilterOwn(v => !v);
+                              },
+                              label: "Mine",
+                              icon: User,
+                              color: "#a855f7",
+                            },
+                            {
+                              key: "followed",
+                              active: filterFollowed,
+                              onClick: () => {
+                                if (!requireCommunityAuth()) return;
+                                setFilterFollowed(v => !v);
+                              },
+                              label: "Following",
+                              icon: Rss,
+                              color: "#38bdf8",
+                            },
+                          ].map(item => {
+                            const Icon = item.icon;
+                            return (
+                              <button
+                                key={item.key}
+                                onClick={item.onClick}
+                                className="cursor-pointer group flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                                style={{
+                                  background: item.active ? `${item.color}10` : "transparent",
+                                  border: `1px solid ${item.active ? `${item.color}25` : "rgba(255,255,255,0.05)"}`,
+                                  color: item.active ? "#ffffff" : "#7a7490",
+                                }}
+                              >
+                                <Icon className={`w-3.5 h-3.5 ${item.fill && item.active ? "fill-current" : ""}`} style={{ color: item.color }} />
+                                <span>{item.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div
+                        className="rounded-xl p-3"
+                        style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+                      >
+                        <div className="mb-2.5 flex items-center gap-2 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
+                          <TrendingUp className="w-3 h-3" />
+                          Sorting
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { id: "hot", label: "Trending", icon: Flame, tone: "#fb923c", title: "Recent activity based on likes, comments, views, and age." },
+                            { id: "top", label: "Top", icon: Trophy, tone: "#a78bfa", title: "Based on likes and comments." },
+                            { id: "new", label: "Newest", icon: Clock, tone: "#38bdf8", title: "Based on creation time." },
+                            { id: "views", label: "Popular", icon: Eye, tone: "#34d399", title: "Based on views." },
+                          ].map(option => {
+                            const Icon = option.icon;
+                            const active = sortBy === option.id;
+                            return (
+                              <button
+                                key={option.id}
+                                title={option.title}
+                                onClick={() => setSortBy(option.id)}
+                                className="cursor-pointer flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all"
+                                style={{
+                                  background: active ? `${option.tone}10` : "transparent",
+                                  border: `1px solid ${active ? `${option.tone}25` : "rgba(255,255,255,0.05)"}`,
+                                  color: active ? "#ffffff" : "#7a7490",
+                                }}
+                              >
+                                <Icon className="w-3.5 h-3.5" style={{ color: option.tone }} />
+                                <span>{option.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {(activeTagFilters.length > 0 || activeCategory !== "all" || search) && (
+                    <div
+                      className="rounded-xl p-3"
+                      style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}
+                    >
+                      <div className="mb-2.5 text-[0.62rem] font-semibold tracking-wide uppercase text-gray-600">
+                        Active filters
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {activeTagFilters.map(tag => (
+                          <button
+                            key={tag}
+                            onClick={() => setActiveTagFilters(prev => prev.filter(t => t !== tag))}
+                            className="cursor-pointer flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
+                            style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}20`, color: accentColor }}
+                          >
+                            <Tag className="w-3 h-3" />
+                            #{tag}
+                            <X className="w-3 h-3" />
+                          </button>
+                        ))}
+                        {activeCategory !== "all" && (
+                          <button
+                            onClick={() => setActiveCategory("all")}
+                            className="cursor-pointer flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
+                            style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}20`, color: accentColor }}
+                          >
+                            <Hash className="w-3 h-3" />
+                            {CATEGORIES.find(c => c.id === activeCategory)?.label}
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                        {search && (
+                          <button
+                            onClick={() => setSearch("")}
+                            className="cursor-pointer flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all"
+                            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", color: "#9a90a8" }}
+                          >
+                            <Search className="w-3 h-3" />
+                            {search}
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Mobile: compact categories + hashtags */}
+              <div className="hidden">
+                <SurfaceCard style={{ padding: "0.75rem" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Hash className="w-3.5 h-3.5 text-purple-400" />
+                      <span className="text-xs font-semibold text-white/80">Categories</span>
+                    </div>
+                    <span className="text-[0.65rem] text-gray-600">{totalThreads.toLocaleString()} topics</span>
+                  </div>
+                  <div className="overflow-x-auto pb-1 -mx-0.5">
+                    <div className="flex items-center gap-1.5 min-w-max px-0.5">
+                      {CATEGORIES.map((cat) => {
+                        const isActive = activeCategory === cat.id;
+                        const count = cat.id === "all" ? totalThreads : categoryCounts[cat.id] || 0;
+                        return (
+                          <button
+                            key={cat.id}
+                            onClick={() => setActiveCategory(cat.id)}
+                            className="cursor-pointer rounded-full px-2.5 py-1.5 text-left transition-all active:scale-[0.98] whitespace-nowrap"
+                            style={{
+                              background: isActive ? `${cat.color}12` : "rgba(255,255,255,0.02)",
+                              border: `1px solid ${isActive ? `${cat.color}35` : "rgba(255,255,255,0.06)"}`,
+                            }}
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <CategoryIcon category={cat} className="h-4 w-4" />
+                                <span
+                                  className="text-[0.72rem] font-medium"
+                                  style={{ color: isActive ? "#ffffff" : "#b7b3c8" }}
+                                >
+                                  {cat.label}
+                                </span>
+                              </div>
+                              <span className="text-[0.64rem] text-gray-500">{count}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-2.5 mb-2">
+                    <Tag className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="text-xs font-semibold text-white/80">Popular hashtags</span>
+                  </div>
+                  <div className="overflow-x-auto pb-1 -mx-0.5">
+                    <div className="flex items-center gap-1.5 min-w-max px-0.5">
+                      {popularTags.slice(0, 12).map(tag => (
+                        <TagPill
+                          key={tag.label}
+                          label={tag.label}
+                          count={tag.count}
+                          color={tag.color}
+                          active={activeTagFilters.includes(tag.label)}
+                          onClick={() => setActiveTagFilters(prev =>
+                            prev.includes(tag.label) ? prev.filter(t => t !== tag.label) : [...prev, tag.label]
+                          )}
+                        />
+                      ))}
+                    </div>
+                    {popularTags.length === 0 && (
+                      <p className="text-[0.65rem] text-gray-600 italic px-0.5">No tags available...</p>
+                    )}
+                  </div>
+                </SurfaceCard>
+              </div>
+
+              {filteredPosts.length === 0 && (
+                <div className="bg-[#13111c] border border-white/5 rounded-xl p-8 text-center">
+                  <HelpCircle className="w-8 h-8 mx-auto mb-3 text-gray-700" />
+                  <p className="text-white/80 font-medium mb-1">No results for these filters</p>
+                  <p className="text-sm text-gray-600 mb-4">Try another category, tag, or quick filter.</p>
+                  <button
+                    onClick={resetFilters}
+                    className="cursor-pointer px-4 py-2 rounded-lg text-sm font-medium text-white transition-all"
+                    style={{ background: `linear-gradient(135deg, ${accentColor}, ${accentColor}99)` }}
+                  >
+                    Clear all filters
                   </button>
-                ))}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
 
-            {!currentUser && (
-              <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl"
-                style={{ background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.15)" }}>
-                <User className="w-4 h-4 text-purple-400 flex-shrink-0" />
-                <p className="text-gray-400 text-xs">
-                  <span className="text-white font-medium">Jelentkezz be</span> a saját témáid szerkesztéséhez és törléséhez.
-                  {DEBUG && <span className="text-red-400 ml-1">(DEBUG: mock postok mindenképp kezelhetők)</span>}
-                </p>
-              </div>
-            )}
-
-            {filteredPosts.length > 0
-              ? filteredPosts.map(post => (
+            <div className="space-y-2">
+              {visiblePosts.map(post => (
                 <PostCard
                   key={post.id}
                   post={post}
@@ -1533,158 +3085,82 @@ export default function Forum() {
                   currentUserId={currentUserId}
                   isAdmin={isAdmin}
                   onDelete={(id, authorId) => {
-                    dbg("PostCard onDelete prop hívva:", { id, authorId });
+                    if (!requireCommunityAuth()) return;
                     setConfirmDelete({ id, authorId });
                   }}
-                  onEdit={(p) => {
-                    dbg("PostCard onEdit prop hívva:", p.id);
-                    setEditingPost(p);
-                  }}
+                  onEdit={handleEdit}
                   onToggle={handleToggleField}
+                  onReport={handleReportPost}
                 />
-              ))
-              : (
-                <div className="flex flex-col items-center justify-center py-16 gap-3 rounded-2xl"
-                  style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                  <Search className="w-10 h-10 text-gray-700" />
-                  <p className="text-gray-500 text-sm">Nincs találat a megadott szűrőkre</p>
-                  <button onClick={() => { setSearch(""); setActiveCategory("all"); setActiveTagFilter(null); setShowOnlyBookmarks(false); }}
-                    className="cursor-pointer text-xs px-3 py-1.5 rounded-lg transition-all hover:bg-white/5" style={{ color: accentColor }}>
-                    Összes szűrő törlése
-                  </button>
-                </div>
-              )
-            }
+              ))}
+            </div>
 
-            {filteredPosts.length > 0 && (
-              <button className="cursor-pointer w-full py-3 rounded-xl text-sm text-gray-600 hover:text-gray-400 transition-all hover:bg-white/5 flex items-center justify-center gap-2"
-                style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-                <RefreshCw className="w-3.5 h-3.5" /> Több téma betöltése
-              </button>
-            )}
+            {hasMorePosts && <div ref={loadMoreSentinelRef} className="h-6 w-full" aria-hidden="true" />}
           </div>
 
-          {/* ── SIDEBAR ── */}
-          <div className="space-y-3">
-            <GlassCard>
-              <div className="px-4 pt-4 pb-3">
-                <h3 className="text-white font-semibold text-xs uppercase tracking-wider flex items-center gap-2 mb-3">
-                  <Hash className="w-3.5 h-3.5 text-purple-400" /> Kategóriák
-                </h3>
-                <div className="space-y-1.5">
-                  <button onClick={() => setActiveCategory("all")}
-                    className="cursor-pointer w-full text-left px-3 py-2 rounded-xl text-xs transition-all"
-                    style={{ background: activeCategory === "all" ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.03)", border: `1px solid ${activeCategory === "all" ? "rgba(167,139,250,0.4)" : "rgba(255,255,255,0.06)"}`, color: activeCategory === "all" ? "white" : "#9ca3af", fontWeight: activeCategory === "all" ? 600 : 400 }}>
-                    🌐 Összes téma
-                  </button>
-                  {CATEGORIES.filter(c => c.id !== "all").map(cat => (
-                    <CatSidebarCard key={cat.id} cat={cat} isActive={activeCategory === cat.id} onClick={setActiveCategory} />
-                  ))}
-                </div>
-              </div>
-            </GlassCard>
-
-            <GlassCard>
-              <div className="px-4 pt-4 pb-3">
-                <h3 className="text-white font-semibold text-xs uppercase tracking-wider flex items-center gap-2 mb-3">
-                  <Trophy className="w-3.5 h-3.5 text-yellow-400" /> Heti toplista
-                </h3>
-                <div className="space-y-1">
-                  {LEADERBOARD.map((user, i) => (
-                    <div key={user.name} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-white/5 transition-all cursor-pointer">
-                      <span className="text-sm w-5 text-center flex-shrink-0">{user.badge}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold truncate" style={{ color: user.color }}>{user.name}</div>
-                        <div className="text-gray-600 text-xs">{user.points.toLocaleString()} pont · {user.posts} bejegyzés</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </GlassCard>
-
-            <GlassCard>
-              <div className="px-4 pt-4 pb-3">
-                <h3 className="text-white font-semibold text-xs uppercase tracking-wider flex items-center gap-2 mb-3">
-                  <Rss className="w-3.5 h-3.5 text-green-400" /> Legutóbbi aktivitás
-                </h3>
-                <div className="space-y-2.5">
-                  {RECENT_ACTIVITY.map((a, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <div className="w-5 h-5 rounded-md flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5"
-                        style={{ background: a.color + "35", color: a.color }}>{a.user[0].toUpperCase()}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs leading-snug">
-                          <span className="font-semibold" style={{ color: a.color }}>{a.user}</span>
-                          <span className="text-gray-500"> {a.action}: </span>
-                          <span className="text-gray-400">{a.post}</span>
-                        </p>
-                        <span className="text-gray-700 text-xs">{a.time}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </GlassCard>
-
-            <GlassCard>
-              <div className="px-4 pt-4 pb-3">
-                <h3 className="text-white font-semibold text-xs uppercase tracking-wider flex items-center gap-2 mb-3">
-                  <BarChart2 className="w-3.5 h-3.5 text-blue-400" /> Statisztikák
-                </h3>
-                {[
-                  { label: "Összes téma", value: totalThreads.toLocaleString(), color: "#a78bfa" },
-                  { label: "Online tagok", value: totalOnline, color: "#4ade80" },
-                  { label: "Mai aktivitás", value: "347", color: "#38bdf8" },
-                  { label: "Regisztrált tag", value: "12 841", color: "#fb923c" },
-                  { label: "Mentett témák", value: bookmarks.size, color: "#fbbf24" },
-                ].map(stat => (
-                  <div key={stat.label} className="flex justify-between items-center py-1.5 border-b border-white/5 last:border-0">
-                    <span className="text-gray-500 text-xs">{stat.label}</span>
-                    <span className="text-xs font-bold" style={{ color: stat.color }}>{stat.value}</span>
+          {/* Right Column: Sidebar - hidden on mobile, shown on lg+ */}
+          <div className="space-y-4 hidden lg:block">
+            {/* Categories Widget */}
+            <SurfaceCard style={{ padding: "1rem" }}>
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Hash className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="text-xs font-semibold text-white/85">Channels</span>
                   </div>
+                  <p className="mt-1 text-[0.66rem] font-medium text-gray-600">
+                    Choose a topic to filter the feed
+                  </p>
+                </div>
+                <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-1 text-[0.65rem] font-semibold text-gray-500">
+                  {totalThreads.toLocaleString()} topics
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                {CATEGORIES.map(cat => (
+                  <CatSidebarCard
+                    key={cat.id}
+                    cat={cat}
+                    isActive={activeCategory === cat.id}
+                    onClick={setActiveCategory}
+                    threadCount={cat.id === "all" ? totalThreads : categoryCounts[cat.id] || 0}
+                  />
                 ))}
               </div>
-            </GlassCard>
+            </SurfaceCard>
 
-            <GlassCard>
-              <div className="px-4 pt-4 pb-3">
-                <h3 className="text-white font-semibold text-xs uppercase tracking-wider flex items-center gap-2 mb-3">
-                  <Globe className="w-3.5 h-3.5 text-purple-400" /> Gyors linkek
-                </h3>
-                <div className="space-y-1">
-                  {[
-                    { icon: <HelpCircle className="w-3.5 h-3.5" />, label: "GYIK / Segítség" },
-                    { icon: <Shield className="w-3.5 h-3.5" />, label: "Fórum szabályok" },
-                    { icon: <Award className="w-3.5 h-3.5" />, label: "Pontrendszer" },
-                    { icon: <AtSign className="w-3.5 h-3.5" />, label: "Kapcsolat / Moderátorok" },
-                  ].map(link => (
-                    <button key={link.label} className="cursor-pointer w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all text-xs">
-                      {link.icon}{link.label}<ChevronRight className="w-3 h-3 ml-auto" />
-                    </button>
-                  ))}
-                </div>
+            {/* Tags Widget */}
+            <SurfaceCard style={{ padding: "1rem" }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Tag className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-xs font-semibold text-white/80">Popular tags</span>
               </div>
-            </GlassCard>
+              <div className="flex flex-wrap gap-1.5">
+                {popularTags.map(tag => (
+                  <TagPill
+                    key={tag.label}
+                    label={tag.label}
+                    count={tag.count}
+                    color={tag.color}
+                    active={activeTagFilters.includes(tag.label)}
+                    onClick={() => setActiveTagFilters(prev =>
+                      prev.includes(tag.label) ? prev.filter(t => t !== tag.label) : [...prev, tag.label]
+                    )}
+                  />
+                ))}
+                {popularTags.length === 0 && (
+                  <p className="text-[0.65rem] text-gray-600 italic">No tags available...</p>
+                )}
+              </div>
+            </SurfaceCard>
+
           </div>
-        </div>
+
+        </main>
       </div>
 
-      {/* Új poszt modal */}
-      <NewPostModal
-        isOpen={newPostOpen}
-        onClose={() => setNewPostOpen(false)}
-        defaultCategory={activeCategory !== "all" ? activeCategory : "chat"}
-        onSubmit={handleNewPost}
-      />
-
-      {/* Közös modálok (szerkesztés + törlés) — lista nézetben */}
       {sharedModals}
-
-      <style>{`
-        @keyframes floatA { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(20px,-20px) scale(1.05)} 66%{transform:translate(-15px,15px) scale(0.95)} }
-        .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-      `}</style>
     </div>
   );
 }

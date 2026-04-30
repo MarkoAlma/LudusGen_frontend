@@ -1,8 +1,7 @@
 import { useState, createContext, useEffect } from "react";
-import { auth, db } from "../firebase/firebaseApp";
+import { auth } from "../firebase/firebaseApp";
 import {
   onAuthStateChanged,
-  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithCustomToken,
   signOut,
@@ -10,11 +9,9 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import axios from "axios";
+import { API_BASE } from "../api/client";
 
 export const MyUserContext = createContext();
-
-// ── API alap URL a .env-ből ────────────────────────────
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const MyUserProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -23,6 +20,8 @@ const MyUserProvider = ({ children }) => {
   const [showNavbar, setShowNavbar] = useState(true);
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [loading2FA, setLoading2FA] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [showCreditTopup, setShowCreditTopup] = useState(false);
 // UserContext vagy valahol központilag
 // UserContext vagy valahol központilag
 const [navHeight, setNavHeight] = useState(0);
@@ -58,6 +57,7 @@ useEffect(() => {
         setIs2FAEnabled(false);
         setLoading2FA(false);
       }
+      setAuthLoading(false);
     });
 
     return () => unsub();
@@ -129,6 +129,30 @@ useEffect(() => {
   // Lokális state frissítés
   const updateUser = (updatedData) => {
     setUser((prevUser) => ({ ...prevUser, ...updatedData }));
+  };
+
+  // Credit egyenleg frissítése a backend-ről
+  // Reuses the already-fetched user data from loadUserFromFirestore to avoid duplicate API calls.
+  // Only makes a fresh call if the user data is stale or missing.
+  const refreshCredits = async () => {
+    if (!user?.uid) return;
+    try {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) return;
+      const token = await firebaseUser.getIdToken();
+      const response = await axios.get(
+        `${API_BASE}/api/get-user/${user.uid}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success && response.data.user) {
+        setUser((prevUser) => ({
+          ...prevUser,
+          credits: response.data.user.credits ?? prevUser?.credits ?? 0,
+        }));
+      }
+    } catch (error) {
+      console.error("Error refreshing credits:", error);
+    }
   };
 
   useEffect(() => {
@@ -291,7 +315,7 @@ useEffect(() => {
       console.error("Google sign-in error:", error);
       setMsg({ incorrectSignIn: error.message });
 
-      try { await signOut(auth); } catch {}
+      try { await signOut(auth); } catch { /* ignore sign-out cleanup failure */ }
 
       return { requires2FA: false };
     }
@@ -328,8 +352,12 @@ useEffect(() => {
         loading2FA,
         resetPassword,
         refresh2FAStatus,
+        refreshCredits,
         loadUserFromFirestore,
         signInWithGoogle,
+        authLoading,
+        showCreditTopup,
+        setShowCreditTopup,
       }}
     >
       {children}

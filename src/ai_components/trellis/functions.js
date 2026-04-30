@@ -1,3 +1,4 @@
+import { API_BASE } from '../../api/client';
 
 const VIEW_MODES = [
   { id: 'clay', label: 'Clay', tip: 'Clay — semleges szürke agyag' },
@@ -141,6 +142,7 @@ Rules:
 - Keep it compact, safe, and Trellis-compatible`;
 
 // ── Standalone GLB fetcher ────────────────────────────────────────────────────
+
 async function fetchGlbAsBlob(modelUrl, getIdToken) {
   if (!modelUrl) return null;
   if (modelUrl.startsWith('data:')) return modelUrl;
@@ -148,9 +150,9 @@ async function fetchGlbAsBlob(modelUrl, getIdToken) {
   let fetchUrl = modelUrl;
 
   if (modelUrl.startsWith('/api/')) {
-    fetchUrl = `http://localhost:3001${modelUrl}`;
+    fetchUrl = `${API_BASE}${modelUrl}`;
   } else if (modelUrl.startsWith('https://s3.') || modelUrl.includes('backblazeb2.com')) {
-    fetchUrl = `http://localhost:3001/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
+    fetchUrl = `${API_BASE}/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
   }
 
   const token = getIdToken ? await getIdToken() : '';

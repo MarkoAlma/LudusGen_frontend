@@ -1,4 +1,215 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 @import "tailwindcss";
+
+@theme {
+  --font-heading: "Plus Jakarta Sans", sans-serif;
+  --font-body: "Inter", sans-serif;
+
+  --color-primary: #8a2be2;
+  --color-secondary: #00e5ff;
+  --color-accent: #ff007f;
+  --color-bg-base: #050505;
+  --color-bg-surface: rgba(25,25,30,0.6);
+  --color-bg-glass: rgba(255,255,255,0.03);
+  --color-text-main: #ffffff;
+  --color-text-dim: #a1a1aa;
+
+  --shadow-glass: 0 8px 32px rgba(0,0,0,0.3);
+  --shadow-primary-glow: 0 0 25px rgba(139,92,246,0.4);
+  --shadow-primary-heavy: 0 0 50px rgba(139,92,246,0.2);
+  --shadow-accent-bright: 0 0 20px rgba(139,92,246,0.3);
+  --shadow-emerald-glow: 0 0 10px rgba(16,185,129,0.5);
+}
+
+@layer base {
+  body {
+    @apply bg-bg-base text-text-main font-body leading-relaxed antialiased selection:bg-primary/30 selection:text-white max-w-[100vw] overflow-x-hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading tracking-tight;
+  }
+
+  button,
+  .cursor-pointer,
+  [role="button"],
+  a {
+    @apply cursor-pointer;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-bg-surface backdrop-blur-xl border border-white/10 rounded-2xl md:rounded-3xl shadow-glass;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 20px rgba(255,255,255,0.4);
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-white/60;
+  }
+
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400;
+  }
+
+  /* Custom Focus Outlines */
+  .focus-ring {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#03000a];
+  }
+
+  /* Complex Aurora Background Mesh */
+  .aurora-mesh {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+    pointer-events: none;
+    background: #050505;
+  }
+
+  .aurora-mesh::before,
+  .aurora-mesh::after,
+  .aurora-blob {
+    content: '';
+    position: absolute;
+    filter: blur(140px);
+    border-radius: 50%;
+    opacity: 0.5;
+    animation: aurora-flow 20s infinite alternate ease-in-out;
+  }
+
+  .aurora-mesh::before {
+    top: -20%;
+    left: -10%;
+    width: 60vw;
+    height: 60vh;
+    background: rgba(138, 43, 226, 0.3);
+    animation-delay: 0s;
+  }
+
+  .aurora-mesh::after {
+    bottom: -20%;
+    right: -10%;
+    width: 70vw;
+    height: 70vh;
+    background: rgba(0, 229, 255, 0.2);
+    animation-delay: -5s;
+    animation-direction: alternate-reverse;
+  }
+
+  .aurora-blob {
+    top: 40%;
+    left: 30%;
+    width: 50vw;
+    height: 50vh;
+    background: rgba(255, 0, 127, 0.15);
+    animation-delay: -10s;
+  }
+
+  .liquid-wave {
+    filter: url(#liquid-wave-filter);
+    transition: filter 0.5s ease;
+    /* Extra scale to prevent edge bleeding from distortion */
+    transform: scale(1.15) !important;
+  }
+
+  /* Cinematic Sidebar Toggle Tab - High Fidelity Motion Style */
+  .tp-toggle-tab {
+    @apply fixed top-1/2 -translate-y-1/2 w-6 h-20 bg-[#0a0a0f]/80 backdrop-blur-2xl border border-white/10 flex items-center justify-center cursor-pointer z-50 transition-colors duration-300;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+
+  .tp-toggle-tab:hover {
+    @apply bg-primary/20 border-primary/30;
+  }
+
+  .tp-toggle-tab.left {
+    @apply rounded-r-2xl border-l-0;
+  }
+
+  .tp-toggle-tab.right {
+    @apply rounded-l-2xl border-r-0;
+  }
+}
+
+@keyframes aurora-flow {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+
+  50% {
+    transform: translate(5%, 10%) scale(1.1) rotate(5deg);
+  }
+
+  100% {
+    transform: translate(-10%, -5%) scale(0.9) rotate(-5deg);
+  }
+}
+
+@keyframes ken-burns {
+  0% {
+    transform: scale(1.1) translate(0, 0);
+  }
+
+  100% {
+    transform: scale(1.3) translate(-2%, -2%);
+  }
+}
+
+@keyframes grain {
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  10% {
+    transform: translate(-5%, -10%);
+  }
+
+  30% {
+    transform: translate(3%, -15%);
+  }
+
+  50% {
+    transform: translate(12%, 9%);
+  }
+
+  70% {
+    transform: translate(-9%, 4%);
+  }
+
+  90% {
+    transform: translate(2%, 8%);
+  }
+}
+
+.grain-overlay {
+  animation: grain 8s steps(10) infinite;
+}
+
+/* Custom Scrollbar - Premium Dark UI */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}

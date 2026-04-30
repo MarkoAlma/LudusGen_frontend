@@ -2,6 +2,7 @@ import { db } from '../../firebase/firebaseApp';
 import { STYLE_OPTIONS } from './Constants';
 import {
   collection,
+  doc,
   query,
   where,
   orderBy,
@@ -9,6 +10,7 @@ import {
   startAfter,
   getDocs,
   addDoc,
+  setDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 
@@ -74,22 +76,46 @@ export const defaultParams = {
 // GLB fetcher — VITE_API_URL-t használ, production-ban is működik
 // ────────────────────────────────────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_BASE } from '../../api/client';
 
-export async function fetchGlbAsBlob(modelUrl, getIdToken) {
+const HISTORY_THUMB_FETCH_LIMIT = 2;
+let activeHistoryThumbFetches = 0;
+const historyThumbFetchQueue = [];
+const historyThumbFetchInFlight = new Map();
+
+function runLimitedHistoryThumbFetch(task) {
+  return new Promise((resolve, reject) => {
+    const start = async () => {
+      activeHistoryThumbFetches += 1;
+      try {
+        resolve(await task());
+      } catch (error) {
+        reject(error);
+      } finally {
+        activeHistoryThumbFetches -= 1;
+        const next = historyThumbFetchQueue.shift();
+        if (next) next();
+      }
+    };
+
+    if (activeHistoryThumbFetches < HISTORY_THUMB_FETCH_LIMIT) {
+      start();
+      return;
+    }
+
+    historyThumbFetchQueue.push(start);
+  });
+}
+
+export async function fetchGlbAsBlob(modelUrl, getIdToken, taskId = null) {
   if (!modelUrl) return null;
-
-  // data URI — base64 fallback
   if (modelUrl.startsWith('data:')) return modelUrl;
 
-  // URL feloldás
   let fetchUrl = modelUrl;
   if (modelUrl.startsWith('/api/')) {
-    // BUG FIX: volt hardcoded http://localhost:3001 — production-ban törött
     fetchUrl = `${API_BASE}${modelUrl}`;
   } else if (modelUrl.includes('tripo3d.com') || modelUrl.includes('tripo3d.ai')) {
-    // FIX: tripo CDN CORS-blokkolt — ide tartozik a tripo-data.rg1.data.tripo3d.com is
-    fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}`;
+    fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}${taskId ? `&taskId=${taskId}` : ''}`;
   } else if (
     modelUrl.startsWith('https://s3.') ||
     modelUrl.includes('backblazeb2.com') ||
@@ -98,25 +124,111 @@ export async function fetchGlbAsBlob(modelUrl, getIdToken) {
     fetchUrl = `${API_BASE}/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
   }
 
-  let token = '';
-  try {
-    token = getIdToken ? await getIdToken() : '';
-  } catch (e) {
-    console.warn('fetchGlbAsBlob: getIdToken hiba:', e?.message ?? e);
+  const tryFetch = async (url) => {
+    let token = '';
+    try {
+      token = getIdToken ? await getIdToken() : '';
+    } catch (e) {
+      console.warn('fetchGlbAsBlob: getIdToken hiba:', e?.message ?? e);
+    }
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return fetch(url, { headers });
+  };
+
+  let r = await tryFetch(fetchUrl);
+
+  // Retry once if 401 or 502 (proxy might be refreshing the URL)
+  if (!r.ok && [401, 502].includes(r.status)) {
+    console.warn(`fetchGlbAsBlob: attempt 1 failed (${r.status}), retrying in 1s...`);
+    await new Promise(res => setTimeout(res, 1000));
+    r = await tryFetch(fetchUrl);
   }
 
-  const headers = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const r = await fetch(fetchUrl, { headers });
-
   if (!r.ok) {
+    if (r.status === 410) {
+      throw new Error("A modell lejárt vagy törölve lett a forrás szerverről (Tripo).");
+    }
     const body = await r.text().catch(() => '');
-    throw new Error(`GLB letöltés sikertelen: HTTP ${r.status} — ${fetchUrl}\n${body.slice(0, 200)}`);
+    throw new Error(`GLB letöltés sikertelen: HTTP ${r.status}${body ? ` — ${body.slice(0, 100)}` : ""}`);
   }
 
   const blob = await r.blob();
   return URL.createObjectURL(blob);
+}
+
+/**
+ * Fetch model as ArrayBuffer (for thumbnail generation).
+ * Returns { buffer: ArrayBuffer, blobUrl: string }
+ */
+export async function fetchModelData(modelUrl, getIdToken, taskId = null) {
+  return runLimitedHistoryThumbFetch(async () => {
+    if (!modelUrl) return null;
+    if (modelUrl.startsWith('data:')) return null;
+
+    let fetchUrl = modelUrl;
+    if (modelUrl.startsWith('/api/')) {
+      fetchUrl = `${API_BASE}${modelUrl}`;
+    } else if (modelUrl.includes('tripo3d.com') || modelUrl.includes('tripo3d.ai')) {
+      fetchUrl = `${API_BASE}/api/tripo/model-proxy?url=${encodeURIComponent(modelUrl)}${taskId ? `&taskId=${taskId}` : ''}`;
+    } else if (
+      modelUrl.startsWith('https://s3.') ||
+      modelUrl.includes('backblazeb2.com') ||
+      modelUrl.includes('b2cdn.com')
+    ) {
+      fetchUrl = `${API_BASE}/api/trellis/proxy?url=${encodeURIComponent(modelUrl)}`;
+    }
+
+    const tryFetch = async (url) => {
+      let token = '';
+      try {
+        token = getIdToken ? await getIdToken() : '';
+      } catch (e) {
+        console.warn('fetchModelData: getIdToken hiba:', e?.message ?? e);
+      }
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return fetch(url, { headers });
+    };
+
+    const inFlightKey = `${taskId ?? "no-task"}|${fetchUrl}`;
+    let requestPromise = historyThumbFetchInFlight.get(inFlightKey);
+
+    if (!requestPromise) {
+      requestPromise = (async () => {
+        let r = await tryFetch(fetchUrl);
+
+        if (!r.ok && [401, 502].includes(r.status)) {
+          // Retry on auth expiration or transient gateway errors, but SKIP permanent errors like 410 Gone
+          console.warn(`fetchModelData: attempt 1 failed (${r.status}), retrying in 1.2s...`);
+          await new Promise(res => setTimeout(res, 1200));
+          r = await tryFetch(fetchUrl);
+        }
+
+        if (!r.ok) {
+          const err = new Error(`Model fetch failed: HTTP ${r.status}`);
+          err.status = r.status;
+          throw err;
+        }
+
+        return r.arrayBuffer();
+      })();
+
+      historyThumbFetchInFlight.set(inFlightKey, requestPromise);
+    }
+
+    try {
+      const sharedBuffer = await requestPromise;
+      const buffer = sharedBuffer.slice(0);
+      const blob = new Blob([buffer]);
+      const blobUrl = URL.createObjectURL(blob);
+      return { buffer, blobUrl };
+    } finally {
+      if (historyThumbFetchInFlight.get(inFlightKey) === requestPromise) {
+        historyThumbFetchInFlight.delete(inFlightKey);
+      }
+    }
+  });
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -206,14 +318,21 @@ export async function loadHistoryPageFromFirestore(userId, { limit = 10, startAf
 // ezzel a mezővel automatikus törléshez (ha engedélyezve van).
 // ────────────────────────────────────────────────────────────────────────────
 
-export async function saveHistoryToFirestore(userId, itemData) {
+export async function saveHistoryToFirestore(userId, itemData, docId = null, firestoreCollection = 'trellis_history') {
+  if (!userId) { console.warn('[saveHistoryToFirestore] called without userId — skipped'); return { docId: null }; }
   const now = Date.now();
-  const docRef = await addDoc(collection(db, 'trellis_history'), {
+  const data = {
     userId,
     ...itemData,
-    createdAt: serverTimestamp(),          // Firestore index + load
-    ts: itemData.ts ?? now,               // client-side rendezés
-    expiresAt: now + HISTORY_TTL_MS,      // TTL: 7 nap — Firestore TTL policy használható
-  });
+    createdAt: serverTimestamp(),
+    ts: itemData.ts ?? now,
+    expiresAt: now + HISTORY_TTL_MS,
+  };
+  if (docId) {
+    const docRef = doc(db, firestoreCollection, docId);
+    await setDoc(docRef, data, { merge: true });
+    return { docId };
+  }
+  const docRef = await addDoc(collection(db, firestoreCollection), data);
   return { docId: docRef.id };
 }

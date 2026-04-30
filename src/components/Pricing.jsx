@@ -1,28 +1,12 @@
-import { useState, useEffect, useRef } from "react";
-import {
-  Check,
-  Sparkles,
-  Zap,
-  Crown,
-  Star,
-  TrendingUp,
-  ArrowRight,
-  Gift,
-  Shield,
-} from "lucide-react";
+import { useState } from "react";
+import { Check, Sparkles, Zap, Crown, Star, ArrowRight } from "lucide-react";
 
-// Ha van saját packages importod, használd azt így:
-// import { packages } from '../data/packages';
-// És kommenteld ki a packagesData-t
-
-// Példa adat struktúra - cseréld le a sajátodra
 const packagesData = [
   {
     name: "Starter",
     price: "9.990 Ft",
     period: "hó",
     icon: Sparkles,
-    gradient: "from-blue-500 to-cyan-500",
     highlight: false,
     features: [
       "10,000 AI kérés/hó",
@@ -36,7 +20,6 @@ const packagesData = [
     price: "29.990 Ft",
     period: "hó",
     icon: Star,
-    gradient: "from-purple-500 to-pink-500",
     highlight: true,
     features: [
       "100,000 AI kérés/hó",
@@ -51,7 +34,6 @@ const packagesData = [
     price: "79.990 Ft",
     period: "hó",
     icon: Crown,
-    gradient: "from-pink-500 to-rose-500",
     highlight: false,
     features: [
       "Unlimited AI kérés",
@@ -66,7 +48,6 @@ const packagesData = [
     price: "Egyedi",
     period: "ár",
     icon: Zap,
-    gradient: "from-cyan-500 to-blue-500",
     highlight: false,
     features: [
       "Teljes testreszabás",
@@ -79,562 +60,111 @@ const packagesData = [
 ];
 
 export default function Pricing() {
-  const [hoveredCard, setHoveredCard] = useState(null);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [activeTab, setActiveTab] = useState("monthly");
-  const [bubbleStyle, setBubbleStyle] = useState({});
-  const tabButtonsRef = useRef({});
-
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
-
-useEffect(() => {
-  // Calculate bubble position and width based on actual button dimensions
-  const activeButton = tabButtonsRef.current[activeTab];
-  if (activeButton) {
-    const { offsetLeft, offsetWidth } = activeButton;
-    const container = activeButton.parentElement;
-    const containerPadding = parseFloat(getComputedStyle(container).paddingLeft);
-    
-    setBubbleStyle({
-      width: `${offsetWidth}px`,
-      transform: `translateX(${offsetLeft - containerPadding}px)`,
-    });
-  }
-}, [activeTab]);
-
-  // Ha van saját packages importod, töröld ezt a sort:
-  const packages = packagesData;
 
   return (
-    <section id="pricing" className="min-h-screen flex items-center justify-center relative py-16 sm:py-24 lg:py-32 px-4 overflow-hidden">
-      {/* MEGA Background Effects */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute top-0 left-1/4 w-[300px] sm:w-[400px] lg:w-[600px] h-[300px] sm:h-[400px] lg:h-[600px] bg-purple-600/20 rounded-full blur-[100px] sm:blur-[120px] lg:blur-[150px] animate-pulse-slow" />
-        <div
-          className="absolute bottom-0 right-1/4 w-[300px] sm:w-[400px] lg:w-[600px] h-[300px] sm:h-[400px] lg:h-[600px] bg-cyan-600/20 rounded-full blur-[100px] sm:blur-[120px] lg:blur-[150px] animate-pulse-slow"
-          style={{ animationDelay: "3s" }}
-        />
-        <div
-          className="absolute top-1/2 left-1/2 w-[250px] sm:w-[350px] lg:w-[500px] h-[250px] sm:h-[350px] lg:h-[500px] bg-pink-600/20 rounded-full blur-[100px] sm:blur-[120px] lg:blur-[150px] animate-pulse-slow"
-          style={{ animationDelay: "6s" }}
-        />
-
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(168,85,247,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(168,85,247,0.5) 1px, transparent 1px)",
-            backgroundSize: "50px 50px sm:100px 100px",
-          }}
-        />
-
-        {[...Array(15)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute animate-float-random hidden sm:block"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${10 + Math.random() * 20}s`,
-            }}
-          >
-            <div className="w-1 h-1 bg-purple-400 rounded-full opacity-60" />
-          </div>
-        ))}
-
-        <div
-          className="absolute w-[400px] sm:w-[600px] lg:w-[800px] h-[400px] sm:h-[600px] lg:h-[800px] pointer-events-none transition-all duration-300 ease-out opacity-20 hidden md:block"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(168,85,247,0.4) 0%, transparent 70%)",
-            left: mousePosition.x - 400,
-            top: mousePosition.y - 400,
-          }}
-        />
-      </div>
-
-      <div className="max-w-7xl mx-auto relative z-10">
+    <section id="pricing" className="min-h-screen relative py-20 px-6 sm:px-12 overflow-hidden flex flex-col justify-center items-center">
+      <div className="max-w-[1200px] w-full mx-auto relative z-10 flex flex-col items-center">
         {/* Header Section */}
-        <div className="text-center mb-12 sm:mb-16 lg:mb-20">
-          <div className="inline-block mb-6 sm:mb-8 relative group cursor-pointer animate-float-subtle">
-            <div className="relative px-4 sm:px-6 lg:px-8 py-2 sm:py-3 bg-gradient-to-r from-purple-900/60 via-pink-900/60 to-cyan-900/60 backdrop-blur-2xl border-2 border-white/30 rounded-full shadow-[0_0_20px_rgba(168,85,247,0.4)] sm:shadow-[0_0_40px_rgba(168,85,247,0.6)]">
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400 animate-pulse" />
-                <span className="text-xs sm:text-sm font-bold bg-gradient-to-r from-purple-200 via-pink-200 to-cyan-200 bg-clip-text text-transparent">
-                  💎 Prémium árazás - Korlátozott ajánlat!
-                </span>
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 animate-spin-slow" />
-              </div>
-            </div>
-          </div>
-
-          <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-black mb-6 sm:mb-8 leading-tight px-4">
-            <span className="block bg-gradient-to-r from-white via-purple-100 to-white bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(255,255,255,0.3)] sm:drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]">
-              Válaszd a te
-            </span>
-            <span className="block relative mt-2">
-              <span className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 bg-clip-text text-transparent blur-xl sm:blur-2xl opacity-50 animate-gradient-x">
-                csomagodat
-              </span>
-              <span className="relative bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent animate-gradient-x">
-                csomagodat
-              </span>
-            </span>
+        <div className="text-center mb-16 max-w-2xl">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold mb-6 tracking-tight text-white">
+            Keresd meg a <br />
+            <span className="text-gradient-primary">SZINTEDET</span>
           </h2>
 
-          <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 max-w-3xl mx-auto mb-8 sm:mb-12 leading-relaxed px-4">
-            Rugalmas árazás minden igényre,{" "}
-            <span className="font-bold text-white">
-              startup-tól enterprise-ig
-            </span>
+          <p className="font-body text-lg text-text-dim leading-relaxed mb-10 text-balance">
+            Rugalmas árazás minden igényre, <span className="text-white font-semibold">startup-tól enterprise-ig</span>. Válassz egy csomagot és aktiváld a rendszert.
           </p>
 
-          {/* Fixed Tab Switcher with Dynamic Animation */}
-          <div className="relative inline-flex items-center p-1.5 sm:p-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl">
-            {/* Animated bubble background with dynamic positioning */}
-            <div
-              className="absolute left-1.5 sm:left-2 top-1.5 sm:top-2 h-[calc(100%-12px)] sm:h-[calc(100%-16px)] rounded-full bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 animate-gradient-x transition-all duration-500 ease-out shadow-lg"
-              style={bubbleStyle}
+          {/* Elegant Pill Tab Switcher */}
+          <div className="inline-flex items-center p-1.5 glass-panel rounded-full relative">
+            <div 
+              className="absolute inset-y-1.5 w-[140px] bg-white/10 rounded-full transition-transform duration-300 ease-in-out"
+              style={{ transform: activeTab === 'monthly' ? 'translateX(0)' : 'translateX(100%)' }}
             />
-            
             <button
-              ref={(el) => (tabButtonsRef.current["monthly"] = el)}
               onClick={() => setActiveTab("monthly")}
-              className={`relative px-4 sm:px-6 lg:px-8 py-2 sm:py-3 rounded-full cursor-pointer font-bold transition-all duration-300 text-sm sm:text-base z-10 whitespace-nowrap ${
-                activeTab === "monthly"
-                  ? "text-white"
-                  : "text-gray-400 hover:text-white"
+              className={`relative z-10 w-[140px] py-2.5 font-body font-semibold text-sm transition-colors ${
+                activeTab === "monthly" ? "text-white" : "text-text-dim hover:text-white"
               }`}
             >
               Havi
             </button>
-            
             <button
-              ref={(el) => (tabButtonsRef.current["yearly"] = el)}
               onClick={() => setActiveTab("yearly")}
-              className={`relative px-4 sm:px-6 lg:px-8 py-2 sm:py-3 rounded-full cursor-pointer font-bold transition-all duration-300 text-sm sm:text-base z-10 whitespace-nowrap ${
-                activeTab === "yearly"
-                  ? "text-white"
-                  : "text-gray-400 hover:text-white"
+              className={`relative z-10 w-[140px] py-2.5 font-body font-semibold text-sm transition-colors flex items-center justify-center gap-2 ${
+                activeTab === "yearly" ? "text-white" : "text-text-dim hover:text-white"
               }`}
             >
-              <span className="flex items-center">
-                Éves
-                <span className="ml-1.5 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-500/20 border border-green-500/50 rounded-lg text-xs text-green-400">
-                  -20%
-                </span>
-              </span>
+              Éves <span className="px-1.5 py-0.5 rounded-md bg-secondary/20 text-secondary text-[10px]">-20%</span>
             </button>
           </div>
         </div>
 
-        {/* Pricing Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-6 lg:gap-8 mb-12 sm:mb-16 items-stretch">
-          {packages.map((pkg, idx) => {
+        {/* Pricing Cards - Modern Bento Style Grids */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch w-full">
+          {packagesData.map((pkg, idx) => {
             const Icon = pkg.icon;
-            const isHovered = hoveredCard === idx;
 
             return (
               <div
                 key={idx}
-                onMouseEnter={() => setHoveredCard(idx)}
-                onMouseLeave={() => setHoveredCard(null)}
-                className={`relative group rounded-2xl sm:rounded-3xl backdrop-blur-2xl transition-all duration-500 transform
-          ${
-            pkg.highlight
-              ? "sm:scale-105 lg:-mt-8 lg:mb-8"
-              : "scale-100 hover:scale-105"
-          }
-          min-h-[600px] sm:min-h-[650px]`}
+                className={`group relative glass-panel p-8 flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] ${
+                  pkg.highlight ? "border-primary/50 shadow-[0_0_30px_rgba(138,43,226,0.15)] bg-white/[0.05]" : "border-white/10"
+                }`}
               >
-                <div
-                  className={`absolute inset-0 rounded-2xl sm:rounded-3xl blur-xl sm:blur-2xl transition-opacity duration-500 ${
-                    isHovered ? "opacity-100" : "opacity-0"
-                  }`}
-                  style={{
-                    background: pkg.gradient.includes("purple")
-                      ? "linear-gradient(135deg, rgba(168,85,247,0.4), transparent)"
-                      : pkg.gradient.includes("blue")
-                      ? "linear-gradient(135deg, rgba(59,130,246,0.4), transparent)"
-                      : pkg.gradient.includes("pink")
-                      ? "linear-gradient(135deg, rgba(236,72,153,0.4), transparent)"
-                      : "linear-gradient(135deg, rgba(34,211,238,0.4), transparent)",
-                  }}
-                />
-
-                <div
-                  className={`relative p-6 sm:p-8 rounded-2xl sm:rounded-3xl transition-all duration-500 h-full flex flex-col justify-between ${
-                    pkg.highlight
-                      ? "bg-gradient-to-b from-white/15 to-white/5 border-2 border-purple-500/50"
-                      : "bg-white/5 border border-white/10 hover:bg-white/10"
-                  }`}
-                  style={
-                    pkg.highlight
-                      ? {
-                          boxShadow: isHovered
-                            ? "0 0 60px rgba(168,85,247,0.5), 0 0 30px rgba(236,72,153,0.3)"
-                            : "0 0 30px rgba(168,85,247,0.25)",
-                        }
-                      : {}
-                  }
-                >
-                  {pkg.highlight && (
-                    <div className="absolute -top-4 sm:-top-6 left-1/2 transform -translate-x-1/2 z-10">
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 rounded-full blur-lg sm:blur-xl opacity-70 animate-pulse-slow" />
-                        <div className="relative px-3 sm:px-6 py-1.5 sm:py-2 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 rounded-full text-xs sm:text-sm font-black shadow-2xl flex items-center space-x-1 sm:space-x-2">
-                          <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-300 animate-spin-slow" />
-                          <span className="hidden sm:inline">LEGJOBB VÁLASZTÁS</span>
-                          <span className="sm:hidden">LEGJOBB</span>
-                          <Star
-                            className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-300 animate-spin-slow"
-                            style={{ animationDirection: "reverse" }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {isHovered && (
-                    <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl sm:rounded-3xl hidden sm:block">
-                      {[...Array(8)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="absolute w-2 h-2 bg-purple-400 rounded-full animate-particle-float"
-                          style={{
-                            left: `${i * 12.5 + 10}%`,
-                            animationDelay: `${i * 0.2}s`,
-                          }}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="mb-6 sm:mb-8 relative">
-                    <div
-                      className={`inline-flex p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-gradient-to-br ${
-                        pkg.gradient
-                      } shadow-2xl transform transition-all duration-500 ${
-                        isHovered ? "scale-110 rotate-6" : "scale-100 rotate-0"
-                      }`}
-                    >
-                      <Icon className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-white" />
-                      {isHovered && (
-                        <div className="absolute inset-0 animate-ping hidden sm:block">
-                          <div
-                            className={`w-full h-full rounded-xl sm:rounded-2xl bg-gradient-to-br ${pkg.gradient} opacity-50`}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    {isHovered && (
-                      <>
-                        <Sparkles className="absolute -top-1 sm:-top-2 -right-1 sm:-right-2 w-4 h-4 sm:w-6 sm:h-6 text-yellow-400 animate-pulse hidden sm:block" />
-                        <Zap className="absolute -bottom-1 sm:-bottom-2 -left-1 sm:-left-2 w-3 h-3 sm:w-5 sm:h-5 text-cyan-400 animate-bounce hidden sm:block" />
-                      </>
-                    )}
+                {pkg.highlight && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-primary to-secondary rounded-full text-white font-body font-bold text-xs shadow-[0_0_15px_rgba(138,43,226,0.5)] whitespace-nowrap">
+                    LEGNÉPSZERŰBB
                   </div>
+                )}
 
-                  <h3
-                    className={`text-2xl sm:text-3xl font-black mb-4 sm:mb-6 transition-all duration-300 ${
-                      isHovered
-                        ? "text-transparent bg-gradient-to-r from-purple-300 via-pink-300 to-cyan-300 bg-clip-text"
-                        : "text-white"
-                    }`}
-                  >
+                <div className="mb-6 flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${pkg.highlight ? "bg-primary/20 text-primary" : "bg-white/5 text-text-dim"}`}>
+                    <Icon className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-heading font-semibold text-white">
                     {pkg.name}
                   </h3>
-
-                  <div className="mb-6 sm:mb-8">
-                    <div className="flex items-baseline mb-2">
-                      <span className="text-4xl sm:text-5xl lg:text-6xl font-black bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                        {pkg.price}
-                      </span>
-                      {pkg.highlight && (
-                        <TrendingUp className="ml-2 w-4 h-4 sm:w-6 sm:h-6 text-green-400 animate-bounce" />
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-gray-400 text-xs sm:text-sm">
-                        /{pkg.period}
-                      </span>
-                      {activeTab === "yearly" && (
-                        <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-500/20 border border-green-500/50 rounded-lg text-xs text-green-400 font-bold animate-pulse">
-                          20% megtakarítás
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-10">
-                    {pkg.features.map((feature, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start group/item transition-all duration-300 hover:translate-x-1 sm:hover:translate-x-2"
-                      >
-                        <div
-                          className={`relative p-0.5 sm:p-1 rounded-full bg-gradient-to-br ${pkg.gradient} mr-2 sm:mr-3 flex-shrink-0 mt-0.5 transition-all duration-300 group-hover/item:scale-110 group-hover/item:rotate-12`}
-                        >
-                          <Check className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                          <div
-                            className={`absolute inset-0 rounded-full bg-gradient-to-br ${pkg.gradient} blur-md opacity-0 group-hover/item:opacity-100 transition-opacity animate-pulse hidden sm:block`}
-                          />
-                        </div>
-                        <span className="text-gray-300 text-xs sm:text-sm leading-relaxed group-hover/item:text-white transition-all">
-                          {feature}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    className={`relative w-full cursor-pointer py-3 sm:py-4 rounded-xl sm:rounded-2xl font-black text-sm sm:text-base lg:text-lg transition-all duration-500 overflow-hidden group/btn ${
-                      pkg.highlight ? "" : "border border-white/30"
-                    }`}
-                  >
-                    {pkg.highlight ? (
-                      <>
-                        <div
-                          className={`absolute inset-0 bg-gradient-to-r ${pkg.gradient} animate-gradient-x`}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-500 animate-gradient-x" />
-                        <div className="absolute inset-0 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-700">
-                          <div className="absolute inset-0 translate-x-[-200%] group-hover/btn:translate-x-[200%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12" />
-                        </div>
-                        <div
-                          className={`absolute inset-[-2px] rounded-xl sm:rounded-2xl bg-gradient-to-r ${pkg.gradient} opacity-0 group-hover/btn:opacity-100 blur-lg transition-opacity`}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <div className="absolute inset-0 bg-white/10 group-hover/btn:bg-white/20 transition-colors" />
-                        <div
-                          className={`absolute inset-0 bg-gradient-to-r ${pkg.gradient} opacity-0 group-hover/btn:opacity-20 transition-opacity`}
-                        />
-                      </>
-                    )}
-                    <span className="relative z-10 flex items-center justify-center space-x-1.5 sm:space-x-2 uppercase tracking-wider">
-                      <span>Kezdés</span>
-                      <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover/btn:translate-x-1 sm:group-hover/btn:translate-x-2 transition-transform" />
-                      {pkg.highlight && (
-                        <Zap className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
-                      )}
-                    </span>
-                    {pkg.highlight && (
-                      <div className="absolute inset-0 rounded-xl sm:rounded-2xl bg-white/20 animate-ping-slow opacity-0 group-hover/btn:opacity-20" />
-                    )}
-                  </button>
-
-                  {pkg.highlight && (
-                    <div className="mt-3 sm:mt-4 text-center">
-                      <div className="inline-flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/50 rounded-full">
-                        <Gift className="w-3 h-3 sm:w-4 sm:h-4 text-green-400" />
-                        <span className="text-xs font-bold text-green-400">
-                          +30 nap INGYEN próbaidő!
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </div>
+
+                <div className="mb-8">
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className={`text-4xl font-heading font-bold ${pkg.highlight ? 'text-white' : 'text-white/90'}`}>
+                      {pkg.price}
+                    </span>
+                  </div>
+                  <div className="font-body text-text-dim text-sm">
+                    / {pkg.period} {activeTab === "yearly" && "(éves fizetés)"}
+                  </div>
+                </div>
+
+                <ul className="space-y-4 mb-10 flex-1 font-body text-sm font-medium text-white/80">
+                  {pkg.features.map((feature, i) => (
+                    <li key={i} className="flex items-start">
+                      <div className={`mt-0.5 mr-3 flex-shrink-0 ${pkg.highlight ? "text-primary" : "text-secondary"}`}>
+                        <Check className="w-4 h-4" />
+                      </div>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <button className={`w-full py-3.5 rounded-xl font-body font-semibold transition-all duration-300 flex items-center justify-center group/btn relative overflow-hidden ${
+                  pkg.highlight 
+                    ? "bg-white text-black hover:bg-white/90 shadow-[0_0_20px_rgba(255,255,255,0.2)]" 
+                    : "glass-panel border-white/10 text-white hover:bg-white/10"
+                }`}>
+                  <span className="relative z-10 flex items-center">
+                    Kiválaszt
+                    <ArrowRight className="ml-2 w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+                  </span>
+                </button>
               </div>
             );
           })}
-        </div>
-
-        {/* Trust badges */}
-        <div className="flex flex-wrap justify-center gap-3 sm:gap-6 lg:gap-8 mb-8 sm:mb-12">
-          {[
-            {
-              icon: Shield,
-              text: "SSL Titkosítás",
-              color: "from-green-400 to-emerald-400",
-            },
-            {
-              icon: Zap,
-              text: "99.9% Uptime",
-              color: "from-yellow-400 to-orange-400",
-            },
-            {
-              icon: Crown,
-              text: "Prémium Support",
-              color: "from-purple-400 to-pink-400",
-            },
-            {
-              icon: Star,
-              text: "10,000+ Elégedett Ügyfél",
-              color: "from-cyan-400 to-blue-400",
-            },
-          ].map((badge, idx) => {
-            const BadgeIcon = badge.icon;
-            return (
-              <div
-                key={idx}
-                className="group flex items-center space-x-2 sm:space-x-3 px-3 sm:px-4 lg:px-6 py-2 sm:py-3 bg-white/5 backdrop-blur-xl border border-white/10 rounded-full hover:border-white/30 hover:bg-white/10 transition-all duration-300 cursor-pointer"
-              >
-                <BadgeIcon
-                  className={`w-4 h-4 sm:w-5 sm:h-5 text-${badge.color.split("-")[1]}-400`}
-                />
-                <span className="text-xs sm:text-sm font-medium text-gray-300 group-hover:text-white transition-colors">
-                  {badge.text}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Money back guarantee */}
-        <div className="relative group cursor-pointer">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-pink-600/20 to-cyan-600/0 rounded-xl sm:rounded-2xl blur-xl sm:blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="relative text-center p-6 sm:p-8 bg-gradient-to-r from-white/5 via-white/10 to-white/5 backdrop-blur-xl border border-white/10 rounded-xl sm:rounded-2xl">
-            <div className="flex items-center justify-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
-              <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-green-400 animate-pulse" />
-              <h3 className="text-lg sm:text-xl lg:text-2xl font-black bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                30 Napos Pénzvisszafizetési Garancia
-              </h3>
-              <Shield
-                className="w-6 h-6 sm:w-8 sm:h-8 text-green-400 animate-pulse hidden sm:block"
-                style={{ animationDelay: "1s" }}
-              />
-            </div>
-            <p className="text-sm sm:text-base text-gray-400 max-w-2xl mx-auto px-4">
-              Nem vagy elégedett?{" "}
-              <span className="text-white font-bold">
-                Visszafizetjük a teljes összeget
-              </span>{" "}
-              - kérdések nélkül!
-            </p>
-          </div>
-        </div>
-
-        {/* FAQ Teaser */}
-        <div className="mt-12 sm:mt-16 text-center">
-          <p className="text-sm sm:text-base text-gray-400 mb-3 sm:mb-4 px-4">
-            Kérdésed van az árazással kapcsolatban?
-          </p>
-          <button className="group relative px-6 sm:px-8 py-3 sm:py-4 bg-white/5 backdrop-blur-xl border border-white/20 rounded-full hover:border-purple-500/50 hover:bg-white/10 transition-all duration-300">
-            <span className="flex items-center space-x-2">
-              <span className="font-bold text-sm sm:text-base text-white group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-purple-300 group-hover:to-cyan-300 group-hover:bg-clip-text transition-all">
-                Nézd meg a gyakori kérdéseket
-              </span>
-              <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400 group-hover:translate-x-2 transition-transform" />
-            </span>
-          </button>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes float-random {
-          0%,
-          100% {
-            transform: translate(0, 0);
-            opacity: 0.3;
-          }
-          25% {
-            transform: translate(20px, -20px);
-            opacity: 0.7;
-          }
-          50% {
-            transform: translate(-15px, -40px);
-            opacity: 0.5;
-          }
-          75% {
-            transform: translate(30px, -25px);
-            opacity: 0.8;
-          }
-        }
-        @keyframes float-subtle {
-          0%,
-          100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-10px);
-          }
-        }
-        @keyframes particle-float {
-          0% {
-            transform: translateY(0) scale(0);
-            opacity: 0;
-          }
-          50% {
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(-100px) scale(1);
-            opacity: 0;
-          }
-        }
-        @keyframes gradient-x {
-          0%,
-          100% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-        }
-        @keyframes pulse-slow {
-          0%,
-          100% {
-            opacity: 0.3;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.5;
-            transform: scale(1.05);
-          }
-        }
-        @keyframes spin-slow {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
-        @keyframes ping-slow {
-          0% {
-            transform: scale(1);
-            opacity: 0;
-          }
-          50% {
-            opacity: 0.3;
-          }
-          100% {
-            transform: scale(1.5);
-            opacity: 0;
-          }
-        }
-        .animate-float-random {
-          animation: float-random 15s ease-in-out infinite;
-        }
-        .animate-float-subtle {
-          animation: float-subtle 3s ease-in-out infinite;
-        }
-        .animate-particle-float {
-          animation: particle-float 2s ease-out infinite;
-        }
-        .animate-gradient-x {
-          background-size: 200% 200%;
-          animation: gradient-x 3s ease infinite;
-        }
-        .animate-pulse-slow {
-          animation: pulse-slow 6s ease-in-out infinite;
-        }
-        .animate-spin-slow {
-          animation: spin-slow 8s linear infinite;
-        }
-        .animate-ping-slow {
-          animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-        }
-      `}</style>
     </section>
   );
 }

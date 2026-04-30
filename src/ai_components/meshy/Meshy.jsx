@@ -1,4 +1,4 @@
-// Trellis2Panel.jsx — Main panel (refactored, modular)
+// Meshy v6 Workspace — Editorial Brutalist Cinematic Desktop
 import React, {
   useState,
   useRef,
@@ -6,6 +6,8 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 import {
   Upload,
   RotateCcw,
@@ -24,10 +26,20 @@ import {
   Play,
   Square,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Image as ImageIcon,
   PersonStanding,
   Settings,
   Paintbrush2,
+  Type,
+  PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen
 } from "lucide-react";
+
+import StudioLayout from "../../components/shared/StudioLayout";
+import { useStudioPanels } from "../../context/StudioPanelContext";
+import { API_BASE as API_BASE_RAW } from "../../api/client";
+import { useJobs } from "../../context/JobsContext";
 
 // ── Sub-modules ────────────────────────────────────────────────────────────
 import ThreeViewer from "./viewer/ThreeViewer";
@@ -37,7 +49,7 @@ import DownloadModal from "./modals/DownloadModal";
 import EditTextureModal from "./modals/EditTextureModal";
 import RemeshModal from "./modals/RemeshModal";
 import AnimateModal from "./modals/AnimateModal";
-import { Tooltip, IconBtn } from "./ui/primitives";
+import { Tooltip, IconBtn } from "./ui/Primitives";
 import {
   Toggle,
   SegControl,
@@ -52,7 +64,7 @@ import {
 const PROMPT_MAX = 600;
 const LS_KEY = "meshy_panel_history_v1";
 const POLL_MS = 2500;
-const API_BASE = "/api/meshy";
+const API_BASE = `${API_BASE_RAW}/api/meshy`;
 
 // ── localStorage helpers ───────────────────────────────────────────────────
 const loadHistory = () => {
@@ -66,7 +78,7 @@ const loadHistory = () => {
 const saveHistory = (h) => {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(h.slice(0, 40)));
-  } catch {}
+  } catch { }
 };
 const fileToDataURI = (file) =>
   new Promise((res, rej) => {
@@ -125,68 +137,41 @@ const VIEW_MODES = [
 const BG_OPTIONS = [
   {
     id: "default",
-    label: "Alap",
-    tip: "Alapértelmezett (átlátszó)",
-    // Checkerboard visual = transparent
+    label: "STATION",
+    tip: "Default Workstation (Checker)",
     render: () => (
       <div
+        className="w-3.5 h-3.5 rounded-md border border-white/10"
         style={{
-          width: 14,
-          height: 14,
-          borderRadius: 3,
           background:
-            "linear-gradient(45deg,#1e1e3a 25%,#111128 25%,#111128 50%,#1e1e3a 50%,#1e1e3a 75%,#111128 75%)",
-          backgroundSize: "6px 6px",
+            "linear-gradient(45deg,#0a0a0f 25%,#18181b 25%,#18181b 50%,#0a0a0f 50%,#0a0a0f 75%,#18181b 75%)",
+          backgroundSize: "4px 4px",
         }}
       />
     ),
   },
   {
     id: "black",
-    label: "Fekete",
-    tip: "Fekete háttér",
+    label: "VOID",
+    tip: "Absolute Zero Black",
     render: () => (
-      <div
-        style={{
-          width: 14,
-          height: 14,
-          borderRadius: 3,
-          background: "#000",
-          border: "1px solid rgba(255,255,255,0.15)",
-        }}
-      />
+      <div className="w-3.5 h-3.5 rounded-md bg-black border border-white/5" />
     ),
   },
   {
     id: "darkgray",
-    label: "Sötétszürke",
-    tip: "Sötétszürke háttér",
+    label: "ZINC",
+    tip: "Matte Zinc Gray",
     render: () => (
-      <div
-        style={{
-          width: 14,
-          height: 14,
-          borderRadius: 3,
-          background: "#111118",
-          border: "1px solid rgba(255,255,255,0.1)",
-        }}
-      />
+      <div className="w-3.5 h-3.5 rounded-md bg-[#18181b] border border-white/10" />
     ),
   },
   {
     id: "white",
-    label: "Fehér",
-    tip: "Fehér háttér",
+    label: "LAB",
+    tip: "Sterile White Laboratory",
     render: () => (
-      <div
-        style={{
-          width: 14,
-          height: 14,
-          borderRadius: 3,
-          background: "#fff",
-          border: "1px solid rgba(255,255,255,0.1)",
-        }}
-      />
+      <div className="w-3.5 h-3.5 rounded-md bg-white border border-white/20" />
     ),
   },
 ];
@@ -206,69 +191,19 @@ function BgColorPicker({ value, onChange }) {
   const current = BG_OPTIONS.find((o) => o.id === value) ?? BG_OPTIONS[0];
 
   return (
-    <div style={{ position: "relative", display: "inline-flex" }} ref={ref}>
+    <div className="relative inline-flex" ref={ref}>
       <Tooltip text="Háttér szín" side="bottom">
         <button
           onClick={() => setOpen((v) => !v)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 5,
-            padding: "3px 7px",
-            borderRadius: 7,
-            fontSize: 10,
-            fontWeight: 700,
-            cursor: "pointer",
-            border: "none",
-            transition: "all 0.15s",
-            background: open
-              ? "rgba(255,255,255,0.1)"
-              : "rgba(255,255,255,0.04)",
-            color: "#6b7280",
-            outline: open
-              ? "1px solid rgba(255,255,255,0.2)"
-              : "1px solid rgba(255,255,255,0.06)",
-          }}
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-zinc-600 bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 transition-all cursor-pointer"
         >
           {current.render()}
-          <span style={{ color: "#6b7280", fontSize: 9 }}>▾</span>
+          <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
       </Tooltip>
 
       {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            right: 0,
-            zIndex: 999,
-            width: 140,
-            borderRadius: 10,
-            background: "#0f0f23",
-            border: "1px solid rgba(255,255,255,0.12)",
-            boxShadow: "0 16px 40px rgba(0,0,0,0.6)",
-            padding: 6,
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-          }}
-        >
-          {/* Arrow */}
-          <div
-            style={{
-              position: "absolute",
-              top: -6,
-              right: 12,
-              width: 12,
-              height: 12,
-              background: "#0f0f23",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderBottom: "none",
-              borderRight: "none",
-              transform: "rotate(45deg)",
-            }}
-          />
-
+        <div className="absolute top-[calc(100%+8px)] right-0 z-[1000] w-40 rounded-2xl bg-[#0a0a0f] border border-white/10 shadow-[0_24_64px_rgba(0,0,0,0.8)] p-1 flex flex-col gap-0.5">
           {BG_OPTIONS.map((opt) => {
             const isActive = value === opt.id;
             return (
@@ -278,46 +213,12 @@ function BgColorPicker({ value, onChange }) {
                   onChange(opt.id);
                   setOpen(false);
                 }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "6px 8px",
-                  borderRadius: 7,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  border: "none",
-                  textAlign: "left",
-                  width: "100%",
-                  background: isActive
-                    ? "rgba(255,255,255,0.08)"
-                    : "transparent",
-                  color: isActive ? "#e5e7eb" : "#9ca3af",
-                  transition: "all 0.12s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive)
-                    e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive)
-                    e.currentTarget.style.background = "transparent";
-                }}
+                className={`flex items-center gap-3 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer border-none text-left w-full transition-all ${isActive ? 'bg-white/5 text-white' : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.02]'
+                  }`}
               >
                 {opt.render()}
                 {opt.label}
-                {isActive && (
-                  <span
-                    style={{
-                      marginLeft: "auto",
-                      fontSize: 10,
-                      color: "#6b7280",
-                    }}
-                  >
-                    ✓
-                  </span>
-                )}
+                {isActive && <div className="ml-auto w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />}
               </button>
             );
           })}
@@ -326,6 +227,7 @@ function BgColorPicker({ value, onChange }) {
     </div>
   );
 }
+
 function WireframeControl({
   active,
   onToggle,
@@ -358,7 +260,6 @@ function WireframeControl({
       }}
       ref={ref}
     >
-      {/* Main Wire toggle button */}
       <Tooltip
         text={
           active ? "Wire overlay kikapcsolása" : "Wire overlay bekapcsolása"
@@ -387,7 +288,6 @@ function WireframeControl({
         </button>
       </Tooltip>
 
-      {/* Settings caret — opens opacity/color popover */}
       <Tooltip text="Wire beállítások" side="bottom">
         <button
           onClick={() => setOpen((v) => !v)}
@@ -411,7 +311,6 @@ function WireframeControl({
         </button>
       </Tooltip>
 
-      {/* Popover */}
       {open && (
         <div
           style={{
@@ -427,7 +326,6 @@ function WireframeControl({
             padding: 12,
           }}
         >
-          {/* Arrow */}
           <div
             style={{
               position: "absolute",
@@ -454,7 +352,6 @@ function WireframeControl({
             Wire overlay
           </p>
 
-          {/* Opacity slider */}
           <div style={{ marginBottom: 12 }}>
             <div
               style={{
@@ -520,7 +417,6 @@ function WireframeControl({
             </div>
           </div>
 
-          {/* Color picker */}
           <div
             style={{
               display: "flex",
@@ -540,7 +436,6 @@ function WireframeControl({
               Szín
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {/* Quick presets */}
               {["#ffffff", "#84cc16", "#60a5fa", "#f87171"].map((c) => (
                 <button
                   key={c}
@@ -560,7 +455,6 @@ function WireframeControl({
                   }}
                 />
               ))}
-              {/* Native color picker fallback */}
               <label
                 style={{
                   cursor: "pointer",
@@ -596,7 +490,6 @@ function WireframeControl({
             </div>
           </div>
 
-          {/* Active indicator */}
           <div
             style={{
               marginTop: 10,
@@ -641,8 +534,23 @@ function WireframeControl({
     </div>
   );
 }
-export default function Trellis2Panel({ selectedModel, getIdToken }) {
+
+export default function MeshyPanel({ selectedModel, getIdToken, userId, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
+  const { registerPanel, unregisterPanel } = useStudioPanels();
+  const { jobs, addJob, updateJob, markJobDoneAndSeen, markJobError } = useJobs();
   const color = selectedModel?.color || "#06b6d4";
+
+  // Register panels with centralized manager
+  useEffect(() => {
+    registerPanel('L1');
+    registerPanel('L2');
+    registerPanel('R');
+    return () => {
+      unregisterPanel('L1');
+      unregisterPanel('L2');
+      unregisterPanel('R');
+    };
+  }, [registerPanel, unregisterPanel]);
 
   // ── Input & generation state ─────────────────────────────────────────────
   const [inputMode, setInputMode] = useState("text");
@@ -665,9 +573,9 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
   const [refining, setRefining] = useState(false);
   const [wireframeOverlay, setWireframeOverlay] = useState(false);
   const [wireOpacity, setWireOpacity] = useState(0.22);
-  const [wireColor, setWireColor] = useState("#ffffff"); // CSS hex for color picker
-  // Derived integer color for Three.js
+  const [wireColor, setWireColor] = useState("#ffffff");
   const wireHexColor = parseInt(wireColor.replace("#", ""), 16);
+
   // ── Viewer state ─────────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState("clay");
   const [lightMode, setLightMode] = useState("studio");
@@ -675,15 +583,42 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
   const [autoSpin, setAutoSpin] = useState(true);
   const [uvLayer, setUvLayer] = useState("base_color");
   const [bgColor, setBgColor] = useState("default");
+
   // ── Lighting advanced state ───────────────────────────────────────────────
   const [lightStrength, setLightStrength] = useState(1.0);
   const [lightRotation, setLightRotation] = useState(0);
+  const [lightElevation, setLightElevation] = useState(45);
   const [lightAutoRotate, setLightAutoRotate] = useState(false);
   const [lightAutoRotateSpeed, setLightAutoRotateSpeed] = useState(0.5);
   const [dramaticColor, setDramaticColor] = useState("#4400ff");
 
-  // ── UI state ─────────────────────────────────────────────────────────────
+  // layout state (controlled by StudioLayout)
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [leftSecondaryOpen, setLeftSecondaryOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+  const [offsets, setOffsets] = useState({ left: 320, right: 320 });
+  const [currentJobId, setCurrentJobId] = useState(null);
+
+  // Master Sidebar Sync
+  useEffect(() => {
+    setLeftOpen(isGlobalOpen);
+  }, [isGlobalOpen]);
+
+  // Sync with global jobs for cancellation
+  useEffect(() => {
+    if (!currentJobId || genStatus !== "pending") return;
+    const stillExists = jobs.some(j => j.id === currentJobId);
+    if (!stillExists) {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      setGenStatus("idle");
+      setProgress(0);
+      setTaskId(null);
+      setRefining(false);
+      setCurrentJobId(null);
+    }
+  }, [jobs, currentJobId, genStatus]);
+
+  // ── UI state ─────────────────────────────────────────────────────────────
   const [showDownload, setShowDownload] = useState(false);
   const [showEditTexture, setShowEditTexture] = useState(false);
   const [showRemesh, setShowRemesh] = useState(false);
@@ -695,10 +630,10 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
   const [histSearch, setHistSearch] = useState("");
   const [bgLightOn, setBgLightOn] = useState(true);
   const [bgLightColor, setBgLightColor] = useState("#ffffff");
-  const [bgLightSize, setBgLightSize] = useState(4); // was 8
-  const [bgLightIntensity, setBgLightIntensity] = useState(0.1); // was 0.9 → now 10%
-  const [gridColor1, setGridColor1] = useState("#1e1e3a"); // centre lines
-  const [gridColor2, setGridColor2] = useState("#111128"); // section lines
+  const [bgLightSize, setBgLightSize] = useState(4);
+  const [bgLightIntensity, setBgLightIntensity] = useState(0.1);
+  const [gridColor1, setGridColor1] = useState("#1e1e3a");
+  const [gridColor2, setGridColor2] = useState("#111128");
 
   useEffect(() => {
     saveHistory(history);
@@ -754,7 +689,6 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
         const dataUrl = e.target?.result;
         setModelUrl(dataUrl);
         setErrorMsg("");
-        // Menüponthoz hozzáadás
         const item = {
           id: `m_uploaded_${Date.now()}`,
           task_id: null,
@@ -785,9 +719,8 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
     };
   }, [getIdToken]);
 
-  // ── Polling ───────────────────────────────────────────────────────────────
   const startPolling = useCallback(
-    (id, type) => {
+    (id, type, jobId) => {
       clearInterval(pollTimerRef.current);
       pollTimerRef.current = setInterval(async () => {
         try {
@@ -795,10 +728,35 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
           const res = await fetch(`${API_BASE}/task/${type}/${id}`, {
             headers,
           });
+          if (!res.ok) {
+            let errMsg = `HTTP ${res.status}`;
+            try { const j = await res.json(); errMsg = j.message || errMsg; } catch {}
+            console.error("[Meshy] poll request failed:", errMsg);
+            return;
+          }
           const data = await res.json();
-          if (!data.success) return;
-          setProgress(data.progress ?? 0);
+          
+          // Cancellation check
+          if (!jobs.some(j => j.id === jobId)) {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+            return;
+          }
+
+          if (!data.success) {
+            console.error("[Meshy] poll returned non-success:", data.message);
+            toast.error("Generálási hiba: " + (data.message || "ismeretlen hiba"));
+            if (jobId) markJobError(jobId, data.message || "Ismeretlen hiba");
+            return;
+          }
+          
+          const currentProgress = data.progress ?? 0;
+          setProgress(currentProgress);
           setGenStatus(data.status?.toLowerCase() ?? "pending");
+          
+          if (jobId) {
+            updateJob(jobId, { progress: currentProgress, status: 'running' });
+          }
+
           if (data.status === "SUCCEEDED") {
             clearInterval(pollTimerRef.current);
             setProgress(100);
@@ -821,19 +779,21 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
             };
             setHistory((h) => [item, ...h]);
             setActiveItem(item);
+            if (jobId) markJobDoneAndSeen(jobId, { progress: 100 });
           } else if (data.status === "FAILED" || data.status === "EXPIRED") {
             clearInterval(pollTimerRef.current);
-            setErrorMsg(data.task_error?.message ?? "Generálás sikertelen");
+            const msg = data.task_error?.message ?? "Generálás sikertelen";
+            setErrorMsg(msg);
+            if (jobId) markJobError(jobId, msg);
           }
         } catch (err) {
           console.error("Poll error:", err);
         }
       }, POLL_MS);
     },
-    [authHeaders, inputMode, prompt, imageFile],
+    [authHeaders, inputMode, prompt, imageFile, updateJob, markJobDoneAndSeen, markJobError],
   );
 
-  // ── Generate ──────────────────────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
     if (genStatus === "pending" || genStatus === "in_progress") return;
     if (inputMode === "text" && !prompt.trim()) return;
@@ -843,6 +803,19 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
     setPreviewTaskId(null);
     setProgress(0);
     setGenStatus("pending");
+    const jobId = crypto.randomUUID();
+    const title = inputMode === "text" ? prompt.trim().slice(0, 30) : `Kép: ${imageFile?.name?.slice(0, 20) || 'feltöltés'}`;
+    
+    addJob({
+      id: jobId,
+      title,
+      status: 'queued',
+      panelType: 'meshy',
+      progress: 0,
+      createdAt: Date.now(),
+    });
+    setCurrentJobId(jobId);
+
     try {
       const headers = await authHeaders();
       let res, data;
@@ -850,7 +823,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
         res = await fetch(`${API_BASE}/text-to-3d`, {
           method: "POST",
           headers,
-          body: JSON.stringify({ prompt: prompt.trim(), ...params }),
+          body: JSON.stringify({ prompt: prompt.trim(), jobId, ...params }),
         });
         data = await res.json();
         setTaskType("text-to-3d");
@@ -861,6 +834,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
           headers,
           body: JSON.stringify({
             image_url: imageDataURI,
+            jobId,
             model_type: params.model_type,
             ai_model: params.ai_model,
             topology: params.topology,
@@ -870,9 +844,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
             should_texture: params.should_texture,
             enable_pbr: params.enable_pbr,
             pose_mode: params.pose_mode,
-            ...(params.texture_prompt
-              ? { texture_prompt: params.texture_prompt }
-              : {}),
+            ...(params.texture_prompt ? { texture_prompt: params.texture_prompt } : {}),
           }),
         });
         data = await res.json();
@@ -881,34 +853,35 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
       if (!data.success) {
         setGenStatus("failed");
         setErrorMsg(data.message ?? "Hiba");
+        markJobError(jobId, data.message ?? "Hiba");
         return;
       }
       setTaskId(data.task_id);
-      startPolling(
-        data.task_id,
-        inputMode === "text" ? "text-to-3d" : "image-to-3d",
-      );
+      startPolling(data.task_id, inputMode === "text" ? "text-to-3d" : "image-to-3d", jobId);
     } catch (err) {
       setGenStatus("failed");
       setErrorMsg(err.message ?? "Hálózati hiba");
+      markJobError(jobId, err.message ?? "Hálózati hiba");
     }
-  }, [
-    genStatus,
-    inputMode,
-    prompt,
-    imageFile,
-    params,
-    authHeaders,
-    startPolling,
-  ]);
+  }, [genStatus, inputMode, prompt, imageFile, params, authHeaders, startPolling, addJob, markJobError]);
 
-  // ── Refine ────────────────────────────────────────────────────────────────
   const handleRefine = useCallback(async () => {
     if (!previewTaskId || refining) return;
     setRefining(true);
     setGenStatus("pending");
     setProgress(0);
     setErrorMsg("");
+    const jobId = crypto.randomUUID();
+    addJob({
+      id: jobId,
+      title: `Finomítás: ${activeItem?.prompt?.slice(0, 20) || '3D Modell'}`,
+      status: 'queued',
+      panelType: 'meshy',
+      progress: 0,
+      createdAt: Date.now(),
+    });
+    setCurrentJobId(jobId);
+
     try {
       const headers = await authHeaders();
       const res = await fetch(`${API_BASE}/refine`, {
@@ -918,6 +891,7 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
           preview_task_id: previewTaskId,
           enable_pbr: params.enable_pbr,
           texture_prompt: params.texture_prompt,
+          jobId,
         }),
       });
       const data = await res.json();
@@ -925,16 +899,18 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
         setGenStatus("failed");
         setErrorMsg(data.message);
         setRefining(false);
+        markJobError(jobId, data.message);
         return;
       }
       setTaskId(data.task_id);
-      startPolling(data.task_id, "text-to-3d");
+      startPolling(data.task_id, "text-to-3d", jobId);
     } catch (err) {
       setGenStatus("failed");
       setErrorMsg(err.message);
       setRefining(false);
+      markJobError(jobId, err.message);
     }
-  }, [previewTaskId, refining, params, authHeaders, startPolling]);
+  }, [previewTaskId, refining, params, authHeaders, startPolling, addJob, markJobError, activeItem]);
 
   useEffect(() => () => clearInterval(pollTimerRef.current), []);
 
@@ -957,1342 +933,274 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
 
   const toggleAutoSpin = useCallback(() => {
     setAutoSpin((v) => !v);
-    // ThreeViewer syncs S.current.autoSpin via useEffect([autoSpin]) automatically
   }, []);
 
   const charPct = prompt.length / PROMPT_MAX;
-  const charColor =
-    charPct > 0.9 ? "#f87171" : charPct > 0.72 ? "#fbbf24" : "#4b5563";
+  const charColor = charPct > 0.9 ? "#f87171" : charPct > 0.72 ? "#fbbf24" : "#4b5563";
   const isRunning = genStatus === "pending" || genStatus === "in_progress";
-  const canGen =
-    !isRunning &&
-    (inputMode === "text" ? prompt.trim().length > 0 : !!imageFile);
+  const canGen = !isRunning && (inputMode === "text" ? prompt.trim().length > 0 : !!imageFile);
 
   const filteredHistory = useMemo(() => {
     const q = histSearch.toLowerCase();
-    return q
-      ? history.filter((i) => i.prompt.toLowerCase().includes(q))
-      : history;
+    return q ? history.filter((i) => i.prompt.toLowerCase().includes(q)) : history;
   }, [history, histSearch]);
 
   return (
-    <>
+    <div className="flex-1 flex flex-col h-full w-full bg-[#03000a] text-white overflow-hidden relative font-['Outfit']">
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .animate-spin { animation: spin 1s linear infinite; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
         .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
       `}</style>
 
-      <div
-        style={{
-          display: "flex",
-          height: "100%",
-          overflow: "hidden",
-          fontFamily: "'SF Pro Display',-apple-system,system-ui,sans-serif",
-        }}
-      >
-        {/* ════ LEFT PANEL ════ */}
-        <aside
-          style={{
-            width: 240,
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            overflowY: "auto",
-            borderRight: "1px solid rgba(255,255,255,0.06)",
-            background: "rgba(8,8,20,0.5)",
-            scrollbarWidth: "thin",
-          }}
-        >
-          <BgColorPicker value={bgColor} onChange={setBgColor} />
-
-          <div style={{ padding: "10px 10px 0" }}>
-            {/* Mode tabs */}
-            <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+      <StudioLayout
+        leftOpen={leftOpen}
+        setLeftOpen={toggleGlobalSidebar}
+        leftSecondaryOpen={leftSecondaryOpen}
+        setLeftSecondaryOpen={setLeftSecondaryOpen}
+        rightOpen={rightOpen}
+        setRightOpen={setRightOpen}
+        leftWidth={320}
+        leftSecondaryWidth={392}
+        leftSecondaryClosedWidth={0}
+        rightWidth={320}
+        onOffsetChange={setOffsets}
+        leftSidebar={globalSidebar}
+        leftSecondarySidebar={
+          <div className="h-full flex flex-row overflow-hidden bg-[#060410]/60 backdrop-blur-3xl border-r border-white/5">
+            {/* Tool Strip (72px) */}
+            <div className="w-[72px] h-full flex flex-col items-center pt-6 space-y-4 border-r border-white/5 bg-[#030308]">
               {[
-                { id: "image", emoji: "🖼️", tip: "Kép → 3D" },
-                {
-                  id: "batch",
-                  emoji: "📦",
-                  tip: "Batch (hamarosan)",
-                  disabled: true,
-                },
-                { id: "text", emoji: "💬", tip: "Szöveg → 3D" },
-              ].map((tab) => (
-                <Tooltip key={tab.id} text={tab.tip} side="bottom">
-                  <button
-                    onClick={() => !tab.disabled && setInputMode(tab.id)}
-                    style={{
-                      width: 44,
-                      height: 36,
-                      borderRadius: 10,
-                      fontSize: 16,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: tab.disabled ? "not-allowed" : "pointer",
-                      border: "none",
-                      transition: "all 0.15s",
-                      background:
-                        inputMode === tab.id
-                          ? "rgba(255,255,255,0.1)"
-                          : "rgba(255,255,255,0.04)",
-                      outline:
-                        inputMode === tab.id
-                          ? `2px solid ${color}60`
-                          : "1px solid rgba(255,255,255,0.08)",
-                      opacity: tab.disabled ? 0.35 : 1,
-                    }}
-                  >
-                    {tab.emoji}
-                  </button>
-                </Tooltip>
-              ))}
-            </div>
-
-            {/* Image input */}
-            {inputMode === "image" ? (
-              <>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 6,
-                  }}
-                >
-                  <span
-                    style={{ color: "#9ca3af", fontSize: 11, fontWeight: 600 }}
-                  >
-                    Image
-                  </span>
-                </div>
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  onDrop={handleDrop}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOver(true);
-                  }}
-                  onDragLeave={() => setDragOver(false)}
-                  style={{
-                    height: 120,
-                    borderRadius: 12,
-                    cursor: "pointer",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: dragOver
-                      ? `${color}18`
-                      : imagePreview
-                        ? "transparent"
-                        : "rgba(255,255,255,0.03)",
-                    border: `1.5px dashed ${dragOver ? color : imagePreview ? "transparent" : "rgba(255,255,255,0.12)"}`,
-                    overflow: "hidden",
-                    transition: "all 0.2s",
-                    marginBottom: 10,
-                  }}
-                >
-                  {imagePreview ? (
-                    <div
-                      style={{
-                        position: "relative",
-                        width: "100%",
-                        height: "100%",
-                      }}
-                    >
-                      <img
-                        src={imagePreview}
-                        alt="preview"
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          borderRadius: 12,
-                        }}
-                      />
-                      <Tooltip text="Kép eltávolítása" side="bottom">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setImageFile(null);
-                            setImagePreview(null);
-                          }}
-                          style={{
-                            position: "absolute",
-                            top: 6,
-                            right: 6,
-                            width: 22,
-                            height: 22,
-                            borderRadius: "50%",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            background: "rgba(0,0,0,0.72)",
-                            border: "none",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <Trash2
-                            style={{ width: 11, height: 11, color: "#f87171" }}
-                          />
-                        </button>
-                      </Tooltip>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload
-                        style={{
-                          width: 22,
-                          height: 22,
-                          color: "#4b5563",
-                          marginBottom: 6,
-                        }}
-                      />
-                      <p
-                        style={{
-                          color: "#6b7280",
-                          fontSize: 11,
-                          textAlign: "center",
-                          margin: "0 0 2px",
-                        }}
-                      >
-                        Click / Drag & Drop / Paste
-                      </p>
-                      <p
-                        style={{
-                          color: "#374151",
-                          fontSize: 9,
-                          textAlign: "center",
-                          margin: 0,
-                        }}
-                      >
-                        PNG, JPG, WEBP — Max 20MB
-                      </p>
-                    </>
-                  )}
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={handleDrop}
-                />
-              </>
-            ) : (
-              /* Text prompt */
-              <>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 6,
-                  }}
-                >
-                  <span
-                    style={{ color: "#9ca3af", fontSize: 11, fontWeight: 600 }}
-                  >
-                    Prompt
-                  </span>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <Tooltip text="Prompt javítása" side="bottom">
-                      <button
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          color: "#374151",
-                          padding: 2,
-                          display: "flex",
-                        }}
-                      >
-                        <Wand2 style={{ width: 11, height: 11 }} />
-                      </button>
-                    </Tooltip>
-                  </div>
-                </div>
-                <div style={{ position: "relative", marginBottom: 6 }}>
-                  <textarea
-                    value={prompt}
-                    maxLength={PROMPT_MAX}
-                    onChange={(e) =>
-                      setPrompt(e.target.value.slice(0, PROMPT_MAX))
-                    }
-                    placeholder="Describe the object to generate…"
-                    rows={5}
-                    style={{
-                      width: "100%",
-                      resize: "none",
-                      borderRadius: 10,
-                      fontSize: 11,
-                      color: "#e5e7eb",
-                      lineHeight: 1.55,
-                      padding: "10px 10px 22px",
-                      background: "rgba(255,255,255,0.04)",
-                      border: `1px solid ${prompt ? color + "40" : "rgba(255,255,255,0.08)"}`,
-                      outline: "none",
-                      scrollbarWidth: "thin",
-                      fontFamily: "inherit",
-                      boxSizing: "border-box",
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = `${color}65`;
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = prompt
-                        ? `${color}40`
-                        : "rgba(255,255,255,0.08)";
-                    }}
-                  />
-                  <span
-                    style={{
-                      position: "absolute",
-                      bottom: 7,
-                      right: 9,
-                      color: charColor,
-                      fontSize: 10,
-                    }}
-                  >
-                    {prompt.length}/{PROMPT_MAX}
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Settings */}
-          <div
-            style={{
-              padding: "2px 10px 6px",
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              gap: 0,
-            }}
-          >
-            {errorMsg && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 6,
-                  padding: "7px 9px",
-                  borderRadius: 9,
-                  background: "rgba(239,68,68,0.12)",
-                  border: "1px solid rgba(239,68,68,0.25)",
-                  marginBottom: 8,
-                }}
-              >
-                <AlertCircle
-                  style={{
-                    width: 12,
-                    height: 12,
-                    color: "#f87171",
-                    flexShrink: 0,
-                    marginTop: 1,
-                  }}
-                />
-                <p
-                  style={{
-                    color: "#fca5a5",
-                    fontSize: 10,
-                    margin: 0,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {errorMsg}
-                </p>
-              </div>
-            )}
-
-            {inputMode === "image" && (
-              <MeshyRow label="Name" tip="Opcionális modell név">
-                <input
-                  value={modelName}
-                  onChange={(e) => setModelName(e.target.value)}
-                  placeholder="Give your generation a name"
-                  style={{
-                    width: "100%",
-                    padding: "6px 10px",
-                    borderRadius: 9,
-                    fontSize: 11,
-                    color: "#e5e7eb",
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    outline: "none",
-                    fontFamily: "inherit",
-                    boxSizing: "border-box",
-                  }}
-                />
-              </MeshyRow>
-            )}
-
-            <MeshyRow
-              label="Model Type"
-              tip="Standard: részletes · Low Poly: stílusos"
-            >
-              <SegControl
-                value={params.model_type}
-                options={[
-                  { value: "standard", label: "Standard" },
-                  { value: "lowpoly", label: "Low Poly (Beta)" },
-                ]}
-                onChange={(v) => setParam("model_type", v)}
-                color={color}
-              />
-            </MeshyRow>
-
-            <MeshyRow label="AI Model" tip="Meshy AI modell verzió">
-              <Select
-                value={params.ai_model}
-                onChange={(v) => setParam("ai_model", v)}
-                options={[
-                  { value: "latest", label: "Meshy 6" },
-                  { value: "meshy-5", label: "Meshy 5" },
-                ]}
-              />
-            </MeshyRow>
-
-            {inputMode === "text" && (
-              <MeshyRow label="Pose 👑" tip="Karakter póz">
-                <SegControl
-                  value={params.pose_mode || "none"}
-                  options={[
-                    { value: "none", label: "None" },
-                    { value: "a-pose", label: "A-Pose" },
-                    { value: "t-pose", label: "T-Pose" },
-                  ]}
-                  onChange={(v) => setParam("pose_mode", v === "none" ? "" : v)}
-                  color={color}
-                />
-              </MeshyRow>
-            )}
-
-            {inputMode === "text" && (
-              <MeshyRow
-                label="Number of Generations"
-                tip="Hány modell variáns (1–4)"
-              >
-                <NumStepper
-                  value={params.num_generations}
-                  onChange={(v) => setParam("num_generations", v)}
-                  min={1}
-                  max={4}
-                />
-              </MeshyRow>
-            )}
-
-            <MeshyRow label="License" tip="CC BY 4.0: nyílt · Private: prémium">
-              <SegControl
-                value={params.license}
-                options={[
-                  { value: "cc", label: "CC BY 4.0" },
-                  { value: "private", label: "Private 👑" },
-                ]}
-                onChange={(v) => setParam("license", v)}
-                color={color}
-              />
-            </MeshyRow>
-
-            <div
-              style={{
-                height: 1,
-                background: "rgba(255,255,255,0.05)",
-                margin: "6px 0",
-              }}
-            />
-
-            <Collapsible title="Speciális beállítások" color={color}>
-              <Select
-                label="Topológia"
-                value={params.topology}
-                onChange={(v) => setParam("topology", v)}
-                options={[
-                  { value: "triangle", label: "▲ Háromszög" },
-                  { value: "quad", label: "□ Négyzet (quad)" },
-                ]}
-              />
-              <div style={{ marginBottom: 10 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 4,
-                  }}
-                >
-                  <p
-                    style={{
-                      color: "#6b7280",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      margin: 0,
-                    }}
-                  >
-                    Poligon cél
-                  </p>
-                  <span
-                    style={{ color: "#a78bfa", fontSize: 11, fontWeight: 800 }}
-                  >
-                    {(params.target_polycount / 1000).toFixed(0)}K
-                  </span>
-                </div>
-                <div
-                  style={{
-                    position: "relative",
-                    height: 4,
-                    borderRadius: 2,
-                    background: "rgba(255,255,255,0.08)",
-                  }}
+                { id: 'model', label: 'MODEL', icon: <Sparkles className="w-5 h-5" />, color },
+                { id: 'segment', label: 'SEGMENT', icon: <Box className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'retopo', label: 'RETOPO', icon: <Layers className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'texture', label: 'TEXTURE', icon: <Paintbrush2 className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'edit', label: 'EDIT', icon: <Wand2 className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'refine', label: 'REFINE', icon: <RefreshCw className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'stylize', label: 'STYLIZE', icon: <Sparkles className="w-5 h-5" />, color: '#94a3b8' },
+                { id: 'animate', label: 'ANIMATE', icon: <PersonStanding className="w-5 h-5" />, color: '#94a3b8' },
+              ].map((tool, idx) => (
+                <button
+                  key={tool.id}
+                  className={`group flex flex-col items-center gap-1.5 transition-all duration-300 border-none bg-transparent cursor-pointer ${idx === 0 ? 'mb-4' : ''}`}
                 >
                   <div
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      top: 0,
-                      height: "100%",
-                      borderRadius: 2,
-                      background: `linear-gradient(90deg,${color},#8b5cf6)`,
-                      width: `${((params.target_polycount - 100) / 299900) * 100}%`,
-                      pointerEvents: "none",
-                    }}
-                  />
-                  <input
-                    type="range"
-                    min={100}
-                    max={300000}
-                    step={5000}
-                    value={params.target_polycount}
-                    onChange={(e) =>
-                      setParam("target_polycount", Number(e.target.value))
-                    }
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      width: "100%",
-                      height: "100%",
-                      opacity: 0,
-                      cursor: "pointer",
-                      margin: 0,
-                    }}
-                  />
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 border ${idx === 0
+                      ? "bg-white/5 border-white/10 shadow-xl"
+                      : "bg-transparent border-transparent"
+                      }`}
+                    style={idx === 0 ? { borderColor: `${tool.color}40`, color: tool.color } : { color: '#52525b' }}
+                  >
+                    {tool.icon}
+                  </div>
+                  <AnimatePresence mode="wait">
+                    {leftSecondaryOpen && (
+                      <motion.span
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 overflow-hidden ${idx === 0 ? 'text-white' : 'text-zinc-700'}`}
+                      >
+                        {tool.label}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </button>
+              ))}
+
+              <div className="flex-1" />
+
+              <button
+                onClick={() => setLeftSecondaryOpen(!leftSecondaryOpen)}
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 border ${leftSecondaryOpen
+                  ? "bg-white/10 border-white/20 text-white shadow-lg"
+                  : "bg-transparent border-transparent text-zinc-600 hover:text-zinc-400"
+                  }`}
+                title="Toggle Panel"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Side Panel Content (320px) */}
+            <div className="flex-1 overflow-hidden tp-scroll h-full">
+              <div className="p-6 border-b border-white/5 bg-white/[0.01]">
+                <div className="flex bg-white/[0.02] border border-white/5 rounded-xl p-1 mb-2">
+                  {[
+                    { id: "text", label: "Neural Prompt", icon: <Type className="w-3 h-3" /> },
+                    { id: "image", label: "Image Reference", icon: <ImageIcon className="w-3 h-3" /> },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setInputMode(tab.id)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer border-none ${inputMode === tab.id ? 'bg-white/5 text-white' : 'text-zinc-600 hover:text-zinc-400'
+                        }`}
+                    >
+                      {tab.icon} {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4">
+                  <BgColorPicker value={bgColor} onChange={setBgColor} />
                 </div>
               </div>
-              <Toggle
-                label="Remesh"
-                hint="Mesh topológia optimalizálás"
-                value={params.should_remesh}
-                onChange={(v) => setParam("should_remesh", v)}
-                color={color}
-              />
-              <Toggle
-                label="PBR térképek"
-                hint="Metallic, Roughness, Normal"
-                value={params.enable_pbr}
-                onChange={(v) => setParam("enable_pbr", v)}
-                color={color}
-              />
-              <div>
-                <p
-                  style={{
-                    color: "#6b7280",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    marginBottom: 4,
-                  }}
-                >
-                  Textúra prompt
-                </p>
-                <textarea
-                  value={params.texture_prompt}
-                  maxLength={600}
-                  onChange={(e) =>
-                    setParam("texture_prompt", e.target.value.slice(0, 600))
-                  }
-                  placeholder="Pl. dark fantasy armor, worn leather…"
-                  rows={2}
-                  style={{
-                    width: "100%",
-                    resize: "none",
-                    borderRadius: 8,
-                    fontSize: 10,
-                    color: "#e5e7eb",
-                    lineHeight: 1.5,
-                    padding: "6px 8px",
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    outline: "none",
-                    fontFamily: "inherit",
-                    boxSizing: "border-box",
-                  }}
-                />
-              </div>
-            </Collapsible>
-          </div>
 
-          {/* Generate footer */}
-          <div
-            style={{
-              padding: "10px",
-              flexShrink: 0,
-              borderTop: "1px solid rgba(255,255,255,0.05)",
-            }}
-          >
-            {isRunning && (
-              <div
-                style={{
-                  marginBottom: 8,
-                  borderRadius: 3,
-                  overflow: "hidden",
-                  height: 3,
-                  background: "rgba(255,255,255,0.08)",
-                }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    borderRadius: 3,
-                    background: `linear-gradient(90deg,${color},#8b5cf6)`,
-                    width: `${progress}%`,
-                    transition: "width 0.5s ease",
-                  }}
-                />
-              </div>
-            )}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 12,
-                marginBottom: 8,
-              }}
-            >
-              <span
-                style={{
-                  color: "#6b7280",
-                  fontSize: 11,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <Clock style={{ width: 11, height: 11 }} /> 1 min
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ fontSize: 14 }}>🟡</span>
-                <span
-                  style={{ color: "#e5e7eb", fontSize: 12, fontWeight: 700 }}
-                >
-                  20
-                </span>
-              </span>
-            </div>
-            <Tooltip
-              text={
-                !canGen
-                  ? inputMode === "text"
-                    ? "Adj meg egy promptot"
-                    : "Tölts fel egy képet"
-                  : "Generálás"
-              }
-              side="top"
-            >
-              <button
-                onClick={handleGenerate}
-                disabled={!canGen}
-                style={{
-                  width: "100%",
-                  padding: "11px 0",
-                  borderRadius: 12,
-                  fontSize: 13,
-                  fontWeight: 800,
-                  color: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 7,
-                  cursor: canGen ? "pointer" : "not-allowed",
-                  border: "none",
-                  background: isRunning
-                    ? "rgba(255,255,255,0.07)"
-                    : canGen
-                      ? "linear-gradient(90deg,#a3e635,#65a30d)"
-                      : "rgba(255,255,255,0.06)",
-                  boxShadow:
-                    canGen && !isRunning
-                      ? "0 4px 20px rgba(132,204,22,0.35)"
-                      : "none",
-                  opacity: !canGen ? 0.4 : 1,
-                  transition: "all 0.2s",
-                }}
-              >
-                {isRunning ? (
+              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide pb-32">
+                {inputMode === "image" ? (
                   <>
-                    <Loader2
-                      style={{ width: 15, height: 15 }}
-                      className="animate-spin"
-                    />{" "}
-                    Generálás… {progress}%
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                      <ImageIcon className="w-3 h-3 text-zinc-700" />
+                      <span className="text-zinc-600 font-black text-[9px] uppercase tracking-[0.4em] italic">Visual Seed</span>
+                    </div>
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = color; }}
+                      onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)"; }}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="aspect-square rounded-2xl border-2 border-dashed border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-all cursor-pointer flex flex-col items-center justify-center p-4 relative overflow-hidden group/drop"
+                    >
+                      {imagePreview ? (
+                        <div className="absolute inset-0">
+                          <img src={imagePreview} alt="preview" className="w-full h-full object-cover transition-transform duration-700 group-hover/drop:scale-110" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/drop:opacity-100 transition-opacity flex items-center justify-center">
+                            <p className="text-white font-black text-[10px] uppercase tracking-widest">Swap Reference</p>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setImageFile(null); setImagePreview(null); }}
+                            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/80 text-red-400 border-none cursor-pointer flex items-center justify-center hover:scale-110 transition-all z-10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 text-zinc-700 mb-2" />
+                          <p className="text-zinc-600 text-[9px] font-black uppercase tracking-widest text-center">Drop image or click to upload</p>
+                        </>
+                      )}
+                    </div>
+                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleDrop({ ...e, dataTransfer: { files: e.target.files } })} />
                   </>
                 ) : (
                   <>
-                    <Sparkles style={{ width: 15, height: 15 }} /> Generate
+                    <div className="flex items-center justify-between mb-3 px-1">
+                      <div className="flex items-center gap-2">
+                        <Wand2 className="w-3.5 h-3.5 text-zinc-400" />
+                        <span className="text-zinc-200 font-black text-[10px] uppercase tracking-[0.4em] italic">Neural Prompt</span>
+                      </div>
+                    </div>
+                    <div className="relative group">
+                      <textarea
+                        value={prompt}
+                        maxLength={PROMPT_MAX}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="CONSTRUCT MODEL FROM DESCRIPTIVE DATA..."
+                        className="w-full min-h-[140px] px-4 py-4 rounded-2xl text-[11px] font-black uppercase tracking-tight text-zinc-200 bg-white/[0.01] border border-white/5 hover:border-white/10 focus:border-zinc-500 outline-none transition-all resize-none placeholder:text-zinc-800 scrollbar-hide"
+                      />
+                    </div>
                   </>
                 )}
-              </button>
-            </Tooltip>
-            {previewTaskId &&
-              inputMode === "text" &&
-              genStatus === "succeeded" && (
-                <Tooltip text="PBR textúra refine fázis" side="top">
+              </div>
+
+              <div className="mt-6 p-6 border-t border-white/5 bg-white/[0.01]">
+                {isRunning && (
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-2 px-1">
+                      <span className="text-zinc-600 font-black text-[8px] uppercase tracking-widest italic">Forging Unit</span>
+                      <span className="text-zinc-400 font-mono text-[10px]">{progress}%</span>
+                    </div>
+                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-full transition-all duration-700 ease-out"
+                        style={{
+                          width: `${progress}%`,
+                          background: `linear-gradient(90deg, ${color}, #8b5cf6)`
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleGenerate}
+                  disabled={!canGen}
+                  className={`w-full group relative overflow-hidden flex items-center justify-center gap-3 py-4 rounded-2xl text-[12px] font-black uppercase tracking-[0.4em] italic transition-all duration-700 cursor-pointer border-none ${!canGen ? 'opacity-20 grayscale brightness-50' : 'hover:scale-[1.02] active:scale-95'
+                    }`}
+                  style={{
+                    background: isRunning
+                      ? 'rgba(255,255,255,0.02)'
+                      : `linear-gradient(135deg, ${color}, #8b5cf6)`,
+                    boxShadow: isRunning ? 'none' : `0 12px 40px ${color}44`,
+                    color: isRunning ? '#52525b' : '#fff'
+                  }}
+                >
+                  {isRunning ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      PROCESSING...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                      INITIATE FORGE
+                    </>
+                  )}
+
+                  {!isRunning && canGen && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
+                  )}
+                </button>
+
+                {previewTaskId && inputMode === "text" && genStatus === "succeeded" && (
                   <button
                     onClick={handleRefine}
                     disabled={refining}
-                    style={{
-                      marginTop: 6,
-                      width: "100%",
-                      padding: "8px 0",
-                      borderRadius: 11,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 5,
-                      cursor: refining ? "not-allowed" : "pointer",
-                      border: "none",
-                      background: refining
-                        ? "rgba(255,255,255,0.05)"
-                        : `linear-gradient(135deg,${color},#8b5cf6)`,
-                      opacity: refining ? 0.5 : 1,
-                    }}
+                    className="w-full mt-3 flex items-center justify-center gap-3 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest italic text-zinc-400 bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:text-white transition-all cursor-pointer"
                   >
                     {refining ? (
-                      <>
-                        <Loader2
-                          style={{ width: 12, height: 12 }}
-                          className="animate-spin"
-                        />{" "}
-                        Refine…
-                      </>
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Refining Vector...</>
                     ) : (
-                      <>
-                        <RefreshCw style={{ width: 12, height: 12 }} /> Refine
-                        (PBR Textúra)
-                      </>
+                      <><RefreshCw className="w-3.5 h-3.5" /> Refine PBR Matrix</>
                     )}
                   </button>
-                </Tooltip>
-              )}
+                )}
+              </div>
+            </div>
           </div>
-        </aside>
-
-        {/* ════ CENTER — 3D VIEWER ════ */}
-        <main
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: "flex",
-            flexDirection: "column",
-            position: "relative",
-          }}
-        >
-          {/* Top toolbar */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "6px 14px",
-              flexShrink: 0,
-              borderBottom: "1px solid rgba(255,255,255,0.05)",
-              background: "rgba(8,8,20,0.3)",
-            }}
-          >
-            {/* ── View mode buttons ─────────────────────────────────────────
-                Solid    → eredeti anyag + fények
-                Wire     → EdgesGeometry overlay, négyszöges élmegjelenítés
-                Clay     → semleges szürke agyag
-                Base Color → textúra fények nélkül (MeshBasicMaterial)
-                RGB      → normálvektorok mint RGB szín, egyszerű diffúz fénnyel
-            ──────────────────────────────────────────────────────────────── */}
-            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <span
-                style={{
-                  color: "#374151",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  marginRight: 4,
-                }}
-              >
-                NÉZET
-              </span>
-
-              {/* View mode buttons */}
-              {VIEW_MODES.map((v) => (
-                <Tooltip key={v.id} text={v.tip} side="bottom">
-                  <button
-                    onClick={() => setViewMode(v.id)}
-                    style={{
-                      padding: "3px 8px",
-                      borderRadius: 7,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      border: "none",
-                      transition: "all 0.15s",
-                      background:
-                        viewMode === v.id
-                          ? `${color}28`
-                          : "rgba(255,255,255,0.04)",
-                      color: viewMode === v.id ? color : "#6b7280",
-                      outline:
-                        viewMode === v.id
-                          ? `1px solid ${color}50`
-                          : "1px solid rgba(255,255,255,0.06)",
-                    }}
-                  >
-                    {v.label}
-                  </button>
-                </Tooltip>
-              ))}
-
-              {/* ── Wire overlay toggle — only visible when a model is loaded ── */}
-              {modelUrl && (
-                <WireframeControl
-                  active={wireframeOverlay}
-                  onToggle={() => setWireframeOverlay((v) => !v)}
-                  opacity={wireOpacity}
-                  onOpacityChange={setWireOpacity}
-                  color={wireColor}
-                  onColorChange={setWireColor}
-                  accentColor={color}
+        }
+        rightSidebar={
+          <div className="w-full h-full flex flex-col bg-[#060410] overflow-hidden">
+            {/* Header - Records HUD */}
+            <div className="p-6 border-b border-white/5 bg-white/[0.01]">
+              <div className="flex items-center gap-3 mb-5">
+                <Clock className="w-4 h-4 text-zinc-500" />
+                <span className="text-white font-black text-[11px] uppercase tracking-[0.4em] italic leading-none text-zinc-400">Station Records</span>
+              </div>
+              <div className="relative group">
+                <input
+                  type="text"
+                  value={histSearch}
+                  onChange={(e) => setHistSearch(e.target.value)}
+                  placeholder="SEARCH RECURSIVE DATA..."
+                  className="w-full h-10 px-10 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-300 bg-white/[0.02] border border-white/5 group-focus-within:border-white/20 outline-none transition-all placeholder:text-zinc-800"
                 />
-              )}
-            </div>
-
-            {/* Right controls */}
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              {/* Upload 3D Model */}
-              <Tooltip
-                text="3D modell feltöltése (GLB, GLTF, OBJ)"
-                side="bottom"
-              >
-                <button
-                  onClick={() => modelFileInputRef.current?.click()}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "4px 6px",
-                    borderRadius: 7,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    border: "none",
-                    transition: "all 0.15s",
-                    background: "rgba(255,255,255,0.04)",
-                    color: "#6b7280",
-                    outline: "1px solid rgba(255,255,255,0.06)",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-                  }}
-                >
-                  <Upload style={{ width: 13, height: 13 }} />
-                </button>
-              </Tooltip>
-              <input
-                ref={modelFileInputRef}
-                type="file"
-                accept=".glb,.gltf,.obj,model/gltf-binary,model/gltf+json"
-                style={{ display: "none" }}
-                onChange={(e) => handleUpload3DModel(e.target.files?.[0])}
-              />
-
-              <div
-                style={{
-                  width: 1,
-                  height: 18,
-                  background: "rgba(255,255,255,0.08)",
-                  margin: "0 2px",
-                }}
-              />
-
-              {/* Lighting controls */}
-              <span
-                style={{
-                  color: "#374151",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  marginRight: 2,
-                }}
-              >
-                FÉNY
-              </span>
-              <LightingControls
-                viewMode={viewMode}
-                lightMode={lightMode}
-                setLightMode={setLightMode}
-                lightStrength={lightStrength}
-                setLightStrength={setLightStrength}
-                lightRotation={lightRotation}
-                setLightRotation={setLightRotation}
-                lightAutoRotate={lightAutoRotate}
-                setLightAutoRotate={setLightAutoRotate}
-                lightAutoRotateSpeed={lightAutoRotateSpeed}
-                setLightAutoRotateSpeed={setLightAutoRotateSpeed}
-                dramaticColor={dramaticColor}
-                setDramaticColor={setDramaticColor}
-                bgLightOn={bgLightOn}
-                setBgLightOn={setBgLightOn}
-                bgLightColor={bgLightColor}
-                setBgLightColor={setBgLightColor}
-                bgLightSize={bgLightSize}
-                setBgLightSize={setBgLightSize}
-                bgLightIntensity={bgLightIntensity}
-                setBgLightIntensity={setBgLightIntensity}
-                gridColor1={gridColor1}
-                setGridColor1={setGridColor1}
-                gridColor2={gridColor2}
-                setGridColor2={setGridColor2}
-                color={color}
-              />
-
-              <div
-                style={{
-                  width: 1,
-                  height: 18,
-                  background: "rgba(255,255,255,0.08)",
-                  margin: "0 4px",
-                }}
-              />
-              <IconBtn
-                icon={
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h6v6h-6z" />
-                  </svg>
-                }
-                tip={showGrid ? "Rács elrejtése" : "Rács megjelenítése"}
-                active={showGrid}
-                color={color}
-                onClick={() => setShowGrid((v) => !v)}
-              />
-              <IconBtn
-                icon={<ChevronRight />}
-                tip={
-                  rightOpen ? "Előzmények bezárása" : "Előzmények megnyitása"
-                }
-                active={rightOpen}
-                color={color}
-                onClick={() => setRightOpen((v) => !v)}
-              />
-            </div>
-          </div>
-
-          {/* Canvas */}
-          <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-            <div
-              style={{
-                position: "absolute",
-                bottom: 50,
-                left: "50%",
-                transform: "translateX(-50%)",
-                fontSize: 10,
-                color: "#1f2937",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                pointerEvents: "none",
-                zIndex: 10,
-                whiteSpace: "nowrap",
-              }}
-            >
-              <RotateCcw style={{ width: 10, height: 10 }} /> Húzd = forgat ·
-              Shift+drag = pan · Scroll = zoom
-            </div>
-            <ThreeViewer
-              color={color}
-              viewMode={viewMode}
-              lightMode={lightMode}
-              showGrid={showGrid}
-              modelUrl={modelUrl}
-              lightStrength={lightStrength}
-              lightRotation={lightRotation}
-              lightAutoRotate={lightAutoRotate}
-              lightAutoRotateSpeed={lightAutoRotateSpeed}
-              dramaticColor={dramaticColor}
-              wireframeOverlay={wireframeOverlay}
-              wireOpacity={wireOpacity}
-              wireHexColor={wireHexColor}
-              autoSpin={autoSpin}
-              bgColor={bgColor}
-              bgLightOn={bgLightOn}
-              bgLightColor={bgLightColor}
-              bgLightSize={bgLightSize}
-              bgLightIntensity={bgLightIntensity}
-              gridColor1={gridColor1}
-              gridColor2={gridColor2}
-              onSpinStop={() => setAutoSpin(false)}
-              onReady={(s) => {
-                sceneRef.current = s;
-              }}
-            />
-
-            {isRunning && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  zIndex: 20,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "rgba(6,6,18,0.8)",
-                  backdropFilter: "blur(8px)",
-                  pointerEvents: "none",
-                }}
-              >
-                <div
-                  style={{
-                    width: 68,
-                    height: 68,
-                    borderRadius: 20,
-                    marginBottom: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: `${color}18`,
-                    border: `1px solid ${color}45`,
-                  }}
-                >
-                  <Box
-                    style={{ width: 28, height: 28, color }}
-                    className="animate-pulse"
-                  />
-                </div>
-                <p
-                  style={{
-                    color: "#fff",
-                    fontWeight: 800,
-                    fontSize: 15,
-                    margin: "0 0 4px",
-                  }}
-                >
-                  3D modell generálása…
-                </p>
-                <p
-                  style={{ color: "#6b7280", fontSize: 11, margin: "0 0 16px" }}
-                >
-                  {genStatus === "pending"
-                    ? "Feldolgozás sorban áll…"
-                    : `Meshy AI dolgozik… ${progress}%`}
-                </p>
-                <div
-                  style={{
-                    width: 192,
-                    height: 4,
-                    borderRadius: 2,
-                    background: "rgba(255,255,255,0.08)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: "100%",
-                      borderRadius: 2,
-                      background: `linear-gradient(90deg,${color},#8b5cf6)`,
-                      width: `${progress}%`,
-                      transition: "width 0.5s ease",
-                    }}
-                  />
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-800 group-focus-within:text-zinc-500 transition-colors">
+                  <Box className="w-3.5 h-3.5" />
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Bottom toolbar */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "6px 14px",
-              flexShrink: 0,
-              borderTop: "1px solid rgba(255,255,255,0.05)",
-              background: "rgba(8,8,20,0.3)",
-            }}
-          >
-            {/* Camera controls */}
-            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <span
-                style={{
-                  color: "#374151",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  marginRight: 3,
-                }}
-              >
-                KAMERA
-              </span>
-              <IconBtn
-                icon={<RotateCcw />}
-                tip="Kamera visszaállítása"
-                onClick={() => camPreset("reset")}
-              />
-              <IconBtn
-                icon={<Camera />}
-                tip="Elölnézet"
-                onClick={() => camPreset("front")}
-              />
-              <IconBtn
-                icon={<Move3d />}
-                tip="Oldalnézet"
-                onClick={() => camPreset("side")}
-              />
-              <IconBtn
-                icon={<Layers />}
-                tip="Felülnézet"
-                onClick={() => camPreset("top")}
-              />
-              <div
-                style={{
-                  width: 1,
-                  height: 18,
-                  background: "rgba(255,255,255,0.08)",
-                  margin: "0 3px",
-                }}
-              />
-              <Tooltip
-                text={autoSpin ? "Auto-spin leállítása" : "Auto-spin indítása"}
-                side="top"
-              >
-                <button
-                  onClick={toggleAutoSpin}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    padding: "3px 8px",
-                    borderRadius: 7,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    border: "none",
-                    background: autoSpin
-                      ? `${color}28`
-                      : "rgba(255,255,255,0.04)",
-                    color: autoSpin ? color : "#6b7280",
-                    outline: autoSpin
-                      ? `1px solid ${color}50`
-                      : "1px solid rgba(255,255,255,0.06)",
-                  }}
-                >
-                  {autoSpin ? (
-                    <Square style={{ width: 9, height: 9 }} />
-                  ) : (
-                    <Play style={{ width: 9, height: 9 }} />
-                  )}
-                  Auto-spin
-                </button>
-              </Tooltip>
             </div>
 
-            {/* Action buttons */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {[
-                {
-                  label: "Remesh",
-                  icon: <Settings style={{ width: 11, height: 11 }} />,
-                  onClick: () => setShowRemesh(true),
-                },
-                {
-                  label: "Edit Texture",
-                  icon: <Paintbrush2 style={{ width: 11, height: 11 }} />,
-                  onClick: () => setShowEditTexture(true),
-                },
-                {
-                  label: "Animate",
-                  icon: <PersonStanding style={{ width: 11, height: 11 }} />,
-                  onClick: () => setShowAnimate(true),
-                },
-              ].map((btn) => (
-                <button
-                  key={btn.label}
-                  onClick={btn.onClick}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "5px 11px",
-                    borderRadius: 10,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#d1d5db",
-                    background: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.12)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-                  }}
-                >
-                  {btn.icon} {btn.label}
-                </button>
-              ))}
-
-              <Tooltip text="Letöltési beállítások" side="top">
-                <button
-                  onClick={() => setShowDownload(true)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "5px 12px",
-                    borderRadius: 10,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#fff",
-                    background: `linear-gradient(90deg,${color}cc,${color})`,
-                    border: "none",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                    boxShadow: `0 3px 12px ${color}44`,
-                  }}
-                >
-                  <Download style={{ width: 11, height: 11 }} /> Download
-                </button>
-              </Tooltip>
-            </div>
-          </div>
-        </main>
-
-        {/* ════ RIGHT PANEL — History ════ */}
-        {rightOpen && (
-          <aside
-            style={{
-              width: 210,
-              flexShrink: 0,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              borderLeft: "1px solid rgba(255,255,255,0.06)",
-              background: "rgba(8,8,20,0.5)",
-            }}
-          >
-            <div
-              style={{
-                padding: "12px 10px 8px",
-                flexShrink: 0,
-                borderBottom: "1px solid rgba(255,255,255,0.05)",
-              }}
-            >
-              <p
-                style={{
-                  color: "#e5e7eb",
-                  fontSize: 11,
-                  fontWeight: 800,
-                  marginBottom: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                }}
-              >
-                <Clock style={{ width: 12, height: 12, color }} /> Előzmények
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: "1px 6px",
-                    borderRadius: 999,
-                    background: `${color}18`,
-                    color,
-                  }}
-                >
-                  {history.length}
-                </span>
-              </p>
-              <input
-                placeholder="Keresés…"
-                value={histSearch}
-                onChange={(e) => setHistSearch(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "5px 9px",
-                  borderRadius: 8,
-                  fontSize: 11,
-                  color: "#e5e7eb",
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  outline: "none",
-                  boxSizing: "border-box",
-                  fontFamily: "inherit",
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = `${color}55`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(255,255,255,0.08)";
-                }}
-              />
-            </div>
-
-            <div
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                padding: 8,
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                scrollbarWidth: "thin",
-              }}
-            >
+            {/* Scrollable List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-hide bg-[#0a0a0f]">
               {filteredHistory.length === 0 && (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    height: 150,
-                    textAlign: "center",
-                  }}
-                >
-                  <Box
-                    style={{
-                      width: 26,
-                      height: 26,
-                      color: "#1f2937",
-                      marginBottom: 8,
-                    }}
-                  />
-                  <p style={{ color: "#2d3748", fontSize: 11 }}>
-                    {histSearch ? "Nincs találat" : "Még nincs generálás"}
+                <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+                  <Box className="w-8 h-8 text-zinc-900 mb-4 opacity-20" />
+                  <p className="text-zinc-800 font-black text-[9px] uppercase tracking-[0.3em] m-0">
+                    {histSearch ? "NO MATCHING UNITS FOUND" : "FORGE DATABASE EMPTY"}
                   </p>
                 </div>
               )}
@@ -2307,14 +1215,9 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
               ))}
             </div>
 
+            {/* Footer Actions */}
             {history.length > 0 && (
-              <div
-                style={{
-                  padding: "8px 10px",
-                  borderTop: "1px solid rgba(255,255,255,0.05)",
-                  flexShrink: 0,
-                }}
-              >
+              <div className="p-5 border-t border-white/5 bg-white/[0.01]">
                 <Tooltip text="Összes előzmény törlése" side="top">
                   <button
                     onClick={() => {
@@ -2323,41 +1226,248 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
                         setActiveItem(null);
                       }
                     }}
-                    style={{
-                      width: "100%",
-                      padding: 5,
-                      borderRadius: 8,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: "#4b5563",
-                      background: "rgba(255,255,255,0.03)",
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 5,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = "#f87171";
-                      e.currentTarget.style.borderColor =
-                        "rgba(248,113,113,0.28)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = "#4b5563";
-                      e.currentTarget.style.borderColor =
-                        "rgba(255,255,255,0.06)";
-                    }}
+                    className="w-full flex items-center justify-center gap-3 py-3 rounded-xl text-[9px] font-black uppercase tracking-[0.4em] italic text-zinc-600 hover:text-red-500 bg-white/[0.01] hover:bg-red-500/5 border border-white/5 hover:border-red-500/20 transition-all cursor-pointer"
                   >
-                    <Trash2 style={{ width: 10, height: 10 }} /> Előzmények
-                    törlése
+                    <Trash2 className="w-3.5 h-3.5" /> Purge Station Records
                   </button>
                 </Tooltip>
               </div>
             )}
-          </aside>
-        )}
-      </div>
+          </div>
+        }
+      >
+        <main
+          className="pt-28 lg:pt-32"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            position: "relative",
+            zIndex: 1,
+            background: "#0a0a0f",
+            overflow: "hidden"
+          }}
+        >
+          <ThreeViewer
+            color={color}
+            viewMode={viewMode}
+            lightMode={lightMode}
+            showGrid={showGrid}
+            modelUrl={modelUrl}
+            lightStrength={lightStrength}
+            lightRotation={lightRotation}
+            lightElevation={lightElevation}
+            lightAutoRotate={lightAutoRotate}
+            lightAutoRotateSpeed={lightAutoRotateSpeed}
+            dramaticColor={dramaticColor}
+            wireframeOverlay={wireframeOverlay}
+            wireOpacity={wireOpacity}
+            wireHexColor={wireHexColor}
+            autoSpin={autoSpin}
+            bgColor={bgColor}
+            bgLightOn={bgLightOn}
+            bgLightColor={bgLightColor}
+            bgLightSize={bgLightSize}
+            bgLightIntensity={bgLightIntensity}
+            gridColor1={gridColor1}
+            gridColor2={gridColor2}
+            onSpinStop={() => setAutoSpin(false)}
+            onReady={(s) => { sceneRef.current = s; }}
+            leftOffset={offsets.left}
+            rightOffset={offsets.right}
+            leftWidth={320}
+            rightWidth={320}
+          />
+
+          {/* STATION FORGE OVERLAY — Cinematic Loading */}
+          {isRunning && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0f]/80 backdrop-blur-xl pointer-events-none">
+              <div className="relative group">
+                <div className="absolute inset-0 blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-1000" style={{ backgroundColor: color }} />
+                <div className="w-20 h-20 rounded-3xl flex items-center justify-center p-0.5 bg-gradient-to-br from-white/10 to-transparent border border-white/5 relative z-10">
+                  <div className="w-full h-full rounded-[1.4rem] bg-zinc-950/80 flex items-center justify-center">
+                    <Box className="w-8 h-8 animate-pulse" style={{ color }} />
+                  </div>
+                </div>
+                {/* Rotating Rings */}
+                <div className="absolute inset-[-10px] border border-dashed border-white/5 rounded-full animate-[spin_10s_linear_infinite] opacity-20" />
+                <div className="absolute inset-[-20px] border border-dashed border-white/5 rounded-full animate-[spin_15s_linear_infinite_reverse] opacity-10" />
+              </div>
+
+              <div className="mt-10 text-center">
+                <h3 className="text-white font-black text-[12px] uppercase tracking-[0.6em] italic m-0">
+                  Neural Forging Sequence
+                </h3>
+                <p className="text-zinc-600 font-bold text-[9px] uppercase tracking-[0.3em] mt-3">
+                  {genStatus === "pending" ? "Station Synchronization..." : `Meshy Core Processing... ${progress}%`}
+                </p>
+              </div>
+
+              {/* Progress Bar — STATION THEME */}
+              <div className="mt-8 w-64 h-[2px] bg-white/5 relative overflow-hidden rounded-full">
+                <div className="absolute inset-y-0 left-0 bg-gradient-to-r transition-all duration-700 ease-out"
+                  style={{
+                    width: `${progress}%`,
+                    background: `linear-gradient(90deg, transparent, ${color}, #8b5cf6)`
+                  }}
+                />
+                <div className="absolute top-0 bottom-0 blur-[2px] opacity-50"
+                  style={{ left: `${progress}%`, width: '10px', backgroundColor: color }}
+                />
+              </div>
+            </div>
+          )}
+          {/* Top toolbar (Floating) — STATION HUD ENTRY */}
+          <div
+            className="absolute top-24 left-1/2 -translate-x-1/2 flex items-center p-1.5 rounded-2xl border border-white/5 backdrop-blur-3xl shadow-2xl z-50 transition-all duration-700 hover:border-white/10"
+            style={{
+              background: "rgba(10,10,15,0.4)",
+              gap: 12,
+            }}
+          >
+            <div className="flex items-center gap-4 px-2">
+              <div className="flex items-center gap-1.5 mr-2">
+                <div className="w-1 h-1 rounded-full animate-pulse shadow-[0_0_8px_#10b981]" style={{ background: color }} />
+                <span className="text-zinc-600 font-black text-[9px] uppercase tracking-[0.4em] italic leading-none">Nézet</span>
+              </div>
+
+              {/* View mode buttons — STATION ENGINE SELECTORS */}
+              <div className="flex items-center gap-1">
+                {VIEW_MODES.map((v) => (
+                  <Tooltip key={v.id} text={v.tip} side="bottom">
+                    <button
+                      onClick={() => setViewMode(v.id)}
+                      className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest cursor-pointer border-none transition-all duration-500 ${viewMode === v.id
+                        ? 'text-white'
+                        : 'text-zinc-600 hover:text-zinc-300'
+                        }`}
+                      style={viewMode === v.id ? {
+                        background: color,
+                        boxShadow: `0 0 15px ${color}40`,
+                      } : {
+                        background: 'rgba(255,255,255,0.02)'
+                      }}
+                    >
+                      {v.label}
+                    </button>
+                  </Tooltip>
+                ))}
+
+                {/* Wireframe Controls */}
+                {modelUrl && (
+                  <div className="ml-1 border-l border-white/5 pl-2">
+                    <WireframeControl
+                      active={wireframeOverlay}
+                      onToggle={() => setWireframeOverlay((v) => !v)}
+                      opacity={wireOpacity}
+                      onOpacityChange={setWireOpacity}
+                      color={wireColor}
+                      onColorChange={setWireColor}
+                      accentColor={color}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right actions — STATION COMMANDS */}
+            <div className="flex items-center gap-1.5 border-l border-white/5 pl-4 ml-2 mr-2">
+              {modelUrl && (
+                <div className="flex items-center gap-1.5">
+                  {[
+                    {
+                      label: "Remesh",
+                      icon: <Settings className="w-3 h-3" />,
+                      onClick: () => setShowRemesh(true),
+                    },
+                    {
+                      label: "Edit Texture",
+                      icon: <Paintbrush2 className="w-3 h-3" />,
+                      onClick: () => setShowEditTexture(true),
+                    },
+                    {
+                      label: "Animate",
+                      icon: <PersonStanding className="w-3 h-3" />,
+                      onClick: () => setShowAnimate(true),
+                    },
+                  ].map((btn) => (
+                    <button
+                      key={btn.label}
+                      onClick={btn.onClick}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-zinc-500 hover:text-white bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 transition-all cursor-pointer"
+                    >
+                      {btn.icon} {btn.label}
+                    </button>
+                  ))}
+
+                  <button
+                    onClick={() => setShowDownload(true)}
+                    className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] italic text-white transition-all cursor-pointer shadow-xl hover:scale-105 active:scale-95 border-none"
+                    style={{
+                      background: `linear-gradient(135deg, ${color}, #8b5cf6)`,
+                      boxShadow: `0 8px 32px ${color}33`,
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export
+                  </button>
+                  <div className="w-[1px] h-4 bg-white/5 mx-2" />
+                </div>
+              )}
+
+              {/* Action Buttons Integration */}
+              <div className="flex items-center gap-1">
+                <Tooltip text="Feltöltés (3D)" side="bottom">
+                  <button
+                    onClick={() => modelFileInputRef.current?.click()}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] hover:border-white/10 text-zinc-600 hover:text-zinc-300 transition-all cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
+
+                <div className="flex items-center gap-1 border-l border-white/5 pl-2 ml-1">
+                  <div className="flex items-center gap-1 mr-1">
+                    <div className="w-1 h-1 rounded-full bg-zinc-800" />
+                    <span className="text-zinc-800 font-black text-[8px] uppercase tracking-[0.4em] italic leading-none">Fény</span>
+                  </div>
+                  <LightingControls
+                    viewMode={viewMode}
+                    lightMode={lightMode}
+                    setLightMode={setLightMode}
+                    lightStrength={lightStrength}
+                    setLightStrength={setLightStrength}
+                    lightRotation={lightRotation}
+                    setLightRotation={setLightRotation}
+                    lightElevation={lightElevation}
+                    setLightElevation={setLightElevation}
+                    lightAutoRotate={lightAutoRotate}
+                    setLightAutoRotate={setLightAutoRotate}
+                    lightAutoRotateSpeed={lightAutoRotateSpeed}
+                    setLightAutoRotateSpeed={setLightAutoRotateSpeed}
+                    dramaticColor={dramaticColor}
+                    setDramaticColor={setDramaticColor}
+                    bgLightOn={bgLightOn}
+                    setBgLightOn={setBgLightOn}
+                    bgLightColor={bgLightColor}
+                    setBgLightColor={setBgLightColor}
+                    bgLightSize={bgLightSize}
+                    setBgLightSize={setBgLightSize}
+                    bgLightIntensity={bgLightIntensity}
+                    setBgLightIntensity={setBgLightIntensity}
+                    gridColor1={gridColor1}
+                    setGridColor1={setGridColor1}
+                    gridColor2={gridColor2}
+                    setGridColor2={setGridColor2}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </StudioLayout>
+
+      <input ref={modelFileInputRef} type="file" accept=".glb,.gltf,.obj" className="hidden" onChange={(e) => handleUpload3DModel(e.target.files[0])} />
 
       {/* ════ MODALS ════ */}
       {showDownload && (
@@ -2390,6 +1500,6 @@ export default function Trellis2Panel({ selectedModel, getIdToken }) {
           modelUrl={modelUrl}
         />
       )}
-    </>
+    </div>
   );
 }

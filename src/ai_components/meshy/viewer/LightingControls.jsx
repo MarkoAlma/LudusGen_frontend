@@ -110,6 +110,7 @@ export default function LightingControls({
   lightMode, setLightMode,
   lightStrength, setLightStrength,
   lightRotation, setLightRotation,
+  lightElevation, setLightElevation,
   lightAutoRotate, setLightAutoRotate,
   lightAutoRotateSpeed, setLightAutoRotateSpeed,
   dramaticColor, setDramaticColor,
@@ -164,16 +165,11 @@ export default function LightingControls({
 
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 999,
-          width: 240, borderRadius: 14, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto',
+          position: 'absolute', top: 'calc(100% + 8px)', bottom: 'auto', right: 0, left: 'auto', zIndex: 9999,
+          width: 'min(240px, calc(100vw - 32px))', borderRadius: 14, maxHeight: 'calc(100vh - 120px)', overflowY: 'auto',
           background: '#0f0f23', border: '1px solid rgba(255,255,255,0.12)',
           boxShadow: '0 16px 48px rgba(0,0,0,0.6)', padding: 14,
         }}>
-          <div style={{
-            position: 'absolute', top: -6, right: 10, width: 12, height: 12,
-            background: '#0f0f23', border: '1px solid rgba(255,255,255,0.12)',
-            borderBottom: 'none', borderRight: 'none', transform: 'rotate(45deg)',
-          }} />
 
           {/* ── Scene Lighting ── */}
           {sceneLightingActive ? (
@@ -185,6 +181,9 @@ export default function LightingControls({
               <MiniSlider label="Rotation" min={0} max={360} step={1}
                 value={lightRotation} onChange={setLightRotation}
                 color={color} display={`${lightRotation}°`} />
+              <MiniSlider label="Elevation" min={-90} max={90} step={1}
+                value={lightElevation ?? 45} onChange={setLightElevation}
+                color={color} display={`${lightElevation ?? 45}°`} />
               <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
                 {[0, 90, 180, 270].map((deg) => (
                   <button key={deg} onClick={() => setLightRotation(deg)} style={{
@@ -216,6 +215,27 @@ export default function LightingControls({
                   </span>
                   <ColorDots colors={DRAMATIC_COLORS} value={dramaticColor ?? '#4400ff'}
                     onChange={setDramaticColor} accentColor={color} />
+                  {/* Full RGB picker row */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, cursor: 'pointer' }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                      background: dramaticColor ?? '#4400ff',
+                      border: `2px solid ${color}50`,
+                      boxShadow: `0 0 10px ${dramaticColor ?? '#4400ff'}70`,
+                      position: 'relative',
+                    }}>
+                      <input
+                        type="color"
+                        value={dramaticColor ?? '#4400ff'}
+                        onChange={(e) => setDramaticColor(e.target.value)}
+                        style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+                      />
+                    </div>
+                    <span style={{ color: '#6b7280', fontSize: 10, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+                      {(dramaticColor ?? '#4400ff').toUpperCase()}
+                    </span>
+                    <span style={{ marginLeft: 'auto', color: '#4b5563', fontSize: 9, fontWeight: 600 }}>RGB</span>
+                  </label>
                 </>
               )}
               <Divider />
@@ -262,7 +282,7 @@ export default function LightingControls({
 
           {/* Reset */}
           <button onClick={() => {
-            setLightStrength(1); setLightRotation(0);
+            setLightStrength(1); setLightRotation(0); setLightElevation(45);
             setLightAutoRotate(false); setLightAutoRotateSpeed(0.5);
             setDramaticColor('#4400ff');
             setGridColor1('#1e1e3a'); setGridColor2('#111128');
