@@ -55,7 +55,7 @@ export default function Hero() {
               variants={itemVariants}
               className="text-lg md:text-xl text-gray-500 mb-12 max-w-xl font-bold leading-relaxed"
             >
-              Egy munkafelület beszélgetéshez, képfelismeréshez, képgeneráláshoz, hanghoz, zenéhez és 3D modellekhez. Válts stúdiót, modellt és workflow-t ugyanabban a felületben.
+              One workspace for chat, image understanding, image generation, audio, music, and 3D assets. Switch studios, models, and workflows without leaving the same interface.
             </motion.p>
 
             <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-6 justify-center lg:justify-start">
@@ -63,7 +63,7 @@ export default function Hero() {
                 onClick={openStudio}
                 className="px-10 py-5 rounded-[2rem] bg-primary text-white font-black text-lg transition-all hover:scale-105 active:scale-95 shadow-[0_20px_50px_rgba(138,43,226,0.3)] flex items-center justify-center gap-3 group"
               >
-                AI Studio megnyitása <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                Open AI Studio <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
                 onClick={() => navigate('/marketplace')}

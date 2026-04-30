@@ -49,12 +49,12 @@ export default function CTABanner() {
             </motion.div>
 
             <h2 className="text-4xl md:text-7xl lg:text-8xl font-black text-white italic leading-[0.85] tracking-tighter">
-              Nyisd meg az <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-emerald-400 italic">AI Studio-t.</span>
+              Open the <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-emerald-400 italic">AI Studio.</span>
             </h2>
 
             <p className="text-lg md:text-2xl text-gray-400 max-w-2xl mx-auto font-bold leading-relaxed">
-              Kezdhetsz chatben, válthatsz képre, hangra vagy 3D-re, majd az elkészült asseteket továbbviheted a marketplace és community felületekre.
+              Start in chat, switch to image, audio, or 3D, then take finished assets into the marketplace and community spaces.
             </p>
           </div>
 

@@ -9,38 +9,38 @@ export default function FeaturesGrid() {
   const features = [
     {
       icon: MessageSquare,
-      title: 'Vision chat modellek',
-      desc: 'A képet fogadó modellek külön jelölést kapnak, a képfeltöltés pedig automatikusan letilt, ha az adott modell nem támogatja.',
+      title: 'Image-aware chat',
+      desc: 'Upload an image and supported chat models can read the visual context inside the same conversation.',
       gradient: 'from-purple-500/20 to-blue-500/20',
     },
     {
       icon: History,
-      title: 'Chat memória és mentés',
-      desc: 'A beszélgetések Firestore-ba kerülnek, a hosszabb kontextust pedig összefoglaló tartja kezelhető méretben.',
+      title: 'Chat memory and saves',
+      desc: 'Conversations are saved, and long context is summarized so bigger sessions stay manageable.',
       gradient: 'from-blue-500/20 to-cyan-500/20',
     },
     {
       icon: ImageIcon,
-      title: 'Kép workflow',
-      desc: 'Képgenerálás, image edit és upscale egy galériával, több aktív providerrel és modellválasztással.',
+      title: 'Image workflow',
+      desc: 'Generate, edit, and upscale images in one gallery with active model selection across providers.',
       gradient: 'from-cyan-500/20 to-emerald-500/20',
     },
     {
       icon: Music,
-      title: 'Hang és zene',
-      desc: 'Text-to-speech, voice clone, voice design és zenei generálás külön Audio Studio felületen.',
+      title: 'Audio and music',
+      desc: 'Create speech, clone voices, design voices, and generate music in a dedicated Audio Studio.',
       gradient: 'from-emerald-500/20 to-yellow-500/20',
     },
     {
       icon: Box,
       title: '3D asset pipeline',
-      desc: 'Tripo3D és Trellis alapú generálás, aktív task queue-val és exportálható modellekkel.',
+      desc: 'Generate export-ready 3D assets with Tripo3D and Trellis, backed by an active task queue.',
       gradient: 'from-yellow-500/20 to-orange-500/20',
     },
     {
       icon: ShoppingBag,
-      title: 'Marketplace és közösség',
-      desc: 'A létrehozott assetekhez marketplace, a beszélgetésekhez és visszajelzésekhez pedig közösségi felület tartozik.',
+      title: 'Marketplace and community',
+      desc: 'Publish created assets to the marketplace and carry discussions or feedback into the community area.',
       gradient: 'from-orange-500/20 to-purple-500/20',
     },
   ];
@@ -67,14 +67,14 @@ export default function FeaturesGrid() {
               viewport={{ once: true }}
               className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-[0.3em] mb-6"
             >
-              <Sparkles className="w-3 h-3" /> Stúdió funkciók
+              <Sparkles className="w-3 h-3" /> Studio features
             </motion.div>
 
             <h2 className="text-4xl md:text-6xl font-black text-white italic tracking-tighter mb-8 leading-none">
-              Minden fő modulnak <br className="hidden lg:block" /> saját munkafolyamata van.
+              Every core module has <br className="hidden lg:block" /> its own workflow.
             </h2>
             <p className="text-lg md:text-xl text-gray-500 max-w-xl font-bold leading-relaxed mb-6">
-              A chat, kép, hang és 3D felületek külön vezérlőkkel dolgoznak, de ugyanahhoz a LudusGen workspace-hez kapcsolódnak.
+              Chat, image, audio, and 3D tools each use focused controls while staying connected to the same LudusGen workspace.
             </p>
           </div>
 

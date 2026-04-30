@@ -40,14 +40,14 @@ export default function Pricing() {
               whileInView={{ opacity: 1 }}
               className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[10px] font-black uppercase tracking-[0.3em] mb-6"
             >
-              <Zap className="w-3 h-3" /> Kredit alapú használat
+              <Zap className="w-3 h-3" /> Credit-based usage
             </motion.div>
             <h2 className="text-4xl md:text-6xl font-black text-white italic tracking-tighter mb-8 leading-none">
-              Csak az kerül kreditbe, <br />
-              <span className="text-amber-500">amit tényleg használsz.</span>
+              Only what you use <br />
+              <span className="text-amber-500">costs credits.</span>
             </h2>
             <p className="text-lg md:text-xl text-gray-500 max-w-xl font-bold leading-relaxed">
-              Tölts fel kreditet, majd használd ugyanazt az egyenleget chathez, képekhez, hanghoz, zenéhez és 3D generáláshoz.
+              Add credits once, then use the same balance for chat, images, audio, music, and 3D generation.
             </p>
           </div>
         </div>
@@ -68,7 +68,7 @@ export default function Pricing() {
                 {pkg.highlight && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
                     <div className="px-5 py-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl">
-                      Ajánlott
+                      Recommended
                     </div>
                   </div>
                 )}
@@ -81,7 +81,7 @@ export default function Pricing() {
                   <h3 className="text-2xl font-black text-white italic mb-2 tracking-tight">{pkg.name}</h3>
                   <div className="mb-4">
                     <div className="text-5xl font-black text-white tracking-tighter">{creditLabel}</div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">kredit</div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">credits</div>
                   </div>
                   <div className="text-2xl font-black text-white mb-6">{pkg.price}</div>
                   <p className="text-sm font-bold text-gray-500 leading-relaxed mb-8 min-h-[64px]">
@@ -108,7 +108,7 @@ export default function Pricing() {
                       : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'
                       }`}
                   >
-                    {user ? 'Kreditek megnyitása' : 'Belépés a kreditekhez'}
+                    {user ? 'Open credits' : 'Sign in for credits'}
                   </button>
                 </div>
               </motion.div>

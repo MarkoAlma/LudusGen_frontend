@@ -65,7 +65,6 @@ export default function Login({ isOpen, onClose }) {
   const switchTimerRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   const [mouseDownTarget, setMouseDownTarget] = useState(null);
-  const [emailKikuldese, setEmailKikuldese] = useState(false);
   
   // ✅ 2FA State
   const [show2FAModal, setShow2FAModal] = useState(false);
@@ -155,7 +154,7 @@ export default function Login({ isOpen, onClose }) {
   useEffect(() => {
     if (msg?.incorrectResetPwEmail!=null) {
       setMsg({incorrectResetPwEmail: null})
-      setEmailKikuldese(false)
+      setEmailSent(false)
     }
   }, [formData.email]);
 
@@ -163,13 +162,7 @@ export default function Login({ isOpen, onClose }) {
 
   useEffect(() => {
     console.log("msg változott:", msg);
-    if (mode == "forgot" && emailKikuldese){
-      if (!msg?.incorrectResetPwEmail) {
-        setEmailSent(true);
-      }
-    }
-    console.log(emailKikuldese);
-  }, [msg, emailKikuldese]);
+  }, [msg]);
 
   
   const prevUserRef = useRef(null);
@@ -262,16 +255,14 @@ export default function Login({ isOpen, onClose }) {
     if (mode === 'forgot') {
       try {
         console.log("FORGOT HANDLER START");
-        // await resetPassword(formData.email);
-
         await axios.post(`${API_BASE}/api/forgot-password`, {
           email: formData.email
         });
 
         console.log("Alma1222");
-        setEmailKikuldese(true)
+        setEmailSent(true);
       } catch (error) {
-        setMsg({err: error.message});
+        setMsg({ incorrectResetPwEmail: error.response?.data?.error || error.message });
       } finally {
         setLoading(false);
       }
@@ -471,7 +462,17 @@ export default function Login({ isOpen, onClose }) {
                       <p style={{ color: '#9CA3AF', fontSize: '14px', margin: 0 }}>
                         We sent a password reset link to <br/> <strong style={{ color: '#F9FAFB' }}>{formData.email}</strong>
                       </p>
-                      <Button style={{ width: '100%', marginTop: '16px' }} variant="subtle" size="lg" onClick={() => switchMode('login')}>
+                      <Button
+                        style={{ width: '100%', marginTop: '16px' }}
+                        variant="primary"
+                        size="lg"
+                        disabled={loading}
+                        loading={loading}
+                        onClick={() => handleSubmit({ preventDefault: () => {} })}
+                      >
+                        Send again
+                      </Button>
+                      <Button style={{ width: '100%' }} variant="subtle" size="lg" onClick={() => switchMode('login')}>
                         Back to login
                       </Button>
                     </div>
