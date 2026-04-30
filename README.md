@@ -1,4 +1,4 @@
-# LudusGen vizsgaremek dokumentáció: https://ludusgen.com
+# LudusGen vizsgaremek dokumentáció
 
 Ez a dokumentáció a LudusGen projekt technikusi vizsgaremekhez készült részletes leírása. A célja, hogy a javító tanár egy helyen lássa az alkalmazás célját, funkcióit, reszponzív működését, adattárolását, backend API-jait és a tesztelés bizonyítékait.
 
@@ -853,6 +853,3 @@ npm run test:run
 ## Összegzés
 
 A LudusGen egy teljes értékű, vizsgaremekként bemutatható webalkalmazás: saját frontenddel, backenddel, adattárolással, hitelesítéssel, kreditlogikával, AI szolgáltató integrációkkal, piactérrel, fórummal, reszponzív felülettel és dokumentált teszteléssel. A dokumentáció a megadott a)-f) követelményeket külön fejezetekben teljesíti, képernyőképekkel, mobil nézetekkel, adattárolási ábrával, konkrét API válaszpéldákkal és backend repository linkkel együtt.
-
-
-https://ludusgen.com
