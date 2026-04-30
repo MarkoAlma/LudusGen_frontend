@@ -130,6 +130,14 @@ Aktuális home statisztikák:
 
 *1. kép: Home oldal desktop nézetben.*
 
+![Home studio preview](docs/screenshots/home-studio-preview.png)
+
+*2. kép: Home modul preview blokk valós LudusGen munkaterület-képekkel.*
+
+![Home credits](docs/screenshots/home-credits.png)
+
+*3. kép: Home kreditcsomag és pricing szekció.*
+
 ### Access Hub: bejelentkezés, regisztráció és 2FA
 
 Az Access Hub a hitelesítési felület. A navbarból nyílik, és több auth folyamatot kezel egy modalon belül.
@@ -145,7 +153,7 @@ Fő funkciók:
 
 ![Login modal desktop](docs/screenshots/login-modal-desktop.png)
 
-*2. kép: Access Hub / login modal desktop nézetben.*
+*4. kép: Access Hub / login modal desktop nézetben.*
 
 ### AI Studio
 
@@ -161,7 +169,7 @@ Az AI Studio felépítése:
 
 ![AI Studio desktop](docs/screenshots/ai-studio-desktop.png)
 
-*3. kép: AI Studio desktop nézetben. A személyes chat előzmény és felhasználói rész maszkolva van.*
+*5. kép: AI Studio desktop nézetben, az Image Studio generáló munkaterületével. A személyes felhasználói részletek maszkolva vannak.*
 
 #### AI Code / Chat modul
 
@@ -262,7 +270,7 @@ Fő funkciók:
 
 ![Marketplace desktop](docs/screenshots/marketplace-desktop.png)
 
-*4. kép: Marketplace desktop nézetben, asset listával és szűrőkkel.*
+*6. kép: Marketplace desktop nézetben, hero résszel, kereséssel és szűrőkkel.*
 
 ### Community / Forum
 
@@ -282,7 +290,7 @@ Fő funkciók:
 
 ![Community desktop](docs/screenshots/forum-desktop.png)
 
-*5. kép: Community / Forum desktop nézetben.*
+*7. kép: Community / Forum desktop nézetben.*
 
 ### Profile / Settings
 
@@ -325,7 +333,7 @@ Mobilon a kezdőlap elsődleges célja az olvashatóság és az azonnali navigá
 
 ![Home mobile](docs/screenshots/home-mobile.png)
 
-*6. kép: Home oldal mobil nézetben.*
+*8. kép: Home oldal mobil nézetben.*
 
 ### Mobil navigáció
 
@@ -333,23 +341,23 @@ Mobilon a desktop navbar helyett hamburger menü jelenik meg. Ebben a fő menüp
 
 ![Mobile menu](docs/screenshots/mobile-menu.png)
 
-*7. kép: Mobil hamburger menü.*
+*9. kép: Mobil hamburger menü.*
 
 ### Mobil Marketplace
 
-A Marketplace mobilon egyoszlopos nézetet használ. Ez azért fontos, mert az asset kártyák képei, címei, árai és gombjai így nem törnek össze, hanem természetes görgetési sorrendben jelennek meg.
+A Marketplace mobilon egyoszlopos nézetet használ. Ez azért fontos, mert az asset kártyák képei, címei, árai és gombjai így nem törnek össze, hanem természetes görgetési sorrendben jelennek meg. A szűrők mobilon külön blokkba rendeződnek, így telefonon is marad hely a keresésnek, a típusválasztónak és az ármezőknek.
 
 ![Marketplace mobile](docs/screenshots/marketplace-mobile.png)
 
-*8. kép: Marketplace mobil nézetben.*
+*10. kép: Marketplace mobil nézetben, keresővel, szűrőpanellel és az asset lista kezdetével.*
 
 ### Mobil AI Studio
 
-Mobilon az AI Studio a rendelkezésre álló szélességhez igazítja a modulválasztót. A desktop oldalsáv helyett nagyobb, különálló modulblokkok láthatók, amelyek ujjal könnyen megnyithatók. A kredit és felhasználói állapot a felső részben marad, a futó taskok és az aktív generálási folyamatok pedig a képernyő alatt folytatódó görgethető nézetben jelennek meg.
+Mobilon az AI Studio a rendelkezésre álló szélességhez igazítja a modulválasztót. A desktop oldalsáv kompakt, érintésbarát modulblokkokká alakul, amelyek ujjal könnyen megnyithatók. A kredit és felhasználói állapot a felső részben marad, a futó taskok és az aktív generálási folyamatok pedig a képernyő alatt folytatódó görgethető nézetben jelennek meg.
 
 ![AI Studio mobile](docs/screenshots/ai-studio-mobile.png)
 
-*9. kép: AI Studio mobil nézetben.*
+*11. kép: AI Studio mobil nézetben, megnyitott Image modullal.*
 
 ### Mobil Forum
 
@@ -357,15 +365,15 @@ A Forum mobilon feed-szerű nézetre vált. A kategóriák, szűrők és témak�
 
 ![Forum mobile](docs/screenshots/forum-mobile.png)
 
-*10. kép: Community / Forum mobil nézetben.*
+*12. kép: Community / Forum mobil nézetben.*
 
 ### Mobil Profile
 
-A Profile/Settings oldal mobilon teljesen egymás alá rendezi a személyes adatokat, biztonsági beállításokat, fiókadatokat és kredit blokkot. A képernyőképen a személyes adatok maszkolva, tesztadatként szerepelnek.
+A Profile/Settings oldal mobilon teljesen egymás alá rendezi a személyes adatokat, biztonsági beállításokat, fiókadatokat és kredit blokkot. A képernyőképen az email cím maszkolt tesztértékként szerepel.
 
 ![Profile mobile](docs/screenshots/profile-mobile.png)
 
-*11. kép: Profile / Settings mobil nézetben, maszkolt tesztadatokkal.*
+*13. kép: Profile / Settings mobil nézetben, maszkolt tesztadatokkal.*
 
 ### Reszponzív tervezési szempontok
 
@@ -720,7 +728,7 @@ Eredmény: a production build sikeresen elkészült.
 
 ![Frontend build](docs/screenshots/frontend-build.png)
 
-*12. kép: Sikeres frontend build.*
+*14. kép: Sikeres frontend build.*
 
 ### Frontend tesztek
 
@@ -739,7 +747,7 @@ Eredmény:
 
 ![Frontend tests](docs/screenshots/tests-frontend.png)
 
-*13. kép: Frontend tesztek sikeres futása.*
+*15. kép: Frontend tesztek sikeres futása.*
 
 A frontend tesztkörnyezetben célzott mockok vannak a külső és böngészőfüggő részekre:
 
@@ -766,7 +774,7 @@ Eredmény:
 
 ![Backend tests](docs/screenshots/tests-backend.png)
 
-*14. kép: Backend tesztek sikeres futása.*
+*16. kép: Backend tesztek sikeres futása.*
 
 A backend tesztek a legfontosabb vizsgaszempontból kritikus részeket fedik:
 
@@ -864,15 +872,15 @@ npm run test:run
 | `docs/screenshots/home-studio-preview.png` | Új Home AI Studio preview blokk, valós LudusGen modul képekkel. |
 | `docs/screenshots/home-credits.png` | Új Home kreditcsomag / pricing blokk. |
 | `docs/screenshots/login-modal-desktop.png` | Access Hub / login modal. |
-| `docs/screenshots/ai-studio-desktop.png` | AI Studio desktop nézet. |
-| `docs/screenshots/marketplace-desktop.png` | Marketplace desktop nézet. |
+| `docs/screenshots/ai-studio-desktop.png` | AI Studio desktop nézet, Image Studio munkaterülettel. |
+| `docs/screenshots/marketplace-desktop.png` | Marketplace desktop hero, kereső és szűrők. |
 | `docs/screenshots/forum-desktop.png` | Community / Forum desktop nézet. |
 | `docs/screenshots/home-mobile.png` | Mobil Home oldal. |
 | `docs/screenshots/mobile-menu.png` | Mobil hamburger menü. |
-| `docs/screenshots/marketplace-mobile.png` | Mobil Marketplace. |
-| `docs/screenshots/ai-studio-mobile.png` | Mobil AI Studio. |
+| `docs/screenshots/marketplace-mobile.png` | Mobil Marketplace kereső és szűrőpanel. |
+| `docs/screenshots/ai-studio-mobile.png` | Mobil AI Studio modulválasztó. |
 | `docs/screenshots/forum-mobile.png` | Mobil Community / Forum. |
-| `docs/screenshots/profile-mobile.png` | Mobil Profile / Settings, maszkolt tesztadatokkal. |
+| `docs/screenshots/profile-mobile.png` | Mobil Profile / Settings, maszkolt email címmel. |
 | `docs/screenshots/frontend-build.png` | Sikeres frontend build bizonyítéka. |
 | `docs/screenshots/tests-frontend.png` | Sikeres frontend tesztek bizonyítéka. |
 | `docs/screenshots/tests-backend.png` | Sikeres backend tesztek bizonyítéka. |
