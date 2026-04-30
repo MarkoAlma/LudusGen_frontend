@@ -1,6 +1,6 @@
 # LudusGen vizsgaremek dokumentáció
 
-Ez a dokumentáció a LudusGen projekt technikusi vizsgaremekhez készült részletes leírása. A célja, hogy a javító tanár egy helyen lássa az alkalmazás célját, funkcióit, reszponzív működését, adattárolását, backend API-jait és a tesztelés bizonyítékait.
+Ez a dokumentáció a LudusGen projekt vizsgaremekhez készült részletes leírása.
 
 Biztonsági okból a dokumentáció nem tartalmaz valós belépési adatokat, jelszavakat, API kulcsokat vagy személyes felhasználói előzményeket. A képernyőképeken az érzékeny részek szükség esetén maszkolva vannak.
 
