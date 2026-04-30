@@ -3,9 +3,13 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Container from '../ui/Container';
-import FloatingCore from '../ui/FloatingCore';
 import { MyUserContext } from '../../context/MyUserProvider';
+<<<<<<< HEAD
 import CTABG from '../../assets/ludusgen_WqbSkeD7zYPnJkdmdmtR.avif';
+=======
+import HomeBackdrop from './HomeBackdrop';
+import CTABG from '../../assets/ludusgen_XVCGbiWdME0qkh5OzkEb.avif';
+>>>>>>> 946a854dc804346fde6d3d4b8686910db85a9f33
 
 export default function CTABanner() {
   const navigate = useNavigate();
@@ -21,11 +25,11 @@ export default function CTABanner() {
 
   return (
     <section className="py-24 md:py-48 relative overflow-hidden">
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-50 transform scale-105">
-        <img src={CTABG} alt="" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#03000a] via-[#03000a]/20 to-[#03000a]" />
-        <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#03000a] to-transparent" />
-      </div>
+      <HomeBackdrop
+        image={CTABG}
+        className="opacity-50 transform scale-105"
+        topFade
+      />
 
       <Container>
         <motion.div
@@ -35,10 +39,6 @@ export default function CTABanner() {
           transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
           className="relative glass-panel p-12 md:p-32 rounded-[4rem] border border-white/5 overflow-hidden text-center flex flex-col items-center gap-12 shadow-[0_50px_100px_rgba(0,0,0,0.8)] bg-white/[0.01]"
         >
-          <div className="absolute inset-0 z-0 opacity-40 pointer-events-none scale-150">
-            <FloatingCore type="sphere" size={1.5} color="#8b5cf6" speed={0.5} />
-          </div>
-
           <div className="relative z-10 space-y-8 max-w-4xl">
             <motion.div
               animate={{ y: [0, -10, 0] }}
@@ -49,12 +49,12 @@ export default function CTABanner() {
             </motion.div>
 
             <h2 className="text-4xl md:text-7xl lg:text-8xl font-black text-white italic leading-[0.85] tracking-tighter">
-              Nyisd meg az <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-emerald-400 italic">AI Studio-t.</span>
+              Open the <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-400 to-emerald-400 italic">AI Studio.</span>
             </h2>
 
             <p className="text-lg md:text-2xl text-gray-400 max-w-2xl mx-auto font-bold leading-relaxed">
-              Kezdhetsz chatben, válthatsz képre, hangra vagy 3D-re, majd az elkészült asseteket továbbviheted a marketplace és community felületekre.
+              Start in chat, switch to image, audio, or 3D, then take finished assets into the marketplace and community spaces.
             </p>
           </div>
 

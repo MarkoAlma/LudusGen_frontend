@@ -30,6 +30,7 @@ import {
 } from "../utils/communityProfiles";
 import { REPORT_REASONS, submitContentReport } from "../utils/reports";
 
+
 const CATEGORIES = {
   code: { label: "Code AI", color: "#34d399", icon: Code },
   image: { label: "Image AI", color: "#f472b6", icon: Image },
@@ -355,19 +356,19 @@ const CommentEditor = ({ placeholder, onSubmit, onCancel, color, isReply = false
 
   return (
     <div className="mt-4 space-y-3 relative z-10 animate-in fade-in slide-in-from-top-2 duration-300">
-      <textarea 
-        value={text} 
+      <textarea
+        value={text}
         onChange={e => setText(e.target.value)}
-        onKeyDown={e => { 
-          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { 
-            e.preventDefault(); 
-            if (text.trim()) { onSubmit(text); setText(""); } 
-          } 
+        onKeyDown={e => {
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            if (text.trim()) { onSubmit(text); setText(""); }
+          }
         }}
         placeholder={placeholder}
         rows={isReply ? 2 : 4}
         className="w-full px-4 py-3.5 rounded-2xl text-white text-sm placeholder-gray-700 bg-[#0c0a12] border border-white/[0.08] focus:border-purple-500/30 focus:outline-none transition-all resize-none leading-relaxed"
-        style={{ minHeight: isReply ? "60px" : "110px", boxShadow: "inset 0 4px 12px rgba(0,0,0,0.4)" }} 
+        style={{ minHeight: isReply ? "60px" : "110px", boxShadow: "inset 0 4px 12px rgba(0,0,0,0.4)" }}
       />
 
       <div className="flex items-center justify-between mt-2 px-1">
@@ -452,7 +453,7 @@ const ReportModal = ({ isOpen, onClose, onSubmit, title = "Report" }) => {
             style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>Cancel</button>
           <button disabled={!reason || submitting} onClick={handleSubmit}
             className="cursor-pointer flex-1 py-2 rounded-xl text-sm text-white font-semibold transition-all disabled:opacity-30"
-          style={{ background: "linear-gradient(135deg,#dc2626,#4c1d95)" }}>
+            style={{ background: "linear-gradient(135deg,#dc2626,#4c1d95)" }}>
             {submitting ? "Sending..." : "Send report"}
           </button>
         </div>

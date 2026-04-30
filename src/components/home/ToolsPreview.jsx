@@ -3,13 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Box, Image as ImageIcon, MessageSquare, Music, Zap } from 'lucide-react';
 import Container from '../ui/Container';
 
-import ChatImg from '../../assets/ai_chat_preview_logic_1775575944543.png';
-import ImageImg from '../../assets/ai_studio_preview_image_gen_1775575925675.png';
-import AudioImg from '../../assets/ai_studio_preview_audio_engine_1775576030938.png';
-import ForgeImg from '../../assets/ai_studio_preview_3d_forge_1775576011580.png';
+import ChatImg from '../../assets/home_preview_ludusgen_chat.png';
+import ImageImg from '../../assets/home_preview_ludusgen_image.png';
+import AudioImg from '../../assets/home_preview_ludusgen_audio.png';
+import ForgeImg from '../../assets/home_preview_ludusgen_3d.png';
 
+import HomeBackdrop from './HomeBackdrop';
 import ChatStudioBG from '../../assets/ludusgen_jvubFciJtA0Fw42FoJ0N.avif';
-import FloatingCore from '../ui/FloatingCore';
 
 export default function ToolsPreview() {
   const [activeTab, setActiveTab] = useState(0);
@@ -20,23 +20,23 @@ export default function ToolsPreview() {
       label: 'AI Chat',
       icon: MessageSquare,
       image: ChatImg,
-      desc: 'Gemma, Gemini, Trinity, Mistral, Groq, NVIDIA és Cerebras chat modellek egy felületen, képes modellek külön jelöléssel.',
-      features: ['Vision modellek', 'Streaming válaszok', 'Kontextus összefoglalás'],
+      desc: 'Gemma, Gemini, Trinity, Mistral, Groq, NVIDIA, and Cerebras chat models in one workspace, with vision-capable models clearly marked.',
+      features: ['Vision models', 'Streaming replies', 'Context summaries'],
     },
     {
       id: 'image',
       label: 'Image Studio',
       icon: ImageIcon,
       image: ImageImg,
-      desc: 'Képgenerálás és képszerkesztés SDXL, Flux, Qwen Image, Z-Image, ModelScope és NVIDIA modellekkel.',
-      features: ['Promptból kép', 'Image edit', 'Upscale'],
+      desc: 'Generate and edit images with SDXL, Flux, Qwen Image, Z-Image, ModelScope, and NVIDIA models.',
+      features: ['Prompt to image', 'Image edit', 'Upscale'],
     },
     {
       id: 'audio',
       label: 'Audio Studio',
       icon: Music,
       image: AudioImg,
-      desc: 'TTS, voice design, voice clone és zenei generálás MiniMax, ACE-Step, Kokoro, Chatterbox és Qwen3 TTS modellekkel.',
+      desc: 'Create speech, clone voices, and generate music with ACE-Step, Kokoro, Chatterbox, Magpie, and Qwen3 TTS models.',
       features: ['Text-to-speech', 'Text-to-music', 'Voice clone'],
     },
     {
@@ -44,23 +44,19 @@ export default function ToolsPreview() {
       label: '3D Studio',
       icon: Box,
       image: ForgeImg,
-      desc: 'Szövegből vagy képből 3D asset Tripo3D és Trellis alapú export munkafolyamatokkal.',
+      desc: 'Turn text or images into 3D assets with Tripo3D and Trellis export workflows.',
       features: ['Text/Image to 3D', 'GLB/FBX export', 'Task queue'],
     },
   ];
 
   return (
     <section className="py-24 md:py-48 relative overflow-hidden">
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40 transform scale-110">
-        <img src={ChatStudioBG} alt="" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#03000a] via-[#03000a]/20 to-[#03000a]" />
-        <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#03000a] to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#03000a] to-transparent" />
-      </div>
-
-      <div className="absolute bottom-20 -left-20 opacity-20 z-0 scale-125">
-        <FloatingCore type="box" size={1.2} color="#7C3AED" speed={0.9} />
-      </div>
+      <HomeBackdrop
+        image={ChatStudioBG}
+        className="opacity-40 transform scale-110"
+        topFade
+        bottomFade
+      />
 
       <Container>
         <div className="text-center mb-24">
@@ -70,13 +66,13 @@ export default function ToolsPreview() {
             viewport={{ once: true }}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-[0.3em] mb-8"
           >
-            <Zap className="w-3 h-3" /> Valódi LudusGen modulok
+            <Zap className="w-3 h-3" /> Real LudusGen modules
           </motion.div>
           <h2 className="text-4xl md:text-6xl font-black text-white italic tracking-tighter mb-8 leading-none">
-            Egyetlen stúdió, <span className="text-primary">négy munkaterület.</span>
+            One studio, <span className="text-primary">four workspaces.</span>
           </h2>
           <p className="text-lg md:text-xl text-gray-500 max-w-2xl mx-auto font-bold">
-            A négy fő munkaterület ugyanabban az AI Studio felületben fut, közös navigációval, mentéssel és kredit alapú használattal.
+            The four core workspaces run inside the same AI Studio, with shared navigation, saved outputs, and credit-based usage.
           </p>
         </div>
 
@@ -89,10 +85,11 @@ export default function ToolsPreview() {
                 <button
                   key={tool.id}
                   onClick={() => setActiveTab(i)}
-                  className={`group relative p-8 rounded-[2.5rem] text-left transition-all duration-500 border overflow-hidden ${isActive
-                    ? 'bg-white/[0.03] border-white/10 shadow-2xl'
-                    : 'bg-transparent border-transparent hover:bg-white/[0.02]'
-                    }`}
+                  className={`group relative p-8 rounded-[2.5rem] text-left transition-all duration-500 border overflow-hidden ${
+                    isActive
+                      ? 'bg-white/[0.03] border-white/10 shadow-2xl'
+                      : 'bg-transparent border-transparent hover:bg-white/[0.02]'
+                  }`}
                 >
                   {isActive && (
                     <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />

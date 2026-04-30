@@ -219,7 +219,6 @@ export default function ImageControls({
   negativePrompt, setNegativePrompt,
   aspectRatio, setAspectRatio,
   quality, setQuality,
-  numImages, setNumImages,
   seed, setSeed,
   steps, setSteps,
   guidance, setGuidance,
@@ -239,14 +238,22 @@ export default function ImageControls({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [galleryPickerOpen, setGalleryPickerOpen] = useState(false);
+  const [pendingModel, setPendingModel] = useState(null);
   const popoverRef = useRef(null);
-  const color = selectedModel.color || "#7c3aed";
+  const displayModel = pendingModel || selectedModel;
+  const color = displayModel.color || "#7c3aed";
 
   // Generáló vs szerkesztő mód
-  const isEditMode = !!selectedModel.needsInputImage;
+  const isEditMode = !!displayModel.needsInputImage;
   const availableModels = ALL_MODELS.filter(
     m => m.panelType === 'image' && !!m.needsInputImage === isEditMode
   );
+
+  useEffect(() => {
+    if (pendingModel?.id === selectedModel?.id) {
+      setPendingModel(null);
+    }
+  }, [pendingModel?.id, selectedModel?.id]);
 
   // Dropdown bezárása külső kattintásra
   useEffect(() => {
@@ -282,14 +289,14 @@ export default function ImageControls({
     });
   };
 
-  const isNvidia = selectedModel.provider === "nvidia-image";
-  const apiId = selectedModel.apiModel || "";
-  const provider = selectedModel.provider || "fal";
+  const isNvidia = displayModel.provider === "nvidia-image";
+  const apiId = displayModel.apiModel || "";
+  const provider = displayModel.provider || "fal";
   const isGoogleImage = provider === "google-image";
   const isStability = provider === "stability";
   const isCloudflare = provider === "cloudflare";
   const isFal = !isStability && !isGoogleImage && !isCloudflare && !isNvidia;
-  const isModelScopeEdit = !!selectedModel.needsInputImage;
+  const isModelScopeEdit = !!displayModel.needsInputImage;
   const getNvidiaType = (id = "") => {
     const lowId = id.toLowerCase();
     if (lowId.includes("flux")) return "flux";
@@ -327,7 +334,7 @@ export default function ImageControls({
                 {isEditMode ? 'Image editing' : 'Image generation'}
               </p>
               <p className="text-[12px] font-black text-white truncate leading-none">
-                {selectedModel.name}
+                {displayModel.name}
               </p>
             </div>
 
@@ -357,13 +364,16 @@ export default function ImageControls({
                 {/* Model list */}
                 <div className="max-h-72 overflow-y-auto py-1">
                   {availableModels.map(model => {
-                    const isActive = selectedModel?.id === model.id;
+                    const isActive = displayModel?.id === model.id;
                     return (
                       <button
                         key={model.id}
                         onClick={() => {
-                          onModelChange?.(model);
+                          if (model.id !== selectedModel?.id) {
+                            setPendingModel(model);
+                          }
                           setDropdownOpen(false);
+                          onModelChange?.(model);
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all ${isActive ? 'bg-white/[0.05]' : 'hover:bg-white/[0.02]'
                           }`}
@@ -591,27 +601,6 @@ export default function ImageControls({
                     </button>
                   );
                 })}
-              </div>
-            </div>
-          )}
-
-          {/* Num images */}
-          {isFal && !isModelScopeEdit && (
-            <div className="space-y-3">
-              <div className="flex justify-between items-center px-1">
-                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest italic">Number of images</span>
-                <span className="text-[10px] font-black italic" style={{ color }}>{numImages}</span>
-              </div>
-              <div className="relative h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div
-                  className="absolute h-full transition-all duration-300"
-                  style={{ width: `${(numImages / 4) * 100}%`, backgroundColor: color }}
-                />
-                <input
-                  type="range" min="1" max="4" step="1"
-                  value={numImages} onChange={(e) => setNumImages(parseInt(e.target.value))}
-                  className="absolute inset-0 w-full opacity-0 cursor-pointer z-10"
-                />
               </div>
             </div>
           )}

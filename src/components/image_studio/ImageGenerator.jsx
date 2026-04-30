@@ -455,7 +455,6 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
   const [negativePrompt, setNegativePrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [quality, setQuality] = useState("balanced");
-  const [numImages, setNumImages] = useState(1);
   const [seed, setSeed] = useState("");
   const [steps, setSteps] = useState(35);
   const [guidance, setGuidance] = useState(3);
@@ -614,16 +613,10 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
 
   const provider = getProvider(selectedModel);
   const apiId = selectedModel.apiModel || "";
-  const isGoogleImage = provider === "google-image";
-  const isStability = provider === "stability";
-  const isCloudflare = provider === "cloudflare";
   const isNvidia = provider === "nvidia-image";
-  const isFal = !isStability && !isGoogleImage && !isCloudflare && !isNvidia;
   const isModelScopeEdit = !!selectedModel.needsInputImage;
   const nvidiaType = isNvidia ? getNvidiaType(apiId) : null;
   const isFlux = nvidiaType === "flux";
-  const isSD3 = nvidiaType === "sd3";
-  const singleImage = isStability || isGoogleImage || isCloudflare || isNvidia;
 
   // ── Edit-mód állapot mentése/visszaállítása modellváltáskor ──────────────
   const savedEditState = useRef({ negativePrompt: "", promptExtend: true });
@@ -703,7 +696,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
           image_size: isFlux
             ? { width: fluxSize.w, height: fluxSize.h }
             : { width: selectedAR.w, height: selectedAR.h },
-          num_images: singleImage ? 1 : Math.min(numImages, 4),
+          num_images: 1,
           seed: seed ? parseInt(seed) : undefined,
           num_inference_steps: steps,
           prompt_extend: promptExtend,
@@ -980,7 +973,6 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
                 negativePrompt={negativePrompt} setNegativePrompt={setNegativePrompt}
                 aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
                 quality={quality} setQuality={setQuality}
-                numImages={numImages} setNumImages={setNumImages}
                 seed={seed} setSeed={setSeed}
                 steps={steps} setSteps={setSteps}
                 guidance={guidance} setGuidance={setGuidance}

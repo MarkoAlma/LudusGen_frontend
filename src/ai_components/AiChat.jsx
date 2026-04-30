@@ -82,6 +82,7 @@ export default function AIChat({ user, getIdToken }) {
   const activeChatSessionIdRef = useRef(null);
   const activeMediaJobRef = useRef(null);
   const activePanelTypeRef = useRef(null);
+  const pendingModelNavigationRef = useRef(null);
 
   // Desktop Sidebar Persistence & Motion
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(() => {
@@ -111,6 +112,15 @@ export default function AIChat({ user, getIdToken }) {
   useEffect(() => {
     const tab = searchParams.get("tab") || "chat";
     const modelParam = searchParams.get("model");
+    const pendingModelId = pendingModelNavigationRef.current;
+
+    if (pendingModelId && modelParam !== pendingModelId) {
+      return;
+    }
+    if (pendingModelId && modelParam === pendingModelId) {
+      pendingModelNavigationRef.current = null;
+    }
+
     const targetModelId = resolveTargetModel(tab, modelParam);
 
     if (targetModelId !== selectedAI) {
@@ -180,7 +190,14 @@ export default function AIChat({ user, getIdToken }) {
   const handleSelectModel = useCallback((modelId) => {
     const oldModel = getModel(selectedAI);
     const newModel = getModel(modelId);
+    if (!newModel) return;
+    if (oldModel?.id === newModel.id) {
+      setSidebarOpen(false);
+      setModelDropdownOpen(false);
+      return;
+    }
     const tab = getTabForModel(newModel);
+    pendingModelNavigationRef.current = modelId;
 
     // Update session storage immediately to avoid race conditions
     sessionStorage.setItem(`ludusgen_last_model:${tab}`, modelId);
