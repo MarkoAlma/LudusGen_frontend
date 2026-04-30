@@ -12,6 +12,7 @@ import { checkThumbnailCache } from '../../ai_components/trellis/Glbthumbnail';
 import { getHistoryThumbnailCacheKey } from '../../ai_components/shared/historyThumbnailCache';
 import { Tooltip } from '../../ai_components/meshy/ui/Primitives';
 import { getHistoryImageUrls, getModelPreviewImageUrl, isImageHistoryItem } from '../../ai_components/tripo/tripoImageHistoryUtils';
+import { resolveHistoryCollectionForTab } from './historyCollectionMap';
 import toast from 'react-hot-toast';
 import './Shared3DHistory.css';
 
@@ -135,6 +136,7 @@ export default function Shared3DHistory({
   onSelect, onReuse, onDownload, onHistoryLoad, activeItemId, loadingId,
   refreshTrigger = 0, defaultTab = 'tripo', optimisticItems = [],
   firestoreCollection = 'trellis_history',
+  firestoreCollectionsByTab = null,
 }) {
   const MotionDiv = motion.div;
   const onHistoryLoadRef = useRef(onHistoryLoad);
@@ -152,6 +154,11 @@ export default function Shared3DHistory({
   const lastDocR = useRef(null);
   const assetFileRef = useRef(null);
   const historyLoadedRef = useRef(false);
+  const resolvedFirestoreCollection = resolveHistoryCollectionForTab(
+    activeTab,
+    firestoreCollection,
+    firestoreCollectionsByTab,
+  );
 
   useEffect(() => {
     onHistoryLoadRef.current = onHistoryLoad;
@@ -159,7 +166,9 @@ export default function Shared3DHistory({
 
   useEffect(() => {
     if (!userId) { setHistLoad(false); return; }
-    const q = query(collection(db, firestoreCollection),
+    setHistLoad(true);
+    lastDocR.current = null;
+    const q = query(collection(db, resolvedFirestoreCollection),
       where('userId', '==', userId), orderBy('createdAt', 'desc'), limit(PAGE_SIZE));
     const handleSnapshot = (snap) => {
       const now = Date.now();
@@ -189,13 +198,13 @@ export default function Shared3DHistory({
     }, err => { console.error("[Shared3DHistory]", err); setHistLoad(false); });
 
     return () => { unsub(); clearTimeout(timeout); };
-  }, [userId, firestoreCollection, refreshTrigger]);
+  }, [userId, resolvedFirestoreCollection, refreshTrigger, activeTab]);
 
   const loadMore = useCallback(async () => {
     if (!hasMore || moreLoad || !lastDocR.current) return;
     setMoreLoad(true);
     try {
-      const q = query(collection(db, firestoreCollection),
+      const q = query(collection(db, resolvedFirestoreCollection),
         where('userId', '==', userId), orderBy('createdAt', 'desc'),
         startAfter(lastDocR.current), limit(PAGE_SIZE));
       const snap = await getDocs(q);
@@ -212,7 +221,7 @@ export default function Shared3DHistory({
       lastDocR.current = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
       setHasMore(snap.docs.length === PAGE_SIZE);
     } catch (e) { console.error(e); } finally { setMoreLoad(false); }
-  }, [userId, hasMore, moreLoad, firestoreCollection]);
+  }, [userId, hasMore, moreLoad, resolvedFirestoreCollection]);
 
   const handleAssetUpload = useCallback(async (file) => {
     if (!file) return;

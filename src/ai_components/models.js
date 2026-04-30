@@ -86,7 +86,7 @@ const DEAPI_CHATTERBOX_LANGUAGES = [
     { id: "zh", label: "Chinese" },
 ];
 
-export const MODEL_GROUPS = [
+const RAW_MODEL_GROUPS = [
 
 
     // ─── KÓD ─────────────────────────────────────────────
@@ -468,35 +468,6 @@ export const MODEL_GROUPS = [
                 label: "Text to Music",
                 models: [
                     {
-                        id: "minimax_music_2_6_free",
-                        name: "MiniMax Music 2.6 Free",
-                        tier: "lite", tierLabel: "Free",
-                        description: "MiniMax - lyric-based or instrumental music generation",
-                        badge: "MiniMax API",
-                        priceNote: "Free tier",
-                        apiId: "music-2.6-free",
-                        provider: "minimax",
-                        color: "#22c55e",
-                        gradient: "from-emerald-400 to-lime-500",
-                        panelType: "audio",
-                        audioType: "music",
-                    },
-                    {
-                        id: "deapi_acestep_1_5_xl_turbo_int8",
-                        name: "Ace Step 1.5 XL Turbo INT8",
-                        tier: "lite", tierLabel: "API",
-                        description: "deAPI ACE-Step XL Turbo INT8 text-to-music generation",
-                        badge: "deAPI",
-                        priceNote: "Queue-based",
-                        apiId: "txt2music",
-                        provider: "deapi",
-                        deapiModelSlug: "AceStep_1_5_XL_Turbo_INT8",
-                        color: "#38bdf8",
-                        gradient: "from-sky-400 to-cyan-500",
-                        panelType: "audio",
-                        audioType: "music",
-                    },
-                    {
                         id: "deapi_acestep_1_5_base",
                         name: "Ace Step 1.5 Base",
                         tier: "lite", tierLabel: "API",
@@ -614,6 +585,20 @@ export const MODEL_GROUPS = [
         ],
     },
 ];
+
+const HIDDEN_MODEL_IDS = new Set([
+    "triposr",
+    "trellis2",
+    "meshy6",
+]);
+
+export const MODEL_GROUPS = RAW_MODEL_GROUPS.map((group) => ({
+    ...group,
+    categories: group.categories.map((category) => ({
+        ...category,
+        models: category.models.filter((model) => !HIDDEN_MODEL_IDS.has(model.id)),
+    })),
+}));
 
 // Flat lookup map
 export const ALL_MODELS = MODEL_GROUPS.flatMap((g) =>

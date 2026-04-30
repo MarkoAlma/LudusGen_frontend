@@ -32,6 +32,16 @@ import { MyUserContext } from '../context/MyUserProvider';
 import { auth, db } from '../firebase/firebaseApp';
 import Button from '../components/ui/Button';
 import LudusAudioPlayer from '../components/audio_studio/LudusAudioPlayer';
+import ThreeViewer from '../ai_components/meshy/viewer/ThreeViewer';
+import { checkThumbnailCache, getCachedThumbnail } from '../ai_components/trellis/Glbthumbnail';
+import { fetchModelData } from '../ai_components/trellis/utils';
+import { getHistoryThumbnailCacheKey } from '../ai_components/shared/historyThumbnailCache';
+import {
+  ensureImageHistoryThumb,
+  getHistoryImageUrls,
+  getModelPreviewImageUrl,
+  isImageHistoryItem,
+} from '../ai_components/tripo/tripoImageHistoryUtils';
 import MarketplaceBg from '../assets/marketplace_bg.png';
 
 const TYPE_TABS = [
@@ -109,6 +119,40 @@ function getCurrentViewerId() {
   return auth.currentUser?.uid || '';
 }
 
+function buildMarketplaceHeaders(headers = {}, token = '') {
+  return {
+    ...headers,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+async function fetchMarketplacePublicJson(path, { token = '', retryWithoutAuth = true, headers = {}, ...init } = {}) {
+  const url = String(path || '').startsWith('http') ? path : `${API_BASE}${path}`;
+  const method = String(init.method || 'GET').toUpperCase();
+  let res = await fetch(url, {
+    ...init,
+    headers: buildMarketplaceHeaders(headers, token),
+  });
+  let usedAuthFallback = false;
+
+  if (retryWithoutAuth && token && method === 'GET' && (res.status === 401 || res.status === 403)) {
+    res = await fetch(url, {
+      ...init,
+      headers,
+    });
+    usedAuthFallback = true;
+  }
+
+  let data = {};
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
+
+  return { res, data, usedAuthFallback };
+}
+
 function hydrateAssetForViewer(asset, ownedAssetIds = new Set(), viewerId = '', { trustOwnedFlag = false } = {}) {
   if (!asset) return asset;
   const ownedIds = ownedAssetIds instanceof Set ? ownedAssetIds : new Set(ownedAssetIds || []);
@@ -136,7 +180,141 @@ function triggerBlobDownload(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-function AssetPreview({ asset, large = false }) {
+function getMarketplaceModelFileName(asset) {
+  return String(asset?.storage?.fileName || asset?.title || 'marketplace-model.glb')
+    .replace(/[^\w.-]+/g, '_')
+    .slice(0, 120);
+}
+
+function MarketplaceModelPreview({ asset, user }) {
+  const [previewState, setPreviewState] = useState({ assetId: '', modelUrl: '', error: '' });
+  const canLoadModel = Boolean(user?.uid && (asset?.owned || asset?.ownerId === user.uid));
+  const modelFileName = getMarketplaceModelFileName(asset);
+  const currentPreview = previewState.assetId === asset?.id
+    ? previewState
+    : { assetId: asset?.id || '', modelUrl: '', error: '' };
+  const isLoading = Boolean(canLoadModel && asset?.id && !currentPreview.modelUrl && !currentPreview.error);
+
+  useEffect(() => {
+    if (!asset?.id || asset.type !== '3d' || !canLoadModel) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let objectUrl = '';
+
+    (async () => {
+      const token = await getToken();
+      if (!token) throw new Error('Login required to preview this model.');
+      const modelPath = asset.modelPreviewUrl || asset.modelUrl || `/api/marketplace/assets/${asset.id}/download?inline=1`;
+      const modelUrl = String(modelPath).startsWith('/api/')
+        ? `${API_BASE}${modelPath}`
+        : modelPath;
+
+      const res = await fetch(modelUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        let message = `Model preview failed (${res.status})`;
+        try {
+          const payload = await res.clone().json();
+          message = payload.message || message;
+        } catch {
+          // Binary download errors are uncommon, but keep a readable fallback.
+        }
+        throw new Error(message);
+      }
+
+      const blob = await res.blob();
+      objectUrl = URL.createObjectURL(blob);
+      if (cancelled) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      setPreviewState({
+        assetId: asset.id,
+        modelUrl: `${objectUrl}#${encodeURIComponent(modelFileName)}`,
+        error: '',
+      });
+    })().catch((err) => {
+      if (cancelled) return;
+      setPreviewState({
+        assetId: asset.id,
+        modelUrl: '',
+        error: err.message || 'Model preview failed',
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [asset?.id, asset?.modelPreviewUrl, asset?.modelUrl, asset?.owned, asset?.ownerId, asset?.type, canLoadModel, modelFileName]);
+
+  if (!canLoadModel) {
+    return (
+      <div className="aspect-video w-full relative flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#0a0612]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(138,43,226,0.22),transparent_70%)]" />
+        <div className="relative z-10 flex max-w-sm flex-col items-center gap-4 px-8 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+            <ShieldCheck className="h-8 w-8" />
+          </div>
+          <p className="text-sm font-black uppercase tracking-widest text-white">3D preview locked</p>
+          <p className="text-xs font-bold leading-relaxed text-gray-400">
+            Buy this asset or open one you own to inspect the actual model.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="aspect-video w-full relative flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#0a0612]">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,229,255,0.16),transparent_70%)]" />
+        <div className="relative z-10 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/40 px-5 py-4 text-xs font-black uppercase tracking-widest text-cyan-100 backdrop-blur-md">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading 3D model
+        </div>
+      </div>
+    );
+  }
+
+  if (currentPreview.error) {
+    return (
+      <div className="aspect-video w-full relative flex items-center justify-center overflow-hidden rounded-2xl border border-red-400/20 bg-red-950/20 p-8">
+        <div className="flex max-w-sm flex-col items-center gap-4 text-center">
+          <AlertTriangle className="h-9 w-9 text-red-300" />
+          <p className="text-sm font-black uppercase tracking-widest text-white">Model preview failed</p>
+          <p className="text-xs font-bold leading-relaxed text-red-100/75">{currentPreview.error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="aspect-video w-full overflow-hidden rounded-2xl border border-cyan-400/15 bg-[#050915] shadow-[0_0_34px_rgba(0,229,255,0.08)]">
+      {currentPreview.modelUrl ? (
+        <ThreeViewer
+          key={currentPreview.modelUrl}
+          modelUrl={currentPreview.modelUrl}
+          viewMode="normal"
+          lightMode="studio"
+          color="#8a2be2"
+          showGrid
+          autoSpin
+          bgColor="default"
+          gridColor1="#18334a"
+          gridColor2="#0d1425"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function AssetPreview({ asset, large = false, user = null }) {
   const TypeMeta = getTypeMeta(asset.type);
   const TypeIcon = TypeMeta.icon;
   const previewClass = large ? 'aspect-video w-full' : 'aspect-[4/3] w-full';
@@ -187,6 +365,10 @@ function AssetPreview({ asset, large = false }) {
         <LudusAudioPlayer src={asset.previewUrl} title={asset.title} eyebrow="Watermarked preview" accent="#a855f7" />
       </div>
     );
+  }
+
+  if (asset.type === '3d' && large) {
+    return <MarketplaceModelPreview asset={asset} user={user} />;
   }
 
   return (
@@ -359,6 +541,105 @@ function CompactAssetThumb({ asset }) {
   );
 }
 
+function MarketplaceHistoryThumb({ item, assetType }) {
+  const historyItem = item?.raw || item;
+  const thumbnailCacheKey = getHistoryThumbnailCacheKey(historyItem);
+  const immediateThumb =
+    item?.previewUrl
+    || historyItem?.previewThumbnail
+    || getModelPreviewImageUrl(historyItem)
+    || historyItem?.thumbnail
+    || historyItem?.thumbnail_url
+    || checkThumbnailCache(thumbnailCacheKey)
+    || checkThumbnailCache(historyItem?.model_url)
+    || null;
+  const [thumb, setThumb] = useState(immediateThumb);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const nextImmediate =
+      item?.previewUrl
+      || historyItem?.previewThumbnail
+      || getModelPreviewImageUrl(historyItem)
+      || historyItem?.thumbnail
+      || historyItem?.thumbnail_url
+      || checkThumbnailCache(thumbnailCacheKey)
+      || checkThumbnailCache(historyItem?.model_url)
+      || null;
+
+    setThumb(nextImmediate);
+    setLoading(false);
+
+    if (nextImmediate || assetType !== '3d') {
+      return () => { cancelled = true; };
+    }
+
+    const imageUrls = getHistoryImageUrls(historyItem);
+    if (isImageHistoryItem(historyItem) && imageUrls.length > 0) {
+      setLoading(true);
+      ensureImageHistoryThumb(historyItem)
+        .then((generatedThumb) => {
+          if (!cancelled) setThumb(generatedThumb || null);
+        })
+        .catch((err) => {
+          if (!cancelled) console.warn('[MarketplaceHistoryThumb] image thumb failed:', err?.message || err);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+      return () => { cancelled = true; };
+    }
+
+    if (historyItem?.model_url) {
+      setLoading(true);
+      fetchModelData(historyItem.model_url, getToken, historyItem.taskId)
+        .then(async (data) => {
+          if (cancelled || !data?.buffer) return;
+          try {
+            const generatedThumb = await getCachedThumbnail(
+              data.buffer,
+              { width: 160, height: 160, resourcePath: historyItem.model_url },
+              thumbnailCacheKey || historyItem.model_url,
+            );
+            if (!cancelled) setThumb(generatedThumb || null);
+          } finally {
+            if (data.blobUrl) URL.revokeObjectURL(data.blobUrl);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) console.warn('[MarketplaceHistoryThumb] model thumb failed:', err?.message || err);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }
+
+    return () => { cancelled = true; };
+  }, [assetType, historyItem, historyItem?.id, historyItem?.model_url, historyItem?.taskId, historyItem?.thumbnail, historyItem?.thumbnail_url, historyItem?.previewThumbnail, item?.previewUrl, thumbnailCacheKey]);
+
+  return (
+    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/40">
+      {thumb ? (
+        <img
+          src={thumb}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+          onError={() => setThumb(null)}
+        />
+      ) : loading ? (
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      ) : assetType === '3d' ? (
+        <Box className="h-5 w-5 text-gray-600" />
+      ) : (
+        <Library className="h-5 w-5 text-gray-600" />
+      )}
+    </div>
+  );
+}
+
 function MarketplaceSelect({ icon: Icon, value, onChange, options = [], label }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
@@ -508,7 +789,7 @@ function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDe
                    <div className="absolute -bottom-1/4 -right-1/4 w-full h-full bg-secondary/10 blur-[120px] animate-pulse" />
                 </div>
                 <div className="relative z-10 w-full">
-                   <AssetPreview asset={asset} large />
+                   <AssetPreview asset={asset} large user={user} />
                 </div>
               </div>
 
@@ -787,13 +1068,31 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
         const items = snap.docs
           .map((doc) => ({ id: doc.id, collection: 'tripo_history', ...doc.data() }))
           .filter((item) => item.model_url)
-          .map((item) => ({
-            id: item.id,
-            collection: 'tripo_history',
-            title: item.prompt || item.params?.filename || `3D ${item.id.slice(0, 6)}`,
-            subtitle: item.mode || item.source || '3D',
-            locked: item.marketplaceLocked,
-          }));
+          .map((item) => {
+            const thumbnailCacheKey = getHistoryThumbnailCacheKey(item);
+            const previewUrl =
+              item.previewThumbnail
+              || getModelPreviewImageUrl(item)
+              || item.thumbnail
+              || item.thumbnail_url
+              || checkThumbnailCache(thumbnailCacheKey)
+              || checkThumbnailCache(item.model_url)
+              || null;
+
+            return {
+              id: item.id,
+              collection: 'tripo_history',
+              sourceCollection: 'tripo_history',
+              sourceId: item.id,
+              title: item.prompt || item.params?.filename || `3D ${item.id.slice(0, 6)}`,
+              subtitle: item.mode || item.source || '3D',
+              locked: item.marketplaceLocked,
+              previewUrl,
+              model_url: item.model_url,
+              taskId: item.taskId || null,
+              raw: item,
+            };
+          });
         setHistoryItems(items);
       }
     } catch (err) {
@@ -1055,13 +1354,7 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
                                 : 'border-white/5 bg-white/[0.02] hover:border-white/20'
                             }`}
                           >
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                              {item.previewUrl ? (
-                                <img src={item.previewUrl} alt="" className="h-full w-full object-cover" />
-                              ) : (
-                                <Library className="h-5 w-5 text-gray-600" />
-                              )}
-                            </div>
+                            <MarketplaceHistoryThumb item={item} assetType={assetType} />
                             <div className="min-w-0">
                               <p className="truncate text-xs font-black text-white">{item.title}</p>
                               <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 mt-0.5">{item.subtitle || item.collection}</p>
@@ -1187,7 +1480,12 @@ export default function Marketplace() {
   const loadMoreRef = useRef(null);
   const assetRequestSeqRef = useRef(0);
   const loadingMoreRef = useRef(false);
+  const ownedAssetIdsRef = useRef(ownedAssetIds);
   const viewerId = user?.uid || '';
+
+  useEffect(() => {
+    ownedAssetIdsRef.current = ownedAssetIds;
+  }, [ownedAssetIds]);
 
   const sellerListings = useMemo(
     () => assets.filter((asset) => asset.ownerId === viewerId),
@@ -1216,6 +1514,7 @@ export default function Marketplace() {
       if (getCurrentViewerId() !== requestViewerId) return;
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to load library');
       const nextOwnedAssetIds = new Set(data.ownedAssetIds || []);
+      ownedAssetIdsRef.current = nextOwnedAssetIds;
       setOwnedAssetIds(nextOwnedAssetIds);
       setLibraryItems((data.items || []).map((item) => (
         item.asset
@@ -1249,16 +1548,19 @@ export default function Marketplace() {
     const requestViewerId = viewerId;
     try {
       const qs = buildQueryParams(filters, { limit: MARKETPLACE_PAGE_SIZE, cursor });
-      const token = await getToken();
+      const publicListWithoutAuth = filters.ownership === 'all';
+      const token = publicListWithoutAuth ? '' : await getToken();
       if (getCurrentViewerId() !== requestViewerId) return;
-      const res = await fetch(`${API_BASE}/api/marketplace/assets${qs ? `?${qs}` : ''}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const { res, data, usedAuthFallback } = await fetchMarketplacePublicJson(`/api/marketplace/assets${qs ? `?${qs}` : ''}`, {
+        token,
+        retryWithoutAuth: filters.ownership === 'all',
       });
-      const data = await res.json();
       if (activeRequestId !== assetRequestSeqRef.current) return;
       if (getCurrentViewerId() !== requestViewerId) return;
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to load marketplace');
-      const nextOwnedAssetIds = new Set(data.ownedAssetIds || []);
+      const nextOwnedAssetIds = usedAuthFallback || publicListWithoutAuth
+        ? ownedAssetIdsRef.current
+        : new Set(data.ownedAssetIds || []);
       const nextAssets = (data.assets || []).map((asset) => (
         hydrateAssetForViewer(asset, nextOwnedAssetIds, requestViewerId, { trustOwnedFlag: true })
       ));
@@ -1272,7 +1574,10 @@ export default function Marketplace() {
       });
       setNextCursor(data.nextCursor || null);
       setHasMoreAssets(Boolean(data.hasMore && data.nextCursor));
-      if (data.ownedAssetIds) setOwnedAssetIds(nextOwnedAssetIds);
+      if (data.ownedAssetIds && !usedAuthFallback && !publicListWithoutAuth) {
+        ownedAssetIdsRef.current = nextOwnedAssetIds;
+        setOwnedAssetIds(nextOwnedAssetIds);
+      }
     } catch (err) {
       if (activeRequestId !== assetRequestSeqRef.current) return;
       toast.error(err.message || 'Failed to load marketplace');
@@ -1342,12 +1647,11 @@ export default function Marketplace() {
     setSelectedAsset(hydrateOwned(asset));
     try {
       const requestViewerId = viewerId;
-      const token = await getToken();
       if (getCurrentViewerId() !== requestViewerId) return;
-      const res = await fetch(`${API_BASE}/api/marketplace/assets/${asset.id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const { res, data } = await fetchMarketplacePublicJson(`/api/marketplace/assets/${asset.id}`, {
+        token: '',
+        retryWithoutAuth: true,
       });
-      const data = await res.json();
       if (getCurrentViewerId() !== requestViewerId) return;
       if (res.ok && data.success) {
         const hydratedAsset = hydrateAssetForViewer(
@@ -1388,7 +1692,11 @@ export default function Marketplace() {
         throw new Error(data.message || 'Purchase failed');
       }
       toast.success(data.alreadyOwned ? 'This asset is already in your library' : 'Purchase successful');
-      setOwnedAssetIds((prev) => new Set([...prev, asset.id]));
+      setOwnedAssetIds((prev) => {
+        const next = new Set([...prev, asset.id]);
+        ownedAssetIdsRef.current = next;
+        return next;
+      });
       setSelectedAsset((prev) => prev ? { ...prev, owned: true } : prev);
       await Promise.all([loadLibrary(), loadAssets(), refreshCredits?.()]);
     } catch (err) {

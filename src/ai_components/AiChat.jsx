@@ -5,7 +5,8 @@ import { ALL_MODELS, getModel, findModelGroup, findModelCat } from "./models";
 import ChatPanel from "./ChatPanel";
 import ImagePanel from "./ImagePanel";
 import AudioPanel from "./AudioPanel";
-import MeshyStudio from "./meshy/Meshy";
+// Meshy is intentionally hidden for now, but kept in the codebase for later reuse.
+// import MeshyStudio from "./meshy/Meshy";
 import TrellisPanel from "./trellis/TrellisPanel";
 import TripoPanel from "./tripo/TripoPanel";
 import { MyUserContext } from "../context/MyUserProvider";
@@ -209,7 +210,7 @@ export default function AIChat({ user, getIdToken }) {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
       next.set("tab", tab);
-      next.delete("model");
+      next.set("model", modelId);
       return next;
     }, { replace: true });
 
@@ -323,8 +324,8 @@ export default function AIChat({ user, getIdToken }) {
         return <ImagePanel {...props} />;
       case "audio":
         return <AudioPanel {...props} />;
-      case "threed":
-        return <MeshyStudio {...props} />;
+      // case "threed":
+      //   return <MeshyStudio {...props} />;
       case "trellis":
         return <TrellisPanel {...props} />;
       case "tripo":

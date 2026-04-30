@@ -61,7 +61,9 @@ export async function streamTaskStatus({
     signal,
   });
   if (!res.ok || !res.body) {
-    throw new Error(`Task stream failed (${res.status})`);
+    const err = new Error(`Task stream failed (${res.status})`);
+    err.status = res.status;
+    throw err;
   }
 
   const reader = res.body.getReader();

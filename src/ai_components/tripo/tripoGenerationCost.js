@@ -1,3 +1,5 @@
+import { getTripoGenerateImageCost } from "./tripoImageGenerationConfig.js";
+
 export const DEFAULT_TRIPO_PANEL_MODE_COST = {
   segment: 40,
   fill_parts: 50,
@@ -5,7 +7,7 @@ export const DEFAULT_TRIPO_PANEL_MODE_COST = {
   animate: 10,
   generate_image: 5,
   generate_multiview_image: 10,
-  edit_multiview_image: 10,
+  edit_multiview_image: 5,
 };
 
 function getPositiveCount(value) {
@@ -23,6 +25,7 @@ export function estimateTripoPanelGenerationCost(options = {}, modeCost = DEFAUL
     quadMesh = false,
     segSub,
     multiviewImageMode,
+    generationModel,
     genTab,
     imageSourceMode,
     modelVer,
@@ -44,7 +47,12 @@ export function estimateTripoPanelGenerationCost(options = {}, modeCost = DEFAUL
   if (mode === "refine") return 30;
   if (mode === "stylize") return 20;
   if (mode === "segment") return modeCost[segSub] ?? modeCost.segment;
-  if (mode === "views") return modeCost[multiviewImageMode] ?? 10;
+  if (mode === "views") {
+    if (multiviewImageMode === "generate_image") {
+      return getTripoGenerateImageCost(generationModel);
+    }
+    return modeCost[multiviewImageMode] ?? 10;
+  }
   if (mode !== "generate") return modeCost[mode] ?? 10;
 
   const type = genTab === "text" ? "text_to_model" : genTab === "multi" ? "multiview_to_model" : "image_to_model";

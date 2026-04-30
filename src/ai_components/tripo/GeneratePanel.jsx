@@ -1,5 +1,6 @@
 // trellis/GeneratePanel.jsx
 import React, { useState, useRef, useEffect, memo } from "react";
+import { createPortal } from "react-dom";
 import {
   Image, Boxes, Grid3x3, Pencil, HelpCircle, Upload, Check, X, Plus,
   Loader2, ChevronDown, ChevronUp, PersonStanding, Zap, Images, Lightbulb,
@@ -9,6 +10,7 @@ import {
 import Enhancer from "../Enhancer";
 import { Tooltip } from "../meshy/ui/Primitives";
 import { MULTIVIEW_UPLOAD_ORDER } from "./multiviewUtils";
+import { GalleryPickerModal } from "../../components/image_studio/ImageControls";
 
 /* ─── Tab definitions ─────────────────────────────────────────────────── */
 export const GEN_TABS = [
@@ -62,6 +64,59 @@ export function getFaceLimitConfig(smartLowPoly, quad) {
  * ─────────────────────────────────────────────────────────────────────── */
 function Na({ children }) {
   return <>{children}</>;
+}
+
+function dataUrlToFile(dataUrl, name = "gallery-image.png") {
+  const [header = "", base64 = ""] = String(dataUrl || "").split(",");
+  const mime = header.match(/data:([^;]+)/)?.[1] || "image/png";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new File([bytes], name, { type: mime });
+}
+
+function ImageSourceChoiceModal({ title = "Add image", onClose, onDevice, onGallery }) {
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 backdrop-blur-xl"
+      onClick={onClose}
+    >
+      <div
+        className="w-[min(92vw,360px)] rounded-2xl border border-white/10 bg-[#0a0a14] p-3 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="px-2 py-2">
+          <h3 className="text-[11px] font-black text-white uppercase tracking-[0.22em]">{title}</h3>
+          <p className="mt-1 text-[9px] font-bold text-white/30 uppercase tracking-[0.18em]">
+            Choose image source
+          </p>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onDevice}
+            className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.035] text-zinc-300 transition-all hover:border-cyan-300/30 hover:bg-cyan-300/[0.06]"
+          >
+            <Upload className="h-5 w-5 text-cyan-200" />
+            <span className="text-[10px] font-black uppercase tracking-[0.16em]">Device</span>
+          </button>
+          <button
+            type="button"
+            onClick={onGallery}
+            className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.035] text-zinc-300 transition-all hover:border-violet-300/30 hover:bg-violet-300/[0.06]"
+          >
+            <Images className="h-5 w-5 text-violet-200" />
+            <span className="text-[10px] font-black uppercase tracking-[0.16em]">Gallery</span>
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 /* ─── helpers ─────────────────────────────────────────────────────────── */
@@ -546,6 +601,9 @@ const GeneratePanel = memo(({
     icon: slotIcons[slot.id],
   }));
   const batchInputRef = useRef(null);
+  const [sourceChoice, setSourceChoice] = useState(null);
+  const [batchGalleryOpen, setBatchGalleryOpen] = useState(false);
+  const [multiviewGallerySlotIndex, setMultiviewGallerySlotIndex] = useState(null);
   const isUploadedItemReady = (item) => Boolean(item?.token || item?.tripoFile);
   const uploadedMultiviewCount = MULTIVIEW_UPLOAD_ORDER.reduce(
     (count, _, index) => count + (isUploadedItemReady(multiImages?.[index]) ? 1 : 0),
@@ -565,6 +623,57 @@ const GeneratePanel = memo(({
       : payload?.token || payload?.object?.key || "sts",
     ...(typeof payload === "object" && payload ? { tripoFile: payload } : {}),
   });
+  const setMultiviewSlot = (slotIndex, file, preview) => {
+    setMultiImages(prev => {
+      const next = [...(prev ?? [])];
+      next[slotIndex] = { file, preview, token: null };
+      return next;
+    });
+    handleMultiImg && handleMultiImg(file).then(payload => {
+      setMultiImages(prev => {
+        const updated = [...(prev ?? [])];
+        if (updated[slotIndex]) updated[slotIndex] = normalizeUploadedItem(file, preview, payload);
+        return updated;
+      });
+    }).catch(() => { });
+  };
+
+  const openMultiviewDevicePicker = (slotIndex) => {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/jpeg,image/png,image/webp,image/avif";
+    inp.onchange = e => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = ev => setMultiviewSlot(slotIndex, f, ev.target.result);
+      r.readAsDataURL(f);
+    };
+    inp.click();
+  };
+
+  const addBatchFile = (file, previewOverride = null) => {
+    const applyPreview = (preview) => {
+      const tempItem = { file, preview, token: null };
+      setBatchImages(prev => {
+        const next = [...(prev ?? [])];
+        if (next.length < 10) next.push(tempItem);
+        return next;
+      });
+      handleBatchImg && handleBatchImg(file).then(payload => {
+        setBatchImages(prev => prev.map(i => i.file === file ? normalizeUploadedItem(file, preview, payload) : i));
+      }).catch(() => { });
+    };
+
+    if (previewOverride) {
+      applyPreview(previewOverride);
+      return;
+    }
+
+    const r = new FileReader();
+    r.onload = ev => applyPreview(ev.target.result);
+    r.readAsDataURL(file);
+  };
 
   /* ─── Capabilities for current model ──────────────────────────────────
    * Priority: backendCaps (fetched from API) > static MODEL_CAPS fallback.
@@ -594,22 +703,44 @@ const GeneratePanel = memo(({
   /* ─── Batch file handler ──────────────────────────────────────────── */
   function handleBatchFiles(files) {
     const arr = Array.from(files).slice(0, 10 - (batchImages?.length ?? 0));
-    arr.forEach(f => {
-      const r = new FileReader();
-      r.onload = ev => {
-        const tempItem = { file: f, preview: ev.target.result, token: null };
-        setBatchImages(prev => {
-          const next = [...(prev ?? [])];
-          if (next.length < 10) next.push(tempItem);
-          return next;
-        });
-        handleBatchImg && handleBatchImg(f).then(payload => {
-          setBatchImages(prev => prev.map(i => i.file === f ? normalizeUploadedItem(f, ev.target.result, payload) : i));
-        }).catch(() => { });
-      };
-      r.readAsDataURL(f);
-    });
+    arr.forEach(f => addBatchFile(f));
   }
+
+  const handleBatchGallerySelect = (imgs) => {
+    const slotsLeft = Math.max(0, 10 - (batchImages?.length ?? 0));
+    imgs.slice(0, slotsLeft).forEach((img, index) => {
+      if (!img?.dataUrl) return;
+      const file = dataUrlToFile(img.dataUrl, img.name || `gallery-image-${index + 1}.png`);
+      addBatchFile(file, img.dataUrl);
+    });
+  };
+
+  const handleMultiviewGallerySelect = (imgs) => {
+    const first = imgs?.[0];
+    if (!first?.dataUrl || multiviewGallerySlotIndex == null) return;
+    const file = dataUrlToFile(first.dataUrl, first.name || `gallery-view-${multiviewGallerySlotIndex + 1}.png`);
+    setMultiviewSlot(multiviewGallerySlotIndex, file, first.dataUrl);
+  };
+
+  const handleSourceChoiceDevice = () => {
+    const choice = sourceChoice;
+    setSourceChoice(null);
+    if (choice?.kind === "multi") {
+      openMultiviewDevicePicker(choice.index);
+      return;
+    }
+    batchInputRef.current?.click();
+  };
+
+  const handleSourceChoiceGallery = () => {
+    const choice = sourceChoice;
+    setSourceChoice(null);
+    if (choice?.kind === "multi") {
+      setMultiviewGallerySlotIndex(choice.index);
+      return;
+    }
+    setBatchGalleryOpen(true);
+  };
 
   /* ─── Derived ─────────────────────────────────────────────────────── */
   const activePbrOn = texOn && pbrOn;
@@ -845,30 +976,7 @@ const GeneratePanel = memo(({
                 const isUploading = multiImages?.[i] && !isUploadedItemReady(multiImages[i]);
                 return (
                   <div key={slot.label} className={"mv-cell checker" + (prev ? " has-img" : "")}
-                    onClick={() => {
-                      const inp = document.createElement("input");
-                      inp.type = "file"; inp.accept = "image/jpeg,image/png,image/webp,image/avif";
-                      inp.onchange = e => {
-                        const f = e.target.files[0];
-                        if (f) {
-                          const r = new FileReader();
-                          r.onload = ev => {
-                            const next = [...(multiImages ?? [])];
-                            next[i] = { file: f, preview: ev.target.result, token: null };
-                            setMultiImages(next);
-                            handleMultiImg && handleMultiImg(f).then(payload => {
-                              setMultiImages(prev => {
-                                const updated = [...prev];
-                                if (updated[i]) updated[i] = normalizeUploadedItem(f, ev.target.result, payload);
-                                return updated;
-                              });
-                            }).catch(() => { });
-                          };
-                          r.readAsDataURL(f);
-                        }
-                      };
-                      inp.click();
-                    }}>
+                    onClick={() => setSourceChoice({ kind: "multi", index: i })}>
                     {prev ? (
                       <div style={{ position: "relative", width: "100%", height: "100%" }}>
                         <img src={prev} alt={slot.label} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -911,7 +1019,7 @@ const GeneratePanel = memo(({
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
               transition: "aspect-ratio 0.3s ease",
             }}
-            onClick={() => batchInputRef.current?.click()}
+            onClick={() => setSourceChoice({ kind: "batch" })}
             onDragOver={e => e.preventDefault()}
             onDrop={e => { e.preventDefault(); handleBatchFiles(e.dataTransfer.files); }}
           >
@@ -977,7 +1085,7 @@ const GeneratePanel = memo(({
             </div>
           )}
           <input ref={batchInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple style={{ display: "none" }}
-            onChange={e => { if (e.target.files) handleBatchFiles(e.target.files); }} />
+            onChange={e => { if (e.target.files) handleBatchFiles(e.target.files); e.target.value = ""; }} />
         </div>
       )}
 
@@ -1218,6 +1326,33 @@ const GeneratePanel = memo(({
         </div>
       </Collapsible>
 
+
+      {sourceChoice && (
+        <ImageSourceChoiceModal
+          title={sourceChoice.kind === "multi" ? "Add view image" : "Add source images"}
+          onClose={() => setSourceChoice(null)}
+          onDevice={handleSourceChoiceDevice}
+          onGallery={handleSourceChoiceGallery}
+        />
+      )}
+
+      {batchGalleryOpen && (
+        <GalleryPickerModal
+          onClose={() => setBatchGalleryOpen(false)}
+          onSelectMultiple={handleBatchGallerySelect}
+          getIdToken={getIdToken}
+          slotsAvailable={Math.max(0, 10 - (batchImages?.length ?? 0))}
+        />
+      )}
+
+      {multiviewGallerySlotIndex != null && (
+        <GalleryPickerModal
+          onClose={() => setMultiviewGallerySlotIndex(null)}
+          onSelectMultiple={handleMultiviewGallerySelect}
+          getIdToken={getIdToken}
+          slotsAvailable={1}
+        />
+      )}
 
     </>
   );

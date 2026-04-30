@@ -62,4 +62,33 @@ import { estimateTripoPanelGenerationCost } from "../tripoGenerationCost.js";
   assert.equal(result, 25, "generate_image preprocess should add 5 credits and produce one image-to-model task");
 }
 
+{
+  const result = estimateTripoPanelGenerationCost({
+    mode: "views",
+    multiviewImageMode: "generate_image",
+    generationModel: "gpt_image_1.5",
+  });
+
+  assert.equal(result, 10, "premium generate_image models should charge 10 credits");
+}
+
+{
+  const result = estimateTripoPanelGenerationCost({
+    mode: "views",
+    multiviewImageMode: "generate_image",
+    generationModel: "gemini_2.5_flash_image_preview",
+  });
+
+  assert.equal(result, 5, "standard generate_image models should charge 5 credits");
+}
+
+{
+  const result = estimateTripoPanelGenerationCost({
+    mode: "views",
+    multiviewImageMode: "edit_multiview_image",
+  });
+
+  assert.equal(result, 5, "edit_multiview_image should charge 5 credits per edited image");
+}
+
 console.log("tripoGenerationCost assertions passed");

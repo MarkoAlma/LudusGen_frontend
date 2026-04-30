@@ -1,12 +1,13 @@
 import React, {
   useState, useRef, useCallback, useEffect, useMemo, useContext, useReducer,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   Download, Loader2, AlertCircle, Trash2, RotateCcw,
   Camera, Move3d, Layers, Play, Square, ChevronRight, ChevronLeft, Box, Zap, Info,
   Sparkles, Grid3x3, Scissors, PaintBucket,
   Boxes, PersonStanding, Wand2, Activity,
-  PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen
+  PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen, X
 } from "lucide-react";
 
 import StudioLayout, { StudioLayoutContext } from "../../components/shared/StudioLayout";
@@ -26,7 +27,11 @@ import { persistGen, loadPersistedGen, updatePersistedProgress, clearPersistedGe
 import { useActiveTasksPoller } from "./useActiveTasksPoller";
 import { checkThumbnailCache, getCachedThumbnail } from "../trellis/Glbthumbnail";
 import { fetchModelData } from "../trellis/utils";
-import { getHistoryThumbnailCacheKey } from "../shared/historyThumbnailCache";
+import {
+  checkResolvedHistoryThumbnail,
+  getHistoryThumbnailCacheKey,
+  subscribeResolvedHistoryThumbnail,
+} from "../shared/historyThumbnailCache";
 import { useTripoHistory } from "./useTripoHistory";
 import { useTripoRig } from "./useTripoRig";
 import GeneratePanel, { MODEL_VERSIONS, STYLE_PREFIX } from "./GeneratePanel";
@@ -35,7 +40,12 @@ import { DEFAULT_MODEL_VERSION, DEFAULT_TEXTURE_MODEL_VERSION, DETAILED_TEXTURE_
 import { streamTaskStatus, uploadViaTripoSts } from "./tripoTransfers";
 import { resolveTripoModelUrl, resolveTripoUrlNode } from "./utils/modelUrl";
 import { estimateTripoPanelGenerationCost } from "./tripoGenerationCost";
-import { buildImageToModelSubmission } from "./tripoGenerationRequest";
+import { buildGenerateImageSubmission, buildImageToModelSubmission } from "./tripoGenerationRequest";
+import {
+  getTripoGenerateImageInputPolicy,
+  isTripoReferenceImageReady,
+  normalizeTripoReferenceImages,
+} from "./tripoImageGenerationConfig";
 import {
   MULTIVIEW_UPLOAD_ORDER,
   buildMultiviewPreviewItems,
@@ -46,6 +56,7 @@ import {
 } from "./multiviewUtils";
 import {
   downloadImageHistoryZip,
+  ensureImageHistoryThumb,
   extractTripoPreviewImageUrls,
   getHistoryImageUrls,
   getModelPreviewImageUrl,
@@ -78,6 +89,7 @@ const PAGE_SIZE = 10;
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 const POLL_MS = 2500;
 const POLL_MAX = 500;
+const MODEL_PROXY_TERMINAL_STATUSES = new Set([401, 403, 404, 410]);
 
 const PROGRESS_JUMP_LIMIT = 30;
 const STUCK_THRESHOLD_MS = 300_000;
@@ -93,6 +105,50 @@ function buildPreviewHistoryFields(previewUrls) {
   return normalized.length > 0
     ? { previewImageUrl: normalized[0], previewImageUrls: normalized }
     : {};
+}
+
+function normalizeHistoryTaskKey(value) {
+  const key = String(value || "").trim();
+  return key.startsWith("tripo_") ? key.slice(6) : key;
+}
+
+function historyItemsReferToSameTask(left, right) {
+  if (!left || !right) return false;
+  const leftKeys = [left.id, left.taskId, left.task_id].map(normalizeHistoryTaskKey).filter(Boolean);
+  const rightKeys = [right.id, right.taskId, right.task_id].map(normalizeHistoryTaskKey).filter(Boolean);
+  return leftKeys.some((key) => rightKeys.includes(key));
+}
+
+const SELECTED_TASK_PREVIEW_CACHE = new Map();
+const SELECTED_TASK_PREVIEW_MISSES = new Set();
+
+async function fetchSelectedHistoryTaskPreviewImageUrl(taskId, getIdToken) {
+  if (!taskId || SELECTED_TASK_PREVIEW_MISSES.has(taskId)) return null;
+  if (SELECTED_TASK_PREVIEW_CACHE.has(taskId)) return SELECTED_TASK_PREVIEW_CACHE.get(taskId);
+
+  try {
+    const token = getIdToken ? await getIdToken() : "";
+    const response = await fetch(`${BASE_URL}/api/tripo/task/${encodeURIComponent(taskId)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      if (response.status === 404 || response.status === 410) {
+        SELECTED_TASK_PREVIEW_MISSES.add(taskId);
+      }
+      return null;
+    }
+
+    const payload = await response.json();
+    const previewUrl = extractTripoPreviewImageUrls(payload)[0] ?? null;
+    if (previewUrl) {
+      SELECTED_TASK_PREVIEW_CACHE.set(taskId, previewUrl);
+    } else {
+      SELECTED_TASK_PREVIEW_MISSES.add(taskId);
+    }
+    return previewUrl;
+  } catch {
+    return null;
+  }
 }
 
 // Module-level store: survives TripoPanel unmount/remount within the same session tab.
@@ -180,7 +236,7 @@ const MODE_COST = {
   animate: 10,
   generate_image: 5,
   generate_multiview_image: 10,
-  edit_multiview_image: 10,
+  edit_multiview_image: 5,
 };
 const TRIPO_PAINT_MODE_DISABLED = true;
 const TRIPO_PAINT_MODE_DISABLED_MESSAGE = "waiting for tripo patch";
@@ -1106,52 +1162,187 @@ const CSS = `
     letter-spacing:0.01em !important;
   }
 
-  .tp-custom-select { position:relative; z-index:20; }
+  .tp-custom-select { position:relative; z-index:20; overflow-anchor:none; }
+  .tp-custom-select.open { z-index:140; }
   .tp-custom-select-trigger {
     width:100%;
-    min-height:46px !important;
+    min-height:54px !important;
     display:flex !important;
     align-items:center !important;
     justify-content:space-between !important;
-    padding:0 14px !important;
-    border:1px solid rgba(139,220,255,0.16) !important;
-    border-radius:18px !important;
-    background:linear-gradient(145deg,rgba(15,23,42,0.48),rgba(3,7,18,0.34)) !important;
+    gap:12px !important;
+    padding:8px 14px !important;
+    border:1px solid rgba(139,220,255,0.18) !important;
+    border-radius:20px !important;
+    background:radial-gradient(circle at 12% 0%,rgba(138,43,226,0.16),transparent 34%),linear-gradient(145deg,rgba(15,23,42,0.58),rgba(3,7,18,0.42)) !important;
     color:#f8fafc !important;
     font-size:12px !important;
     font-weight:850 !important;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,0.055) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.07),0 12px 30px rgba(0,0,0,0.16) !important;
+    touch-action:manipulation !important;
+  }
+  .tp-custom-select-trigger:hover,
+  .tp-custom-select.open .tp-custom-select-trigger {
+    border-color:rgba(0,229,255,0.28) !important;
+    background:radial-gradient(circle at 12% 0%,rgba(138,43,226,0.22),transparent 36%),linear-gradient(145deg,rgba(15,23,42,0.66),rgba(3,7,18,0.48)) !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.09),0 0 26px rgba(0,229,255,0.08),0 14px 34px rgba(0,0,0,0.22) !important;
+  }
+  .tp-custom-select-trigger:focus-visible,
+  .tp-custom-select-option:focus-visible {
+    outline:2px solid rgba(0,229,255,0.58) !important;
+    outline-offset:2px !important;
+  }
+  .tp-custom-select-trigger-copy,
+  .tp-custom-select-option-copy {
+    min-width:0 !important;
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-start !important;
+    gap:3px !important;
+  }
+  .tp-custom-select-trigger-meta {
+    display:inline-flex !important;
+    align-items:center !important;
+    gap:8px !important;
+    flex:0 0 auto !important;
+  }
+  .tp-custom-select-title {
+    max-width:100% !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+    color:#f8fafc !important;
+    font-size:13px !important;
+    font-weight:950 !important;
+    line-height:1.1 !important;
+    letter-spacing:0 !important;
+  }
+  .tp-custom-select-hint {
+    color:rgba(165,243,252,0.78) !important;
+    font-size:9px !important;
+    font-weight:950 !important;
+    line-height:1.1 !important;
+    letter-spacing:0.08em !important;
+    text-transform:uppercase !important;
+  }
+  .tp-custom-select-badge {
+    min-height:22px !important;
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    padding:0 8px !important;
+    border-radius:999px !important;
+    border:1px solid rgba(0,229,255,0.28) !important;
+    background:rgba(0,229,255,0.10) !important;
+    color:#a5f3fc !important;
+    font-size:9px !important;
+    font-weight:950 !important;
+    line-height:1 !important;
+    letter-spacing:0.08em !important;
+    text-transform:uppercase !important;
+    white-space:nowrap !important;
+    box-shadow:0 0 18px rgba(0,229,255,0.08) !important;
+  }
+  .tp-custom-select-badge.premium {
+    border-color:rgba(255,0,127,0.32) !important;
+    background:rgba(255,0,127,0.11) !important;
+    color:#f9a8d4 !important;
+    box-shadow:0 0 20px rgba(255,0,127,0.10) !important;
   }
   .tp-custom-select-menu {
-    position:absolute;
-    top:calc(100% + 6px);
-    left:0;
-    right:0;
-    z-index:80;
-    padding:6px;
-    border:1px solid rgba(139,220,255,0.16);
-    border-radius:18px;
-    background:rgba(4,7,18,0.96);
-    box-shadow:0 22px 48px rgba(0,0,0,0.40),0 0 30px rgba(47,140,255,0.10);
-    backdrop-filter:blur(22px);
+    position:fixed;
+    top:auto;
+    left:auto;
+    right:auto;
+    z-index:9999;
+    max-height:360px;
+    overflow-y:auto;
+    overflow-anchor:none;
+    overscroll-behavior:contain;
+    padding:8px;
+    border:1px solid rgba(139,220,255,0.20);
+    border-radius:22px;
+    background:radial-gradient(circle at 12% 0%,rgba(138,43,226,0.16),transparent 32%),linear-gradient(180deg,rgba(8,13,30,0.985),rgba(3,7,18,0.985));
+    box-shadow:0 26px 64px rgba(0,0,0,0.48),0 0 34px rgba(47,140,255,0.12),inset 0 1px 0 rgba(255,255,255,0.07);
+    backdrop-filter:blur(24px);
+    scrollbar-width:thin;
+    scrollbar-color:rgba(0,229,255,0.32) rgba(255,255,255,0.04);
+  }
+  .tp-custom-select-menu::-webkit-scrollbar { width:7px; }
+  .tp-custom-select-menu::-webkit-scrollbar-track {
+    background:rgba(255,255,255,0.035);
+    border-radius:999px;
+  }
+  .tp-custom-select-menu::-webkit-scrollbar-thumb {
+    background:linear-gradient(180deg,rgba(0,229,255,0.42),rgba(138,43,226,0.36));
+    border-radius:999px;
   }
   .tp-custom-select-option {
     width:100%;
-    min-height:38px !important;
-    justify-content:flex-start !important;
-    padding:0 12px !important;
-    border:0 !important;
-    border-radius:12px !important;
+    min-height:56px !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:space-between !important;
+    gap:10px !important;
+    position:relative !important;
+    margin:0 0 4px !important;
+    padding:9px 10px 9px 13px !important;
+    border:1px solid transparent !important;
+    border-radius:15px !important;
     background:transparent !important;
     color:rgba(203,213,225,0.76) !important;
-    font-size:12px !important;
+    font-size:13px !important;
     font-weight:800 !important;
+    line-height:1.25 !important;
+    text-align:left !important;
+    white-space:normal !important;
     box-shadow:none !important;
+    cursor:pointer !important;
+    transition:background 0.16s ease,border-color 0.16s ease,box-shadow 0.16s ease,transform 0.16s ease !important;
+  }
+  .tp-custom-select-option:last-child { margin-bottom:0 !important; }
+  .tp-custom-select-option.has-description { min-height:70px !important; }
+  .tp-custom-select-option-head {
+    width:100% !important;
+    min-width:0 !important;
+    display:flex !important;
+    align-items:center !important;
+    gap:8px !important;
+  }
+  .tp-custom-select-description {
+    max-width:100% !important;
+    color:rgba(148,163,184,0.78) !important;
+    font-size:10px !important;
+    font-weight:800 !important;
+    line-height:1.35 !important;
   }
   .tp-custom-select-option:hover,
   .tp-custom-select-option.selected {
-    background:rgba(47,140,255,0.13) !important;
+    background:linear-gradient(135deg,rgba(0,229,255,0.12),rgba(138,43,226,0.10)) !important;
+    border-color:rgba(0,229,255,0.22) !important;
     color:#ffffff !important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.07),0 0 20px rgba(0,229,255,0.07) !important;
+  }
+  .tp-custom-select-option.selected::before {
+    content:"";
+    position:absolute;
+    left:0;
+    top:12px;
+    bottom:12px;
+    width:3px;
+    border-radius:999px;
+    background:linear-gradient(180deg,#00e5ff,#8a2be2);
+    box-shadow:0 0 16px rgba(0,229,255,0.30);
+  }
+  .tp-custom-select-option:disabled,
+  .tp-custom-select-option.disabled {
+    cursor:not-allowed !important;
+    opacity:0.44 !important;
+  }
+  .tp-custom-select-option:disabled:hover,
+  .tp-custom-select-option.disabled:hover {
+    background:transparent !important;
+    color:rgba(203,213,225,0.76) !important;
   }
 
   .tp-action-dock {
@@ -1742,7 +1933,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [submitLocked, setSubmitLocked] = useState(false);
   const [, setMultiviewSourceMode] = useState("upload");
   const [generationModel, setGenerationModel] = useState("");
-  const [generationTemplateId, setGenerationTemplateId] = useState("");
   const [generationOrientation, setGenerationOrientation] = useState("");
   const [generationCompress, setGenerationCompress] = useState("");
   const [generationRenderImage, setGenerationRenderImage] = useState(true);
@@ -1856,6 +2046,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   const [gc1, setGc1] = useState("#1e1e3a");
   const [gc2, setGc2] = useState("#111128");
   const [segmentProcessing, setSegmentProcessing] = useState(false);
+  const [viewerLoading, setViewerLoading] = useState(false);
 
   // layout state (controlled by StudioLayout)
   const [leftOpen, setLeftOpen] = useState(true);
@@ -1939,23 +2130,30 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   }, [findHistoryItemById, viewerHistId, manualSelectedItem]);
   const activeDisplayName = useMemo(() => resolveHistoryDisplayName(activeH), [activeH, resolveHistoryDisplayName]);
   const selectedPreviewItem = useMemo(() => {
-    const baseItem = manualSelectedItem || activeH;
+    const selectedBaseItem = manualSelectedItem || activeH;
+    const baseItem = isImageHistoryItem(selectedBaseItem)
+      ? selectedBaseItem
+      : (viewerH || selectedBaseItem);
     if (!baseItem) return null;
     const thumbnailCacheKey = getHistoryThumbnailCacheKey(baseItem);
-    const previewImageUrl = getModelPreviewImageUrl(baseItem);
+    const previewImageUrl = baseItem?.previewThumbnail || getModelPreviewImageUrl(baseItem);
+    const selectedThumbForBaseItem = historyItemsReferToSameTask(baseItem, selectedBaseItem)
+      ? selectedPreviewThumb
+      : null;
     return {
       ...baseItem,
       displayName: resolveHistoryDisplayName(baseItem),
       thumbnail:
         previewImageUrl
-        || selectedPreviewThumb
+        || selectedThumbForBaseItem
         || baseItem?.thumbnail
         || baseItem?.thumbnail_url
+        || checkResolvedHistoryThumbnail(baseItem)
         || checkThumbnailCache(thumbnailCacheKey)
         || checkThumbnailCache(baseItem?.model_url)
         || null,
     };
-  }, [manualSelectedItem, activeH, selectedPreviewThumb, resolveHistoryDisplayName]);
+  }, [manualSelectedItem, activeH, viewerH, selectedPreviewThumb, resolveHistoryDisplayName]);
   const selectedPreviewColor = useMemo(() => {
     const item = selectedPreviewItem;
     if (!item) return color;
@@ -2269,7 +2467,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
 
   const PARALLEL_LIMIT = 10;
 
-  const hasImageReference = !!(imageReference?.tripoFile || imageReference?.token);
+  const imageReferenceItems = useMemo(() => normalizeTripoReferenceImages(imageReference), [imageReference]);
+  const hasImageReference = imageReferenceItems.some(isTripoReferenceImageReady);
   const hasMultiviewReference = !!(multiviewReference?.tripoFile || multiviewReference?.token);
 
   const isUploadedImageReady = useCallback((item) => {
@@ -2302,7 +2501,12 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         }
         return false;
       case "views":
-        if (multiviewImageMode === "generate_image") return !!prompt.trim();
+        if (multiviewImageMode === "generate_image") {
+          const inputPolicy = getTripoGenerateImageInputPolicy(generationModel);
+          const promptReady = !inputPolicy.requiresPrompt || !!prompt.trim();
+          const imageReady = !inputPolicy.requiresImage || hasImageReference;
+          return promptReady && imageReady;
+        }
         if (multiviewImageMode === "generate_multiview_image") return hasMultiviewReference;
         return !!selectedMultiviewImageTaskId && !!multiviewEditPrompt.trim();
       case "segment":
@@ -2354,8 +2558,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     textureSourceHasTexture, textureEditSourceTaskId, refineBlockedBySelectedSource, focusedInstanceId,
     _taskTick, submitLocked, isSegmentModelVersionSupported, isRetopoModelVersionSupported,
     segmentActionTaskId, retopoActionTaskId, imageReference,
-    multiviewReference, multiviewOriginalTaskId, isUploadedImageReady, hasMultiviewReference, textureMultiViewsReady,
-    multiviewUploadsReady, multiviewImageMode, multiviewEditPrompt, selectedMultiviewImageTaskId]);
+    multiviewReference, multiviewOriginalTaskId, isUploadedImageReady, hasImageReference, hasMultiviewReference, textureMultiViewsReady,
+    multiviewUploadsReady, multiviewImageMode, generationModel, multiviewEditPrompt, selectedMultiviewImageTaskId]);
 
 
 
@@ -2760,11 +2964,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             signal: AbortSignal.timeout(45_000),
           });
         };
-        let res = await fetchFromProxy(taskId);
-        if (res.status === 403 && taskId) {
-          console.warn("[fetchProxy] task-scoped proxy returned 403, retrying without taskId");
-          res = await fetchFromProxy(null);
-        }
+        const res = await fetchFromProxy(taskId);
         if (!res.ok) {
           const err = new Error("Model load HTTP " + res.status);
           err.status = res.status;
@@ -2776,7 +2976,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       } catch (err) {
         lastErr = err;
         console.warn(`[fetchProxy] attempt ${attempt + 1}/${retries} failed:`, err.message);
-        if (err?.status === 410 || err?.status === 404) break;
+        if (MODEL_PROXY_TERMINAL_STATUSES.has(err?.status)) break;
       }
     }
     throw lastErr ?? new Error("fetchProxy: all retries exhausted");
@@ -3051,6 +3251,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     quadMesh,
     segSub,
     multiviewImageMode,
+    generationModel,
     genTab,
     modelVer,
     texOn,
@@ -3060,7 +3261,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     batchImageCount: batchImages?.length ?? 0,
   }, MODE_COST), [
     mode, texSub, genTab, texOn, pbrOn, tex4K, meshQ, inParts, quadMesh,
-    smartLowPoly, modelVer, multiviewImageMode, segSub, batchImages,
+    smartLowPoly, modelVer, multiviewImageMode, generationModel, segSub, batchImages,
   ]);
 
   const createTripoTaskRequest = useCallback(async (body, headersOverride = null) => {
@@ -3150,10 +3351,11 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
             setModelUrl(null);
           }
         } else {
-          console.warn("[loadHistoryIntoViewer] fetchProxy failed, using direct URL:", loadErr.message);
+          console.warn("[loadHistoryIntoViewer] fetchProxy failed:", loadErr.message);
           if (!t.cancelled) {
-            setModelUrl(item.model_url);
-            prevUrl.current = item.model_url;
+            if (showLoading || loadErr?.status === 403) {
+              toast.error("A modell linkje nem elerheto. Ujrafrissites vagy ujrageneralas szukseges.");
+            }
           }
         }
       }
@@ -3325,18 +3527,13 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         switch (mode) {
           case "views": {
             if (multiviewImageMode === "generate_image") {
-              body = {
-                type: "generate_image",
-                prompt: prompt.trim(),
-                ...(negPrompt.trim() && { negative_prompt: negPrompt.trim() }),
-                ...(generationModel && { model: generationModel }),
-                ...(generationTemplateId && { template_id: generationTemplateId }),
-                ...(generationOrientation && { orientation: generationOrientation }),
-                ...(generationCompress && { compress: generationCompress }),
-                ...(generationTextureAlignment && { texture_alignment: generationTextureAlignment }),
-                ...(generationRenderImage && { render_image: true }),
-                ...(hasImageReference && { reference_image: toTripoImageRef(imageReference) }),
-              };
+              const submission = buildGenerateImageSubmission({
+                prompt,
+                modelVersion: generationModel,
+                referenceImages: imageReferenceItems.map(toTripoImageRef).filter(Boolean),
+              });
+              requestPath = submission.requestPath;
+              body = submission.body;
             } else if (multiviewImageMode === "generate_multiview_image") {
               const sourceFile = toTripoImageRef(multiviewReference);
               if (!sourceFile) throw new Error("Upload a source image before generating multiview images.");
@@ -3793,7 +3990,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
       submitLockedRef.current = false;
       setSubmitLocked(false);
     }
-  }, [canGen, mode, texSub, refineBlockedBySelectedSource, effectiveRefineDisableReason, refineSourceTaskId, refineSelectedTaskId, refineResolvedFromUpstream, refineDraftDisplayName, refineSourceDisplayName, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, textureModelVer, textureRequestModelVer, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getIdToken, history, forceUpdate, persistActiveTask, addJob, addJobs, updateJob, markJobError, textureSourceHasTexture, textureEditSourceTaskId, textureEditSourceItem, textureEditItem, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH, generationModel, generationTemplateId, generationOrientation, generationCompress, generationRenderImage, generationTextureAlignment, imageReference, multiviewReference, multiviewMode, multiviewOrthographic, multiviewOriginalTaskId, selectedMultiviewImageTaskId, multiviewImageMode, multiviewEditPrompt, multiviewEditView, toTripoImageRef, uploadImageFile, hasImageReference, hasMultiviewReference]);
+  }, [canGen, mode, texSub, refineBlockedBySelectedSource, effectiveRefineDisableReason, refineSourceTaskId, refineSelectedTaskId, refineResolvedFromUpstream, refineDraftDisplayName, refineSourceDisplayName, genTab, prompt, negPrompt, modelVer, texOn, pbrOn, tex4K, meshQ, polycount, inParts, makeBetter, imgToken, imgFile, multiImages, batchImages, segId, fillId, retopoId, quadMesh, smartLowPoly, outFormat, pivotToBottom, texId, texPrompt, texNeg, texPbr, texAlignment, textureModelVer, textureRequestModelVer, editId, brushPrompt, creativity, riggedId, selAnim, tPose, modelSeed, textureSeed, imageSeed, autoSize, exportUv, authH, fetchProxy, revokeBlobUrl, activeTaskId, refreshCredits, refineId, refineManualOverride, stylizeId, stylizeStyle, getIdToken, history, forceUpdate, persistActiveTask, addJob, addJobs, updateJob, markJobError, textureSourceHasTexture, textureEditSourceTaskId, textureEditSourceItem, textureEditItem, textureSourceTaskId, textureTargetItem, textureSourceItem, resolveHistoryDisplayName, getTripoImageType, activeH, generationModel, generationOrientation, generationCompress, generationRenderImage, generationTextureAlignment, imageReference, imageReferenceItems, multiviewReference, multiviewMode, multiviewOrthographic, multiviewOriginalTaskId, selectedMultiviewImageTaskId, multiviewImageMode, multiviewEditPrompt, multiviewEditView, toTripoImageRef, uploadImageFile, hasImageReference, hasMultiviewReference]);
 
   const { rigCompatRef, getCompatibility, handleAutoRig } = useTripoRig({
     activeTaskId, animId, authH, pollTask, fetchProxy, revokeBlobUrl,
@@ -3853,6 +4050,32 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
   }, [focusedInstanceId, getIdToken, forceUpdate, markJobError, currentTaskId, pollAb, userStoppedRef, setStatusMsg]);
 
   // ── Parallel task poller callbacks ──────────────────────────────────────
+  const persistTripoImagesToGallery = useCallback(async ({
+    taskId,
+    imageUrls,
+    prompt: imagePrompt,
+    imageTaskType,
+  }) => {
+    if (!taskId || !Array.isArray(imageUrls) || imageUrls.length === 0) return;
+    const token = getIdToken ? await getIdToken() : "";
+    await Promise.allSettled(imageUrls.map((url, index) => fetch(`${BASE_URL}/api/image-gallery/import`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        url,
+        prompt: imagePrompt || "Tripo image",
+        taskId,
+        index,
+        type: imageTaskType,
+        mode: "views",
+        operation: 'tripo_3d_image',
+      }),
+    })));
+  }, [getIdToken]);
+
   const onParallelTaskSuccess = useCallback(async (inst, d, blobUrl) => {
     const thisOptimisticId = inst.taskId ? `tripo_${inst.taskId}` : null;
     const resolvedModelUrl = resolveTripoModelUrl(d);
@@ -3939,6 +4162,14 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         } catch (e) {
           console.error("[onParallelTaskSuccess] saveImageHist failed:", e?.message ?? e);
         }
+        persistTripoImagesToGallery({
+          taskId: inst.taskId,
+          imageUrls: previewUrls,
+          prompt: inst.snapshot?.prompt || inst.label || historyLabel,
+          imageTaskType,
+        }).catch((e) => {
+          console.warn("[onParallelTaskSuccess] gallery import failed:", e?.message ?? e);
+        });
       }
       toast.success(
         isMultiviewTask
@@ -4080,7 +4311,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
     } catch (e) {
       console.error("[onParallelTaskSuccess] saveHist failed:", e?.message ?? e);
     }
-  }, [saveHist, saveImageHist, getIdToken, refreshCredits, revokeBlobUrl, markJobDone, setOptimisticItems, history, setViewMode, syncAutoLoadedHistoryItem, multiviewImageMode]);
+  }, [saveHist, saveImageHist, persistTripoImagesToGallery, getIdToken, refreshCredits, revokeBlobUrl, markJobDone, setOptimisticItems, history, setViewMode, syncAutoLoadedHistoryItem, multiviewImageMode]);
 
   const onParallelTaskFail = useCallback((inst, reason) => {
     markJobError(inst.instanceId, reason);
@@ -4467,8 +4698,6 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   uploadReferenceImage={handleBatchImg}
                   generationModel={generationModel}
                   setGenerationModel={setGenerationModel}
-                  generationTemplateId={generationTemplateId}
-                  setGenerationTemplateId={setGenerationTemplateId}
                   generationOrientation={generationOrientation}
                   setGenerationOrientation={setGenerationOrientation}
                   generationCompress={generationCompress}
@@ -4485,6 +4714,7 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
                   setEditPrompt={setMultiviewEditPrompt}
                   editView={multiviewEditView}
                   setEditView={setMultiviewEditView}
+                  getIdToken={getIdToken}
                 />
               </div>
               <div className="tp-workflow-page" style={mode !== "segment" ? { display: "none" } : undefined}>
@@ -4900,6 +5130,8 @@ export default function TripoPanel({ selectedModel, getIdToken, userId, isGlobal
         autoSpin={autoSpin}
         setAutoSpin={setAutoSpin}
         loadingId={loadingId}
+        viewerLoading={viewerLoading}
+        setViewerLoading={setViewerLoading}
         isRunning={isRunning}
         camP={camP}
         sceneRef={sceneRef}
@@ -4947,7 +5179,7 @@ function TripoWorkspaceWrapper({
   dramC, setDramC, gc1, setGc1, gc2, setGc2, wireOv, setWireOv,
   wireOp, setWireOp, wireC, setWireC, showRig, setShowRig, riggedId,
   autoSpin, setAutoSpin,
-  loadingId, isRunning, camP, sceneRef,
+  loadingId, viewerLoading, setViewerLoading, isRunning, camP, sceneRef,
   dlItem, setDlItem, setDlOpen, dlOpen, handleDlClose, activeH, viewerH, selectedItem, selectedPreviewColor, getIdToken,
   onRigDetected,
   onAnimClipsDetected,
@@ -5034,6 +5266,7 @@ function TripoWorkspaceWrapper({
               gridColor2={gc2}
               onSpinStop={() => setAutoSpin(false)}
               onReady={s => { sceneRef.current = s; }}
+              onModelLoadingChange={setViewerLoading}
               // 3D Paint
               paintMode={paintMode}
               paintColor={paintColor}
@@ -5053,6 +5286,20 @@ function TripoWorkspaceWrapper({
             >
               <Loader2 className="w-8 h-8 text-sky-300 anim-spin mb-4" />
               <p className="text-[11px] font-black text-white uppercase tracking-[0.3em] italic">Fetching Spatial Voxel Map</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {viewerLoading && modelUrl && !isRunning && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="pointer-events-none absolute left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full border border-sky-300/20 bg-black/60 px-3 py-2 text-[9px] font-black uppercase tracking-[0.22em] text-sky-100 shadow-[0_12px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+            >
+              <Loader2 className="h-3 w-3 animate-spin text-sky-300" />
+              <span>Loading Model</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -5112,7 +5359,7 @@ function TripoWorkspaceWrapper({
         )}
 
         {selectedItem && (
-          <SelectedHistoryPreview item={selectedItem} color={selectedPreviewColor || color} viewerItemId={viewerH?.id} selectedItemId={activeH?.id} getIdToken={getIdToken} />
+          <SelectedHistoryPreview item={selectedItem} color={selectedPreviewColor || color} viewerItemId={viewerH?.id} selectedItemId={activeH?.id} viewerModelUrl={modelUrl} getIdToken={getIdToken} />
         )}
       </div>
 
@@ -5177,43 +5424,98 @@ function TripoWorkspaceWrapper({
   );
 }
 
-function SelectedHistoryPreview({ item, color, viewerItemId, selectedItemId, getIdToken }) {
+function SelectedHistoryPreview({ item, color, viewerItemId, selectedItemId, viewerModelUrl, getIdToken }) {
   const thumbnailCacheKey = getHistoryThumbnailCacheKey(item);
-  const previewImageUrl = getModelPreviewImageUrl(item);
+  const imageUrls = useMemo(() => getHistoryImageUrls(item), [item]);
+  const isImageSet = isImageHistoryItem(item) && imageUrls.length > 0;
+  const previewImageUrl = item?.previewThumbnail || getModelPreviewImageUrl(item);
   const [blockedPreviewUrl, setBlockedPreviewUrl] = useState(null);
   const usablePreviewImageUrl = previewImageUrl && previewImageUrl !== blockedPreviewUrl
     ? previewImageUrl
     : null;
   const [thumbnail, setThumbnail] = useState(() =>
-    usablePreviewImageUrl
+    checkResolvedHistoryThumbnail(item)
+    || usablePreviewImageUrl
+    || item?.previewThumbnail
     || item?.thumbnail
     || item?.thumbnail_url
     || checkThumbnailCache(thumbnailCacheKey)
     || checkThumbnailCache(item?.model_url)
     || null
   );
+  const [imagePopupOpen, setImagePopupOpen] = useState(false);
 
   useEffect(() => {
     setBlockedPreviewUrl(null);
+    setImagePopupOpen(false);
   }, [item?.id]);
 
   useEffect(() => {
-    if (!item?.model_url) {
-      setThumbnail(usablePreviewImageUrl || item?.thumbnail || item?.thumbnail_url || null);
-      return;
-    }
-    const cached =
-      usablePreviewImageUrl
+    return subscribeResolvedHistoryThumbnail(item, (nextThumbnail) => {
+      if (nextThumbnail) setThumbnail(nextThumbnail);
+    });
+  }, [item?.id, item?.taskId, item?.task_id, item?.model_url]);
+
+  useEffect(() => {
+    const immediate =
+      checkResolvedHistoryThumbnail(item)
+      || usablePreviewImageUrl
+      || item?.previewThumbnail
       || item?.thumbnail
       || item?.thumbnail_url
       || checkThumbnailCache(thumbnailCacheKey)
+      || checkThumbnailCache(item?.model_url)
+      || null;
+
+    if (isImageSet) {
+      setThumbnail(immediate);
+      if (immediate) return undefined;
+
+      let cancelled = false;
+      (async () => {
+        const thumb = await ensureImageHistoryThumb(item);
+        if (!cancelled) setThumbnail(thumb || null);
+      })().catch((err) => {
+        if (!cancelled) console.warn("[SelectedHistoryPreview] image thumbnail failed:", err?.message || err);
+      });
+
+      return () => { cancelled = true; };
+    }
+
+    if (!item?.model_url) {
+      setThumbnail(immediate);
+      return undefined;
+    }
+    const cached =
+      immediate
       || checkThumbnailCache(item.model_url)
       || null;
     setThumbnail(cached);
     if (cached) return undefined;
 
     let cancelled = false;
+    const viewerItemMatchesSelectedItem = historyItemsReferToSameTask({ id: viewerItemId }, item);
     (async () => {
+      const taskPreviewUrl = await fetchSelectedHistoryTaskPreviewImageUrl(item.taskId, getIdToken);
+      if (cancelled) return;
+      if (taskPreviewUrl) {
+        setThumbnail(taskPreviewUrl);
+        return;
+      }
+
+      if (viewerItemMatchesSelectedItem && viewerModelUrl) {
+        const viewerThumb = await getCachedThumbnail(
+          viewerModelUrl,
+          { width: 280, height: 280, resourcePath: item.model_url },
+          thumbnailCacheKey || item.model_url || viewerModelUrl
+        );
+        if (cancelled) return;
+        if (viewerThumb) {
+          setThumbnail(viewerThumb);
+          return;
+        }
+      }
+
       const data = await fetchModelData(item.model_url, getIdToken, item.taskId);
       if (cancelled || !data?.buffer) return;
       try {
@@ -5231,85 +5533,186 @@ function SelectedHistoryPreview({ item, color, viewerItemId, selectedItemId, get
     });
 
     return () => { cancelled = true; };
-  }, [getIdToken, item?.id, item?.model_url, item?.taskId, item?.thumbnail, item?.thumbnail_url, usablePreviewImageUrl, thumbnailCacheKey]);
+  }, [getIdToken, imageUrls.length, isImageSet, item, item?.id, item?.model_url, item?.taskId, item?.thumbnail, item?.thumbnail_url, item?.previewThumbnail, usablePreviewImageUrl, thumbnailCacheKey, viewerItemId, viewerModelUrl]);
 
   if (!item) return null;
 
   const displayName = item?.displayName || item?.name || item?.prompt || item?.mode || "Selected";
   const modeLabel = (item?.mode || item?.params?.mode || "model").replace(/_/g, " ");
-  const isMirroringViewer = viewerItemId === item.id;
-  const isSelected = selectedItemId === item.id;
+  const isMirroringViewer = historyItemsReferToSameTask({ id: viewerItemId }, item);
+  const isSelected = historyItemsReferToSameTask({ id: selectedItemId }, item);
   const aura = `${color}85`;
   const border = `${color}aa`;
   const panelBg = `${color}1a`;
   const statusColor = isSelected ? color : (isMirroringViewer ? "#2f8cff" : color);
   const statusLabel = isSelected ? "selected" : (isMirroringViewer ? "viewer loaded" : "preview");
+  const canOpenImagePopup = isImageSet && imageUrls.length > 0;
+  const previewGridClass = imageUrls.length === 1 ? "grid-cols-1 grid-rows-1" : "grid-cols-2 grid-rows-2";
+  const openImagePopup = () => {
+    if (canOpenImagePopup) setImagePopupOpen(true);
+  };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 8, scale: 0.96 }}
-      className="pointer-events-none absolute bottom-4 right-4 z-[70] aspect-square w-32 overflow-hidden rounded-[1.25rem] border bg-[#07070f]/90 backdrop-blur-xl sm:w-36"
-      style={{
-        borderColor: border,
-        boxShadow: `0 16px 38px rgba(0,0,0,0.5), 0 0 30px ${aura}`,
-      }}
-    >
-      <div className="absolute inset-0 overflow-hidden" style={{ background: `radial-gradient(circle at 50% -5%, ${panelBg}, transparent 60%), #04040b` }}>
-        {thumbnail ? (
-          <img
-            src={thumbnail}
-            alt={displayName}
-            className="h-full w-full object-cover"
-            loading="eager"
-            decoding="async"
-            onError={() => {
-              if (thumbnail && thumbnail === previewImageUrl) {
-                setBlockedPreviewUrl(thumbnail);
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 12, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+        role={canOpenImagePopup ? "button" : undefined}
+        tabIndex={canOpenImagePopup ? 0 : undefined}
+        onClick={openImagePopup}
+        onKeyDown={(event) => {
+          if (!canOpenImagePopup) return;
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openImagePopup();
+          }
+        }}
+        className={`${canOpenImagePopup ? "pointer-events-auto cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-cyan-300/60" : "pointer-events-none"} absolute bottom-4 right-4 z-[70] aspect-square w-32 overflow-hidden rounded-[1.25rem] border bg-[#07070f]/90 backdrop-blur-xl sm:w-36`}
+        style={{
+          borderColor: border,
+          boxShadow: `0 16px 38px rgba(0,0,0,0.5), 0 0 30px ${aura}`,
+        }}
+      >
+        <div className="absolute inset-0 overflow-hidden" style={{ background: `radial-gradient(circle at 50% -5%, ${panelBg}, transparent 60%), #04040b` }}>
+          {thumbnail ? (
+            <img
+              src={thumbnail}
+              alt={displayName}
+              className="h-full w-full object-cover"
+              loading="eager"
+              decoding="async"
+              onError={() => {
+                if (thumbnail && (thumbnail === previewImageUrl || thumbnail === usablePreviewImageUrl || thumbnail === item?.previewThumbnail)) {
+                  setBlockedPreviewUrl(thumbnail);
+                }
                 setThumbnail(null);
-              }
-            }}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Box className="h-8 w-8 text-white/30" />
-          </div>
-        )}
-
-        <div
-          className="absolute inset-0"
-          style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.18) 48%, rgba(0,0,0,0.72) 100%)" }}
-        />
-
-        <div className="absolute inset-x-0 top-0 flex items-center justify-between px-2 py-2">
-          <span
-            className="rounded-full px-2 py-1 text-[7px] font-black uppercase tracking-[0.14em] text-white"
-            style={{ background: `${color}33`, border: `1px solid ${color}66` }}
-          >
-            Selected
-          </span>
-          <span
-            className="rounded-full px-2 py-1 text-[7px] font-black uppercase tracking-[0.14em] text-white/90"
-            style={{ background: "rgba(0,0,0,0.55)", border: `1px solid ${color}4d` }}
-          >
-            {modeLabel}
-          </span>
-        </div>
-
-        <div className="absolute inset-x-0 bottom-0 px-2.5 pb-2.5">
-          <div className="truncate text-[10px] font-black tracking-[0.01em] text-white drop-shadow-[0_1px_6px_rgba(0,0,0,0.7)]">
-            {displayName}
-          </div>
-          <div className="mt-1 flex items-center gap-1.5 text-[7px] font-black uppercase tracking-[0.12em]" style={{ color: `${statusColor}db` }}>
-            <span
-              className="inline-flex h-1.5 w-1.5 rounded-full"
-              style={{ background: statusColor, boxShadow: `0 0 8px ${statusColor}` }}
+              }}
             />
-            {statusLabel}
+          ) : canOpenImagePopup ? (
+            <div className={`grid h-full w-full ${previewGridClass}`}>
+              {imageUrls.slice(0, 4).map((url, index) => (
+                <div key={`${url}-${index}`} className="min-h-0 min-w-0 overflow-hidden border border-black/30 bg-black/30">
+                  <img src={url} alt="" className="h-full w-full object-cover" loading="eager" decoding="async" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <Box className="h-8 w-8 text-white/30" />
+            </div>
+          )}
+
+          <div
+            className="absolute inset-0"
+            style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.18) 48%, rgba(0,0,0,0.72) 100%)" }}
+          />
+
+          <div className="absolute inset-x-0 top-0 flex items-center justify-between px-2 py-2">
+            <span
+              className="rounded-full px-2 py-1 text-[7px] font-black uppercase tracking-[0.14em] text-white"
+              style={{ background: `${color}33`, border: `1px solid ${color}66` }}
+            >
+              Selected
+            </span>
+            <span
+              className="rounded-full px-2 py-1 text-[7px] font-black uppercase tracking-[0.14em] text-white/90"
+              style={{ background: "rgba(0,0,0,0.55)", border: `1px solid ${color}4d` }}
+            >
+              {canOpenImagePopup ? "2D" : modeLabel}
+            </span>
+          </div>
+
+          <div className="absolute inset-x-0 bottom-0 px-2.5 pb-2.5">
+            <div className="truncate text-[10px] font-black tracking-[0.01em] text-white drop-shadow-[0_1px_6px_rgba(0,0,0,0.7)]">
+              {displayName}
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-[7px] font-black uppercase tracking-[0.12em]" style={{ color: `${statusColor}db` }}>
+              <span
+                className="inline-flex h-1.5 w-1.5 rounded-full"
+                style={{ background: statusColor, boxShadow: `0 0 8px ${statusColor}` }}
+              />
+              {canOpenImagePopup ? `${imageUrls.length} image${imageUrls.length === 1 ? "" : "s"}` : statusLabel}
+            </div>
           </div>
         </div>
+      </motion.div>
+
+      {canOpenImagePopup && imagePopupOpen && typeof document !== "undefined"
+        ? createPortal(
+            <SelectedHistoryImagePopup
+              images={imageUrls}
+              title={displayName}
+              color={color}
+              onClose={() => setImagePopupOpen(false)}
+            />,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+function SelectedHistoryImagePopup({ images = [], title = "Images", color = "#00e5ff", onClose }) {
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const hasMultiple = images.length > 1;
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/80 p-3 backdrop-blur-2xl sm:p-6" onClick={onClose}>
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 12, scale: 0.96 }}
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#05050d]/95 shadow-[0_40px_120px_rgba(0,0,0,0.8)]"
+          style={{ boxShadow: `0 40px 120px rgba(0,0,0,0.8), 0 0 44px ${color}33` }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3 sm:px-5">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black italic tracking-tighter text-white sm:text-base">{title}</p>
+              <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.24em]" style={{ color }}>{images.length} image{images.length === 1 ? "" : "s"}</p>
+            </div>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.92 }}
+              onClick={onClose}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/70 transition-colors hover:bg-white/[0.08] hover:text-white"
+            >
+              <X className="h-5 w-5" />
+            </motion.button>
+          </div>
+
+          <div className="min-h-0 overflow-y-auto p-3 sm:p-4">
+            <div className={hasMultiple ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3" : "flex min-h-[60vh] items-center justify-center"}>
+              {images.map((url, index) => (
+                <div
+                  key={`${url}-${index}`}
+                  className={hasMultiple
+                    ? "overflow-hidden rounded-2xl border border-white/10 bg-black/35"
+                    : "flex max-h-[78vh] w-full items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/35"}
+                >
+                  <img
+                    src={url}
+                    alt={`${title} ${index + 1}`}
+                    className={hasMultiple ? "aspect-square h-full w-full object-cover" : "max-h-[78vh] max-w-full object-contain"}
+                    loading="eager"
+                    decoding="async"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
       </div>
-    </motion.div>
+    </AnimatePresence>
   );
 }

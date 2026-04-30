@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
 export const hexToInt = (h) => (h ? parseInt(h.replace("#", ""), 16) : null);
 
@@ -108,6 +110,12 @@ function normalizeMaterialTextureColorSpaces(THREE, material) {
       if (textureHasImageData(texture)) texture.needsUpdate = true;
     }
   });
+}
+
+function getPreservedBaseColorFactor(material, THREE) {
+  const preserved = material?.userData?.originalBaseColorFactor;
+  if (preserved?.isColor) return preserved;
+  return material?.color ?? new THREE.Color(0xe0dbd5);
 }
 
 function cloneSegmentMaterial(THREE, _originalMaterial, tintColor) {
@@ -235,7 +243,7 @@ export function applyViewMode(s, mode) {
 
     } else if (mode === 'uv') {
       if (!s._uvMats.has(node.uuid)) {
-        const buildLitUV = (m) => {
+        const buildBaseColor = (m) => {
           const map = m?.map ?? null;
           if (map) {
             map.colorSpace = THREE.SRGBColorSpace;
@@ -243,21 +251,20 @@ export function applyViewMode(s, mode) {
           }
           const alphaMap = m?.alphaMap ?? null;
           if (alphaMap && textureHasImageData(alphaMap)) alphaMap.needsUpdate = true;
-          return new THREE.MeshStandardMaterial({
+          return new THREE.MeshBasicMaterial({
             map,
-            color: map ? 0xffffff : (m?.color ?? new THREE.Color(0xe0dbd5)),
-            roughness: 0.6,
-            metalness: 0.0,
-            envMapIntensity: 0.5,
+            color: getPreservedBaseColorFactor(m, THREE),
             side: THREE.DoubleSide,
             transparent: m?.transparent ?? false,
             opacity: m?.opacity ?? 1,
             alphaTest: m?.alphaTest ?? 0,
             alphaMap,
-            depthWrite: m?.depthWrite ?? true
+            depthWrite: m?.depthWrite ?? true,
+            vertexColors: m?.vertexColors ?? false,
+            toneMapped: false,
           });
         };
-        s._uvMats.set(node.uuid, Array.isArray(orig) ? orig.map(m => buildLitUV(m)) : buildLitUV(orig));
+        s._uvMats.set(node.uuid, Array.isArray(orig) ? orig.map(m => buildBaseColor(m)) : buildBaseColor(orig));
       }
       node.material = s._uvMats.get(node.uuid);
 
@@ -475,35 +482,88 @@ export function disposeModel(scene, model, origMaterials, wireCache, clayMats, u
   scene.remove(model);
 }
 
-export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOverlay = false, wireOpacity = 0.22, wireHexColor = 0xffffff, showRig = false, onRigDetected = null, segmentHighlight = false, segmentEdgeColor = 0x00ff88, onModelLoaded = null) {
-  const { THREE, scene, placeholder } = s;
-  if (!THREE) return;
-  if (placeholder) placeholder.visible = false;
-
-  // Cancel any in-flight load — stale handleSuccess will no-op
-  if (s._loadToken) s._loadToken.cancelled = true;
-  const token = { cancelled: false };
-  s._loadToken = token;
-
+function clearCurrentModel(s) {
+  if (!s?.scene) return;
   if (s.model) {
-    disposeModel(scene, s.model, s.origMaterials, s._wireCache, s._clayMats, s._uvMats, s._segmentMats, s._segEdgeCache);
+    disposeModel(s.scene, s.model, s.origMaterials, s._wireCache, s._clayMats, s._uvMats, s._segmentMats, s._segEdgeCache);
     s.model = null;
     s._segmentMeshes = null;
     s.origMaterials.clear();
     s._segOrigMats?.clear();
     s._segEdgeCache?.clear();
     s._segmentMats?.clear();
-    // Clean up rig overlay
-    if (s._rigOverlay) {
-      scene.remove(s._rigOverlay);
-      s._rigOverlay.traverse((c) => { if (c.material) c.material.dispose(); });
-      s._rigOverlay = null;
-    }
   }
+  if (s._rigOverlay) {
+    s.scene.remove(s._rigOverlay);
+    s._rigOverlay.traverse((c) => { if (c.material) c.material.dispose(); });
+    s._rigOverlay = null;
+  }
+  if (s._mixer) {
+    s._mixer.stopAllAction();
+    s._mixer = null;
+  }
+  s._animClips = [];
+  s._animAction = null;
+  s._activeClipIndex = 0;
+}
+
+function getModelExtension(url = '') {
+  const withoutQuery = String(url || '').split('?')[0];
+  const fragment = withoutQuery.includes('#') ? withoutQuery.split('#').pop() : '';
+  const source = fragment && fragment.includes('.') ? fragment : withoutQuery.split('#')[0];
+  const lastSegment = source.split('/').pop() || '';
+  return lastSegment.includes('.') ? lastSegment.split('.').pop().toLowerCase() : '';
+}
+
+function getFetchableModelUrl(url = '') {
+  return String(url || '').split('#')[0];
+}
+
+function createStlMesh(THREE, geometry) {
+  if (geometry && !geometry.attributes.normal) geometry.computeVertexNormals();
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xb8c7dc,
+    metalness: 0.02,
+    roughness: 0.72,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'STL Model';
+  return mesh;
+}
+
+function isBinaryStl(buffer) {
+  if (!buffer || buffer.byteLength < 84) return false;
+  const view = new DataView(buffer);
+  const faces = view.getUint32(80, true);
+  return 84 + faces * 50 === buffer.byteLength;
+}
+
+function looksLikeObj(text = '') {
+  return /(^|\n)\s*(o|g|v|vn|vt|f|mtllib|usemtl)\s+/m.test(text);
+}
+
+function looksLikeAsciiStl(text = '') {
+  const trimmed = text.trimStart();
+  return trimmed.startsWith('solid') && /\bfacet\s+normal\b/i.test(trimmed);
+}
+
+export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOverlay = false, wireOpacity = 0.22, wireHexColor = 0xffffff, showRig = false, onRigDetected = null, segmentHighlight = false, segmentEdgeColor = 0x00ff88, onModelLoaded = null, onModelError = null) {
+  const { THREE, scene, placeholder } = s;
+  if (!THREE) return;
+  if (placeholder) placeholder.visible = !s.model;
+
+  // Cancel any in-flight load — stale handleSuccess will no-op
+  if (s._loadToken) s._loadToken.cancelled = true;
+  const token = { cancelled: false };
+  s._loadToken = token;
 
   const handleSuccess = (object) => {
-    if (token.cancelled) return;
     const model = object.scene || object;
+    if (token.cancelled) {
+      disposeModel(scene, model, new Map(), new Map(), new Map(), new Map(), new Map(), new Map());
+      return;
+    }
 
     // Filter out non-mesh objects (bones, empty nodes) before computing bounds
     // to avoid NaN bounding sphere errors from SkinnedMesh with no geometry
@@ -532,6 +592,7 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     model.position.y = -1 - scaledMin.y;
 
     const segmentMeshes = [];
+    const nextOrigMaterials = new Map();
     model.traverse((n) => {
       if (n.isMesh) {
         segmentMeshes.push(n);
@@ -565,6 +626,9 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
           // FIX: Tripo FBX/GLB often has a base color tint that interferes with the texture.
           // We force it to white if a map is present to ensure true RGB rendering.
           if (sm.map) {
+            if (!sm.userData.originalBaseColorFactor?.isColor) {
+              sm.userData.originalBaseColorFactor = sm.color.clone();
+            }
             sm.color.set(0xffffff);
           }
 
@@ -586,11 +650,15 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
         } else {
           n.material = sanitizeMat(n.material);
         }
-        s.origMaterials.set(n.uuid, n.material);
+        nextOrigMaterials.set(n.uuid, n.material);
       }
     });
-    s._segmentMeshes = segmentMeshes;
 
+    clearCurrentModel(s);
+    s._segmentMeshes = segmentMeshes;
+    s.origMaterials.clear();
+    nextOrigMaterials.forEach((mat, uuid) => s.origMaterials.set(uuid, mat));
+    if (placeholder) placeholder.visible = false;
     scene.add(model);
     s.model = model;
     s.cam.radius = 7;
@@ -637,28 +705,45 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
     s.markDirty?.();
   };
 
+  const handleError = (err) => {
+    if (token.cancelled) return;
+    console.error("Model load error:", err);
+    onModelError?.(err);
+    s.markDirty?.();
+  };
+
   // Detect format by extension first
-  const ext = url.split('?')[0].split('.').pop().toLowerCase();
+  const ext = getModelExtension(url);
+  const fetchUrl = getFetchableModelUrl(url);
   if (ext === 'fbx') {
     // FBXLoader.load() is async — suppress warnings for the whole load cycle
     const _origWarn = console.warn;
     console.warn = () => { };
     const restoreWarn = () => { console.warn = _origWarn; };
-    new FBXLoader().load(url, (object) => { restoreWarn(); handleSuccess(object); }, undefined, (err) => { restoreWarn(); console.error("Model load error:", err); });
+    new FBXLoader().load(fetchUrl, (object) => { restoreWarn(); handleSuccess(object); }, undefined, (err) => { restoreWarn(); handleError(err); });
     return;
   }
   if (['glb', 'gltf'].includes(ext)) {
-    new GLTFLoader().load(url, handleSuccess, undefined, (err) => console.error("Model load error:", err));
+    new GLTFLoader().load(fetchUrl, handleSuccess, undefined, handleError);
+    return;
+  }
+  if (ext === 'obj') {
+    new OBJLoader().load(fetchUrl, handleSuccess, undefined, handleError);
+    return;
+  }
+  if (ext === 'stl') {
+    new STLLoader().load(fetchUrl, (geometry) => handleSuccess(createStlMesh(THREE, geometry)), undefined, handleError);
     return;
   }
 
   // Unknown extension or no extension (e.g. API URL) — fetch & sniff magic bytes
-  fetch(url)
+  fetch(fetchUrl)
     .then((res) => res.arrayBuffer())
     .then((buffer) => {
       const header = new Uint8Array(buffer, 0, Math.min(20, buffer.byteLength));
       const headerStr = String.fromCharCode(...header);
       const isFBX = headerStr.startsWith('Kaydara');
+      const text = new TextDecoder('utf-8', { fatal: false }).decode(buffer.slice(0, Math.min(buffer.byteLength, 4096)));
       // glTF binary starts with "glTF" magic at byte 0
       // const isGLB = headerStr.startsWith('glTF');
 
@@ -673,13 +758,20 @@ export function loadGLB(s, url, currentViewMode, autoSpin = false, wireframeOver
           console.warn = _origWarn;
         }
         handleSuccess(object);
+      } else if (isBinaryStl(buffer) || looksLikeAsciiStl(text)) {
+        const loader = new STLLoader();
+        handleSuccess(createStlMesh(THREE, loader.parse(buffer)));
+      } else if (looksLikeObj(text)) {
+        const loader = new OBJLoader();
+        const fullText = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+        handleSuccess(loader.parse(fullText));
       } else {
         // Default to GLTF
         const loader = new GLTFLoader();
-        loader.parse(buffer, '', handleSuccess, (err) => console.error("Model load error:", err));
+        loader.parse(buffer, '', handleSuccess, handleError);
       }
     })
-    .catch((err) => console.error("Model fetch error:", err));
+    .catch(handleError);
 }
 
 export function applySegmentHighlight(s, show, edgeColor = 0x00ff88, options = {}) {

@@ -153,6 +153,12 @@ export function useActiveTasksPoller({
       }).catch((err) => {
         controllers.delete(inst.instanceId);
         if (err?.name === "AbortError") return;
+        if (err?.status === 403) {
+          if (resolveTaskFailure(inst, "Task access expired after backend restart")) {
+            cbRef.current.forceUpdate();
+          }
+          return;
+        }
         console.warn(`[useActiveTasksPoller] SSE stream failed for ${inst.taskId}:`, err?.message ?? err);
         streamFailuresRef.current.add(inst.instanceId);
       });
@@ -176,16 +182,31 @@ export function useActiveTasksPoller({
       const results = await Promise.allSettled(
         pollTargets.map(inst =>
           fetch(buildTaskStatusUrl(inst.taskId, inst.snapshot), { headers })
-            .then(r => r.json())
-            .then(d => ({ inst, d }))
+            .then(async (response) => {
+              let d = null;
+              try {
+                d = await response.json();
+              } catch {
+                d = null;
+              }
+              return { inst, d, response };
+            })
         )
       );
 
       let changed = false;
       for (const result of results) {
         if (result.status === "rejected") continue;
-        const { inst, d } = result.value;
-        if (!d.success) continue;
+        const { inst, d, response } = result.value;
+        if (!response.ok) {
+          if (response.status === 404 || response.status === 410) {
+            changed = resolveTaskFailure(inst, "Task expired or deleted from source") || changed;
+          } else if (response.status === 403) {
+            changed = resolveTaskFailure(inst, "Task access expired after backend restart") || changed;
+          }
+          continue;
+        }
+        if (!d?.success) continue;
 
         const current = map.get(inst.instanceId);
         if (!current || current.status !== "running") continue;

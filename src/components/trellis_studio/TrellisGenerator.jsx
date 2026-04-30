@@ -9,7 +9,8 @@ import StudioLayout from '../shared/StudioLayout';
 import { useStudioPanels } from '../../context/StudioPanelContext';
 
 export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, toggleGlobalSidebar, globalSidebar }) {
-  const { registerPanel, unregisterPanel, togglePanel } = useStudioPanels();
+  const { registerPanel, unregisterPanel } = useStudioPanels();
+  const MotionSpan = motion.span;
 
   // Register panels with centralized manager
   useEffect(() => {
@@ -96,14 +97,14 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
                 </div>
                 <AnimatePresence mode="wait">
                   {leftSecondaryOpen && (
-                    <motion.span
+                    <MotionSpan
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
                       className={`text-[8px] font-black tracking-[0.2em] transition-all duration-500 overflow-hidden ${idx === 0 ? 'text-white' : 'text-zinc-700'}`}
                     >
                       {tool.label}
-                    </motion.span>
+                    </MotionSpan>
                   )}
                 </AnimatePresence>
               </button>
@@ -149,6 +150,11 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
           getIdToken={getIdToken}
           color="#60a5fa"
           defaultTab="trellis"
+          firestoreCollectionsByTab={{
+            tripo: 'tripo_history',
+            trellis: 'trellis_history',
+            upload: 'tripo_history',
+          }}
           activeItemId={activeItem?.id}
           refreshTrigger={refreshTrigger}
           onSelect={(item) => {

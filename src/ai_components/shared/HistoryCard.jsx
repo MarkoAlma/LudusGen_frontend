@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Download, RotateCcw, Trash2, Box, Sparkles, AlertCircle, PersonStanding, Wand2, Scissors, Boxes, Images } from "lucide-react";
 import { getCachedThumbnail, checkThumbnailCache, isThumbnailUnsupported } from "../trellis/Glbthumbnail";
 import { fetchModelData } from "../trellis/utils";
-import { getHistoryThumbnailCacheKey } from "./historyThumbnailCache";
+import { getHistoryThumbnailCacheKey, rememberResolvedHistoryThumbnail } from "./historyThumbnailCache";
 import {
   ensureImageHistoryThumb,
   extractTripoPreviewImageUrls,
@@ -230,6 +230,10 @@ const HistoryCard = React.memo(function HistoryCard({
   const usableModelPreviewUrl = modelPreviewUrl && modelPreviewUrl !== blockedPreviewUrl
     ? modelPreviewUrl
     : null;
+
+  useEffect(() => {
+    if (thumbnail) rememberResolvedHistoryThumbnail(item, thumbnail);
+  }, [item, thumbnail]);
 
   useEffect(() => {
     if (!containerRef.current) return;

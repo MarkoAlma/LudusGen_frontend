@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useContext, forwardRef, useImperativeHandle, memo } from "react";
+import React, { useRef, useEffect, useCallback, useContext, useState, forwardRef, useImperativeHandle, memo } from "react";
 import { useMotionValueEvent } from "framer-motion";
 import { StudioLayoutContext } from "../../../components/shared/StudioLayout";
 import * as THREE from 'three';
@@ -12,7 +12,7 @@ import {
   applyLights, applyViewMode, applyWireframeOverlay, applyRigSkeletonOverlay,
   applySegmentHighlight,
   updateRigOverlay,
-  setSceneBg, setGridColor, loadGLB,
+  setSceneBg, setGridColor, loadGLB, disposeModel,
   focusOnHit, applyExponentialZoom,
   modelHasTextures, modelHasUvOverlapSuspicion,
 } from './threeHelpers';
@@ -614,6 +614,7 @@ const ThreeViewer = memo(forwardRef(({
   onAnimClipsDetected,
   onTextureAvailabilityChange,
   onUvOverlapChange,
+  onModelLoadingChange,
   bgColor = 'default',
   gridColor1 = '#1e1e3a',
   gridColor2 = '#111128',
@@ -630,6 +631,12 @@ const ThreeViewer = memo(forwardRef(({
   const mountRef = useRef(null);
   const S = useRef(null);
   const segmentTimerRef = useRef(null);
+  const [internalModelLoading, setInternalModelLoading] = useState(false);
+  const [viewerReadyTick, setViewerReadyTick] = useState(0);
+
+  useEffect(() => {
+    onModelLoadingChange?.(internalModelLoading);
+  }, [internalModelLoading, onModelLoadingChange]);
 
   const lightParamsRef = useRef({ lightMode, color, lightStrength, lightRotation, lightElevation, dramaticColor });
   useEffect(() => {
@@ -894,6 +901,7 @@ const ThreeViewer = memo(forwardRef(({
 
       attachViewerApi();
       if (onReady) onReady(S.current);
+      setViewerReadyTick((tick) => tick + 1);
     })().catch(console.error);
 
     return () => {
@@ -993,8 +1001,42 @@ const ThreeViewer = memo(forwardRef(({
   }, [showGrid]);
 
   useEffect(() => {
-    if (!modelUrl || !S.current?.scene) return;
+    if (!S.current?.scene) {
+      setInternalModelLoading(!!modelUrl);
+      return;
+    }
     if (onSegmentProcessing) onSegmentProcessing(false);
+    if (!modelUrl) {
+      setInternalModelLoading(false);
+      if (S.current._loadToken) S.current._loadToken.cancelled = true;
+      onTextureAvailabilityChange?.(false);
+      onUvOverlapChange?.(false);
+      S.current._hasUvOverlap = false;
+      disposePaintResources(S.current);
+      if (S.current.model) {
+        disposeModel(S.current.scene, S.current.model, S.current.origMaterials, S.current._wireCache, S.current._clayMats, S.current._uvMats, S.current._segmentMats, S.current._segEdgeCache);
+        S.current.model = null;
+        S.current._segmentMeshes = null;
+        S.current.origMaterials.clear();
+        S.current._segOrigMats?.clear();
+        S.current._segEdgeCache?.clear();
+        S.current._segmentMats?.clear();
+        if (S.current._rigOverlay) {
+          S.current.scene.remove(S.current._rigOverlay);
+          S.current._rigOverlay.traverse((c) => { if (c.material) c.material.dispose(); });
+          S.current._rigOverlay = null;
+        }
+        if (S.current._mixer) {
+          S.current._mixer.stopAllAction();
+          S.current._mixer = null;
+        }
+        S.current._animClips = [];
+        S.current._animAction = null;
+        S.current._activeClipIndex = 0;
+      }
+      S.current.markDirty?.();
+      return;
+    }
     // Blob URL-nél nincs kiterjesztés — azok mindig GLB (fetchGlbAsBlob hozza létre)
     if (!modelUrl.startsWith('blob:')) {
       const cleanPath = modelUrl.split('?')[0].split('#')[0];
@@ -1005,6 +1047,8 @@ const ThreeViewer = memo(forwardRef(({
         // FIX: ne dobjuk el csendben — értesítsük a szülőt hogy ez nem renderelhető
         // (most már az FBX is támogatott)
         console.warn('ThreeViewer: nem modell URL, kihagyva:', modelUrl);
+        setInternalModelLoading(false);
+        if (S.current?._loadToken) S.current._loadToken.cancelled = true;
         onTextureAvailabilityChange?.(false);
         onUvOverlapChange?.(false);
         if (S.current) S.current._hasUvOverlap = false;
@@ -1016,6 +1060,7 @@ const ThreeViewer = memo(forwardRef(({
     onUvOverlapChange?.(false);
     if (S.current) S.current._hasUvOverlap = false;
     disposePaintResources(S.current);
+    setInternalModelLoading(true);
     loadGLB(
       S.current,
       modelUrl,
@@ -1033,13 +1078,20 @@ const ThreeViewer = memo(forwardRef(({
         if (S.current) S.current._hasUvOverlap = hasUvOverlap;
         onTextureAvailabilityChange?.(modelHasTextures(model));
         onUvOverlapChange?.(hasUvOverlap);
+        if (onAnimClipsDetected) {
+          const clips = S.current._animClips || [];
+          onAnimClipsDetected(clips.map((c, i) => ({ index: i, name: c.name || `Clip ${i + 1}`, duration: c.duration })));
+        }
+        setInternalModelLoading(false);
+      },
+      () => {
+        setInternalModelLoading(false);
+        onTextureAvailabilityChange?.(false);
+        onUvOverlapChange?.(false);
+        if (S.current) S.current._hasUvOverlap = false;
       }
     );
-    if (onAnimClipsDetected) {
-      const clips = S.current._animClips || [];
-      onAnimClipsDetected(clips.map((c, i) => ({ index: i, name: c.name || `Clip ${i + 1}`, duration: c.duration })));
-    }
-  }, [modelUrl]); // eslint-disable-line
+  }, [modelUrl, viewerReadyTick]); // eslint-disable-line
 
   useEffect(() => {
     const el = mountRef.current;

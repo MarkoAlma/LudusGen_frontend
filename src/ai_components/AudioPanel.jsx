@@ -230,7 +230,6 @@ Output rules:
 - Do not reference copyrighted songs or reuse famous lyrics.
 `.trim();
 const DEAPI_MUSIC_MODEL_OPTIONS = [
-  { slug: "AceStep_1_5_XL_Turbo_INT8", name: "Ace Step 1.5 XL Turbo INT8" },
   { slug: "AceStep_1_5_Base", name: "Ace Step 1.5 Base" },
 ];
 const normalizeDeapiModelSlug = (slug) => String(slug || "").trim().toLowerCase();
