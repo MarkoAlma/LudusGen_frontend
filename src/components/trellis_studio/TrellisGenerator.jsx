@@ -12,6 +12,7 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
   const { registerPanel, unregisterPanel } = useStudioPanels();
   const [searchParams, setSearchParams] = useSearchParams();
   const tripoTaskIdParam = searchParams.get("tripoTaskId");
+  const workspaceRef = useRef(null);
 
   // Register panels with centralized manager
   useEffect(() => {
@@ -24,6 +25,7 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
       unregisterPanel('R');
     };
   }, [registerPanel, unregisterPanel]);
+
   const {
     prompt, setPrompt,
     genStatus, setGenStatus,
@@ -38,7 +40,8 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
     handleEnhance,
     handleDechant,
     customPreset,
-    handleSaveCustomPreset
+    handleSaveCustomPreset,
+    handleDeleteCustomPreset,
   } = useTrellisLogic(userId, getIdToken);
 
   const [leftOpen, setLeftOpen] = useState(true);
@@ -122,6 +125,33 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
     setRefreshTrigger(p => p + 1);
   };
 
+  // Download the currently loaded model as a .glb file
+  const handleDownload = useCallback(() => {
+    const url = modelUrl;
+    if (!url) return;
+
+    const rawPrompt = activeItem?.prompt || 'trellis_model';
+    const safeName = String(rawPrompt)
+      .slice(0, 60)
+      .replace(/[^\w\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '_') || 'trellis_model';
+    const filename = `${safeName}.glb`;
+
+    // The modelUrl is already a blob:// URL — trigger a browser download directly
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }, [modelUrl, activeItem?.prompt]);
+
+  // Camera reset — forwarded to TrellisWorkspace via imperative ref
+  const handleCameraReset = useCallback(() => {
+    workspaceRef.current?.resetCamera?.();
+  }, []);
+
   return (
     <StudioLayout
       leftOpen={leftOpen}
@@ -155,6 +185,7 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
               onDechant={handleDechant}
               customPreset={customPreset}
               handleSaveCustomPreset={handleSaveCustomPreset}
+              onDeleteCustomPreset={handleDeleteCustomPreset}
             />
           </div>
         </div>
@@ -178,16 +209,17 @@ export default function TrellisGenerator({ getIdToken, userId, isGlobalOpen, tog
           onReuse={(item) => {
             setPrompt(item.prompt);
           }}
-          onDownload={() => { }}
+          onDownload={handleDownload}
         />
       }
     >
       <TrellisWorkspace
+        ref={workspaceRef}
         modelUrl={modelUrl}
         genStatus={genStatus}
         activeItem={activeItem}
-        onDownload={() => { }}
-        onCameraReset={() => { }}
+        onDownload={handleDownload}
+        onCameraReset={handleCameraReset}
         leftOffset={offsets.left}
         rightOffset={offsets.right}
         leftWidth={320}

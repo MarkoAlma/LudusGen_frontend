@@ -106,7 +106,7 @@ export default function TrellisControls({
   onGenerate, isRunning,
   enhancing, onEnhance, onDechant,
   enhanceError,
-  customPreset, handleSaveCustomPreset
+  customPreset, handleSaveCustomPreset, onDeleteCustomPreset,
 }) {
   const color = "#a78bfa";
   const colorCyan = "#67e8f9";
@@ -175,7 +175,7 @@ export default function TrellisControls({
         <div className="space-y-2">
           <SectionLabel className="mb-0">Algorithm</SectionLabel>
           <div className="grid grid-cols-2 gap-1.5">
-            {STYLE_OPTIONS.slice(0, 6).map(style => {
+            {STYLE_OPTIONS.map(style => {
               const isActive = selectedStyle === style.id;
               return (
                 <motion.button
@@ -269,7 +269,7 @@ export default function TrellisControls({
               value={params.ss_sampling_steps}
               min={5} max={50} step={1}
               onChange={(v) => setParams(prev => ({ ...prev, ss_sampling_steps: v }))}
-              onReset={() => handleResetParam('ss_sampling_steps', 30)}
+              onReset={() => handleResetParam('ss_sampling_steps', 25)}
             />
           </GlassCard>
         </div>
@@ -319,8 +319,7 @@ export default function TrellisControls({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    localStorage.removeItem('trellis_custom_preset');
-                    window.location.reload(); // Simple way to reset state without extra props, but better would be a prop
+                    onDeleteCustomPreset?.();
                   }}
                   className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center opacity-0 group-hover/preset:opacity-100 transition-opacity hover:bg-red-500/20 hover:border-red-500/30 text-zinc-500 hover:text-red-400 z-20"
                 >
