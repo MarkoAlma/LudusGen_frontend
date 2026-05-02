@@ -46,7 +46,7 @@ useEffect(() => {
           setUser(null);
           setIs2FAEnabled(false);
           setLoading2FA(false);
-          setMsg({ err: "Nincs megerősítve az email!" });
+          setMsg({ err: "Email is not verified!" });
           return;
         }
 
@@ -169,7 +169,7 @@ useEffect(() => {
       });
 
       if (response.data.success) {
-        setMsg({ katt: "Kattints az emailben érkezett aktiváló linkre" });
+        setMsg({ katt: "Click the activation link sent to your email" });
       } else {
         setMsg({ incorrectSignUp: response.data.message });
       }
@@ -185,7 +185,7 @@ useEffect(() => {
 
   const logoutUser = async () => {
     await signOut(auth);
-    setMsg({ kijelentkezes: "Sikeres kijelentkezés!" });
+    setMsg({ kijelentkezes: "Successfully logged out!" });
     setUser(null);
     setIs2FAEnabled(false);
   };
@@ -210,7 +210,7 @@ useEffect(() => {
           if (validateResponse.data.success) {
             return { requires2FA: true };
           } else {
-            setMsg({ incorrectSignIn: "Hibás email/jelszó páros" });
+            setMsg({ incorrectSignIn: "Invalid email or password" });
             setLoading(false);
             return { requires2FA: false };
           }
@@ -218,7 +218,7 @@ useEffect(() => {
           console.error("Password validation error:", error);
           setMsg({
             incorrectSignIn:
-              error.response?.data?.message || "Hibás email/jelszó páros",
+              error.response?.data?.message || "Invalid email or password",
           });
           setLoading(false);
           return { requires2FA: false };
@@ -228,14 +228,14 @@ useEffect(() => {
       const adat = await signInWithEmailAndPassword(auth, email, password);
 
       if (!adat.user.emailVerified) {
-        setMsg({ err: "Nincs megerősítve az email!" });
+        setMsg({ err: "Email is not verified!" });
         setUser(null);
         await signOut(auth);
         setLoading(false);
         return { requires2FA: false };
       }
 
-      setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés!" });
+      setMsg({ signIn: true, kijelentkezes: "Successfully logged in!" });
       return { requires2FA: false };
     } catch (error) {
       console.log(error);
@@ -249,21 +249,26 @@ useEffect(() => {
   const signInWith2FA = async (customToken) => {
     try {
       await signInWithCustomToken(auth, customToken);
-      setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés!" });
+      setMsg({ signIn: true, kijelentkezes: "Successfully logged in!" });
       return { success: true };
     } catch (error) {
       console.error("2FA sign in error:", error);
-      setMsg({ incorrectSignIn: "Bejelentkezési hiba" });
+      setMsg({ incorrectSignIn: "Sign in error" });
       return { success: false };
     }
   };
 
   // Google bejelentkezés
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (onStartBackendCheck) => {
     const provider = new GoogleAuthProvider();
 
     try {
       const result = await signInWithPopup(auth, provider);
+      
+      if (typeof onStartBackendCheck === "function") {
+        onStartBackendCheck();
+      }
+
       const email = result.user.email;
 
       console.log("Google popup completed for:", email);
@@ -293,20 +298,20 @@ useEffect(() => {
             sessionId: validateResponse.data.sessionId,
           };
         } else {
-          setMsg({ incorrectSignIn: "Google bejelentkezési hiba" });
+          setMsg({ incorrectSignIn: "Google sign in error" });
           return { requires2FA: false };
         }
       }
 
       if (!result.user.emailVerified) {
-        setMsg({ err: "Nincs megerősítve az email!" });
+        setMsg({ err: "Email is not verified!" });
         await signOut(auth);
         setUser(null);
         return { requires2FA: false };
       }
 
       console.log("✅ Google sign-in successful (no 2FA)");
-      setMsg({ signIn: true, kijelentkezes: "Sikeres bejelentkezés!" });
+      setMsg({ signIn: true, kijelentkezes: "Successfully logged in!" });
       setIsAuthOpen(false);
       setShowNavbar(true);
 
@@ -315,7 +320,10 @@ useEffect(() => {
       console.error("Google sign-in error:", error);
       setMsg({ incorrectSignIn: error.message });
 
-      try { await signOut(auth); } catch { /* ignore sign-out cleanup failure */ }
+      // Nem várjuk meg a signOut-ot (nem használunk await-et), 
+      // mert Firebase hajlamos 10 másodpercig "lefagyni" (timeoutolni), 
+      // ha a user épp bezárta a popupot és nincs aktív session.
+      try { signOut(auth).catch(() => {}); } catch { /* ignore */ }
 
       return { requires2FA: false };
     }
@@ -324,7 +332,7 @@ useEffect(() => {
   const resetPassword = async (email) => {
     try {
       await axios.post(`${API_BASE}/api/forgot-password`, { email });
-      setMsg({ resetSent: "Ha létezik a fiók, kiküldtük az emailt." });
+      setMsg({ resetSent: "If the account exists, we sent the email." });
     } catch (error) {
       console.log(error);
       setMsg({ incorrectResetPwEmail: error.response?.data?.error || error.message });

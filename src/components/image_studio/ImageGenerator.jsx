@@ -432,7 +432,8 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
   const { addJob, updateJob, markJobDone, markJobDoneAndSeen, markJobError, removeJob, jobs, clearSeenCompletedJobs, registerCancelHandler, unregisterCancelHandler } = useJobs();
   const { isMobile, isTablet, setPanelOpen, setPanelsOpen, mobileActive, panelState } = useStudioPanels();
   const startJob = (kind, title, targetTab) => {
-    const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const randomId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const id = `${kind}-${randomId}`;
     addJob({ id, kind, panelType: 'image', modelId: selectedModel.id, title, status: 'running', progress: 0, createdAt: Date.now(), updatedAt: Date.now(), errorMessage: null, completedAt: null, seenAt: null, targetTab });
     return id;
   };
@@ -689,6 +690,7 @@ export default function ImageGenerator({ selectedModel, onModelChange, onGallery
         signal,
         body: JSON.stringify({
           prompt: prompt.trim(),
+          modelId: selectedModel.id,
           provider,
           apiId,
           negative_prompt: negativePrompt.trim() || undefined,

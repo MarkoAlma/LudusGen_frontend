@@ -18,6 +18,16 @@ const getSpeechRecognitionLanguage = () => {
 const MotionDiv = motion.div;
 const MotionButton = motion.button;
 const VOICE_WARMUP_MS = 4200;
+const CHAT_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+const CHAT_IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const CHAT_IMAGE_ACCEPT = Array.from(CHAT_IMAGE_MIME_TYPES).join(',');
+
+const validateChatImageFile = (file) => {
+  if (!file) return 'Choose an image first.';
+  if (!CHAT_IMAGE_MIME_TYPES.has(file.type)) return 'Only JPG, PNG, WebP, or GIF images are supported.';
+  if (file.size > CHAT_IMAGE_MAX_BYTES) return 'Images can be up to 8 MB.';
+  return '';
+};
 
 export default function ChatInput({
   input, setInput, isTyping, handleSend, handleStop,
@@ -43,6 +53,7 @@ export default function ChatInput({
   const [isDragOver, setIsDragOver] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState('idle');
   const [voiceError, setVoiceError] = useState('');
+  const [inputError, setInputError] = useState('');
   const [isVoicePreparing, setIsVoicePreparing] = useState(false);
 
   const speechRecognitionSupported = typeof window !== 'undefined'
@@ -272,8 +283,35 @@ export default function ChatInput({
   };
 
   const handleTextChange = (e) => {
+    setInputError('');
     setInput(e.target.value);
     resizeTextarea(e.target);
+  };
+
+  const attachImageFile = (file) => {
+    if (!supportsImageInput) {
+      return;
+    }
+    if (!file) return;
+    const validationError = validateChatImageFile(file);
+    if (validationError) {
+      setAttachedImage(null);
+      setInputError(validationError);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (typeof ev.target.result !== 'string') {
+        setInputError('The image could not be read.');
+        return;
+      }
+      setInputError('');
+      setAttachedImage({ dataUrl: ev.target.result, name: file.name });
+    };
+    reader.onerror = () => {
+      setInputError('The image could not be read.');
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleImageSelect = (e) => {
@@ -281,13 +319,8 @@ export default function ChatInput({
       e.target.value = '';
       return;
     }
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setAttachedImage({ dataUrl: ev.target.result, name: file.name });
-    };
-    reader.readAsDataURL(file);
+    attachImageFile(e.target.files?.[0]);
+    e.target.value = '';
   };
 
   const onKeyDown = (e) => {
@@ -304,13 +337,7 @@ export default function ChatInput({
   };
 
   const processFile = (file) => {
-    if (!supportsImageInput) return;
-    if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setAttachedImage({ dataUrl: ev.target.result, name: file.name });
-    };
-    reader.readAsDataURL(file);
+    attachImageFile(file);
   };
 
   const handleDragEnter = (e) => {
@@ -351,6 +378,7 @@ export default function ChatInput({
   };
 
   const hasContent = input.trim() || attachedImage;
+  const visibleInputError = inputError || voiceError;
 
   return (
     <div
@@ -408,7 +436,10 @@ export default function ChatInput({
                 <p className="text-[8px] font-bold text-gray-600 uppercase mt-0.5 tracking-[0.2em]">Image attached</p>
               </div>
               <button
-                onClick={() => setAttachedImage(null)}
+                onClick={() => {
+                  setInputError('');
+                  setAttachedImage(null);
+                }}
                 className="p-2 rounded-xl hover:bg-white/10 text-gray-600 hover:text-white transition-all duration-500 ml-1"
               >
                 <X className="w-4 h-4" />
@@ -487,7 +518,7 @@ export default function ChatInput({
             ref={fileInputRef}
             onChange={handleImageSelect}
             className="hidden"
-            accept="image/*"
+            accept={CHAT_IMAGE_ACCEPT}
             disabled={!supportsImageInput}
           />
 
@@ -551,14 +582,14 @@ export default function ChatInput({
           </div>
         </div>
         <AnimatePresence>
-          {voiceError && (
+          {visibleInputError && (
             <MotionDiv
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               className="px-5 pb-3 -mt-1 text-[10px] font-bold text-amber-300/80"
             >
-              {voiceError}
+              {visibleInputError}
             </MotionDiv>
           )}
         </AnimatePresence>

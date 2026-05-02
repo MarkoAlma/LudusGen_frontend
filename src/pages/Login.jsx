@@ -229,13 +229,14 @@ export default function Login({ isOpen, onClose }) {
   };
 
   const handleGoogleSignIn = async () => {
-    setLoading(true);
-    
-    const result = await signInWithGoogle();
+    // ⚠️ Csak akkor mutatunk loadingot, ha a popup SIKERESEN visszatért, 
+    // így elkerüljük, hogy a gomb lefagyjon, ha a user be is zárja a popupot.
+    const result = await signInWithGoogle(() => {
+      setLoading(true);
+    });
     
     // ✅ GOOGLE 2FA KEZELÉS
-    if (result.requires2FA) {
-    
+    if (result && result.requires2FA) {
       console.log("2FA required for Google login");
       setEmail(result.email);
       setSessionId(result.sessionId);
@@ -318,7 +319,7 @@ export default function Login({ isOpen, onClose }) {
       }
     } catch (error) {
       isSubmittingRef.current = false;
-      setMsg({ err: "HIBA" });
+      setMsg({ err: "ERROR" });
       setLoading(false)
     }
   };
@@ -329,7 +330,7 @@ export default function Login({ isOpen, onClose }) {
     setShow2FAModal(false);
     setIsAuthOpen(false);
     setShowNavbar(true)
-    setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
+    setMsg({signIn:true, kijelentkezes: 'Successfully logged in!'})
     // setLoading(false)
     try {
 
@@ -340,7 +341,7 @@ export default function Login({ isOpen, onClose }) {
       
       // A signInWith2FA már megtörtént a TwoFactorLogin komponensben
       // Csak bezárjuk a modalt és tisztítjuk a state-et
-    // setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
+    // setMsg({signIn:true, kijelentkezes: 'Successfully logged in!'})
       
       setEmail("");
       setSessionId(null);
@@ -355,7 +356,7 @@ export default function Login({ isOpen, onClose }) {
       const { auth } = await import("../firebase/firebaseApp");
             await signInWithEmailAndPassword(auth, pending2FAEmail, pending2FAPassword);
       
-    // setMsg({signIn:true, kijelentkezes: 'Sikeres bejelentkezés!'})
+    // setMsg({signIn:true, kijelentkezes: 'Successfully logged in!'})
 
       // ✅ Most beállítjuk az isSubmittingRef-et, hogy a useEffect bezárja a modalt
       isSubmittingRef.current = true;
@@ -372,7 +373,7 @@ export default function Login({ isOpen, onClose }) {
       
     } catch (error) {
       console.error("❌ Firebase login after 2FA error:", error);
-      setMsg({ err: "Hiba történt a bejelentkezés során" });
+      setMsg({ err: "An error occurred during sign in" });
       setPending2FAEmail("");
       setPending2FAPassword("");
       setEmail("");

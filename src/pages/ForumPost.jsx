@@ -147,7 +147,7 @@ This makes Claude's performance stand out even more.`,
 ];
 
 
-// ─── Firebase timestamp → olvasható szöveg ────────────────────────
+// ─── Firebase timestamp → readable text ────────────────────────
 const formatFirebaseTime = (timestamp) => {
   if (!timestamp?.toDate) return "Recently";
   const date = timestamp.toDate();
@@ -696,7 +696,7 @@ const TableOfContents = ({ content, color }) => {
     <GlassCard style={{ marginBottom: "1rem" }}>
       <div className="px-4 pt-4 pb-3">
         <h4 className="text-white font-semibold text-xs uppercase tracking-wider flex items-center gap-2 mb-2">
-          <List className="w-3.5 h-3.5" style={{ color }} /> Tartalom
+          <List className="w-3.5 h-3.5" style={{ color }} /> Content
         </h4>
         <div className="space-y-1">
           {headings.map((h, i) => (
@@ -886,7 +886,7 @@ const UserProfileModal = ({
   );
 };
 
-// ─── Delete megerősítő dialog (lokális, poszt nézetben) ───────────
+// ─── Delete confirmation dialog (local, post view) ───────────
 const ConfirmDeleteModal = ({ isOpen, onConfirm, onCancel }) => {
   if (!isOpen) return null;
   return createPortal(
@@ -921,7 +921,7 @@ const ConfirmDeleteModal = ({ isOpen, onConfirm, onCancel }) => {
 };
 
 // ─── FŐ KOMPONENS ─────────────────────────────────────────────────
-// JAVÍTÁS: currentUserId, isAdmin, onDelete, onEdit, onToggle propok hozzáadva
+// FIX: currentUserId, isAdmin, onDelete, onEdit, onToggle props added
 export default function ForumPost({
   post,
   allPosts = [],
@@ -1008,9 +1008,9 @@ export default function ForumPost({
   }, [isCommunityAuthenticated, onRequireAuth, setIsAuthOpen]);
   const isOwnAuthor = !!currentUserId && !!post?.authorId && currentUserId === post.authorId;
 
-  // JAVÍTÁS: jogosultság-számítás
-  // Ha nincs authorId (mock poszt) → mindenki kezelheti; ha van → csak a saját uid
-  // Az isAdmin prop-ot kiegészítjük a helyi ADMIN_UIDS ellenőrzéssel is
+  // FIX: permission calculation
+  // If no authorId (mock post) → everyone can manage; if there is → only the own uid
+  // We supplement the isAdmin prop with the local ADMIN_UIDS check as well
   const isLocalAdmin = !!currentUserId && ADMIN_UIDS.includes(currentUserId);
   const effectiveIsAdmin = isAdmin || isLocalAdmin;
   const isOwn = !!currentUserId && (!post?.authorId || currentUserId === post?.authorId);
@@ -1035,7 +1035,7 @@ export default function ForumPost({
     setAuthorUserDoc(null);
   }, [post?.authorId]);
 
-  // ── Author adatainak lekérése (Biztonságos API-n keresztül) ────────
+  // ── Fetching Author data (via Secure API) ────────
   useEffect(() => {
     if (!post?.authorId || authorUserDoc?.uid === post.authorId) return;
     if ((currentUserId && post.authorId === currentUserId) || (globalUser?.uid && post.authorId === globalUser.uid)) return;
@@ -1053,10 +1053,10 @@ export default function ForumPost({
         if (response.ok) {
           const result = await response.json();
           if (result.success) {
-            // Firestore-szerű adatstrukturát emulálunk a kompatibilitás miatt
+            // Firestore-like data structure for compatibility
             const userData = {
               ...result.user,
-              // Ha a backend nem Timestamp-et küld, konvertáljuk (szimpla dátum ként)
+              // If the backend doesn't send a Timestamp, we convert it (as a simple date)
               createdAt: result.user.createdAt
             };
             setAuthorUserDoc(userData);
@@ -1072,11 +1072,11 @@ export default function ForumPost({
   const authorJoinedDate = useMemo(() => {
     let date = null;
 
-    // 1. Próbáljuk a valódi regisztrációs dátumot
+    // 1. Try the real registration date
     if (authorProfile?.createdAt) {
       date = authorProfile.createdAt.toDate ? authorProfile.createdAt.toDate() : new Date(authorProfile.createdAt._seconds * 1000);
     }
-    // 2. Fallback: legelső poszt dátuma
+    // 2. Fallback: date of the very first post
     else if (authorPosts.length > 0) {
       const sorted = [...authorPosts].sort((a, b) => {
         const dateA = a.createdAt?.toDate?.() || new Date(0);
@@ -1086,13 +1086,11 @@ export default function ForumPost({
       date = sorted[0].createdAt?.toDate?.() || null;
     }
 
-    if (!date) return "2024. december";
+    if (!date) return "December 2024";
 
-    const formatted = date.toLocaleDateString("hu-HU", { year: "numeric", month: "short" })
-      .replace(/ /g, "")
-      .replace(/\./g, ". ");
+    const formatted = date.toLocaleDateString("en-GB", { year: "numeric", month: "short" });
 
-    return formatted.trim();
+    return formatted;
   }, [authorProfile, authorPosts]);
 
 
@@ -1156,9 +1154,9 @@ export default function ForumPost({
     }
   };
 
-  // ── Értesítés létrehozása ──────────────────────────────────────────
+  // ── Create notification ──────────────────────────────────────────
   const createNotification = useCallback(async (recipientId, type, text, extraData = {}) => {
-    if (!recipientId || recipientId === currentUserId) return; // ne értesítsd magad
+    if (!recipientId || recipientId === currentUserId) return; // don't notify yourself
     try {
       await addDoc(collection(db, "forum_notifications"), {
         recipientId,
@@ -1166,7 +1164,7 @@ export default function ForumPost({
         text,
         read: false,
         createdAt: serverTimestamp(),
-        // Alapértelmezett navigációs adatok az aktuális poszthoz
+        // Default navigation data for the current post
         postId: post.id,
         category: post.category,
         slug: post.slug,
@@ -1241,7 +1239,7 @@ export default function ForumPost({
         time: formatFirebaseTime(d.data().createdAt)
       })).filter(isVisibleComment);
 
-      // Csoportosítás parentId alapján
+      // Grouping by parentId
       const rootComments = allComms.filter(c => !c.parentId);
       const replies = allComms.filter(c => c.parentId);
 
@@ -1250,7 +1248,7 @@ export default function ForumPost({
         replies: replies.filter(r => r.parentId === rc.id)
       }));
 
-      // RÖGZÍTETT RENDEZÉS LEKÉRÉSKOR
+      // FIXED SORTING UPON FETCHING
       assembled.sort((a, b) => {
         if (sortComments === "top") return (b.likes || 0) - (a.likes || 0);
         const dateA = a.createdAt?.toDate?.() || new Date(0);
@@ -1304,12 +1302,12 @@ export default function ForumPost({
 
       await addDoc(collection(db, "forum_comments"), nc);
       console.log("[ForumPost] Comment saved to Firebase");
-      fetchComments(); // Frissítés beküldés után
+      fetchComments(); // Refresh after submission
 
 
 
 
-      // Értesítés a bejegyzés szerzőjének (ha nem saját magunknak írunk)
+      // Notification to the post author (if we are not writing to ourselves)
       if (post.authorId && post.authorId !== currentUserId) {
         const authorName = getProfileDisplayName(currentAuthorProfile, "Someone");
         createNotification(
@@ -1351,8 +1349,8 @@ export default function ForumPost({
 
 
 
-      // Értesítés a szülő comments szerzőjének
-      // Megkeressük a szülő commentst a listában
+      // Notification to the parent comment author
+      // We look for the parent comment in the list
       const parentComment = comments.find(c => c.id === parentId);
       if (parentComment && parentComment.authorId && parentComment.authorId !== currentUserId) {
         const authorName = getProfileDisplayName(currentAuthorProfile, "Someone");
@@ -1382,7 +1380,7 @@ export default function ForumPost({
         likedIds: isLikedNow ? arrayRemove(currentUserId) : arrayUnion(currentUserId)
       });
 
-      // Optimista helyi frissítés, hogy ne kelljen újra lekérni és ne ugráljon a sorrend
+      // Optimistic local update so we don't have to fetch again and the order doesn't jump
       setComments(prev => {
         return prev.map(c => {
           if (c.id === commentId) {
@@ -1418,7 +1416,7 @@ export default function ForumPost({
 
 
 
-  // A commentsok listájának elérése a useCallback-ek számára
+  // Accessing the list of comments for useCallbacks
   const flatComments = useMemo(
     () => comments.flatMap(c => [c, ...(c.replies || [])]),
     [comments]
@@ -1525,7 +1523,7 @@ export default function ForumPost({
         <ReadingProgress color={color} />
         <ScrollToTop />
 
-        {/* Profil modal */}
+        {/* Profile modal */}
         <UserProfileModal
           isOpen={showProfile}
           onClose={() => setShowProfile(false)}
@@ -1543,7 +1541,7 @@ export default function ForumPost({
           authorStats={authorStats}
         />
 
-        {/* Delete megerősítő (lokális) */}
+        {/* Delete confirmation (local) */}
         <ConfirmDeleteModal
           isOpen={showDeleteConfirm}
           onConfirm={() => {

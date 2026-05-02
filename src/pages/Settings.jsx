@@ -2,7 +2,7 @@ import { useState, useEffect, useContext, useRef } from "react";
 import { User, Mail, Calendar, Shield, Edit2, Save, X, Check, AlertCircle, Lock, Sparkles, ChevronLeft, Camera, Upload, Trash2, XCircle, Zap } from "lucide-react";
 import { MyUserContext } from "../context/MyUserProvider";
 import { useNavigate } from "react-router-dom";
-import Enable2FA from "../components/Enable2Fa";
+import Enable2FA from "../components/Enable2FA";
 import axios from "axios";
 import { API_BASE } from "../api/client";
 import UpdatePassword from "../components/UpdatePassword";
@@ -148,19 +148,19 @@ export default function Settings() {
                 onClick={() => navigate("/")} 
                 className="flex items-center gap-2 text-primary font-black uppercase tracking-widest text-[10px] mb-4 hover:opacity-70 transition-all cursor-pointer"
               >
-                <ChevronLeft className="w-4 h-4" /> Vissza a központba
+                <ChevronLeft className="w-4 h-4" /> Back to hub
               </button>
-              <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter mb-2">Beállítások.</h1>
-              <p className="text-gray-500 font-medium">Személyre szabott élmény és biztonság.</p>
+              <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter mb-2">Settings.</h1>
+              <h2 className="text-gray-500 font-medium">Personalized experience and security.</h2>
             </div>
             {!editMode ? (
               <Button variant="primary" onClick={() => setEditMode(true)} className="cursor-pointer">
-                <Edit2 className="w-4 h-4 mr-2" /> Profil szerkesztése
+                <Edit2 className="w-4 h-4 mr-2" /> Edit Profile
               </Button>
             ) : (
               <div className="flex gap-3">
-                <Button variant="subtle" onClick={handleCancel} className="cursor-pointer">Mégse</Button>
-                <Button variant="primary" onClick={handleSave} loading={loading} className="cursor-pointer">Mentés</Button>
+                <Button variant="subtle" onClick={handleCancel} className="cursor-pointer">Cancel</Button>
+                <Button variant="primary" onClick={handleSave} loading={loading} className="cursor-pointer">Save</Button>
               </div>
             )}
           </div>
@@ -192,7 +192,7 @@ export default function Settings() {
                     <p className="text-sm text-gray-400 font-medium mb-4">{user.email}</p>
                     <div className="flex flex-wrap justify-center md:justify-start gap-2">
                       <Badge variant="primary">{user.accountType || "Standard"}</Badge>
-                      {is2FAEnabled && <Badge variant="success">2FA Aktív</Badge>}
+                      {is2FAEnabled && <Badge variant="success">2FA Active</Badge>}
                     </div>
                   </div>
                 </div>
@@ -200,14 +200,14 @@ export default function Settings() {
                 <div className="mt-12 space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <SettingsInput 
-                      label="Megjelenített név" 
+                      label="Display Name" 
                       name="displayName" 
                       value={formData.displayName} 
                       onChange={handleChange} 
                       disabled={!editMode} 
                     />
                     <SettingsInput 
-                      label="Teljes név" 
+                      label="Full Name" 
                       name="name" 
                       value={formData.name} 
                       onChange={handleChange} 
@@ -215,14 +215,14 @@ export default function Settings() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-4">Bemutatkozás</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-4">Bio</label>
                     <textarea
                       name="bio"
                       value={formData.bio}
                       onChange={handleChange}
                       disabled={!editMode}
                       className="w-full bg-white/[0.03] border border-white/10 rounded-3xl p-6 text-sm font-medium focus:outline-none focus:border-primary/50 transition-all min-h-[120px] resize-none disabled:opacity-50"
-                      placeholder="Mesélj magadról..."
+                      placeholder="Tell us about yourself..."
                     />
                   </div>
                 </div>
@@ -234,31 +234,31 @@ export default function Settings() {
                   <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                     <Shield className="w-5 h-5" />
                   </div>
-                  <h3 className="text-xl font-black italic tracking-tight">Biztonsági központ.</h3>
+                  <h3 className="text-xl font-black italic tracking-tight">Security Center.</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
                     <div className="flex items-center justify-between mb-4">
                       <Lock className="w-4 h-4 text-primary" />
-                      <Badge variant="subtle">Jelszó</Badge>
+                      <Badge variant="subtle">Password</Badge>
                     </div>
-                    <p className="text-sm font-bold text-white mb-1">Jelszó módosítása</p>
-                    <p className="text-[10px] text-gray-500 mb-6 font-medium">Ajánlott legalább 6 havonta frissíteni.</p>
-                    <Button variant="subtle" size="sm" onClick={handleUpdatePW} className="w-full cursor-pointer">Megnyitás</Button>
+                    <p className="text-sm font-bold text-white mb-1">Update Password</p>
+                    <p className="text-[10px] text-gray-500 mb-6 font-medium">Recommended to update at least every 6 months.</p>
+                    <Button variant="subtle" size="sm" onClick={handleUpdatePW} className="w-full cursor-pointer">Open</Button>
                   </div>
 
                   <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
                     <div className="flex items-center justify-between mb-4">
                       <Shield className="w-4 h-4 text-primary" />
-                      <Badge variant={is2FAEnabled ? "success" : "danger"}>{is2FAEnabled ? "Védett" : "Sebezhető"}</Badge>
+                      <Badge variant={is2FAEnabled ? "success" : "danger"}>{is2FAEnabled ? "Protected" : "Vulnerable"}</Badge>
                     </div>
-                    <p className="text-sm font-bold text-white mb-1">Kétlépcsős azonosítás</p>
-                    <p className="text-[10px] text-gray-500 mb-6 font-medium">Extra védelmi réteg a fiókodhoz.</p>
+                    <p className="text-sm font-bold text-white mb-1">Two-Factor Authentication</p>
+                    <p className="text-[10px] text-gray-500 mb-6 font-medium">An extra layer of security for your account.</p>
                     {!is2FAEnabled ? (
-                      <Button variant="primary" size="sm" onClick={() => setShow2FA(true)} className="w-full cursor-pointer">Beállítás</Button>
+                      <Button variant="primary" size="sm" onClick={() => setShow2FA(true)} className="w-full cursor-pointer">Set Up</Button>
                     ) : (
-                      <Button variant="danger" size="sm" onClick={() => setShowDisable2FA(true)} className="w-full cursor-pointer">Kikapcsolás</Button>
+                      <Button variant="danger" size="sm" onClick={() => setShowDisable2FA(true)} className="w-full cursor-pointer">Turn Off</Button>
                     )}
                   </div>
                 </div>
@@ -268,10 +268,10 @@ export default function Settings() {
             {/* Sidebar */}
             <div className="lg:col-span-4 space-y-6">
               <div className="glass-panel p-6 rounded-[2.5rem] border border-white/10">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-6 px-2">Fiók Adatok</h4>
+                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-6 px-2">Account Info</h4>
                 <div className="space-y-4">
-                  <InfoRow label="Létrehozva" value={user.createdAt?._seconds ? new Date(user.createdAt._seconds * 1000).toLocaleDateString("hu-HU") : "Ismeretlen"} icon={Calendar} />
-                  <InfoRow label="Profil Típus" value={user.accountType || "Standard"} icon={Sparkles} color="text-primary" />
+                  <InfoRow label="Created" value={user.createdAt?._seconds ? new Date(user.createdAt._seconds * 1000).toLocaleDateString("en-US") : "Unknown"} icon={Calendar} />
+                  <InfoRow label="Profile Type" value={user.accountType || "Standard"} icon={Sparkles} color="text-primary" />
                   <InfoRow label="Unique ID" value={user.uid?.substring(0, 10) + "..."} icon={Shield} />
                 </div>
               </div>
@@ -282,22 +282,22 @@ export default function Settings() {
                   <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                     <Zap className="w-5 h-5" />
                   </div>
-                  <h3 className="text-xl font-black italic tracking-tight">Kreditek.</h3>
+                  <h3 className="text-xl font-black italic tracking-tight">Credits.</h3>
                 </div>
 
                 <div className="rounded-2xl mb-4 bg-white/[0.02] border border-white/5 p-5 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Jelenlegi</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Current</p>
                     <p className="font-black text-white text-3xl italic tracking-tighter">
-                      {(user.credits ?? 0).toLocaleString("hu-HU")}
-                      <span className="text-primary text-sm ml-1 not-italic tracking-normal">kr</span>
+                      {(user.credits ?? 0).toLocaleString("en-US")}
+                      <span className="text-primary text-sm ml-1 not-italic tracking-normal">cr</span>
                     </p>
                   </div>
                   <Zap className="w-6 h-6 text-primary" />
                 </div>
 
                 <Button variant="primary" onClick={() => setShowCreditTopup(true)} className="w-full cursor-pointer">
-                  Kredit feltöltése
+                  Top up credits
                 </Button>
               </div>
 
@@ -310,15 +310,15 @@ export default function Settings() {
         <Enable2FA isOpen={show2FA} onClose={() => { setShow2FA(false); refresh2FAStatus();  }} />
         
         
-        <Modal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} title="Profilkép frissítése">
+        <Modal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} title="Update Profile Picture">
           <div className="flex flex-col items-center p-6">
             <div className="w-40 h-40 rounded-[2.5rem] border-4 border-primary/20 overflow-hidden mb-8">
-              <img src={imagePreview || user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`} className="w-full h-full object-cover" />
+              <img src={imagePreview || user.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.email}`} className="w-full h-full object-cover" alt="Preview" />
             </div>
             <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
             <div className="grid grid-cols-2 gap-4 w-full">
-              <Button variant="subtle" onClick={() => fileInputRef.current.click()} className="cursor-pointer">Választás</Button>
-              <Button variant="primary" onClick={handleUploadProfilePicture} loading={uploadingImage} className="cursor-pointer">Feltöltés</Button>
+              <Button variant="subtle" onClick={() => fileInputRef.current.click()} className="cursor-pointer">Choose</Button>
+              <Button variant="primary" onClick={handleUploadProfilePicture} loading={uploadingImage} className="cursor-pointer">Upload</Button>
             </div>
           </div>
         </Modal>
