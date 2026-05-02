@@ -42,7 +42,7 @@ const ADMIN_UIDS = ["T7fU9Zp3N5M9wz2G8xQ4L1rV6bY2"];
 const DEBUG = true;
 const dbg = (...args) => { if (DEBUG) console.log("[Forum DEBUG]", ...args); };
 
-// ─── Slug generátor ───────────────────────────────────────────────
+// ─── Slug generator ───────────────────────────────────────────────
 export function generateSlug(title) {
   return title
     .toLowerCase()
@@ -56,7 +56,7 @@ export function generateSlug(title) {
     .slice(0, 80);
 }
 
-// ─── Firebase timestamp → olvasható szöveg ────────────────────────
+// ─── Firebase timestamp → readable text ────────────────────────
 const formatFirebaseTime = (timestamp) => {
   if (!timestamp?.toDate) return "Recently";
   const date = timestamp.toDate();
@@ -1301,7 +1301,7 @@ const NewPostModal = ({ isOpen, onClose, defaultCategory, onSubmit, editPost = n
             />
             <div className="flex justify-between items-center text-[0.6rem] px-1 font-bold tracking-wider">
               <span style={{ color: title.length > 0 && title.length < 10 ? "#f87171" : "#5a5470" }}>
-                {title.length > 0 && title.length < 10 ? `NEEDED: ${10 - title.length} CHARACTERS` : "MINIMUM 10 CHARACTERS ELEVE"}
+                {title.length > 0 && title.length < 10 ? `NEEDED: ${10 - title.length} CHARACTERS` : "MINIMUM 10 CHARACTERS REQUIRED"}
               </span>
               <span className="opacity-40">{title.length}/200</span>
             </div>

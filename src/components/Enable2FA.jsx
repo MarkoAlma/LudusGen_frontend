@@ -52,7 +52,7 @@ export default function Enable2FA({ isOpen, onClose }) {
       setBackupCodes(res.data.backupCodes || []);
     } catch (err) {
       console.error("QR fetch error:", err);
-      setError("Hiba történt a QR kód betöltése során");
+      setError("An error occurred while loading the QR code");
     } finally {
       setLoading(false);
     }
@@ -104,7 +104,7 @@ export default function Enable2FA({ isOpen, onClose }) {
     } catch (err) {
       console.error("❌ Verify error:", err);
       console.error("Error response:", err.response?.data);
-      setError(err.response?.data?.message || "Érvénytelen kód. Próbáld újra!");
+      setError(err.response?.data?.message || "Invalid code. Try again!");
       setCode("");
     } finally {
       setVerifying(false);
@@ -118,7 +118,7 @@ export default function Enable2FA({ isOpen, onClose }) {
   };
 
   const handleDownloadBackupCodes = () => {
-    const text = `LudusGen - 2FA Visszaállítási Kódok\n\n${backupCodes.join('\n')}\n\nFigyelem: Ezeket a kódokat biztonságos helyen tárold!\nMinden kód csak egyszer használható.`;
+    const text = `LudusGen - 2FA Recovery Codes\n\n${backupCodes.join('\n')}\n\nAttention: Store these codes in a safe place!\nEach code can only be used once.`;
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -187,10 +187,10 @@ export default function Enable2FA({ isOpen, onClose }) {
                 </div>
 
                 <h2 className="text-3xl font-black text-white mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  Kétlépcsős Azonosítás
+                  Two-Factor Authentication
                 </h2>
                 <p className="text-gray-400 text-sm">
-                  Védd meg a fiókodat egy extra biztonsági réteggel
+                  Protect your account with an extra layer of security
                 </p>
               </div>
 
@@ -198,7 +198,7 @@ export default function Enable2FA({ isOpen, onClose }) {
               {loading && (
                 <div className="flex flex-col items-center justify-center py-16">
                   <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-4" />
-                  <p className="text-gray-400 text-sm">QR kód betöltése...</p>
+                  <p className="text-gray-400 text-sm">Loading QR code...</p>
                 </div>
               )}
 
@@ -213,7 +213,7 @@ export default function Enable2FA({ isOpen, onClose }) {
                     onClick={fetchQr}
                     className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-all duration-200 hover:shadow-lg hover:shadow-purple-500/30"
                   >
-                    Újrapróbálkozás
+                    Retry
                   </button>
                 </div>
               )}
@@ -225,8 +225,8 @@ export default function Enable2FA({ isOpen, onClose }) {
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-4 animate-scale-check">
                       <Check className="w-8 h-8 text-green-500" />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-1">Sikeres aktiválás!</h3>
-                    <p className="text-gray-400 text-sm">A 2FA sikeresen be lett kapcsolva</p>
+                    <h3 className="text-xl font-bold text-white mb-1">Activation successful!</h3>
+                    <p className="text-gray-400 text-sm">2FA has been successfully enabled</p>
                   </div>
 
                   {/* Warning Box */}
@@ -235,10 +235,10 @@ export default function Enable2FA({ isOpen, onClose }) {
                       <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-sm text-amber-200 font-semibold mb-1">
-                          Fontos: Mentsd el a visszaállítási kódokat!
+                          Important: Save your recovery codes!
                         </p>
                         <p className="text-xs text-amber-300/80">
-                          Ezekkel tudsz bejelentkezni, ha nincs hozzáférésed az autentikátor alkalmazásodhoz.
+                          You can use these to log in if you lose access to your authenticator app.
                         </p>
                       </div>
                     </div>
@@ -246,7 +246,7 @@ export default function Enable2FA({ isOpen, onClose }) {
 
                   {/* Backup Codes */}
                   <div>
-                    <h4 className="text-white font-semibold mb-3 text-center text-sm">Visszaállítási Kódok</h4>
+                    <h4 className="text-white font-semibold mb-3 text-center text-sm">Recovery Codes</h4>
                     <div className="grid grid-cols-2 gap-2 p-4 bg-black/30 rounded-xl border border-purple-500/20">
                       {backupCodes.map((code, index) => (
                         <div
@@ -266,7 +266,7 @@ export default function Enable2FA({ isOpen, onClose }) {
                       className="w-full py-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 hover:border-purple-500/50 text-purple-300 font-semibold transition-all duration-200 flex items-center justify-center gap-2"
                     >
                       <Download className="w-5 h-5" />
-                      Kódok letöltése (.txt)
+                      Download codes (.txt)
                     </button>
 
                     <button
@@ -274,12 +274,12 @@ export default function Enable2FA({ isOpen, onClose }) {
                       className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:shadow-xl hover:shadow-purple-500/40 hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2"
                     >
                       <Sparkles className="w-5 h-5" />
-                      Kész, bezárás
+                      Done, close
                     </button>
                   </div>
 
                   <p className="text-xs text-gray-500 text-center pt-1">
-                    Minden visszaállítási kód csak egyszer használható fel
+                    Each recovery code can only be used once
                   </p>
                 </div>
               )}
@@ -295,9 +295,9 @@ export default function Enable2FA({ isOpen, onClose }) {
                         1
                       </div>
                       <div>
-                        <h3 className="text-white font-semibold mb-1 text-sm">Telepítsd az alkalmazást</h3>
+                        <h3 className="text-white font-semibold mb-1 text-sm">Install the application</h3>
                         <p className="text-gray-400 text-xs leading-relaxed">
-                          Töltsd le a Google Authenticator, Authy vagy hasonló alkalmazást
+                          Download Google Authenticator, Authy, or a similar app
                         </p>
                       </div>
                     </div>
@@ -308,7 +308,7 @@ export default function Enable2FA({ isOpen, onClose }) {
                         2
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-white font-semibold mb-3 text-sm">Szkenneld be a QR kódot</h3>
+                        <h3 className="text-white font-semibold mb-3 text-sm">Scan the QR code</h3>
                         <div className="flex justify-center p-3 bg-white rounded-xl mb-3 shadow-lg">
                           <img src={qr} alt="2FA QR Code" className="w-40 h-40" />
                         </div>
@@ -316,7 +316,7 @@ export default function Enable2FA({ isOpen, onClose }) {
                         {/* Manual Entry Option */}
                         <details className="group">
                           <summary className="text-xs text-purple-400 hover:text-purple-300 cursor-pointer list-none flex items-center gap-2 transition-colors">
-                            <span>Vagy add meg manuálisan a kódot</span>
+                            <span>Or enter the code manually</span>
                             <svg className="w-3.5 h-3.5 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
@@ -330,7 +330,7 @@ export default function Enable2FA({ isOpen, onClose }) {
                               <button
                                 onClick={handleCopySecret}
                                 className="p-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 transition-all duration-200 hover:scale-105"
-                                title="Másolás"
+                                title="Copy"
                               >
                                 {copiedCode ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                               </button>
@@ -346,7 +346,7 @@ export default function Enable2FA({ isOpen, onClose }) {
                         3
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-white font-semibold mb-3 text-sm">Add meg a 6 jegyű kódot</h3>
+                        <h3 className="text-white font-semibold mb-3 text-sm">Enter the 6-digit code</h3>
                         <form onSubmit={handleVerify}>
                           <div className="relative">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
@@ -390,12 +390,12 @@ export default function Enable2FA({ isOpen, onClose }) {
                             {verifying ? (
                               <>
                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                <span>Ellenőrzés...</span>
+                                <span>Verifying...</span>
                               </>
                             ) : (
                               <>
                                 <Sparkles className="w-5 h-5" />
-                                <span>Aktiválás</span>
+                                <span>Activate</span>
                               </>
                             )}
                           </button>
@@ -410,7 +410,7 @@ export default function Enable2FA({ isOpen, onClose }) {
                       <Smartphone className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
                       <div>
                         <p className="text-xs text-gray-300 leading-relaxed">
-                          <span className="font-semibold text-white">Tipp:</span> Az aktiválás után visszaállítási kódokat kapsz, amelyekkel bejelentkezhetsz, ha elveszíted a telefonodat.
+                          <span className="font-semibold text-white">Tip:</span> After activation, you will receive recovery codes that you can use to log in if you lose your phone.
                         </p>
                       </div>
                     </div>

@@ -402,7 +402,8 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
   const [currentJobId, setCurrentJobId] = useState(null);
   const [selectedJobId, setSelectedJobId] = useState(null);
   const startJob = (kind, title, targetTab) => {
-    const id = `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const randomId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const id = `${kind}-${randomId}`;
     addJob({ id, kind, panelType: 'audio', modelId: selectedModel.id, title, status: 'running', progress: 0, createdAt: Date.now(), updatedAt: Date.now(), errorMessage: null, completedAt: null, seenAt: null, targetTab });
     return id;
   };
@@ -1371,6 +1372,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         if (isDeapiTTS) {
           const formData = new FormData();
           const deapiTtsPayload = {
+            modelId: selectedModel.id,
             apiId: selectedModel.apiId,
             provider: selectedModel.provider,
             model: effectiveDeapiTtsModelSlug,
@@ -1396,6 +1398,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
         } else if (isNvidiaRiva) {
           const lc = rivaLang.toLowerCase().replace(/^(\w+)-(\w+)$/, (_, a, b) => `${a}-${b.toUpperCase()}`);
           body = {
+            modelId: selectedModel.id,
             model: selectedModel.apiModel,
             provider: "nvidia-riva",
             text,
@@ -1404,7 +1407,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
             jobId,
           };
         } else {
-          body = { model: selectedModel.apiModel, provider: selectedModel.provider, text, voice: selectedVoice, speed, format: audioFormat, jobId };
+          body = { modelId: selectedModel.id, model: selectedModel.apiModel, provider: selectedModel.provider, text, voice: selectedVoice, speed, format: audioFormat, jobId };
         }
         if (!isDeapiTTS) {
           headers["Content-Type"] = "application/json";
@@ -1439,6 +1442,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
             ? -1
             : Math.trunc(parsedSeed);
           const deapiPayload = {
+            modelId: selectedModel.id,
             apiId: selectedModel.apiId,
             provider: selectedModel.provider,
             model: deapiModelSlug,
@@ -1466,6 +1470,7 @@ export default function AudioPanel({ selectedModel, onModelChange, userId, getId
           body = formData;
         } else {
           body = {
+            modelId: selectedModel.id,
             apiId: selectedModel.apiId,
             provider: selectedModel.provider,
             prompt: musicPrompt,

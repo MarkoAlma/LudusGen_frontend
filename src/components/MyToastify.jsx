@@ -53,7 +53,7 @@ const MyToastify = ({ err, katt, resetPw, resetSent, kijelentkezes, torles, sign
             showLudusToast({
               type: "error",
               tone: "error",
-              title: "Hiba történt",
+              title: "An error occurred",
               detail: err,
               icon: AlertTriangle,
               autoClose: 1800,
@@ -64,7 +64,7 @@ const MyToastify = ({ err, katt, resetPw, resetSent, kijelentkezes, torles, sign
             }, 50);
         }else if (katt) {
             showLudusToast({
-              title: "Ellenőrizd az emailed",
+              title: "Check your email",
               detail: katt,
               icon: MailCheck,
               autoClose: 3000,
@@ -73,8 +73,8 @@ const MyToastify = ({ err, katt, resetPw, resetSent, kijelentkezes, torles, sign
             setMsg({})
         }else if (kijelentkezes) {
           showLudusToast({
-            title: signIn ? "Sikeres bejelentkezés" : "Sikeres kijelentkezés",
-            detail: signIn ? "Üdv újra a LudusGenben." : kijelentkezes,
+            title: signIn ? "Successful login" : "Successful logout",
+            detail: signIn ? "Welcome back to LudusGen." : kijelentkezes,
             icon: signIn ? CheckCircle2 : LogOut,
             autoClose: signIn ? 2400 : 1600,
             toastId: signIn ? "ludus-sign-in" : "ludus-sign-out",
@@ -82,7 +82,7 @@ const MyToastify = ({ err, katt, resetPw, resetSent, kijelentkezes, torles, sign
           setMsg({})
         }else if (torles) {
           showLudusToast({
-            title: "Törlés kész",
+            title: "Deletion complete",
             detail: torles,
             icon: Trash2,
             autoClose: 2500,
@@ -92,7 +92,7 @@ const MyToastify = ({ err, katt, resetPw, resetSent, kijelentkezes, torles, sign
         }
         else if (resetPw || resetSent) {
             showLudusToast({
-              title: "Email elküldve",
+              title: "Email sent",
               detail: resetPw || resetSent,
               icon: MailCheck,
               autoClose: 2800,
