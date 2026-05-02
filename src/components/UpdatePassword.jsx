@@ -49,7 +49,7 @@ export default function UpdatePassword({ isOpen, onClose }) {
       const user = auth.currentUser;
       
       if (!user || !user.email) {
-        setError('Nem vagy bejelentkezve');
+        setError('You are not logged in');
         setVerifying(false);
         return;
       }
@@ -62,11 +62,11 @@ export default function UpdatePassword({ isOpen, onClose }) {
       } catch (reauthError) {
         console.error('Reauthentication error:', reauthError);
         if (reauthError.code === 'auth/wrong-password' || reauthError.code === 'auth/invalid-credential') {
-          setError('A megadott régi jelszó hibás');
+          setError('The provided old password is incorrect');
         } else if (reauthError.code === 'auth/too-many-requests') {
-          setError('Túl sok sikertelen próbálkozás. Próbáld újra később.');
+          setError('Too many unsuccessful attempts. Try again later.');
         } else {
-          setError('Hitelesítési hiba történt');
+          setError('Authentication error occurred');
         }
         setVerifying(false);
         return;
@@ -89,11 +89,11 @@ export default function UpdatePassword({ isOpen, onClose }) {
     } catch (err) {
       console.error('Password update error:', err);
       if (err.code === 'auth/weak-password') {
-        setError('A jelszó túl gyenge');
+        setError('The password is too weak');
       } else if (err.code === 'auth/requires-recent-login') {
-        setError('A művelethez újra be kell jelentkezned');
+        setError('You need to log in again for this operation');
       } else {
-        setError('Hiba történt a jelszó megváltoztatása során');
+        setError('An error occurred while changing the password');
       }
     } finally {
       setVerifying(false);
@@ -142,10 +142,10 @@ export default function UpdatePassword({ isOpen, onClose }) {
                     <Lock className="w-8 h-8 text-white" />
                   </div>
                   <h2 className="text-3xl font-black text-white mb-2">
-                    Jelszó megváltoztatása
+                    Update Password
                   </h2>
                   <p className="text-gray-400">
-                    Add meg a jelenlegi és az új jelszavadat
+                    Enter your current and new password
                   </p>
                 </div>
 
@@ -153,7 +153,7 @@ export default function UpdatePassword({ isOpen, onClose }) {
                   {/* Régi jelszó */}
                   <div>
                     <label className="block text-sm font-semibold text-purple-300 mb-2">
-                      Jelenlegi jelszó
+                      Current Password
                     </label>
                     <div className="relative">
                       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10">
@@ -181,7 +181,7 @@ export default function UpdatePassword({ isOpen, onClose }) {
                   {/* Új jelszó */}
                   <div>
                     <label className="block text-sm font-semibold text-purple-300 mb-2">
-                      Új jelszó
+                      New Password
                     </label>
                     <div className="relative">
                       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10">
@@ -210,15 +210,15 @@ export default function UpdatePassword({ isOpen, onClose }) {
                       <div className="mt-2 space-y-1 validation-message">
                         <div className={`flex items-center gap-1 text-xs transition-all duration-300 ${passwordValidation.minLength ? 'text-green-400' : 'text-red-400'}`}>
                           {passwordValidation.minLength ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                          <span>Minimum 8 karakter</span>
+                          <span>Minimum 8 characters</span>
                         </div>
                         <div className={`flex items-center gap-1 text-xs transition-all duration-300 ${passwordValidation.hasUpperCase ? 'text-green-400' : 'text-red-400'}`}>
                           {passwordValidation.hasUpperCase ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                          <span>Legalább egy nagybetű</span>
+                          <span>At least one uppercase letter</span>
                         </div>
                         <div className={`flex items-center gap-1 text-xs transition-all duration-300 ${passwordValidation.hasSpecialChar ? 'text-green-400' : 'text-red-400'}`}>
                           {passwordValidation.hasSpecialChar ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                          <span>Legalább egy speciális karakter (!@#$%^&*...)</span>
+                          <span>At least one special character (!@#$%^&*...)</span>
                         </div>
                       </div>
                     )}
@@ -227,7 +227,7 @@ export default function UpdatePassword({ isOpen, onClose }) {
                   {/* Jelszó megerősítése */}
                   <div>
                     <label className="block text-sm font-semibold text-purple-300 mb-2">
-                      Új jelszó megerősítése
+                      Confirm New Password
                     </label>
                     <div className="relative">
                       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10">
@@ -251,7 +251,7 @@ export default function UpdatePassword({ isOpen, onClose }) {
                     {confirmPassword !== '' && !doPasswordsMatch && (
                       <div className="flex items-center gap-1 mt-2 text-xs text-red-400 validation-message">
                         <XCircle className="w-3 h-3" />
-                        <span>A jelszavak nem egyeznek</span>
+                        <span>Passwords do not match</span>
                       </div>
                     )}
                   </div>
@@ -276,12 +276,12 @@ export default function UpdatePassword({ isOpen, onClose }) {
                     {verifying ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Mentés...</span>
+                        <span>Saving...</span>
                       </>
                     ) : (
                       <>
                         <Lock className="w-5 h-5" />
-                        Jelszó mentése
+                        Save Password
                       </>
                     )}
                   </button>
@@ -293,13 +293,13 @@ export default function UpdatePassword({ isOpen, onClose }) {
                   <CheckCircle2 className="w-10 h-10 text-green-400" />
                 </div>
                 <h2 className="text-2xl font-black text-white mb-3">
-                  Sikeres mentés!
+                  Save successful!
                 </h2>
                 <p className="text-gray-400 mb-2">
-                  A jelszavad sikeresen megváltozott.
+                  Your password has been successfully changed.
                 </p>
                 <p className="text-sm text-gray-500">
-                  Bezárás...
+                  Closing...
                 </p>
               </div>
             )}

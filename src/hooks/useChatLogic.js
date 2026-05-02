@@ -696,61 +696,72 @@ export function useChatLogic(selectedModel, userId, getIdToken, onModelChange, i
         const decoder = new TextDecoder();
         let accumulated = "";
         let lastJobProgress = 12;
+        let buffer = "";
+
+        const processSseLine = (line) => {
+          if (!line.startsWith("data: ")) return;
+          const data = line.slice(6).trim();
+          if (!data || data === "[DONE]") return;
+          let parsed;
+          try {
+            parsed = JSON.parse(data);
+          } catch {
+            return;
+          }
+          if (parsed.error) {
+            throw new Error(parsed.error);
+          }
+          if (parsed.retry) {
+            const attemptLabel = parsed.attempt && parsed.maxAttempts ? `${parsed.attempt}/${parsed.maxAttempts}` : "...";
+            const providerLabel = parsed.provider?.includes('gemini')
+              ? 'Gemini'
+              : parsed.provider?.includes('modelscope')
+                ? 'ModelScope'
+                : 'AI provider';
+            const retryProgress = Math.min(60, Math.max(lastJobProgress, 12 + ((parsed.attempt || 1) * 6)));
+            lastJobProgress = retryProgress;
+            updateLiveAssistant(chatJobId, {
+              content: `${providerLabel} hit a temporary rate limit. Retrying... (${attemptLabel})`
+            });
+            updateJob(chatJobId, { progress: retryProgress });
+            return;
+          }
+          if (parsed.summaryStarted) {
+            setIsSummarizing(true);
+            return;
+          }
+          if (parsed.summaryRefreshed) {
+            summaryRefreshed = true;
+            setIsSummarizing(false);
+            return;
+          }
+          accumulated += parsed.delta || "";
+          const visibleContent = stripAssistantThinking(accumulated);
+          const activeRequest = activeChatRequestsRef.current.get(chatJobId);
+          if (activeRequest) activeRequest.accumulated = accumulated;
+          updateLiveAssistant(chatJobId, { content: visibleContent });
+
+          const nextProgress = Math.min(92, 12 + Math.floor(visibleContent.length / 80));
+          if (nextProgress > lastJobProgress) {
+            lastJobProgress = nextProgress;
+            updateJob(chatJobId, { progress: nextProgress });
+          }
+        };
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n");
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
           for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
-              if (data === "[DONE]") continue;
-              let parsed;
-              try {
-                parsed = JSON.parse(data);
-              } catch {
-                continue;
-              }
-              if (parsed.error) {
-                throw new Error(parsed.error);
-              }
-              if (parsed.retry) {
-                const attemptLabel = parsed.attempt && parsed.maxAttempts ? `${parsed.attempt}/${parsed.maxAttempts}` : "...";
-                const providerLabel = parsed.provider?.includes('gemini')
-                  ? 'Gemini'
-                  : parsed.provider?.includes('modelscope')
-                    ? 'ModelScope'
-                    : 'AI provider';
-                const retryProgress = Math.min(60, Math.max(lastJobProgress, 12 + ((parsed.attempt || 1) * 6)));
-                lastJobProgress = retryProgress;
-                updateLiveAssistant(chatJobId, {
-                  content: `${providerLabel} hit a temporary rate limit. Retrying... (${attemptLabel})`
-                });
-                updateJob(chatJobId, { progress: retryProgress });
-                continue;
-              }
-              if (parsed.summaryStarted) {
-                setIsSummarizing(true);
-                continue;
-              }
-              if (parsed.summaryRefreshed) {
-                summaryRefreshed = true;
-                setIsSummarizing(false);
-                continue;
-              }
-              accumulated += parsed.delta || "";
-              const visibleContent = stripAssistantThinking(accumulated);
-              const activeRequest = activeChatRequestsRef.current.get(chatJobId);
-              if (activeRequest) activeRequest.accumulated = accumulated;
-              updateLiveAssistant(chatJobId, { content: visibleContent });
-
-              const nextProgress = Math.min(92, 12 + Math.floor(visibleContent.length / 80));
-              if (nextProgress > lastJobProgress) {
-                lastJobProgress = nextProgress;
-                updateJob(chatJobId, { progress: nextProgress });
-              }
-            }
+            processSseLine(line);
+          }
+        }
+        buffer += decoder.decode();
+        if (buffer) {
+          for (const line of buffer.split("\n")) {
+            processSseLine(line);
           }
         }
 

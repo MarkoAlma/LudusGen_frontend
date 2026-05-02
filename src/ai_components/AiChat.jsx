@@ -139,8 +139,14 @@ export default function AIChat({ user, getIdToken }) {
   }, [searchParams, resolveTargetModel, selectedAI, isStudioMobile, setStudioPanelOpen, setStudioPanelsOpen]);
 
   const selectedModel = getModel(selectedAI) || ALL_MODELS[0];
-  activeChatSessionIdRef.current = activeChatSessionId;
-  activePanelTypeRef.current = selectedModel?.panelType || null;
+
+  useEffect(() => {
+    activeChatSessionIdRef.current = activeChatSessionId;
+  }, [activeChatSessionId]);
+
+  useEffect(() => {
+    activePanelTypeRef.current = selectedModel?.panelType || null;
+  }, [selectedModel?.panelType]);
 
   const handleActiveMediaJobChange = useCallback((job) => {
     activeMediaJobRef.current = job || null;
