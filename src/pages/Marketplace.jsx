@@ -326,11 +326,11 @@ function AssetPreview({ asset, large = false, user = null }) {
   if (asset.previewUrl && asset.type === 'image') {
     if (large) {
       return (
-        <div className="flex w-full items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+        <div className="flex w-full items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-2 sm:p-0">
           <img
             src={asset.previewUrl}
             alt={asset.title}
-            className="h-auto max-h-[calc(95vh-4rem)] max-w-full object-contain"
+            className="h-auto max-h-[52svh] max-w-full object-contain sm:max-h-[calc(95vh-4rem)]"
           />
         </div>
       );
@@ -462,7 +462,7 @@ function AssetCard({ asset, onOpen }) {
         <div className="flex flex-1 flex-col gap-4 p-3 sm:p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="truncate text-base font-black italic tracking-tighter text-white sm:text-lg">{asset.title}</h3>
+              <h3 className="truncate pr-2 text-base font-black italic tracking-tighter text-white sm:text-lg">{asset.title}</h3>
               <p className="mt-0.5 truncate text-[11px] font-black uppercase tracking-[0.2em] text-gray-500">{asset.ownerName}</p>
             </div>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-primary backdrop-blur-md transition-colors group-hover:bg-primary group-hover:text-white sm:h-10 sm:w-10">
@@ -750,6 +750,17 @@ function MarketplaceSelect({ icon: Icon, value, onChange, options = [], label })
 }
 
 function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDelete, onReport, busy, user }) {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   if (!asset) return null;
   const isOwner = user?.uid === asset.ownerId;
   const canDownload = asset.owned || isOwner;
@@ -758,7 +769,7 @@ function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDe
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center overflow-x-hidden px-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] pt-[calc(env(safe-area-inset-top,0px)+4.25rem)] sm:p-4">
           <MotionDiv
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -771,87 +782,78 @@ function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDe
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 40 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="glass-panel relative max-h-[95vh] w-full max-w-5xl overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)]"
+            className="glass-panel relative max-h-[calc(100svh-5.25rem)] w-[calc(100vw-1.5rem)] max-w-5xl overflow-x-hidden overflow-y-auto overscroll-contain shadow-[0_40px_100px_rgba(0,0,0,0.8)] sm:w-full lg:max-h-[95vh] lg:overflow-hidden"
           >
             {/* Modal Header/Close */}
-            <div className="absolute right-6 top-6 z-20">
+            <div className="absolute right-3 top-3 z-20 sm:right-6 sm:top-6">
               <motion.button
                 whileHover={{ scale: 1.1, rotate: 90 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={onClose}
-                className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-black/40 text-white/70 backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/60 text-white/75 backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white sm:h-12 sm:w-12 sm:rounded-2xl"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
               </motion.button>
             </div>
 
-            <div className="grid h-full max-h-[95vh] lg:grid-cols-[1fr_400px]">
+            <div className="grid min-w-0 lg:h-full lg:max-h-[95vh] lg:grid-cols-[1fr_400px]">
               {/* Left Side: Preview */}
-              <div className="relative flex min-h-[400px] items-center justify-center bg-black/40 p-8 lg:min-h-0">
+              <div className="relative flex min-h-0 min-w-0 items-center justify-center bg-black/40 p-3 sm:p-5 lg:p-8">
                 <div className="absolute inset-0 overflow-hidden">
                    <div className="absolute -top-1/4 -left-1/4 w-full h-full bg-primary/10 blur-[120px] animate-pulse" />
                    <div className="absolute -bottom-1/4 -right-1/4 w-full h-full bg-secondary/10 blur-[120px] animate-pulse" />
                 </div>
-                <div className="relative z-10 w-full">
+                <div className="relative z-10 min-w-0 w-full">
                    <AssetPreview asset={asset} large user={user} />
                 </div>
               </div>
 
               {/* Right Side: Details */}
-              <div className="flex flex-col border-l border-white/10 bg-[#0c0c0e]/80 p-8 pt-12 backdrop-blur-xl overflow-y-auto">
-                <div className="mb-8">
-                  <div className="mb-4 flex flex-wrap gap-2">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+              <div className="flex min-w-0 flex-col border-t border-white/10 bg-[#0c0c0e]/90 p-5 pt-6 backdrop-blur-xl lg:overflow-y-auto lg:border-l lg:border-t-0 lg:p-8 lg:pt-12">
+                <div className="mb-5 lg:mb-8">
+                  <div className="mb-3 flex flex-wrap gap-2 lg:mb-4">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-primary sm:px-4 sm:text-[10px]">
                       <ShoppingBag className="h-3.5 w-3.5" />
                       Marketplace
                     </span>
                     {asset.owned && (
-                      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300 sm:px-4 sm:text-[10px]">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         In your library
                       </span>
                     )}
                   </div>
-                  <h2 className="text-4xl font-black italic tracking-tighter text-white leading-tight">{asset.title}</h2>
-                  <p className="mt-6 text-sm font-bold leading-relaxed text-gray-400">{asset.description || 'No description provided.'}</p>
+                  <h2 className="min-w-0 break-words pr-10 text-2xl font-black italic leading-tight tracking-tighter text-white sm:text-3xl lg:pr-4 lg:text-4xl">{asset.title}</h2>
+                  <p className="mt-3 text-sm font-bold leading-relaxed text-gray-400 lg:mt-6">{asset.description || 'No description provided.'}</p>
                   {imageResolution && (
-                    <div className="mt-4 inline-flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-black text-white">
-                      <ImageIcon className="h-4 w-4 text-primary" />
-                      <span className="uppercase tracking-[0.22em] text-gray-500">Original resolution</span>
-                      <span>{imageResolution}</span>
+                    <div className="mt-4 flex max-w-full min-w-0 flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-[11px] font-black text-white sm:inline-flex sm:gap-3 sm:px-4 sm:py-3 sm:text-xs">
+                      <ImageIcon className="h-4 w-4 shrink-0 text-primary" />
+                      <span className="min-w-0 break-words uppercase leading-relaxed tracking-[0.12em] text-gray-500 sm:tracking-[0.22em]">Original resolution</span>
+                      <span className="min-w-0 break-words">{imageResolution}</span>
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Price</p>
-                      <div className="mt-3 flex items-center gap-2">
-                        <Coins className="h-5 w-5 text-primary" />
-                        <p className="text-2xl font-black text-white">{formatCredits(asset.priceCredits)}</p>
-                      </div>
-                    </div>
-                    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Sold</p>
-                      <p className="mt-3 text-2xl font-black text-white">{asset.metrics?.purchaseCount || 0}</p>
-                    </div>
+                <div className="space-y-3 lg:space-y-4">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 lg:rounded-3xl lg:p-5">
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 lg:tracking-[0.3em]">Sold</p>
+                    <p className="mt-2 text-xl font-black text-white lg:mt-3 lg:text-2xl">{asset.metrics?.purchaseCount || 0}</p>
                   </div>
 
-                  <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 lg:rounded-3xl lg:p-5">
                     <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-black/40 shadow-inner">
-                        <User className="h-6 w-6 text-primary" />
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-black/40 shadow-inner lg:h-12 lg:w-12">
+                        <User className="h-5 w-5 text-primary lg:h-6 lg:w-6" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Creator</p>
-                        <p className="truncate text-lg font-black text-white">{asset.ownerName}</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 lg:tracking-[0.3em]">Creator</p>
+                        <p className="truncate text-base font-black text-white lg:text-lg">{asset.ownerName}</p>
                       </div>
                     </div>
                   </div>
 
                   {asset.type === '3d' && (
-                    <div className={`rounded-3xl border p-5 ${
+                    <div className={`rounded-2xl border p-4 lg:rounded-3xl lg:p-5 ${
                       asset.downloadOnly
                         ? 'border-amber-400/20 bg-amber-400/5 text-amber-200'
                         : 'border-cyan-400/20 bg-cyan-400/5 text-cyan-200'
@@ -864,7 +866,7 @@ function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDe
                   )}
                 </div>
 
-                <div className="mt-auto pt-10 flex flex-col gap-4">
+                <div className="mt-6 flex flex-col gap-3 pt-0 lg:mt-auto lg:gap-4 lg:pt-10">
                   <Button
                     variant="subtle"
                     onClick={() => onReport(asset)}
@@ -910,7 +912,7 @@ function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDe
                       className="w-full text-base"
                     >
                       <ShoppingBag className="h-5 w-5" />
-                      Buy now
+                      {formatCredits(asset.priceCredits)}
                     </Button>
                   )}
                 </div>
@@ -1968,7 +1970,7 @@ export default function Marketplace() {
   );
 
   return (
-    <main className="min-h-screen bg-[#03000a] text-white">
+    <main className="min-h-screen overflow-x-hidden bg-[#03000a] text-white">
       {/* Hero Section with Cinematic Background */}
       <section className="relative overflow-hidden pt-32 pb-24 md:pt-48 md:pb-40">
         <div className="absolute inset-0 z-0">
@@ -1993,9 +1995,9 @@ export default function Marketplace() {
               <Sparkles className="h-4 w-4 animate-pulse" />
               Next-Gen Asset Marketplace
             </div>
-            <h1 className="text-6xl font-black italic tracking-tighter text-white sm:text-7xl lg:text-8xl leading-[0.9]">
+            <h1 className="max-w-full text-4xl font-black italic leading-[0.9] tracking-tighter text-white sm:text-7xl lg:text-8xl">
                TURN <br/>
-               <span className="text-gradient-primary">IMAGINATION</span> INTO REALITY.
+               <span className="text-gradient-primary pr-4">IMAGINATION</span> <br className="sm:hidden" /> INTO REALITY.
             </h1>
             <p className="mt-8 max-w-2xl text-lg font-bold leading-relaxed text-gray-300 md:text-xl">
                Discover premium AI assets created by the LudusGen community.
@@ -2011,17 +2013,6 @@ export default function Marketplace() {
                  <UploadCloud className="h-5 w-5" />
                  Upload asset
                </Button>
-               <div className="flex items-center gap-6 px-6">
-                  <div className="text-center">
-                     <p className="text-2xl font-black italic tracking-tighter text-white">{assets.length}+</p>
-                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Asset</p>
-                  </div>
-                  <div className="h-8 w-px bg-white/10" />
-                  <div className="text-center">
-                     <p className="text-2xl font-black italic tracking-tighter text-white">2.4k</p>
-                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Purchases</p>
-                  </div>
-               </div>
             </div>
           </motion.div>
         </div>

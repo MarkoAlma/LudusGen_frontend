@@ -15,7 +15,7 @@ import {
   Check, Copy, Sparkles, Bot, User, Reply, Trash2, Flag,
   Hash, TrendingUp, Star, Heart, Smile, Lock, CheckCircle,
   AlertCircle, Award, Edit3, X, BarChart2, RefreshCw,
-  ArrowUp, Zap, AtSign, Bold, Italic, Code,
+  Zap, AtSign, Bold, Italic, Code,
   List, Quote, ChevronRight, Image, Music, Box,
   PenSquare, Shield, Search, Rss, Link, Unlock,
 } from "lucide-react";
@@ -670,24 +670,6 @@ const ReadingProgress = ({ color }) => {
   );
 };
 
-// ─── Scroll to top ────────────────────────────────────────────────
-const ScrollToTop = () => {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const h = () => setVisible(window.scrollY > 400);
-    window.addEventListener("scroll", h);
-    return () => window.removeEventListener("scroll", h);
-  }, []);
-  if (!visible) return null;
-  return (
-    <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-      className="cursor-pointer fixed bottom-6 right-6 z-40 w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-all hover:scale-110 active:scale-95"
-      style={{ background: "#13111c", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
-      <ArrowUp className="w-4 h-4" />
-    </button>
-  );
-};
-
 // ─── Table of Contents ────────────────────────────────────────────
 const TableOfContents = ({ content, color }) => {
   const headings = content?.split("\n").filter(l => l.startsWith("## ")).map(l => l.slice(3)) || [];
@@ -961,6 +943,21 @@ export default function ForumPost({
   const [commentAuthorProfiles, setCommentAuthorProfiles] = useState({});
   const [mobilePostSidebarOpen, setMobilePostSidebarOpen] = useState(false);
   const [showPostReport, setShowPostReport] = useState(false);
+
+  useEffect(() => {
+    if (!mobilePostSidebarOpen) return undefined;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [mobilePostSidebarOpen]);
 
 
   const { user: globalUser, setIsAuthOpen } = useContext(MyUserContext);
@@ -1521,8 +1518,6 @@ export default function ForumPost({
       <div className="relative z-10 w-full">
 
         <ReadingProgress color={color} />
-        <ScrollToTop />
-
         {/* Profile modal */}
         <UserProfileModal
           isOpen={showProfile}
@@ -1925,24 +1920,28 @@ export default function ForumPost({
               )}
             </div>
 
-            {/* Mobile Post Sidebar Toggle */}
-            <button
-              onClick={() => setMobilePostSidebarOpen(true)}
-              className="lg:hidden fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all hover:scale-110 active:scale-95"
-              style={{ background: "linear-gradient(135deg, #7c3aed, #4c1d95)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 8px 32px rgba(124,58,237,0.4)" }}
-            >
-              <List className="w-5 h-5" />
-            </button>
+            {createPortal(
+              <>
+                {/* Mobile Post Sidebar Toggle */}
+                {!mobilePostSidebarOpen && (
+                  <button
+                    onClick={() => setMobilePostSidebarOpen(true)}
+                    className="lg:hidden fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all hover:scale-110 active:scale-95"
+                    style={{ background: "linear-gradient(135deg, #7c3aed, #4c1d95)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 8px 32px rgba(124,58,237,0.4)" }}
+                  >
+                    <List className="w-5 h-5" />
+                  </button>
+                )}
 
-            {/* Mobile Post Sidebar Overlay */}
-            <AnimatePresence>
+                {/* Mobile Post Sidebar Overlay */}
+                <AnimatePresence>
               {mobilePostSidebarOpen && (
                 <>
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+                    className="lg:hidden fixed inset-0 z-[1000] bg-[#03000a]/85 backdrop-blur-md"
                     onClick={() => setMobilePostSidebarOpen(false)}
                   />
                   <motion.div
@@ -1950,7 +1949,7 @@ export default function ForumPost({
                     animate={{ x: 0 }}
                     exit={{ x: "100%" }}
                     transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                    className="lg:hidden fixed right-0 top-0 bottom-0 z-50 w-80 max-w-[85vw] overflow-y-auto p-4"
+                    className="lg:hidden fixed right-0 top-0 z-[1001] h-[100dvh] max-h-[100dvh] w-80 max-w-[85vw] overflow-y-auto overscroll-contain p-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]"
                     style={{ background: "#0a0814", borderLeft: "1px solid rgba(255,255,255,0.08)" }}
                     onClick={e => e.stopPropagation()}
                   >
@@ -2069,7 +2068,10 @@ export default function ForumPost({
                   </motion.div>
                 </>
               )}
-            </AnimatePresence>
+                </AnimatePresence>
+              </>,
+              document.body
+            )}
           </div>
         </motion.div>
       </div>

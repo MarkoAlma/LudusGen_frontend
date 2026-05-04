@@ -9,8 +9,12 @@ import CTABanner from '../components/home/CTABanner';
 export default function Home() {
   return (
     <div className="flex flex-col bg-[#03000a]">
-       <Hero />
-       <TrustStrip />
+       <div className="relative">
+         <Hero />
+         <div className="sm:absolute sm:inset-x-0 sm:bottom-4 sm:z-20 md:static lg:absolute lg:bottom-6">
+           <TrustStrip />
+         </div>
+       </div>
        <FeaturesGrid />
        <ToolsPreview />
        <Pricing />
