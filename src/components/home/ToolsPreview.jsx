@@ -14,6 +14,7 @@ import ChatStudioBG from '../../assets/ludusgen_jvubFciJtA0Fw42FoJ0N.avif';
 export default function ToolsPreview() {
   const [activeTab, setActiveTab] = useState(0);
 
+
   const tools = [
     {
       id: 'chat',
@@ -85,11 +86,10 @@ export default function ToolsPreview() {
                 <button
                   key={tool.id}
                   onClick={() => setActiveTab(i)}
-                  className={`group relative p-8 rounded-[2.5rem] text-left transition-all duration-500 border overflow-hidden ${
-                    isActive
+                  className={`group relative p-8 rounded-[2.5rem] text-left transition-all duration-500 border overflow-hidden ${isActive
                       ? 'bg-white/[0.03] border-white/10 shadow-2xl'
                       : 'bg-transparent border-transparent hover:bg-white/[0.02]'
-                  }`}
+                    }`}
                 >
                   {isActive && (
                     <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
