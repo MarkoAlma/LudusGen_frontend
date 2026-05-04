@@ -192,6 +192,9 @@ function getMarketplaceModelFileName(asset) {
 
 function MarketplaceModelPreview({ asset, user }) {
   const [previewState, setPreviewState] = useState({ assetId: '', modelUrl: '', error: '' });
+  // Track active blob URL in a ref — cleanup always revokes the correct URL,
+  // even when asset.id changes before the async state update arrives.
+  const activeBlobUrlRef = useRef('');
   const canLoadModel = Boolean(user?.uid && (asset?.owned || asset?.ownerId === user.uid));
   const modelFileName = getMarketplaceModelFileName(asset);
   const currentPreview = previewState.assetId === asset?.id
@@ -205,7 +208,12 @@ function MarketplaceModelPreview({ asset, user }) {
     }
 
     let cancelled = false;
-    let objectUrl = '';
+
+    // Revoke the previous asset's blob before starting the new fetch
+    if (activeBlobUrlRef.current) {
+      URL.revokeObjectURL(activeBlobUrlRef.current);
+      activeBlobUrlRef.current = '';
+    }
 
     (async () => {
       const token = await getToken();
@@ -231,12 +239,13 @@ function MarketplaceModelPreview({ asset, user }) {
       }
 
       const blob = await res.blob();
-      objectUrl = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(blob);
       if (cancelled) {
         URL.revokeObjectURL(objectUrl);
         return;
       }
 
+      activeBlobUrlRef.current = objectUrl;
       setPreviewState({
         assetId: asset.id,
         modelUrl: `${objectUrl}#${encodeURIComponent(modelFileName)}`,
@@ -253,7 +262,11 @@ function MarketplaceModelPreview({ asset, user }) {
 
     return () => {
       cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      // Revoke via ref — correct even if asset changes before state update lands
+      if (activeBlobUrlRef.current) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+        activeBlobUrlRef.current = '';
+      }
     };
   }, [asset?.id, asset?.modelPreviewUrl, asset?.modelUrl, asset?.owned, asset?.ownerId, asset?.type, canLoadModel, modelFileName]);
 
@@ -373,6 +386,24 @@ function AssetPreview({ asset, large = false, user = null }) {
 
   if (asset.type === '3d' && large) {
     return <MarketplaceModelPreview asset={asset} user={user} />;
+  }
+
+  // 3D card (not large) with a real preview image from Tripo
+  if (asset.previewUrl && asset.type === '3d' && !large) {
+    return (
+      <div className={`${previewClass} relative overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
+        <img
+          src={asset.previewUrl}
+          alt={asset.title}
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+        />
+        {/* 3D badge */}
+        <div className="pointer-events-none absolute bottom-2.5 right-2.5 flex items-center gap-1.5 rounded-xl border border-cyan-400/20 bg-black/60 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-cyan-300 backdrop-blur-md">
+          <Box className="h-3 w-3" />
+          3D
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -983,7 +1014,9 @@ function ReportAssetModal({ asset, isOpen, onClose, onConfirm, busy }) {
 
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setReason('');
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDetails('');
     }
   }, [isOpen]);
@@ -1065,6 +1098,13 @@ function ReportAssetModal({ asset, isOpen, onClose, onConfirm, busy }) {
   );
 }
 
+function formatFileSize(bytes) {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
   const [sourceMode, setSourceMode] = useState('upload');
   const [assetType, setAssetType] = useState('image');
@@ -1074,6 +1114,8 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
   const [tags, setTags] = useState('');
   const [file, setFile] = useState(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState('');
+  const [glbPreviewUrl, setGlbPreviewUrl] = useState('');
+  const [dragActive, setDragActive] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const [historyItems, setHistoryItems] = useState([]);
   const [selectedHistoryId, setSelectedHistoryId] = useState('');
@@ -1094,6 +1136,8 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
     setTags('');
     setFile(null);
     setUploadResult(null);
+    setGlbPreviewUrl('');
+    setDragActive(false);
     setHistoryItems([]);
     setSelectedHistoryId('');
     setRightsAccepted(false);
@@ -1103,18 +1147,47 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
     if (!isOpen) return;
     setUploadResult(null);
     setFile(null);
+    setGlbPreviewUrl('');
   }, [assetType, isOpen]);
 
+  // Image preview
   useEffect(() => {
     if (!isOpen || assetType !== 'image' || !file || !String(file.type || '').startsWith('image/')) {
       setFilePreviewUrl('');
       return undefined;
     }
-
     const url = URL.createObjectURL(file);
     setFilePreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [assetType, file, isOpen]);
+
+  // GLB preview — create an object URL for the 3D viewer
+  useEffect(() => {
+    if (!isOpen || assetType !== '3d' || !file) {
+      setGlbPreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return ''; });
+      return undefined;
+    }
+    const url = URL.createObjectURL(file);
+    setGlbPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [assetType, file, isOpen]);
+
+  const handleDrop = useCallback((event) => {
+    event.preventDefault();
+    setDragActive(false);
+    const dropped = event.dataTransfer?.files?.[0];
+    if (dropped) {
+      setFile(dropped);
+      setUploadResult(null);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((event) => {
+    event.preventDefault();
+    setDragActive(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => setDragActive(false), []);
 
   const loadHistory = useCallback(async () => {
     if (!user) {
@@ -1363,7 +1436,7 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
                   </div>
 
                   {sourceMode === 'upload' ? (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-4"
@@ -1372,19 +1445,29 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
                         ref={fileRef}
                         type="file"
                         className="hidden"
-                        accept={assetType === 'image' ? 'image/*' : assetType === 'audio' ? 'audio/*' : '.glb,.gltf,.fbx,.obj,.stl'}
+                        accept={assetType === 'image' ? 'image/*' : assetType === 'audio' ? 'audio/*' : '.glb,.fbx,.obj,.stl'}
                         onChange={(event) => {
                           setFile(event.target.files?.[0] || null);
                           setUploadResult(null);
                         }}
                       />
+
+                      {/* Drop zone */}
                       <motion.button
-                        whileHover={{ borderColor: 'rgba(138,43,226,0.4)', backgroundColor: 'rgba(255,255,255,0.04)' }}
                         type="button"
                         onClick={() => fileRef.current?.click()}
-                        className="relative flex min-h-[220px] w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-3xl border-2 border-dashed border-white/10 bg-white/[0.02] text-center transition-all"
+                        onDrop={handleDrop}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        animate={dragActive
+                          ? { borderColor: 'rgba(138,43,226,0.7)', backgroundColor: 'rgba(138,43,226,0.06)', scale: 1.01 }
+                          : { borderColor: 'rgba(255,255,255,0.10)', backgroundColor: 'rgba(255,255,255,0.02)', scale: 1 }
+                        }
+                        transition={{ duration: 0.15 }}
+                        className="relative flex min-h-[220px] w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-3xl border-2 border-dashed text-center transition-colors"
                       >
-                        {filePreviewUrl ? (
+                        {/* Image preview */}
+                        {assetType === 'image' && filePreviewUrl && (
                           <>
                             <div className="absolute inset-2 overflow-hidden rounded-[1.35rem] bg-black/45">
                               <img src={filePreviewUrl} alt="" className="h-full w-full object-contain" />
@@ -1397,32 +1480,88 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
                               <UploadCloud className="h-5 w-5" />
                             </div>
                           </>
-                        ) : (
+                        )}
+
+                        {/* GLB 3D preview */}
+                        {assetType === '3d' && glbPreviewUrl && (
                           <>
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20 text-primary">
-                           <UploadCloud className="h-7 w-7" />
-                        </div>
-                        <div>
-                           <p className="text-sm font-black text-white">{file ? file.name : 'Select file'}</p>
-                           <p className="mt-1 text-[10px] font-bold text-gray-500">
-                             {assetType === '3d' ? 'GLB, GLTF, FBX, OBJ, STL' : assetType === 'audio' ? 'MP3, WAV, OGG, FLAC' : 'PNG, JPG, WEBP, GIF'}
-                           </p>
-                        </div>
+                            <div className="absolute inset-2 overflow-hidden rounded-[1.35rem] pointer-events-none">
+                              <ThreeViewer
+                                key={glbPreviewUrl}
+                                modelUrl={glbPreviewUrl}
+                                viewMode="normal"
+                                lightMode="studio"
+                                color="#8a2be2"
+                                autoSpin
+                                bgColor="default"
+                                showGrid
+                                gridColor1="#18334a"
+                                gridColor2="#0d1425"
+                              />
+                            </div>
+                            <div className="absolute left-4 top-4 z-10 rounded-xl border border-white/10 bg-black/65 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white backdrop-blur-md">
+                              3D Preview
+                            </div>
+                            <div className="absolute bottom-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/65 text-primary backdrop-blur-md">
+                              <UploadCloud className="h-5 w-5" />
+                            </div>
+                          </>
+                        )}
+
+                        {/* Default state (no preview) */}
+                        {!(assetType === 'image' && filePreviewUrl) && !(assetType === '3d' && glbPreviewUrl) && (
+                          <>
+                            <div className={`flex h-14 w-14 items-center justify-center rounded-2xl transition-colors ${
+                              dragActive ? 'bg-primary/30 text-primary' : 'bg-primary/20 text-primary'
+                            }`}>
+                              <UploadCloud className="h-7 w-7" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-black text-white">
+                                {file ? file.name : dragActive ? 'Drop it here!' : 'Select or drag a file'}
+                              </p>
+                              <p className="mt-1 text-[10px] font-bold text-gray-500">
+                                {assetType === '3d' ? 'GLB, FBX, OBJ, STL' : assetType === 'audio' ? 'MP3, WAV, OGG, FLAC' : 'PNG, JPG, WEBP, GIF'}
+                              </p>
+                            </div>
                           </>
                         )}
                       </motion.button>
 
-                      {assetType === '3d' && uploadResult?.tripo && (
-                        <div className={`rounded-2xl border p-4 text-xs font-bold leading-relaxed ${
-                          uploadResult.tripo.compatible
-                            ? 'border-cyan-400/20 bg-cyan-400/10 text-cyan-200'
-                            : 'border-amber-400/20 bg-amber-400/10 text-amber-200'
-                        }`}>
-                          {uploadResult.tripo.compatible
-                            ? 'Tripo compatibility confirmed. This asset will be marked as Studio-ready.'
-                            : 'This asset will be available as download-only.'}
+                      {/* File info row */}
+                      {file && (
+                        <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.02] px-4 py-3 text-xs font-bold">
+                          <span className="min-w-0 truncate text-white/80" title={file.name}>{file.name}</span>
+                          <span className="ml-3 shrink-0 font-black text-gray-500">{formatFileSize(file.size)}</span>
                         </div>
                       )}
+
+                      {/* Tripo compatibility status */}
+                      {assetType === '3d' && uploadResult?.tripo && (() => {
+                        const { compatible, importStatus } = uploadResult.tripo;
+                        if (compatible) {
+                          return (
+                            <div className="flex items-center gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-xs font-bold text-cyan-200">
+                              <BadgeCheck className="h-4 w-4 shrink-0" />
+                              Tripo compatibility confirmed. This asset will be marked as Studio-ready.
+                            </div>
+                          );
+                        }
+                        if (importStatus === 'pending') {
+                          return (
+                            <div className="flex items-center gap-3 rounded-2xl border border-purple-400/20 bg-purple-400/10 p-4 text-xs font-bold text-purple-200">
+                              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                              Checking Tripo compatibility… This may take a moment.
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="flex items-center gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-xs font-bold text-amber-200">
+                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                            This asset will be published as download-only (not Tripo-compatible).
+                          </div>
+                        );
+                      })()}
                     </motion.div>
                   ) : (
                     <motion.div 
@@ -1444,27 +1583,43 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
                           <div className="rounded-2xl border border-white/5 bg-black/20 p-6 text-center">
                             <p className="text-xs font-bold text-gray-600">No history items available.</p>
                           </div>
-                        ) : historyItems.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedHistoryId(item.id);
-                              if (!title.trim()) setTitle(item.title);
-                            }}
-                            className={`flex w-full items-center gap-4 rounded-2xl border p-3 text-left transition-all ${
-                              selectedHistoryId === item.id
-                                ? 'border-primary/50 bg-primary/10 shadow-[0_0_15px_rgba(138,43,226,0.1)]'
-                                : 'border-white/5 bg-white/[0.02] hover:border-white/20'
-                            }`}
-                          >
-                            <MarketplaceHistoryThumb item={item} assetType={assetType} />
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-black text-white">{item.title}</p>
-                              <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 mt-0.5">{item.subtitle || item.collection}</p>
-                            </div>
-                          </button>
-                        ))}
+                        ) : historyItems.map((item) => {
+                          const isLocked = Boolean(item.locked);
+                          const isSelected = selectedHistoryId === item.id;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              disabled={isLocked}
+                              onClick={() => {
+                                if (isLocked) return;
+                                setSelectedHistoryId(item.id);
+                                if (!title.trim()) setTitle(item.title);
+                              }}
+                              className={`relative flex w-full items-center gap-4 rounded-2xl border p-3 text-left transition-all ${
+                                isLocked
+                                  ? 'cursor-not-allowed border-white/5 bg-white/[0.01] opacity-50'
+                                  : isSelected
+                                    ? 'border-primary/50 bg-primary/10 shadow-[0_0_15px_rgba(138,43,226,0.1)]'
+                                    : 'border-white/5 bg-white/[0.02] hover:border-white/20'
+                              }`}
+                            >
+                              <MarketplaceHistoryThumb item={item} assetType={assetType} />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-black text-white">{item.title}</p>
+                                <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 mt-0.5">{item.subtitle || item.collection}</p>
+                              </div>
+                              {isLocked && (
+                                <span className="shrink-0 rounded-lg border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-amber-400">
+                                  Listed
+                                </span>
+                              )}
+                              {isSelected && !isLocked && (
+                                <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     </motion.div>
                   )}
@@ -1785,10 +1940,12 @@ export default function Marketplace() {
     try {
       const requestViewerId = viewerId;
       if (getCurrentViewerId() !== requestViewerId) return;
+      const token = await getToken();
       const res = await fetch(`${API_BASE}/api/marketplace/assets/${assetId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (getCurrentViewerId() !== requestViewerId) return;
+      const data = await res.json();
       if (res.ok && data.success) {
         const hydratedAsset = hydrateAssetForViewer(
           data.asset,

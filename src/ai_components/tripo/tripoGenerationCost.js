@@ -34,6 +34,7 @@ export function estimateTripoPanelGenerationCost(options = {}, modeCost = DEFAUL
     meshQ,
     inParts = false,
     batchImageCount = 1,
+    animCount = 1,
   } = options;
 
   if (mode === "texture") {
@@ -53,7 +54,11 @@ export function estimateTripoPanelGenerationCost(options = {}, modeCost = DEFAUL
     }
     return modeCost[multiviewImageMode] ?? 10;
   }
-  if (mode !== "generate") return modeCost[mode] ?? 10;
+  if (mode !== "generate") {
+    const flat = modeCost[mode] ?? 10;
+    // animate_retarget is charged per selected animation clip
+    return mode === "animate" ? flat * Math.max(1, getPositiveCount(animCount)) : flat;
+  }
 
   const type = genTab === "text" ? "text_to_model" : genTab === "multi" ? "multiview_to_model" : "image_to_model";
   const effectiveVer = modelVer;
