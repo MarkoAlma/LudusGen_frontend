@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   defaultParams,
   fetchGlbAsBlob,
@@ -7,7 +7,7 @@ import {
   loadHistoryPageFromFirestore,
 } from '../ai_components/trellis/utils';
 import { TRELLIS_ENHANCE_PROMPT, TRELLIS_SIMPLIFY_PROMPT } from '../ai_components/trellis/Constants';
-import { enhancePrompt } from '../api/client';
+import { API_BASE } from '../api/client';
 
 export function useTrellisLogic(userId, getIdToken) {
   const [prompt, setPrompt] = useState("");
@@ -44,6 +44,11 @@ export function useTrellisLogic(userId, getIdToken) {
      };
      localStorage.setItem('trellis_custom_preset', JSON.stringify(preset));
      setCustomPreset(preset);
+   }, []);
+
+   const handleDeleteCustomPreset = useCallback(() => {
+     localStorage.removeItem('trellis_custom_preset');
+     setCustomPreset(null);
    }, []);
 
   const authHeaders = useCallback(async () => {
@@ -223,6 +228,7 @@ export function useTrellisLogic(userId, getIdToken) {
     handleEnhance,
     handleDechant,
     customPreset,
-    handleSaveCustomPreset
+    handleSaveCustomPreset,
+    handleDeleteCustomPreset,
   };
 }

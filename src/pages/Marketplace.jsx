@@ -192,6 +192,9 @@ function getMarketplaceModelFileName(asset) {
 
 function MarketplaceModelPreview({ asset, user }) {
   const [previewState, setPreviewState] = useState({ assetId: '', modelUrl: '', error: '' });
+  // Track active blob URL in a ref — cleanup always revokes the correct URL,
+  // even when asset.id changes before the async state update arrives.
+  const activeBlobUrlRef = useRef('');
   const canLoadModel = Boolean(user?.uid && (asset?.owned || asset?.ownerId === user.uid));
   const modelFileName = getMarketplaceModelFileName(asset);
   const currentPreview = previewState.assetId === asset?.id
@@ -205,7 +208,12 @@ function MarketplaceModelPreview({ asset, user }) {
     }
 
     let cancelled = false;
-    let objectUrl = '';
+
+    // Revoke the previous asset's blob before starting the new fetch
+    if (activeBlobUrlRef.current) {
+      URL.revokeObjectURL(activeBlobUrlRef.current);
+      activeBlobUrlRef.current = '';
+    }
 
     (async () => {
       const token = await getToken();
@@ -231,12 +239,13 @@ function MarketplaceModelPreview({ asset, user }) {
       }
 
       const blob = await res.blob();
-      objectUrl = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(blob);
       if (cancelled) {
         URL.revokeObjectURL(objectUrl);
         return;
       }
 
+      activeBlobUrlRef.current = objectUrl;
       setPreviewState({
         assetId: asset.id,
         modelUrl: `${objectUrl}#${encodeURIComponent(modelFileName)}`,
@@ -253,7 +262,11 @@ function MarketplaceModelPreview({ asset, user }) {
 
     return () => {
       cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      // Revoke via ref — correct even if asset changes before state update lands
+      if (activeBlobUrlRef.current) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+        activeBlobUrlRef.current = '';
+      }
     };
   }, [asset?.id, asset?.modelPreviewUrl, asset?.modelUrl, asset?.owned, asset?.ownerId, asset?.type, canLoadModel, modelFileName]);
 
@@ -326,11 +339,11 @@ function AssetPreview({ asset, large = false, user = null }) {
   if (asset.previewUrl && asset.type === 'image') {
     if (large) {
       return (
-        <div className="flex w-full items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+        <div className="flex w-full items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-2 sm:p-0">
           <img
             src={asset.previewUrl}
             alt={asset.title}
-            className="h-auto max-h-[calc(95vh-4rem)] max-w-full object-contain"
+            className="h-auto max-h-[52svh] max-w-full object-contain sm:max-h-[calc(95vh-4rem)]"
           />
         </div>
       );
@@ -373,6 +386,24 @@ function AssetPreview({ asset, large = false, user = null }) {
 
   if (asset.type === '3d' && large) {
     return <MarketplaceModelPreview asset={asset} user={user} />;
+  }
+
+  // 3D card (not large) with a real preview image from Tripo
+  if (asset.previewUrl && asset.type === '3d' && !large) {
+    return (
+      <div className={`${previewClass} relative overflow-hidden rounded-2xl border border-white/10 bg-white/5`}>
+        <img
+          src={asset.previewUrl}
+          alt={asset.title}
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+        />
+        {/* 3D badge */}
+        <div className="pointer-events-none absolute bottom-2.5 right-2.5 flex items-center gap-1.5 rounded-xl border border-cyan-400/20 bg-black/60 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-cyan-300 backdrop-blur-md">
+          <Box className="h-3 w-3" />
+          3D
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -462,7 +493,7 @@ function AssetCard({ asset, onOpen }) {
         <div className="flex flex-1 flex-col gap-4 p-3 sm:p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="truncate text-base font-black italic tracking-tighter text-white sm:text-lg">{asset.title}</h3>
+              <h3 className="truncate pr-2 text-base font-black italic tracking-tighter text-white sm:text-lg">{asset.title}</h3>
               <p className="mt-0.5 truncate text-[11px] font-black uppercase tracking-[0.2em] text-gray-500">{asset.ownerName}</p>
             </div>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-primary backdrop-blur-md transition-colors group-hover:bg-primary group-hover:text-white sm:h-10 sm:w-10">
@@ -750,6 +781,17 @@ function MarketplaceSelect({ icon: Icon, value, onChange, options = [], label })
 }
 
 function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDelete, onReport, busy, user }) {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   if (!asset) return null;
   const isOwner = user?.uid === asset.ownerId;
   const canDownload = asset.owned || isOwner;
@@ -758,7 +800,7 @@ function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDe
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center overflow-x-hidden px-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] pt-[calc(env(safe-area-inset-top,0px)+4.25rem)] sm:p-4">
           <MotionDiv
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -771,87 +813,78 @@ function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDe
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 40 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="glass-panel relative max-h-[95vh] w-full max-w-5xl overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)]"
+            className="glass-panel relative max-h-[calc(100svh-5.25rem)] w-[calc(100vw-1.5rem)] max-w-5xl overflow-x-hidden overflow-y-auto overscroll-contain shadow-[0_40px_100px_rgba(0,0,0,0.8)] sm:w-full lg:max-h-[95vh] lg:overflow-hidden"
           >
             {/* Modal Header/Close */}
-            <div className="absolute right-6 top-6 z-20">
+            <div className="absolute right-3 top-3 z-20 sm:right-6 sm:top-6">
               <motion.button
                 whileHover={{ scale: 1.1, rotate: 90 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={onClose}
-                className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-black/40 text-white/70 backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/60 text-white/75 backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white sm:h-12 sm:w-12 sm:rounded-2xl"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
               </motion.button>
             </div>
 
-            <div className="grid h-full max-h-[95vh] lg:grid-cols-[1fr_400px]">
+            <div className="grid min-w-0 lg:h-full lg:max-h-[95vh] lg:grid-cols-[1fr_400px]">
               {/* Left Side: Preview */}
-              <div className="relative flex min-h-[400px] items-center justify-center bg-black/40 p-8 lg:min-h-0">
+              <div className="relative flex min-h-0 min-w-0 items-center justify-center bg-black/40 p-3 sm:p-5 lg:p-8">
                 <div className="absolute inset-0 overflow-hidden">
                    <div className="absolute -top-1/4 -left-1/4 w-full h-full bg-primary/10 blur-[120px] animate-pulse" />
                    <div className="absolute -bottom-1/4 -right-1/4 w-full h-full bg-secondary/10 blur-[120px] animate-pulse" />
                 </div>
-                <div className="relative z-10 w-full">
+                <div className="relative z-10 min-w-0 w-full">
                    <AssetPreview asset={asset} large user={user} />
                 </div>
               </div>
 
               {/* Right Side: Details */}
-              <div className="flex flex-col border-l border-white/10 bg-[#0c0c0e]/80 p-8 pt-12 backdrop-blur-xl overflow-y-auto">
-                <div className="mb-8">
-                  <div className="mb-4 flex flex-wrap gap-2">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+              <div className="flex min-w-0 flex-col border-t border-white/10 bg-[#0c0c0e]/90 p-5 pt-6 backdrop-blur-xl lg:overflow-y-auto lg:border-l lg:border-t-0 lg:p-8 lg:pt-12">
+                <div className="mb-5 lg:mb-8">
+                  <div className="mb-3 flex flex-wrap gap-2 lg:mb-4">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-primary sm:px-4 sm:text-[10px]">
                       <ShoppingBag className="h-3.5 w-3.5" />
                       Marketplace
                     </span>
                     {asset.owned && (
-                      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300 sm:px-4 sm:text-[10px]">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         In your library
                       </span>
                     )}
                   </div>
-                  <h2 className="text-4xl font-black italic tracking-tighter text-white leading-tight">{asset.title}</h2>
-                  <p className="mt-6 text-sm font-bold leading-relaxed text-gray-400">{asset.description || 'No description provided.'}</p>
+                  <h2 className="min-w-0 break-words pr-10 text-2xl font-black italic leading-tight tracking-tighter text-white sm:text-3xl lg:pr-4 lg:text-4xl">{asset.title}</h2>
+                  <p className="mt-3 text-sm font-bold leading-relaxed text-gray-400 lg:mt-6">{asset.description || 'No description provided.'}</p>
                   {imageResolution && (
-                    <div className="mt-4 inline-flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-black text-white">
-                      <ImageIcon className="h-4 w-4 text-primary" />
-                      <span className="uppercase tracking-[0.22em] text-gray-500">Original resolution</span>
-                      <span>{imageResolution}</span>
+                    <div className="mt-4 flex max-w-full min-w-0 flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-[11px] font-black text-white sm:inline-flex sm:gap-3 sm:px-4 sm:py-3 sm:text-xs">
+                      <ImageIcon className="h-4 w-4 shrink-0 text-primary" />
+                      <span className="min-w-0 break-words uppercase leading-relaxed tracking-[0.12em] text-gray-500 sm:tracking-[0.22em]">Original resolution</span>
+                      <span className="min-w-0 break-words">{imageResolution}</span>
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Price</p>
-                      <div className="mt-3 flex items-center gap-2">
-                        <Coins className="h-5 w-5 text-primary" />
-                        <p className="text-2xl font-black text-white">{formatCredits(asset.priceCredits)}</p>
-                      </div>
-                    </div>
-                    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Sold</p>
-                      <p className="mt-3 text-2xl font-black text-white">{asset.metrics?.purchaseCount || 0}</p>
-                    </div>
+                <div className="space-y-3 lg:space-y-4">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 lg:rounded-3xl lg:p-5">
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 lg:tracking-[0.3em]">Sold</p>
+                    <p className="mt-2 text-xl font-black text-white lg:mt-3 lg:text-2xl">{asset.metrics?.purchaseCount || 0}</p>
                   </div>
 
-                  <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 lg:rounded-3xl lg:p-5">
                     <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-black/40 shadow-inner">
-                        <User className="h-6 w-6 text-primary" />
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-black/40 shadow-inner lg:h-12 lg:w-12">
+                        <User className="h-5 w-5 text-primary lg:h-6 lg:w-6" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Creator</p>
-                        <p className="truncate text-lg font-black text-white">{asset.ownerName}</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-500 lg:tracking-[0.3em]">Creator</p>
+                        <p className="truncate text-base font-black text-white lg:text-lg">{asset.ownerName}</p>
                       </div>
                     </div>
                   </div>
 
                   {asset.type === '3d' && (
-                    <div className={`rounded-3xl border p-5 ${
+                    <div className={`rounded-2xl border p-4 lg:rounded-3xl lg:p-5 ${
                       asset.downloadOnly
                         ? 'border-amber-400/20 bg-amber-400/5 text-amber-200'
                         : 'border-cyan-400/20 bg-cyan-400/5 text-cyan-200'
@@ -864,7 +897,7 @@ function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDe
                   )}
                 </div>
 
-                <div className="mt-auto pt-10 flex flex-col gap-4">
+                <div className="mt-6 flex flex-col gap-3 pt-0 lg:mt-auto lg:gap-4 lg:pt-10">
                   <Button
                     variant="subtle"
                     onClick={() => onReport(asset)}
@@ -910,7 +943,7 @@ function AssetDetailModal({ asset, isOpen, onClose, onPurchase, onDownload, onDe
                       className="w-full text-base"
                     >
                       <ShoppingBag className="h-5 w-5" />
-                      Buy now
+                      {formatCredits(asset.priceCredits)}
                     </Button>
                   )}
                 </div>
@@ -981,7 +1014,9 @@ function ReportAssetModal({ asset, isOpen, onClose, onConfirm, busy }) {
 
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setReason('');
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDetails('');
     }
   }, [isOpen]);
@@ -1063,6 +1098,13 @@ function ReportAssetModal({ asset, isOpen, onClose, onConfirm, busy }) {
   );
 }
 
+function formatFileSize(bytes) {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
   const [sourceMode, setSourceMode] = useState('upload');
   const [assetType, setAssetType] = useState('image');
@@ -1072,6 +1114,8 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
   const [tags, setTags] = useState('');
   const [file, setFile] = useState(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState('');
+  const [glbPreviewUrl, setGlbPreviewUrl] = useState('');
+  const [dragActive, setDragActive] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const [historyItems, setHistoryItems] = useState([]);
   const [selectedHistoryId, setSelectedHistoryId] = useState('');
@@ -1092,6 +1136,8 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
     setTags('');
     setFile(null);
     setUploadResult(null);
+    setGlbPreviewUrl('');
+    setDragActive(false);
     setHistoryItems([]);
     setSelectedHistoryId('');
     setRightsAccepted(false);
@@ -1101,18 +1147,47 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
     if (!isOpen) return;
     setUploadResult(null);
     setFile(null);
+    setGlbPreviewUrl('');
   }, [assetType, isOpen]);
 
+  // Image preview
   useEffect(() => {
     if (!isOpen || assetType !== 'image' || !file || !String(file.type || '').startsWith('image/')) {
       setFilePreviewUrl('');
       return undefined;
     }
-
     const url = URL.createObjectURL(file);
     setFilePreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [assetType, file, isOpen]);
+
+  // GLB preview — create an object URL for the 3D viewer
+  useEffect(() => {
+    if (!isOpen || assetType !== '3d' || !file) {
+      setGlbPreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return ''; });
+      return undefined;
+    }
+    const url = URL.createObjectURL(file);
+    setGlbPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [assetType, file, isOpen]);
+
+  const handleDrop = useCallback((event) => {
+    event.preventDefault();
+    setDragActive(false);
+    const dropped = event.dataTransfer?.files?.[0];
+    if (dropped) {
+      setFile(dropped);
+      setUploadResult(null);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((event) => {
+    event.preventDefault();
+    setDragActive(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => setDragActive(false), []);
 
   const loadHistory = useCallback(async () => {
     if (!user) {
@@ -1361,7 +1436,7 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
                   </div>
 
                   {sourceMode === 'upload' ? (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-4"
@@ -1370,19 +1445,29 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
                         ref={fileRef}
                         type="file"
                         className="hidden"
-                        accept={assetType === 'image' ? 'image/*' : assetType === 'audio' ? 'audio/*' : '.glb,.gltf,.fbx,.obj,.stl'}
+                        accept={assetType === 'image' ? 'image/*' : assetType === 'audio' ? 'audio/*' : '.glb,.fbx,.obj,.stl'}
                         onChange={(event) => {
                           setFile(event.target.files?.[0] || null);
                           setUploadResult(null);
                         }}
                       />
+
+                      {/* Drop zone */}
                       <motion.button
-                        whileHover={{ borderColor: 'rgba(138,43,226,0.4)', backgroundColor: 'rgba(255,255,255,0.04)' }}
                         type="button"
                         onClick={() => fileRef.current?.click()}
-                        className="relative flex min-h-[220px] w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-3xl border-2 border-dashed border-white/10 bg-white/[0.02] text-center transition-all"
+                        onDrop={handleDrop}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        animate={dragActive
+                          ? { borderColor: 'rgba(138,43,226,0.7)', backgroundColor: 'rgba(138,43,226,0.06)', scale: 1.01 }
+                          : { borderColor: 'rgba(255,255,255,0.10)', backgroundColor: 'rgba(255,255,255,0.02)', scale: 1 }
+                        }
+                        transition={{ duration: 0.15 }}
+                        className="relative flex min-h-[220px] w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-3xl border-2 border-dashed text-center transition-colors"
                       >
-                        {filePreviewUrl ? (
+                        {/* Image preview */}
+                        {assetType === 'image' && filePreviewUrl && (
                           <>
                             <div className="absolute inset-2 overflow-hidden rounded-[1.35rem] bg-black/45">
                               <img src={filePreviewUrl} alt="" className="h-full w-full object-contain" />
@@ -1395,32 +1480,88 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
                               <UploadCloud className="h-5 w-5" />
                             </div>
                           </>
-                        ) : (
+                        )}
+
+                        {/* GLB 3D preview */}
+                        {assetType === '3d' && glbPreviewUrl && (
                           <>
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20 text-primary">
-                           <UploadCloud className="h-7 w-7" />
-                        </div>
-                        <div>
-                           <p className="text-sm font-black text-white">{file ? file.name : 'Select file'}</p>
-                           <p className="mt-1 text-[10px] font-bold text-gray-500">
-                             {assetType === '3d' ? 'GLB, GLTF, FBX, OBJ, STL' : assetType === 'audio' ? 'MP3, WAV, OGG, FLAC' : 'PNG, JPG, WEBP, GIF'}
-                           </p>
-                        </div>
+                            <div className="absolute inset-2 overflow-hidden rounded-[1.35rem] pointer-events-none">
+                              <ThreeViewer
+                                key={glbPreviewUrl}
+                                modelUrl={glbPreviewUrl}
+                                viewMode="normal"
+                                lightMode="studio"
+                                color="#8a2be2"
+                                autoSpin
+                                bgColor="default"
+                                showGrid
+                                gridColor1="#18334a"
+                                gridColor2="#0d1425"
+                              />
+                            </div>
+                            <div className="absolute left-4 top-4 z-10 rounded-xl border border-white/10 bg-black/65 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-white backdrop-blur-md">
+                              3D Preview
+                            </div>
+                            <div className="absolute bottom-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/65 text-primary backdrop-blur-md">
+                              <UploadCloud className="h-5 w-5" />
+                            </div>
+                          </>
+                        )}
+
+                        {/* Default state (no preview) */}
+                        {!(assetType === 'image' && filePreviewUrl) && !(assetType === '3d' && glbPreviewUrl) && (
+                          <>
+                            <div className={`flex h-14 w-14 items-center justify-center rounded-2xl transition-colors ${
+                              dragActive ? 'bg-primary/30 text-primary' : 'bg-primary/20 text-primary'
+                            }`}>
+                              <UploadCloud className="h-7 w-7" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-black text-white">
+                                {file ? file.name : dragActive ? 'Drop it here!' : 'Select or drag a file'}
+                              </p>
+                              <p className="mt-1 text-[10px] font-bold text-gray-500">
+                                {assetType === '3d' ? 'GLB, FBX, OBJ, STL' : assetType === 'audio' ? 'MP3, WAV, OGG, FLAC' : 'PNG, JPG, WEBP, GIF'}
+                              </p>
+                            </div>
                           </>
                         )}
                       </motion.button>
 
-                      {assetType === '3d' && uploadResult?.tripo && (
-                        <div className={`rounded-2xl border p-4 text-xs font-bold leading-relaxed ${
-                          uploadResult.tripo.compatible
-                            ? 'border-cyan-400/20 bg-cyan-400/10 text-cyan-200'
-                            : 'border-amber-400/20 bg-amber-400/10 text-amber-200'
-                        }`}>
-                          {uploadResult.tripo.compatible
-                            ? 'Tripo compatibility confirmed. This asset will be marked as Studio-ready.'
-                            : 'This asset will be available as download-only.'}
+                      {/* File info row */}
+                      {file && (
+                        <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.02] px-4 py-3 text-xs font-bold">
+                          <span className="min-w-0 truncate text-white/80" title={file.name}>{file.name}</span>
+                          <span className="ml-3 shrink-0 font-black text-gray-500">{formatFileSize(file.size)}</span>
                         </div>
                       )}
+
+                      {/* Tripo compatibility status */}
+                      {assetType === '3d' && uploadResult?.tripo && (() => {
+                        const { compatible, importStatus } = uploadResult.tripo;
+                        if (compatible) {
+                          return (
+                            <div className="flex items-center gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-xs font-bold text-cyan-200">
+                              <BadgeCheck className="h-4 w-4 shrink-0" />
+                              Tripo compatibility confirmed. This asset will be marked as Studio-ready.
+                            </div>
+                          );
+                        }
+                        if (importStatus === 'pending') {
+                          return (
+                            <div className="flex items-center gap-3 rounded-2xl border border-purple-400/20 bg-purple-400/10 p-4 text-xs font-bold text-purple-200">
+                              <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                              Checking Tripo compatibility… This may take a moment.
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="flex items-center gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-xs font-bold text-amber-200">
+                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                            This asset will be published as download-only (not Tripo-compatible).
+                          </div>
+                        );
+                      })()}
                     </motion.div>
                   ) : (
                     <motion.div 
@@ -1442,27 +1583,43 @@ function PublishAssetModal({ isOpen, onClose, onPublished, user, openAuth }) {
                           <div className="rounded-2xl border border-white/5 bg-black/20 p-6 text-center">
                             <p className="text-xs font-bold text-gray-600">No history items available.</p>
                           </div>
-                        ) : historyItems.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedHistoryId(item.id);
-                              if (!title.trim()) setTitle(item.title);
-                            }}
-                            className={`flex w-full items-center gap-4 rounded-2xl border p-3 text-left transition-all ${
-                              selectedHistoryId === item.id
-                                ? 'border-primary/50 bg-primary/10 shadow-[0_0_15px_rgba(138,43,226,0.1)]'
-                                : 'border-white/5 bg-white/[0.02] hover:border-white/20'
-                            }`}
-                          >
-                            <MarketplaceHistoryThumb item={item} assetType={assetType} />
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-black text-white">{item.title}</p>
-                              <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 mt-0.5">{item.subtitle || item.collection}</p>
-                            </div>
-                          </button>
-                        ))}
+                        ) : historyItems.map((item) => {
+                          const isLocked = Boolean(item.locked);
+                          const isSelected = selectedHistoryId === item.id;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              disabled={isLocked}
+                              onClick={() => {
+                                if (isLocked) return;
+                                setSelectedHistoryId(item.id);
+                                if (!title.trim()) setTitle(item.title);
+                              }}
+                              className={`relative flex w-full items-center gap-4 rounded-2xl border p-3 text-left transition-all ${
+                                isLocked
+                                  ? 'cursor-not-allowed border-white/5 bg-white/[0.01] opacity-50'
+                                  : isSelected
+                                    ? 'border-primary/50 bg-primary/10 shadow-[0_0_15px_rgba(138,43,226,0.1)]'
+                                    : 'border-white/5 bg-white/[0.02] hover:border-white/20'
+                              }`}
+                            >
+                              <MarketplaceHistoryThumb item={item} assetType={assetType} />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-black text-white">{item.title}</p>
+                                <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 mt-0.5">{item.subtitle || item.collection}</p>
+                              </div>
+                              {isLocked && (
+                                <span className="shrink-0 rounded-lg border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-amber-400">
+                                  Listed
+                                </span>
+                              )}
+                              {isSelected && !isLocked && (
+                                <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     </motion.div>
                   )}
@@ -1783,10 +1940,12 @@ export default function Marketplace() {
     try {
       const requestViewerId = viewerId;
       if (getCurrentViewerId() !== requestViewerId) return;
+      const token = await getToken();
       const res = await fetch(`${API_BASE}/api/marketplace/assets/${assetId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (getCurrentViewerId() !== requestViewerId) return;
+      const data = await res.json();
       if (res.ok && data.success) {
         const hydratedAsset = hydrateAssetForViewer(
           data.asset,
@@ -1968,7 +2127,7 @@ export default function Marketplace() {
   );
 
   return (
-    <main className="min-h-screen bg-[#03000a] text-white">
+    <main className="min-h-screen overflow-x-hidden bg-[#03000a] text-white">
       {/* Hero Section with Cinematic Background */}
       <section className="relative overflow-hidden pt-32 pb-24 md:pt-48 md:pb-40">
         <div className="absolute inset-0 z-0">
@@ -1993,9 +2152,9 @@ export default function Marketplace() {
               <Sparkles className="h-4 w-4 animate-pulse" />
               Next-Gen Asset Marketplace
             </div>
-            <h1 className="text-6xl font-black italic tracking-tighter text-white sm:text-7xl lg:text-8xl leading-[0.9]">
+            <h1 className="max-w-full text-4xl font-black italic leading-[0.9] tracking-tighter text-white sm:text-7xl lg:text-8xl">
                TURN <br/>
-               <span className="text-gradient-primary">IMAGINATION</span> INTO REALITY.
+               <span className="text-gradient-primary pr-4">IMAGINATION</span> <br className="sm:hidden" /> INTO REALITY.
             </h1>
             <p className="mt-8 max-w-2xl text-lg font-bold leading-relaxed text-gray-300 md:text-xl">
                Discover premium AI assets created by the LudusGen community.
@@ -2011,17 +2170,6 @@ export default function Marketplace() {
                  <UploadCloud className="h-5 w-5" />
                  Upload asset
                </Button>
-               <div className="flex items-center gap-6 px-6">
-                  <div className="text-center">
-                     <p className="text-2xl font-black italic tracking-tighter text-white">{assets.length}+</p>
-                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Asset</p>
-                  </div>
-                  <div className="h-8 w-px bg-white/10" />
-                  <div className="text-center">
-                     <p className="text-2xl font-black italic tracking-tighter text-white">2.4k</p>
-                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Purchases</p>
-                  </div>
-               </div>
             </div>
           </motion.div>
         </div>

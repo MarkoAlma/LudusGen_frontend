@@ -1,9 +1,8 @@
-import React, { useState, useRef, useContext } from 'react';
-import { motion, AnimatePresence, useTransform, useMotionValue } from 'framer-motion';
+import React, { useState, useRef, useContext, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box, Download, Camera, RotateCcw, Sparkles,
   Grid3x3, Move3d, Layers, Play, Square,
-  PanelLeftClose, PanelRightClose, PanelLeftOpen, PanelRightOpen
 } from 'lucide-react';
 
 import { StudioLayoutContext } from '../shared/StudioLayout';
@@ -15,25 +14,44 @@ import {
   VIEW_MODES, WireframeControl, BgColorPicker
 } from '../../ai_components/trellis';
 
-export default function TrellisWorkspace({
+// Animated progress bar
+const PBar = ({ value }) => (
+  <div className="w-full h-[3px] rounded-full bg-white/10 overflow-hidden mt-6">
+    <motion.div
+      initial={{ width: 0 }}
+      animate={{ width: `${value}%` }}
+      transition={{ duration: 0.8, ease: 'easeOut' }}
+      className="h-full bg-gradient-to-r from-primary to-cyan-400"
+    />
+  </div>
+);
+
+// Status → progress % mapping (smooth indeterminate animation fallback)
+const STATUS_PROGRESS = {
+  pending: 45,
+  running: 70,
+  succeeded: 100,
+};
+
+// Status → human-readable label for the progress area
+const STATUS_LABEL = {
+  pending: 'Initializing spatial lattice…',
+  running: 'Assembling neural voxel mesh…',
+  succeeded: 'Mesh complete',
+};
+
+const TrellisWorkspace = forwardRef(function TrellisWorkspace({
   modelUrl,
   genStatus,
   activeItem,
   onDownload,
-  onCameraReset,
-  leftOffset = 0,
-  rightOffset = 0
-}) {
+}, ref) {
 
   const [viewMode, setViewMode] = useState("clay");
   const [showGrid, setShowGrid] = useState(true);
   const [bgColor, setBgColor] = useState("grayish");
-  const ctx = useContext(StudioLayoutContext);
-  const fallbackMV = useMotionValue(0);
-  const smoothL = ctx?.smoothL ?? fallbackMV;
-  const smoothR = ctx?.smoothR ?? fallbackMV;
 
-  // HUD States (from Tripo style)
+  // HUD States
   const [lightMode, setLightMode] = useState("studio");
   const [lStr, setLStr] = useState(1.4);
   const [lRot, setLRot] = useState(0);
@@ -49,31 +67,29 @@ export default function TrellisWorkspace({
   const [wireHex, setWireHex] = useState(0xffffff);
 
   const sceneRef = useRef(null);
-  const isPending = genStatus === "pending";
+  const isPending = genStatus === "pending" || genStatus === "running";
   const color = "#a78bfa";
 
-  const camP = (p) => {
+  const progressValue = STATUS_PROGRESS[genStatus] ?? 0;
+  const progressLabel = STATUS_LABEL[genStatus] ?? '';
+
+  const camP = useCallback((p) => {
     if (sceneRef.current) {
       setCameraPreset(sceneRef.current, p);
       setAutoSpin(p === "reset");
       sceneRef.current.autoSpin = p === "reset";
     }
-  };
+  }, []);
 
-  const PBar = ({ value }) => (
-    <div className="w-full h-[3px] rounded-full bg-white/10 overflow-hidden mt-6">
-      <motion.div
-        initial={{ width: 0 }}
-        animate={{ width: `${value}%` }}
-        className="h-full bg-gradient-to-r from-primary to-cyan-400"
-      />
-    </div>
-  );
+  // Expose resetCamera() to parent via ref
+  useImperativeHandle(ref, () => ({
+    resetCamera: () => camP("reset"),
+  }), [camP]);
 
   return (
     <div className="relative h-full flex flex-col bg-[#0a0a0f] overflow-hidden">
 
-      {/* ── TOP HUD: Integrated Control Bar ── */}
+      {/* ── TOP HUD ── */}
       <div className="h-14 flex items-center justify-between border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-2xl z-40 relative px-4 sm:px-6">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mr-4 italic">View Orbit</span>
@@ -154,10 +170,14 @@ export default function TrellisWorkspace({
                 />
               </div>
               <h2 className="text-3xl font-black text-white italic tracking-[0.2em] uppercase mb-4">Spatial Forge Active</h2>
-              <p className="text-primary/60 max-w-sm font-bold text-[10px] uppercase tracking-[0.4em] leading-relaxed mb-8 opacity-80">Assembling neural voxels into high-fidelity mesh clusters</p>
+              <p className="text-primary/60 max-w-sm font-bold text-[10px] uppercase tracking-[0.4em] leading-relaxed mb-8 opacity-80">
+                Assembling neural voxels into high-fidelity mesh clusters
+              </p>
               <div className="w-64">
-                <PBar value={45} />
-                <p className="text-[10px] font-mono text-zinc-600 mt-4 tracking-widest uppercase">Initializing Slat-Sampling v2.0</p>
+                <PBar value={progressValue} />
+                <p className="text-[10px] font-mono text-zinc-600 mt-4 tracking-widest uppercase">
+                  {progressLabel}
+                </p>
               </div>
             </motion.div>
           )}
@@ -198,7 +218,7 @@ export default function TrellisWorkspace({
           />
         </div>
 
-        {/* ── BOTTOM HUD: Camera & Tools ── */}
+        {/* ── BOTTOM HUD ── */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 z-40">
           <div className="bg-[#0a0a0f]/60 backdrop-blur-3xl px-4 py-2.5 rounded-2xl border border-white/5 flex items-center gap-5 shadow-2xl">
             <div className="flex items-center gap-2 pr-4 border-r border-white/5">
@@ -225,7 +245,8 @@ export default function TrellisWorkspace({
               whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.1)' }}
               whileTap={{ scale: 0.95 }}
               onClick={onDownload}
-              className="flex items-center gap-2.5 px-5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest shadow-xl"
+              disabled={!modelUrl}
+              className="flex items-center gap-2.5 px-5 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest shadow-xl disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <Download className="w-3.5 h-3.5" />
               Production Export
@@ -261,4 +282,6 @@ export default function TrellisWorkspace({
       )}
     </div>
   );
-}
+});
+
+export default TrellisWorkspace;
